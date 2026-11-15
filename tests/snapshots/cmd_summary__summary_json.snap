@@ -71,6 +71,6 @@ expression: json
     ]
   },
   "ok": true,
-  "schema": "todo.todo.summary.v1.v1",
+  "schema": "todo.summary.v1",
   "warnings": []
 }

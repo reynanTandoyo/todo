@@ -67,7 +67,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         if out.is_json() {
             out.set_dry_run_diff(diff.clone());
             out.emit_json_ok(
-                "todo.restore.v1",
+                META.name,
                 &RestoreJson {
                     restored_from: entry.number,
                     applied: false,
@@ -110,7 +110,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     if out.is_json() {
         out.emit_json_ok(
-            "todo.restore.v1",
+            META.name,
             &RestoreJson {
                 restored_from: entry.number,
                 applied: true,

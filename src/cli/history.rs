@@ -49,7 +49,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     if out.is_json() {
         let count = entries.len();
         out.emit_json_ok(
-            "todo.history.v1",
+            META.name,
             &HistoryJson {
                 snapshots: entries,
                 count,

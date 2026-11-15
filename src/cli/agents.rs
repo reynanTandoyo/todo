@@ -106,7 +106,7 @@ fn run_install(into: PathBuf, ctx: &Context, out: &mut Output) -> Result<()> {
         if out.is_json() {
             out.set_dry_run_diff(diff.clone());
             out.emit_json_ok(
-                "todo.agents.v1",
+                META.name,
                 &AgentsInstallJson {
                     file: label,
                     applied: false,
@@ -150,7 +150,7 @@ fn run_install(into: PathBuf, ctx: &Context, out: &mut Output) -> Result<()> {
 
     if out.is_json() {
         out.emit_json_ok(
-            "todo.agents.v1",
+            META.name,
             &AgentsInstallJson {
                 file: label,
                 applied: true,
@@ -202,7 +202,7 @@ fn run_check(into: PathBuf, out: &mut Output) -> Result<()> {
         ManagedBlockStatus::Current { begin_line, .. } => {
             if out.is_json() {
                 out.emit_json_ok(
-                    "todo.agents.v1",
+                    META.name,
                     &AgentsCheckJson {
                         file: label,
                         status: "current",

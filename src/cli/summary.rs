@@ -214,7 +214,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     };
 
     if out.is_json() {
-        out.emit_json_ok("todo.summary.v1", &payload);
+        out.emit_json_ok(META.name, &payload);
         return Ok(());
     }
 

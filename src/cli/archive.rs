@@ -74,7 +74,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
         if out.is_json() {
             out.emit_json_ok(
-                "todo.archive.v1",
+                META.name,
                 &ArchiveJson {
                     archive_file: cfg.archive_file.clone(),
                     applied: false,
@@ -162,7 +162,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     if out.is_json() {
         out.emit_json_ok(
-            "todo.archive.v1",
+            META.name,
             &ArchiveJson {
                 archive_file: cfg.archive_file,
                 applied: true,

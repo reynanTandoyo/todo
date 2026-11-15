@@ -104,7 +104,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     if out.is_json() {
         out.emit_json_ok(
-            "todo.init.v1",
+            META.name,
             &InitJson {
                 file: label,
                 created: true,

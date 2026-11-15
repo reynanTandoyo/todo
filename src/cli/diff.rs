@@ -80,7 +80,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     if out.is_json() {
         out.emit_json_ok(
-            "todo.diff.v1",
+            META.name,
             &DiffJson {
                 from: from_num,
                 to: to_num,
