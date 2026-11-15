@@ -254,6 +254,7 @@ register_commands! {
     List => list,
     Lock => lock,
     Next => next,
+    Note => note,
     Release => release,
     Show => show,
     Status => status,
