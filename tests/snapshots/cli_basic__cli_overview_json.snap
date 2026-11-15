@@ -46,6 +46,11 @@ expression: ok_json
         "summary": "Check TODO.md for format, dependency, claim, and state problems"
       },
       {
+        "kind": "meta",
+        "name": "completions",
+        "summary": "Print a tab-completion script for powershell, bash, zsh, fish or elvish"
+      },
+      {
         "kind": "write",
         "name": "claim",
         "summary": "Claim a task for an agent"

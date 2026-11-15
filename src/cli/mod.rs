@@ -540,6 +540,7 @@ register_commands! {
     Ask => ask,
     Block => block,
     Check => check,
+    Completions => completions,
     Claim => claim,
     Diff => diff,
     Done => done,

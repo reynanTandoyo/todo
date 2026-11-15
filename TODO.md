@@ -606,12 +606,13 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - reqs: I-2
 
 ### T-072 · Claims tagged with an agent session
-- status: claimed
+- status: done
 - owner: r4-sonnet
-- claimed: 2026-11-16T00:19+01:00
 - priority: P2 · type: idea · area: agent
 - accept: claim, next --claim, unblock write session from --session / TODO_SESSION / CLAUDE_CODE_SESSION_ID; release --session; hidden SessionEnd hook command; hooks install/uninstall handle it
+- commit: a870b0a
 - reqs: R-CLAIM-7
+- note (2026-11-16, r4-sonnet): done — session field after claimed; --session/TODO_SESSION/CLAUDE_CODE_SESSION_ID; release --session; hidden session-end hook command; hooks install/uninstall SessionEnd
 
 ### T-073 · todo schema
 - status: open
@@ -650,8 +651,9 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - reqs: I-9
 
 ### T-079 · PowerShell tab completion
-- status: open
-- owner: —
+- status: claimed
+- owner: r4-sonnet
+- claimed: 2026-11-16T00:26+01:00
 - priority: P2 · type: idea · area: cli
 - accept: todo completions <shell> prints scripts for powershell, bash, zsh, fish, elvish via clap_complete; README explains the PowerShell profile line
 - reqs: R-OUT-10

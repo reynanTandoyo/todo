@@ -112,6 +112,22 @@ Task arguments also match unique case-insensitive title substrings (excluding `d
 tasks). Text options accept `-` (standard input) or `@path` (a UTF-8 file) so quotes, backticks,
 and `$` pass cleanly through PowerShell.
 
+### Tab completion
+
+`todo completions <shell>` prints a completion script for `powershell`, `bash`, `zsh`, `fish` or
+`elvish`, generated from the command definitions: Tab completes commands and options. In
+PowerShell, add this line to your profile (`notepad $PROFILE`; create the file first with
+`New-Item -ItemType File -Force $PROFILE` if it does not exist):
+
+```powershell
+todo completions powershell | Out-String | Invoke-Expression
+```
+
+For bash use `source <(todo completions bash)` in `~/.bashrc`; zsh, fish and elvish scripts go into
+the usual completion folders of those shells (`todo completions zsh > _todo` into a folder of
+`$fpath`, `todo completions fish > ~/.config/fish/completions/todo.fish`). The PowerShell script
+completes command and option names; it does not list option values such as `--status`.
+
 ### Importing a checkbox list
 
 `todo import --from checkbox` turns a Markdown checkbox list (`- [ ]`, `- [~]`, `- [!]`, `- [x]`

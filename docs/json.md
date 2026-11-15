@@ -387,6 +387,11 @@ holds the converted file when the target does not exist, and `diff` (unified dif
 neither is present after a write. `checkbox_lines` and `tasks` are always equal; a result that fails
 the `todo check` rules or the count is an error (`BAD_VALUE`, exit 1, `details.problems`).
 
+### `todo completions <shell> --json` (`todo.completions.v1`)
+
+`{"shell":"powershell","script":"<the completion script>"}`. Without `--json` the script itself is
+printed, ready to pipe into `Invoke-Expression`.
+
 ### `todo agents install --json` and `todo agents check --json` (`todo.agents.v1`)
 
 - `install`: `{"file":"AGENTS.md","applied":true,"changed":true,"created":false}`
