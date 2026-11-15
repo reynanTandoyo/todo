@@ -371,3 +371,62 @@ pub fn matching_section_indices(sections: &[Section], query: &str) -> Vec<usize>
         .map(|(idx, _)| idx)
         .collect()
 }
+
+/// Resolves a task argument that may be either an ID (`R-ID-3`) or a case-insensitive substring
+/// of an active (non-done, non-dropped) task's title (`R-ID-4`).
+pub fn resolve_task_in_doc<'a>(doc: &'a Document, input: &str) -> Result<&'a Task> {
+    if let Some(task_id) = doc.id_config.parse_user_id(input) {
+        let id_str = doc.id_config.format_id(task_id);
+        return doc.task_by_id(task_id).ok_or_else(|| {
+            TodoError::new(ErrorCode::NotFound, format!("task {id_str} not found"))
+                .with_task(id_str)
+        });
+    }
+    resolve_task_by_title(doc, input)
+}
+
+/// Resolves a non-ID task argument by case-insensitive title substring among tasks that are not
+/// `done` or `dropped` (`R-ID-4`).
+pub fn resolve_task_by_title<'a>(doc: &'a Document, input: &str) -> Result<&'a Task> {
+    let needle = input.trim().to_lowercase();
+    if needle.is_empty() {
+        return Err(TodoError::new(
+            ErrorCode::NotFound,
+            "no active task matches empty title query",
+        ));
+    }
+
+    let matches: Vec<&Task> = doc
+        .tasks
+        .iter()
+        .filter(|t| {
+            !matches!(t.status, Status::Done | Status::Dropped)
+                && t.title.to_lowercase().contains(&needle)
+        })
+        .collect();
+
+    match matches.as_slice() {
+        [only] => Ok(only),
+        [] => Err(TodoError::new(
+            ErrorCode::NotFound,
+            format!("no active task matches title {input:?}"),
+        )),
+        many => {
+            let candidates: Vec<String> =
+                many.iter().map(|t| doc.id_config.format_id(t.id)).collect();
+            let listed: Vec<String> = many
+                .iter()
+                .map(|t| format!("{} · {}", doc.id_config.format_id(t.id), t.title))
+                .collect();
+            Err(TodoError::new(
+                ErrorCode::Ambiguous,
+                format!(
+                    "title {input:?} matches {} tasks: {}",
+                    many.len(),
+                    listed.join("; ")
+                ),
+            )
+            .with_candidates(candidates))
+        }
+    }
+}

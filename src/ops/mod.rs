@@ -50,7 +50,7 @@ pub use pipeline::{
 };
 pub use query::{
     ListFilter, NextFilter, SelectedNext, StatusFilter, WhereClause, filter_tasks,
-    matching_section_indices, select_next_task,
+    matching_section_indices, resolve_task_by_title, resolve_task_in_doc, select_next_task,
 };
 pub use read::{
     DependencyStatusJson, DependentTaskJson, ListTaskJson, LoadedRead, NoteJson, TaskJson,

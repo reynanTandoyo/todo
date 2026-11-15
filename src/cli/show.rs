@@ -5,7 +5,9 @@ use clap::Args as ClapArgs;
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::current_time;
-use crate::ops::{build_task_json, file_label, load_for_read};
+use crate::ops::{
+    build_task_json, file_label, load_for_read, resolve_task_by_title,
+};
 use crate::output::Output;
 
 /// Metadata for the `show` command.
@@ -32,32 +34,31 @@ pub struct Args {
 /// Runs `todo show <task>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let cfg = ctx.load_config()?;
-    let Some(task_id) = cfg.id_config.parse_user_id(&args.task) else {
-        return Err(TodoError::new(
-            ErrorCode::NotFound,
-            format!("task '{}' not found", args.task),
-        ));
-    };
-
     let loaded = load_for_read(ctx, &cfg, false, true, out)?;
-    let id_str = cfg.id_config.format_id(task_id);
 
     let (primary_doc, secondary_doc, task, archived) =
-        if let Some(t) = loaded.doc.task_by_id(task_id) {
-            (&loaded.doc, loaded.archive.as_ref(), t, false)
-        } else if let Some(ref arch_doc) = loaded.archive
-            && let Some(t) = arch_doc.task_by_id(task_id)
-        {
-            let arch_label = file_label(&cfg.archive_path(&loaded.found.path));
-            for problem in &arch_doc.problems {
-                out.warn(problem.format_with_path(&arch_label));
+        if let Some(task_id) = cfg.id_config.parse_user_id(&args.task) {
+            let id_str = cfg.id_config.format_id(task_id);
+            if let Some(t) = loaded.doc.task_by_id(task_id) {
+                (&loaded.doc, loaded.archive.as_ref(), t, false)
+            } else if let Some(ref arch_doc) = loaded.archive
+                && let Some(t) = arch_doc.task_by_id(task_id)
+            {
+                let arch_label = file_label(&cfg.archive_path(&loaded.found.path));
+                for problem in &arch_doc.problems {
+                    out.warn(problem.format_with_path(&arch_label));
+                }
+                (arch_doc, Some(&loaded.doc), t, true)
+            } else {
+                return Err(TodoError::new(
+                    ErrorCode::NotFound,
+                    format!("task {id_str} not found"),
+                )
+                .with_task(id_str));
             }
-            (arch_doc, Some(&loaded.doc), t, true)
         } else {
-            return Err(
-                TodoError::new(ErrorCode::NotFound, format!("task {id_str} not found"))
-                    .with_task(id_str),
-            );
+            let t = resolve_task_by_title(&loaded.doc, &args.task)?;
+            (&loaded.doc, loaded.archive.as_ref(), t, false)
         };
 
     if out.is_json() {

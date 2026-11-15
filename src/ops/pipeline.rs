@@ -10,6 +10,7 @@ use crate::find::FoundTodo;
 use crate::lock::{WriteOutcome, current_time, locked_read_modify_write};
 use crate::ops::config::OpsConfig;
 use crate::ops::edits::TaskEditBuilder;
+use crate::ops::query::resolve_task_in_doc;
 use crate::ops::read::{TaskJson, build_task_json, file_label, read_optional_archive};
 use crate::ops::rules::{ClaimPlan, ReleasePlan};
 use crate::output::Output;
@@ -220,24 +221,12 @@ where
     ) -> Result<(Vec<LineEdit>, T)>,
     T: 'static,
 {
-    let Some(task_id) = cfg.id_config.parse_user_id(task_input) else {
-        let _ = ctx.require_agent()?;
-        return Err(TodoError::new(
-            ErrorCode::NotFound,
-            format!("task '{task_input}' not found"),
-        ));
-    };
-
-    let id_str = cfg.id_config.format_id(task_id);
     let label_cfg = cfg.clone();
 
     let res = edit_doc_and_write(ctx, cfg, command, out, |doc, archive, label, agent, now| {
-        let Some(task) = doc.task_by_id(task_id) else {
-            return Err(
-                TodoError::new(ErrorCode::NotFound, format!("task {id_str} not found"))
-                    .with_task(id_str.clone()),
-            );
-        };
+        let task = resolve_task_in_doc(doc, task_input)?;
+        let task_id = task.id;
+        let id_str = label_cfg.id_config.format_id(task_id);
         check_task_writable(doc, task, label, archive)?;
 
         let (edits, payload) = op(doc, task, archive, agent, now)?;
@@ -275,7 +264,7 @@ where
 
     Ok(WriteTaskResult {
         found: res.found,
-        task_id: id_str,
+        task_id: res.value.0.id.clone(),
         task: res.value.0,
         changed: res.changed,
         value: res.value.1,
