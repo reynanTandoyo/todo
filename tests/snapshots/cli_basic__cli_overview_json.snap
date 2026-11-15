@@ -6,6 +6,11 @@ expression: ok_json
   "data": {
     "commands": [
       {
+        "kind": "write",
+        "name": "claim",
+        "summary": "Claim a task for an agent"
+      },
+      {
         "kind": "meta",
         "name": "help",
         "summary": "Show overview or detailed help for a command"
@@ -19,6 +24,11 @@ expression: ok_json
         "kind": "write",
         "name": "lock",
         "summary": "Take a manual editing lease on TODO.md"
+      },
+      {
+        "kind": "write",
+        "name": "release",
+        "summary": "Release a claimed task back to open (or clear owner on blocked)"
       },
       {
         "kind": "read",
