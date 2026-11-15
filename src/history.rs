@@ -1,12 +1,14 @@
-//! Numbered snapshots, history index, and outside-edit tracking (`R-HIST-2`, `R-HIST-3`).
+//! Numbered snapshots, history index, outside-edit tracking, and write journal (`R-HIST-2`, `R-HIST-3`, `R-HIST-4`).
 
-use std::fs;
-use std::io;
+use std::collections::BTreeMap;
+use std::fs::{self, OpenOptions};
+use std::io::{self, Write};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use crate::atomic::{FileSnapshot, atomic_write_bytes, read_file_with_snapshot};
+use crate::doc::{Document, IdConfig, Line};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::lock::{LockConfig, WriteLockGuard, current_time, is_lease_live};
@@ -334,4 +336,168 @@ pub fn record_lease_edit_if_changed(
     )?;
     state.write_last_write(&LastWrite::from_snapshot(&fresh.snapshot))?;
     Ok(())
+}
+
+/// One entry in `journal.jsonl` recording a completed write (`R-HIST-4`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JournalEntry {
+    /// RFC 3339 timestamp when the write completed.
+    pub time: String,
+    /// Agent that performed the write.
+    pub agent: String,
+    /// Subcommand name (e.g. `"claim"`, `"done"`, `"apply"`).
+    pub command: String,
+    /// Command-line arguments passed to `todo`.
+    pub arguments: Vec<String>,
+    /// Canonical task IDs touched by this write (added, modified, or removed).
+    pub tasks: Vec<String>,
+    /// Lowercase hex SHA-256 of `TODO.md` before the write.
+    pub hash_before: String,
+    /// Lowercase hex SHA-256 of `TODO.md` after the write.
+    pub hash_after: String,
+}
+
+/// Appends one [`JournalEntry`] line to `journal.jsonl` (`R-HIST-4`).
+pub fn append_journal(state: &StateDir, entry: &JournalEntry) -> Result<()> {
+    state.ensure_created()?;
+    let path = state.journal_path();
+    let line = serde_json::to_string(entry).map_err(|e| {
+        TodoError::new(
+            ErrorCode::WriteFailed,
+            format!("failed serializing journal entry: {e}"),
+        )
+    })?;
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(fs_path(&path).as_ref())
+        .map_err(|e| {
+            TodoError::new(
+                ErrorCode::WriteFailed,
+                format!("failed opening {}: {e}", path.display()),
+            )
+        })?;
+    writeln!(file, "{line}").map_err(|e| {
+        TodoError::new(
+            ErrorCode::WriteFailed,
+            format!("failed writing {}: {e}", path.display()),
+        )
+    })?;
+    Ok(())
+}
+
+/// Reads all entries from `journal.jsonl`, returning an empty list if none exist yet (`R-HIST-4`, `R-READ-7`).
+pub fn read_journal(state: &StateDir) -> Result<Vec<JournalEntry>> {
+    let path = state.journal_path();
+    let content = match fs::read_to_string(fs_path(&path).as_ref()) {
+        Ok(s) => s,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => {
+            return Err(TodoError::new(
+                ErrorCode::WriteFailed,
+                format!("failed reading {}: {e}", path.display()),
+            ));
+        }
+    };
+
+    let mut entries = Vec::new();
+    for (idx, line) in content.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let entry: JournalEntry = serde_json::from_str(trimmed).map_err(|e| {
+            TodoError::new(
+                ErrorCode::WriteFailed,
+                format!(
+                    "failed parsing {}:{}: {e}",
+                    path.display(),
+                    idx.saturating_add(1)
+                ),
+            )
+        })?;
+        entries.push(entry);
+    }
+    Ok(entries)
+}
+
+/// Computes the canonical task IDs added, modified, or removed between `before` and `after`.
+#[must_use]
+pub fn diff_task_ids(before: &[u8], after: &[u8], id_config: &IdConfig) -> Vec<String> {
+    let Ok(doc_before) = Document::parse_bytes_with_config(before, id_config.clone()) else {
+        return Vec::new();
+    };
+    let Ok(doc_after) = Document::parse_bytes_with_config(after, id_config.clone()) else {
+        return Vec::new();
+    };
+
+    let before_map: BTreeMap<u64, &[Line]> = doc_before
+        .tasks
+        .iter()
+        .map(|t| {
+            (
+                t.id.number(),
+                &doc_before.line_doc.lines[t.block_range.clone()],
+            )
+        })
+        .collect();
+    let after_map: BTreeMap<u64, &[Line]> = doc_after
+        .tasks
+        .iter()
+        .map(|t| {
+            (
+                t.id.number(),
+                &doc_after.line_doc.lines[t.block_range.clone()],
+            )
+        })
+        .collect();
+
+    let mut touched = Vec::new();
+    for (&num, after_lines) in &after_map {
+        match before_map.get(&num) {
+            Some(before_lines) if before_lines == after_lines => {}
+            _ => {
+                if let Some(task) = doc_after.tasks.iter().find(|t| t.id.number() == num) {
+                    touched.push(id_config.format_id(task.id));
+                }
+            }
+        }
+    }
+    for &num in before_map.keys() {
+        if !after_map.contains_key(&num)
+            && let Some(task) = doc_before.tasks.iter().find(|t| t.id.number() == num)
+        {
+            touched.push(id_config.format_id(task.id));
+        }
+    }
+    touched
+}
+
+/// Records one journal entry for a completed write (`R-HIST-4`).
+#[allow(clippy::too_many_arguments)]
+pub fn record_journal_for_write(
+    state: &StateDir,
+    id_config: &IdConfig,
+    agent: &str,
+    command: &str,
+    before_bytes: &[u8],
+    after_bytes: &[u8],
+    hash_before: &str,
+    hash_after: &str,
+) -> Result<()> {
+    let arguments: Vec<String> = std::env::args_os()
+        .skip(1)
+        .map(|s| s.to_string_lossy().into_owned())
+        .collect();
+    let tasks = diff_task_ids(before_bytes, after_bytes, id_config);
+    let entry = JournalEntry {
+        time: current_time().to_rfc3339(),
+        agent: agent.to_string(),
+        command: command.to_string(),
+        arguments,
+        tasks,
+        hash_before: hash_before.to_string(),
+        hash_after: hash_after.to_string(),
+    };
+    append_journal(state, &entry)
 }

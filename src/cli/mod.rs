@@ -380,6 +380,7 @@ register_commands! {
     Init => init,
     List => list,
     Lock => lock,
+    Log => log,
     Move => move_cmd,
     Next => next,
     Note => note,

@@ -287,6 +287,19 @@ where
                 sha256: atomic::sha256_bytes(&new_bytes),
             };
             state.write_last_write(&LastWrite::from_snapshot(&post_snap))?;
+            let id_config = crate::ops::OpsConfig::load_next_to(todo_path)
+                .map(|c| c.id_config)
+                .unwrap_or_default();
+            crate::history::record_journal_for_write(
+                state,
+                &id_config,
+                agent,
+                command,
+                &read.bytes,
+                &new_bytes,
+                &read.snapshot.sha256_hex(),
+                &post_snap.sha256_hex(),
+            )?;
             drop(guard);
             Ok(value)
         }
