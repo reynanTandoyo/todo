@@ -1,6 +1,11 @@
 //! `todo add` command: add a new task to a section with monotonic IDs (T-028; R-WRITE-1, R-ID-2).
 
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::io::Read as _;
+use std::path::Path;
+
 use clap::Args as ClapArgs;
+use serde::{Deserialize, Serialize};
 
 use crate::cli::{CommandKind, CommandMeta, Context, resolve_opt_text_arg, resolve_text_arg};
 use crate::doc::{
@@ -9,7 +14,7 @@ use crate::doc::{
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
-    DocWritePlan, OpsConfig, build_task_json, edit_doc_with_state_and_write,
+    DocWritePlan, OpsConfig, TaskJson, build_task_json, edit_doc_with_state_and_write,
     matching_section_indices,
 };
 use crate::output::Output;
@@ -30,9 +35,13 @@ pub const META: CommandMeta = CommandMeta {
 /// Arguments for `todo add`.
 #[derive(Debug, ClapArgs)]
 pub struct Args {
-    /// Title for the new task (required).
+    /// Title for the new task (required unless `--from` is used).
     #[arg(long, value_name = "TEXT")]
-    pub title: String,
+    pub title: Option<String>,
+
+    /// Add multiple tasks from JSON lines in a file or `-` (standard input).
+    #[arg(long, value_name = "FILE|-")]
+    pub from: Option<String>,
 
     /// Target section name (exact or unique substring match).
     #[arg(long, value_name = "NAME")]
@@ -75,9 +84,26 @@ pub struct Args {
     pub fields: Vec<String>,
 }
 
-/// Runs `todo add --title ...`.
+/// Runs `todo add --title ...` or `todo add --from <file|->`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let raw_title = resolve_text_arg(&args.title)?;
+    if let Some(ref from_src) = args.from {
+        if args.title.is_some() {
+            return Err(TodoError::new(
+                ErrorCode::Usage,
+                "cannot combine --title and --from",
+            ));
+        }
+        return run_batch_from(from_src, args.section.as_deref(), ctx, out);
+    }
+
+    let Some(ref title_arg) = args.title else {
+        return Err(TodoError::new(
+            ErrorCode::Usage,
+            "missing --title <TEXT> or --from <FILE|->",
+        ));
+    };
+
+    let raw_title = resolve_text_arg(title_arg)?;
     let clean_title = sanitize_trimmed_value(&raw_title);
     if clean_title.is_empty() {
         return Err(TodoError::new(
@@ -449,4 +475,454 @@ fn resolve_target_section(
             ))
         }
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum DependsInput {
+    One(String),
+    Many(Vec<String>),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BatchAddEntry {
+    #[serde(rename = "ref")]
+    ref_name: Option<String>,
+    title: String,
+    section: Option<String>,
+    priority: Option<String>,
+    #[serde(rename = "type")]
+    task_type: Option<String>,
+    area: Option<String>,
+    depends: Option<DependsInput>,
+    files: Option<String>,
+    problem: Option<String>,
+    fix: Option<String>,
+    accept: Option<String>,
+    #[serde(default)]
+    fields: BTreeMap<String, String>,
+}
+
+struct ValidatedBatchEntry {
+    ref_name: Option<String>,
+    title: String,
+    section: Option<String>,
+    priority: Option<String>,
+    task_type: Option<String>,
+    area: Option<String>,
+    depends_tokens: Vec<String>,
+    files: Option<String>,
+    problem: Option<String>,
+    fix: Option<String>,
+    accept: Option<String>,
+    extra: Vec<(String, String)>,
+}
+
+#[derive(Serialize)]
+struct BatchAddJson {
+    ids: Vec<String>,
+    added: Vec<TaskJson>,
+    count: usize,
+}
+
+fn read_batch_input(src: &str) -> Result<String> {
+    if src == "-" {
+        let mut buf = Vec::new();
+        std::io::stdin().read_to_end(&mut buf).map_err(|e| {
+            TodoError::new(
+                ErrorCode::BadValue,
+                format!("failed to read standard input: {e}"),
+            )
+        })?;
+        let text = String::from_utf8(buf).map_err(|e| {
+            TodoError::new(
+                ErrorCode::BadValue,
+                format!("standard input is not valid UTF-8: {e}"),
+            )
+        })?;
+        return Ok(text.strip_prefix('\u{feff}').unwrap_or(&text).to_string());
+    }
+    let path = Path::new(src);
+    let bytes = std::fs::read(crate::find::fs_path(path).as_ref()).map_err(|e| {
+        TodoError::new(
+            ErrorCode::NoFile,
+            format!("could not read {}: {e}", path.display()),
+        )
+        .with_file(path.display().to_string())
+    })?;
+    let text = String::from_utf8(bytes).map_err(|e| {
+        TodoError::new(
+            ErrorCode::BadValue,
+            format!("file {} is not valid UTF-8: {e}", path.display()),
+        )
+        .with_file(path.display().to_string())
+    })?;
+    Ok(text.strip_prefix('\u{feff}').unwrap_or(&text).to_string())
+}
+
+fn run_batch_from(
+    from_src: &str,
+    default_section_flag: Option<&str>,
+    ctx: &Context,
+    out: &mut Output,
+) -> Result<()> {
+    let raw = read_batch_input(from_src)?;
+    let cfg = ctx.load_config()?;
+
+    let mut entries = Vec::new();
+    let mut seen_refs = HashMap::new();
+    let mut seen_titles = Vec::<String>::new();
+
+    for (line_idx, line) in raw.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let line_no = line_idx + 1;
+        let parsed: BatchAddEntry = serde_json::from_str(trimmed).map_err(|e| {
+            TodoError::new(
+                ErrorCode::BadValue,
+                format!("--from line {line_no}: invalid JSON: {e}"),
+            )
+            .with_line(line_no)
+        })?;
+
+        let title = sanitize_trimmed_value(&parsed.title);
+        if title.is_empty() {
+            return Err(TodoError::new(
+                ErrorCode::BadValue,
+                format!("--from line {line_no}: title cannot be empty"),
+            )
+            .with_line(line_no));
+        }
+        if seen_titles.iter().any(|t| t.eq_ignore_ascii_case(&title)) {
+            return Err(TodoError::new(
+                ErrorCode::DuplicateTitle,
+                format!("--from line {line_no}: duplicate title {title:?} in batch"),
+            )
+            .with_line(line_no));
+        }
+        seen_titles.push(title.clone());
+
+        let ref_name = match parsed.ref_name {
+            Some(r) => {
+                let clean = r.trim().to_string();
+                if clean.is_empty() || clean.chars().any(char::is_whitespace) || clean.contains(',')
+                {
+                    return Err(TodoError::new(
+                        ErrorCode::BadValue,
+                        format!("--from line {line_no}: invalid ref {r:?}"),
+                    )
+                    .with_line(line_no));
+                }
+                if seen_refs.insert(clean.clone(), line_no).is_some() {
+                    return Err(TodoError::new(
+                        ErrorCode::BadValue,
+                        format!("--from line {line_no}: duplicate ref {clean:?}"),
+                    )
+                    .with_line(line_no));
+                }
+                Some(clean)
+            }
+            None => None,
+        };
+
+        let mut extra = Vec::new();
+        for (k, v) in parsed.fields {
+            let key = k.trim().to_ascii_lowercase();
+            if key.is_empty()
+                || matches!(key.as_str(), "status" | "owner" | "claimed" | "note" | "title")
+            {
+                return Err(TodoError::new(
+                    ErrorCode::BadValue,
+                    format!("--from line {line_no}: cannot set field `{k}`"),
+                )
+                .with_line(line_no));
+            }
+            extra.push((key, sanitize_trimmed_value(&v)));
+        }
+
+        let priority = resolve_priority(parsed.priority.as_deref(), &extra, &cfg)?;
+        let task_type = resolve_allowed("type", parsed.task_type.as_deref(), &extra, &cfg.types)?;
+        let area = resolve_allowed("area", parsed.area.as_deref(), &extra, &cfg.areas)?;
+        let files = parsed
+            .files
+            .as_deref()
+            .map(sanitize_trimmed_value)
+            .filter(|s| !s.is_empty())
+            .or_else(|| resolve_opt(None, &extra, "files"));
+        let problem = parsed
+            .problem
+            .as_deref()
+            .map(sanitize_trimmed_value)
+            .filter(|s| !s.is_empty())
+            .or_else(|| resolve_opt(None, &extra, "problem"));
+        let fix = parsed
+            .fix
+            .as_deref()
+            .map(sanitize_trimmed_value)
+            .filter(|s| !s.is_empty())
+            .or_else(|| resolve_opt(None, &extra, "fix"));
+        let accept = parsed
+            .accept
+            .as_deref()
+            .map(sanitize_trimmed_value)
+            .filter(|s| !s.is_empty())
+            .or_else(|| resolve_opt(None, &extra, "accept"));
+
+        let depends_tokens: Vec<String> = match parsed.depends {
+            Some(DependsInput::One(s)) => s
+                .split(',')
+                .map(sanitize_trimmed_value)
+                .filter(|t| !t.is_empty())
+                .collect(),
+            Some(DependsInput::Many(items)) => items
+                .into_iter()
+                .map(|t| sanitize_trimmed_value(&t))
+                .filter(|t| !t.is_empty())
+                .collect(),
+            None => resolve_opt(None, &extra, "depends")
+                .map(|s| {
+                    s.split(',')
+                        .map(sanitize_trimmed_value)
+                        .filter(|t| !t.is_empty())
+                        .collect()
+                })
+                .unwrap_or_default(),
+        };
+
+        let depends_summary = if depends_tokens.is_empty() {
+            None
+        } else {
+            Some(depends_tokens.join(", "))
+        };
+        check_required_fields(
+            &cfg.required_fields,
+            priority.as_deref(),
+            task_type.as_deref(),
+            area.as_deref(),
+            depends_summary.as_deref(),
+            files.as_deref(),
+            problem.as_deref(),
+            fix.as_deref(),
+            accept.as_deref(),
+            &extra,
+        )?;
+
+        let section = parsed
+            .section
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .or_else(|| default_section_flag.map(str::to_string));
+
+        entries.push(ValidatedBatchEntry {
+            ref_name,
+            title,
+            section,
+            priority,
+            task_type,
+            area,
+            depends_tokens,
+            files,
+            problem,
+            fix,
+            accept,
+            extra,
+        });
+    }
+
+    if entries.is_empty() {
+        return Err(TodoError::new(
+            ErrorCode::BadValue,
+            "no tasks found in --from input",
+        ));
+    }
+
+    let cfg_clone = cfg.clone();
+    let res = edit_doc_with_state_and_write(
+        ctx,
+        &cfg,
+        META.name,
+        out,
+        |doc, archive, state, _label, agent, now| {
+            // 1. Check duplicate titles against existing active tasks.
+            for entry in &entries {
+                if let Some(existing) = doc.tasks.iter().find(|t| {
+                    !matches!(t.status, Status::Done | Status::Dropped)
+                        && t.title.trim().eq_ignore_ascii_case(&entry.title)
+                }) {
+                    let existing_id = cfg.id_config.format_id(existing.id);
+                    return Err(TodoError::new(
+                        ErrorCode::DuplicateTitle,
+                        format!("task {existing_id} already has title {:?}", entry.title),
+                    )
+                    .with_task(existing_id));
+                }
+            }
+
+            // 2. Allocate monotonic IDs for the entire batch.
+            let max_doc = doc.tasks.iter().map(|t| t.id.number()).max().unwrap_or(0);
+            let max_arch = archive
+                .iter()
+                .flat_map(|a| a.tasks.iter())
+                .map(|t| t.id.number())
+                .max()
+                .unwrap_or(0);
+            let max_state = state.read_ids()?.map_or(0, |s| s.highest_id);
+            let mut next_num = max_doc.max(max_arch).max(max_state);
+
+            let mut allocated_ids = Vec::with_capacity(entries.len());
+            let mut ref_to_id = HashMap::new();
+            for entry in &entries {
+                next_num = next_num
+                    .checked_add(1)
+                    .ok_or_else(|| TodoError::new(ErrorCode::WriteFailed, "task ID overflow"))?;
+                let id = TaskId(next_num);
+                let id_str = cfg.id_config.format_id(id);
+                if let Some(ref r) = entry.ref_name {
+                    ref_to_id.insert(r.clone(), id_str.clone());
+                }
+                allocated_ids.push((id, id_str));
+            }
+
+            // 3. Resolve sections and `@ref` dependencies before writing `ids.json`.
+            let date = OpsConfig::format_note_date(now);
+            let mut grouped_lines: BTreeMap<usize, Vec<String>> = BTreeMap::new();
+            let mut added_ids = BTreeSet::new();
+            let mut ordered_ids = Vec::with_capacity(entries.len());
+
+            for (entry, (new_id, id_str)) in entries.iter().zip(allocated_ids.iter()) {
+                let sec_idx = resolve_target_section(doc, entry.section.as_deref(), &cfg)?;
+                let insert_at = doc.sections[sec_idx].content_end;
+
+                let mut resolved_deps = Vec::with_capacity(entry.depends_tokens.len());
+                for tok in &entry.depends_tokens {
+                    if let Some(rname) = tok.strip_prefix('@') {
+                        let Some(target_id) = ref_to_id.get(rname) else {
+                            return Err(TodoError::new(
+                                ErrorCode::BadValue,
+                                format!("unknown dependency reference {tok:?}"),
+                            ));
+                        };
+                        resolved_deps.push(target_id.clone());
+                    } else {
+                        resolved_deps.push(tok.clone());
+                    }
+                }
+                let depends_val = if resolved_deps.is_empty() {
+                    None
+                } else {
+                    Some(resolved_deps.join(", "))
+                };
+
+                let buf = grouped_lines.entry(insert_at).or_default();
+                buf.push(String::new());
+                buf.push(format!(
+                    "### {id_str}{CANONICAL_HEADING_SEPARATOR}{}",
+                    entry.title
+                ));
+                buf.push("- status: open".to_string());
+                buf.push(format!("- owner: {CANONICAL_NOBODY_OWNER}"));
+
+                let mut combined_parts = Vec::new();
+                if let Some(ref p) = entry.priority {
+                    combined_parts.push(format!("priority: {p}"));
+                }
+                if let Some(ref t) = entry.task_type {
+                    combined_parts.push(format!("type: {t}"));
+                }
+                if let Some(ref a) = entry.area {
+                    combined_parts.push(format!("area: {a}"));
+                }
+                if !combined_parts.is_empty() {
+                    buf.push(format!("- {}", combined_parts.join(" \u{00b7} ")));
+                }
+
+                for (key, val_opt) in [
+                    ("depends", &depends_val),
+                    ("files", &entry.files),
+                    ("problem", &entry.problem),
+                    ("fix", &entry.fix),
+                    ("accept", &entry.accept),
+                ] {
+                    if let Some(v) = val_opt {
+                        buf.push(format!("- {key}: {v}"));
+                    }
+                }
+
+                for (k, v) in &entry.extra {
+                    if !is_known_add_key(k) {
+                        buf.push(format!("- {k}: {v}"));
+                    }
+                }
+
+                buf.push(format!("- note ({date}, {agent}): added"));
+
+                added_ids.insert(*new_id);
+                ordered_ids.push((*new_id, id_str.clone()));
+            }
+
+            // All validations succeeded: persist the new high-water mark under the lock.
+            state.write_ids(&IdsState {
+                highest_id: next_num,
+            })?;
+
+            let edits: Vec<LineEdit> = grouped_lines
+                .into_iter()
+                .map(|(idx, lines)| LineEdit::insert(idx, lines))
+                .collect();
+            let intent = TaskChangeIntent {
+                added_ids,
+                ..TaskChangeIntent::default()
+            };
+            let arch_owned = archive.cloned();
+            let cfg_owned = cfg_clone.clone();
+
+            Ok(DocWritePlan::Edits {
+                edits,
+                intent,
+                build_value: Box::new(move |new_doc| {
+                    let mut ids = Vec::with_capacity(ordered_ids.len());
+                    let mut added = Vec::with_capacity(ordered_ids.len());
+                    for (id, id_str) in ordered_ids {
+                        let task = new_doc.task_by_id(id).ok_or_else(|| {
+                            TodoError::new(
+                                ErrorCode::WriteFailed,
+                                format!("added task {id_str} missing after verification"),
+                            )
+                        })?;
+                        ids.push(id_str);
+                        added.push(build_task_json(
+                            new_doc,
+                            task,
+                            arch_owned.as_ref(),
+                            false,
+                            now,
+                            &cfg_owned,
+                        ));
+                    }
+                    Ok((ids, added))
+                }),
+            })
+        },
+    )?;
+
+    if out.is_json() {
+        out.emit_json_ok(
+            META.name,
+            &BatchAddJson {
+                count: res.value.0.len(),
+                ids: res.value.0,
+                added: res.value.1,
+            },
+        );
+    } else {
+        for id in &res.value.0 {
+            out.write_line(&format!("{id}: add ok"));
+        }
+    }
+    Ok(())
 }
