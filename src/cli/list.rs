@@ -1,5 +1,7 @@
 //! `todo list` command: list and filter tasks (T-020; R-READ-1, R-READ-4).
 
+use std::fmt::Write as _;
+
 use clap::Args as ClapArgs;
 use serde::Serialize;
 
@@ -9,7 +11,7 @@ use crate::error::Result;
 use crate::lock::current_time;
 use crate::ops::{
     ListFilter, ListTaskJson, OpsConfig, StatusFilter, WhereClause, build_list_task_json,
-    filter_tasks, load_for_read,
+    filter_tasks, load_for_read_with_found,
 };
 use crate::output::Output;
 
@@ -93,7 +95,7 @@ struct ListJson {
 
 /// Runs `todo list`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let cfg = ctx.load_config()?;
+    let (found, cfg) = ctx.load_config_with_found()?;
 
     let status_filter = match args.status.as_deref() {
         Some(raw) => Some(StatusFilter::parse(raw)?),
@@ -111,7 +113,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         None
     };
 
-    let loaded = load_for_read(ctx, &cfg, args.archive, !args.archive && args.ready, out)?;
+    let loaded =
+        load_for_read_with_found(found, &cfg, args.archive, !args.archive && args.ready, out)?;
     let now = current_time();
 
     let filter = ListFilter {
@@ -128,7 +131,9 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         archive_mode: args.archive,
     };
 
+    let t_filter = crate::timing::PhaseTimer::start("list.filter");
     let tasks = filter_tasks(&loaded.doc, loaded.archive.as_ref(), &filter, now, &cfg);
+    t_filter.finish();
 
     if out.is_json() {
         let task_jsons: Vec<ListTaskJson> = tasks
@@ -146,16 +151,18 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         return Ok(());
     }
 
+    let t_out = crate::timing::PhaseTimer::start("list.format_and_print");
+
     let owner_width = tasks
         .iter()
         .filter_map(|t| t.owner.as_deref())
-        .map(|o| o.chars().count())
+        .map(char_len)
         .max()
         .unwrap_or(0);
     let prio_width = tasks
         .iter()
         .filter_map(|t| t.priority.as_deref())
-        .map(|p| p.chars().count())
+        .map(char_len)
         .max()
         .unwrap_or(1)
         .max(2);
@@ -165,80 +172,166 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         Some(effective_terminal_width())
     };
 
+    let use_color = out.use_color();
+    let mut buf = String::with_capacity(16_500);
+    let mut id_buf = String::with_capacity(16);
+
     for task in &tasks {
-        let line = format_task_line(task, &cfg, prio_width, owner_width, max_width, out);
-        out.write_line(&line);
+        write_task_line_into(
+            &mut buf,
+            task,
+            &cfg,
+            prio_width,
+            owner_width,
+            max_width,
+            use_color,
+            &mut id_buf,
+        );
+        if buf.len() >= 16_384 {
+            out.write_str(&buf);
+            buf.clear();
+            if out.broken_pipe() {
+                break;
+            }
+        }
     }
 
     let count = tasks.len();
     let noun = if count == 1 { "task" } else { "tasks" };
-    out.write_line(&format!("{count} {noun}"));
+    let _ = writeln!(buf, "{count} {noun}");
+    out.write_str(&buf);
+    t_out.finish();
     Ok(())
 }
 
-fn format_task_line(
+#[inline]
+fn char_len(s: &str) -> usize {
+    if s.is_ascii() {
+        s.len()
+    } else {
+        s.chars().count()
+    }
+}
+
+#[inline]
+fn push_spaces(out: &mut String, count: usize) {
+    const SPACES: &str = "                                                                ";
+    let mut rem = count;
+    while rem > 0 {
+        let chunk = rem.min(SPACES.len());
+        out.push_str(&SPACES[..chunk]);
+        rem -= chunk;
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn write_task_line_into(
+    out: &mut String,
     task: &Task,
     cfg: &OpsConfig,
     prio_width: usize,
     owner_width: usize,
     max_width: Option<usize>,
-    out: &Output,
-) -> String {
-    let id_str = cfg.id_config.format_id(task.id);
+    use_color: bool,
+    id_buf: &mut String,
+) {
+    id_buf.clear();
+    let _ = write!(
+        id_buf,
+        "{}-{:0width$}",
+        cfg.id_config.prefix,
+        task.id.number(),
+        width = cfg.id_config.width
+    );
     let prio = task.priority.as_deref().unwrap_or("-");
     let status = task.status.as_str();
+    let id_chars = char_len(id_buf);
+    let prio_chars = char_len(prio);
+    let prio_pad = prio_width.saturating_sub(prio_chars);
 
-    let plain_prefix = if owner_width > 0 {
+    if use_color {
+        out.push_str("\x1b[36m");
+        out.push_str(id_buf);
+        out.push_str("\x1b[0m  ");
+    } else {
+        out.push_str(id_buf);
+        out.push_str("  ");
+    }
+
+    out.push_str(prio);
+    push_spaces(out, prio_pad + 2);
+
+    let status_code = match task.status {
+        crate::doc::Status::Done => "32",
+        crate::doc::Status::Claimed | crate::doc::Status::Blocked => "33",
+        crate::doc::Status::Dropped => "31",
+        crate::doc::Status::Open => "2",
+    };
+    let status_pad = 7usize.saturating_sub(status.len());
+    if use_color {
+        out.push_str("\x1b[");
+        out.push_str(status_code);
+        out.push('m');
+        out.push_str(status);
+        push_spaces(out, status_pad);
+        out.push_str("\x1b[0m  ");
+    } else {
+        out.push_str(status);
+        push_spaces(out, status_pad + 2);
+    }
+
+    let mut plain_prefix_chars = id_chars + 2 + prio_chars + prio_pad + 2 + 7 + 2;
+    if owner_width > 0 {
         let owner = task.owner.as_deref().unwrap_or("-");
-        format!("{id_str}  {prio:<prio_width$}  {status:<7}  {owner:<owner_width$}  ")
-    } else {
-        format!("{id_str}  {prio:<prio_width$}  {status:<7}  ")
-    };
-
-    let colored_prefix = if out.use_color() {
-        let id_c = out.cyan(&id_str);
-        let status_padded = format!("{status:<7}");
-        let status_c = match task.status {
-            crate::doc::Status::Done => out.green(&status_padded),
-            crate::doc::Status::Claimed | crate::doc::Status::Blocked => out.yellow(&status_padded),
-            crate::doc::Status::Dropped => out.red(&status_padded),
-            crate::doc::Status::Open => out.dim(&status_padded),
-        };
-        if owner_width > 0 {
-            let owner = task.owner.as_deref().unwrap_or("-");
-            format!("{id_c}  {prio:<prio_width$}  {status_c}  {owner:<owner_width$}  ")
-        } else {
-            format!("{id_c}  {prio:<prio_width$}  {status_c}  ")
-        }
-    } else {
-        plain_prefix.clone()
-    };
+        let owner_chars = char_len(owner);
+        let owner_pad = owner_width.saturating_sub(owner_chars);
+        out.push_str(owner);
+        push_spaces(out, owner_pad + 2);
+        plain_prefix_chars += owner_chars + owner_pad + 2;
+    }
 
     match max_width {
-        None => format!("{colored_prefix}{}", task.title),
+        None => out.push_str(&task.title),
         Some(limit) => {
-            let prefix_chars = plain_prefix.chars().count();
-            let avail = limit.saturating_sub(prefix_chars);
-            let title = truncate_chars(&task.title, avail);
-            format!("{colored_prefix}{title}")
+            let avail = limit.saturating_sub(plain_prefix_chars);
+            push_truncated_chars(out, &task.title, avail);
         }
     }
+    out.push('\n');
 }
 
-fn truncate_chars(text: &str, max_chars: usize) -> String {
-    let count = text.chars().count();
-    if count <= max_chars {
-        return text.to_string();
+fn push_truncated_chars(out: &mut String, text: &str, max_chars: usize) {
+    if text.len() <= max_chars {
+        out.push_str(text);
+        return;
+    }
+    if text.is_ascii() {
+        if max_chars == 0 {
+            return;
+        }
+        if max_chars == 1 {
+            out.push('…');
+            return;
+        }
+        out.push_str(&text[..max_chars - 1]);
+        out.push('…');
+        return;
+    }
+    if text.chars().count() <= max_chars {
+        out.push_str(text);
+        return;
     }
     if max_chars == 0 {
-        return String::new();
+        return;
     }
     if max_chars == 1 {
-        return "…".to_string();
+        out.push('…');
+        return;
     }
-    let mut out: String = text.chars().take(max_chars - 1).collect();
+    for c in text.chars().take(max_chars - 1) {
+        out.push(c);
+    }
     out.push('…');
-    out
 }
 
 fn effective_terminal_width() -> usize {

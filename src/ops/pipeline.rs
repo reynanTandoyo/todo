@@ -1,7 +1,5 @@
 //! Shared write pipeline used by every mutating `todo` command (`R-LOCK-1..6`, `R-EDIT-7`, `R-EDIT-8`, `R-IO-1..5`).
 
-use std::collections::BTreeSet;
-
 use chrono::{DateTime, FixedOffset};
 use serde::Serialize;
 use similar::TextDiff;
@@ -11,7 +9,7 @@ use crate::cli::Context;
 use crate::doc::{Document, EditError, LineEdit, Problem, Task, TaskChangeIntent, TaskId};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::FoundTodo;
-use crate::lock::{WriteOutcome, current_time, locked_read_modify_write_with_warnings};
+use crate::lock::{WriteOutcomeFull, current_time, locked_read_modify_write_full};
 use crate::ops::config::OpsConfig;
 use crate::ops::edits::TaskEditBuilder;
 use crate::ops::query::resolve_task_in_doc;
@@ -152,6 +150,48 @@ where
     )
 }
 
+type DocValueWithArchiveBuilder<T> = Box<dyn FnOnce(&Document, Option<&Document>) -> Result<T>>;
+
+enum DocValueCallback<T> {
+    Plain(DocValueBuilder<T>),
+    WithArchive(DocValueWithArchiveBuilder<T>),
+}
+
+impl<T> DocValueCallback<T> {
+    fn call(self, doc: &Document, archive: Option<&Document>) -> Result<T> {
+        match self {
+            Self::Plain(f) => f(doc),
+            Self::WithArchive(f) => f(doc, archive),
+        }
+    }
+}
+
+enum DocWritePlanInner<T> {
+    Unchanged(T),
+    Edits {
+        edits: Vec<LineEdit>,
+        intent: TaskChangeIntent,
+        build_value: DocValueCallback<T>,
+    },
+}
+
+impl<T> From<DocWritePlan<T>> for DocWritePlanInner<T> {
+    fn from(plan: DocWritePlan<T>) -> Self {
+        match plan {
+            DocWritePlan::Unchanged(val) => Self::Unchanged(val),
+            DocWritePlan::Edits {
+                edits,
+                intent,
+                build_value,
+            } => Self::Edits {
+                edits,
+                intent,
+                build_value: DocValueCallback::Plain(build_value),
+            },
+        }
+    }
+}
+
 /// Same as [`edit_doc_and_write`], but also provides `&StateDir` inside the lock so commands like
 /// `add` can read and update `ids.json` atomically under the write lock (`R-ID-2`).
 pub fn edit_doc_with_state_and_write<T, F>(
@@ -171,52 +211,132 @@ where
         DateTime<FixedOffset>,
     ) -> Result<DocWritePlan<T>>,
 {
-    let agent = ctx.require_agent()?.to_owned();
+    let find_timer = crate::timing::PhaseTimer::start("write.find_todo");
     let found = ctx.find_todo_with_mode(cfg.worktree, out)?;
+    find_timer.finish();
+    edit_doc_core(
+        ctx,
+        found,
+        cfg,
+        command,
+        out,
+        |doc, archive, state, label, agent, now| {
+            Ok(op(doc, archive, state, label, agent, now)?.into())
+        },
+    )
+}
+
+/// Like [`edit_doc_with_state_and_write`], reusing an already-located [`FoundTodo`] to avoid
+/// running `find_todo` twice.
+pub(crate) fn edit_doc_with_found_and_state_and_write<T, F>(
+    ctx: &Context,
+    found: FoundTodo,
+    cfg: &OpsConfig,
+    command: &str,
+    out: &mut Output,
+    mut op: F,
+) -> Result<WriteDocResult<T>>
+where
+    F: FnMut(
+        &Document,
+        Option<&Document>,
+        &StateDir,
+        &str,
+        &str,
+        DateTime<FixedOffset>,
+    ) -> Result<DocWritePlan<T>>,
+{
+    crate::cli::emit_find_notices(&found, out);
+    edit_doc_core(
+        ctx,
+        found,
+        cfg,
+        command,
+        out,
+        |doc, archive, state, label, agent, now| {
+            Ok(op(doc, archive, state, label, agent, now)?.into())
+        },
+    )
+}
+
+fn edit_doc_core<T, F>(
+    ctx: &Context,
+    found: FoundTodo,
+    cfg: &OpsConfig,
+    command: &str,
+    out: &mut Output,
+    mut op: F,
+) -> Result<WriteDocResult<T>>
+where
+    F: FnMut(
+        &Document,
+        Option<&Document>,
+        &StateDir,
+        &str,
+        &str,
+        DateTime<FixedOffset>,
+    ) -> Result<DocWritePlanInner<T>>,
+{
+    let agent = ctx.require_agent()?.to_owned();
     if let Some(warning) = crate::find::synced_folder_warning(&found.path) {
         out.warn(warning);
     }
+    let state_timer = crate::timing::PhaseTimer::start("write.state_dir");
     let state = StateDir::from_found(&found)?;
+    state_timer.finish();
     let label = file_label(&found.path);
     let archive_path = cfg.archive_path(&found.path);
 
     let mut dry_run_diff: Option<String> = None;
     let mut lock_warnings: Vec<String> = Vec::new();
-    let (changed, value) = locked_read_modify_write_with_warnings(
+    let (changed, value) = locked_read_modify_write_full(
         &found.path,
         &state,
         &agent,
         command,
         &cfg.lock,
+        Some(&cfg.id_config),
         &mut lock_warnings,
         |bytes, _snap| {
+            let parse_timer = crate::timing::PhaseTimer::start("write.parse_doc");
             let doc = parse_doc_for_write(bytes, &label, cfg)?;
+            parse_timer.finish();
+            let arch_timer = crate::timing::PhaseTimer::start("write.read_archive");
             let archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
+            arch_timer.finish();
             let now = current_time();
 
-            match op(&doc, archive.as_ref(), &state, &label, &agent, now)? {
-                DocWritePlan::Unchanged(val) => {
+            let op_timer = crate::timing::PhaseTimer::start("write.op_plan");
+            let plan = op(&doc, archive.as_ref(), &state, &label, &agent, now)?;
+            op_timer.finish();
+            match plan {
+                DocWritePlanInner::Unchanged(val) => {
                     if ctx.dry_run {
                         dry_run_diff = Some(String::new());
                     }
-                    Ok(WriteOutcome::Unchanged((false, val)))
+                    Ok(WriteOutcomeFull::Unchanged((false, val)))
                 }
-                DocWritePlan::Edits {
+                DocWritePlanInner::Edits {
                     edits,
                     intent,
                     build_value,
                 } => {
+                    let apply_timer = crate::timing::PhaseTimer::start("write.apply_and_verify");
                     let applied = doc
-                        .apply_and_verify(&edits, &intent)
+                        .apply_and_verify_with_orig_bytes(bytes, &edits, &intent)
                         .map_err(|e| edit_error_to_todo_error(&e, &label))?;
-                    let val = build_value(&applied.doc)?;
+                    apply_timer.finish();
+                    let val_timer = crate::timing::PhaseTimer::start("write.build_value");
+                    let val = build_value.call(&applied.doc, archive.as_ref())?;
+                    val_timer.finish();
                     if !applied.changed {
                         if ctx.dry_run {
                             dry_run_diff = Some(String::new());
                         }
-                        return Ok(WriteOutcome::Unchanged((false, val)));
+                        return Ok(WriteOutcomeFull::Unchanged((false, val)));
                     }
                     if ctx.dry_run {
+                        let diff_timer = crate::timing::PhaseTimer::start("write.dry_run_diff");
                         let old_text = String::from_utf8_lossy(bytes);
                         let new_text = String::from_utf8_lossy(&applied.bytes);
                         let diff = TextDiff::from_lines(old_text.as_ref(), new_text.as_ref())
@@ -224,10 +344,13 @@ where
                             .header(&format!("a/{label}"), &format!("b/{label}"))
                             .to_string();
                         dry_run_diff = Some(diff);
-                        return Ok(WriteOutcome::Unchanged((false, val)));
+                        diff_timer.finish();
+                        return Ok(WriteOutcomeFull::Unchanged((false, val)));
                     }
-                    Ok(WriteOutcome::Changed {
+                    let touched_tasks = crate::history::diff_doc_task_ids(&doc, &applied.doc);
+                    Ok(WriteOutcomeFull::Changed {
                         new_bytes: applied.bytes,
+                        touched_tasks: Some(touched_tasks),
                         value: (true, val),
                     })
                 }
@@ -285,6 +408,55 @@ pub fn edit_task_and_write<T, F>(
     command: &str,
     task_input: &str,
     out: &mut Output,
+    op: F,
+) -> Result<WriteTaskResult<T>>
+where
+    F: FnMut(
+        &Document,
+        &Task,
+        Option<&Document>,
+        &str,
+        DateTime<FixedOffset>,
+    ) -> Result<(Vec<LineEdit>, T)>,
+    T: 'static,
+{
+    let find_timer = crate::timing::PhaseTimer::start("write.find_todo");
+    let found = ctx.find_todo_with_mode(cfg.worktree, out)?;
+    find_timer.finish();
+    edit_task_core(ctx, found, cfg, command, task_input, out, op)
+}
+
+/// Like [`edit_task_and_write`], reusing an already-located [`FoundTodo`].
+pub(crate) fn edit_task_with_found_and_write<T, F>(
+    ctx: &Context,
+    found: FoundTodo,
+    cfg: &OpsConfig,
+    command: &str,
+    task_input: &str,
+    out: &mut Output,
+    op: F,
+) -> Result<WriteTaskResult<T>>
+where
+    F: FnMut(
+        &Document,
+        &Task,
+        Option<&Document>,
+        &str,
+        DateTime<FixedOffset>,
+    ) -> Result<(Vec<LineEdit>, T)>,
+    T: 'static,
+{
+    crate::cli::emit_find_notices(&found, out);
+    edit_task_core(ctx, found, cfg, command, task_input, out, op)
+}
+
+fn edit_task_core<T, F>(
+    ctx: &Context,
+    found: FoundTodo,
+    cfg: &OpsConfig,
+    command: &str,
+    task_input: &str,
+    out: &mut Output,
     mut op: F,
 ) -> Result<WriteTaskResult<T>>
 where
@@ -299,65 +471,82 @@ where
 {
     let label_cfg = cfg.clone();
 
-    let res = edit_doc_and_write(ctx, cfg, command, out, |doc, archive, label, agent, now| {
-        let task = resolve_task_in_doc(doc, task_input)?;
-        let task_id = task.id;
-        let id_str = label_cfg.id_config.format_id(task_id);
-        check_task_writable(doc, task, label, archive)?;
+    let res = edit_doc_core(
+        ctx,
+        found,
+        cfg,
+        command,
+        out,
+        |doc, archive, _state, label, agent, now| {
+            let task = resolve_task_in_doc(doc, task_input)?;
+            let task_id = task.id;
+            let id_str = label_cfg.id_config.format_id(task_id);
+            check_task_writable(doc, task, label, archive)?;
 
-        let (edits, payload) = op(doc, task, archive, agent, now)?;
-        if edits.is_empty() {
-            let task_json = build_task_json(doc, task, archive, false, now, &label_cfg);
-            return Ok(DocWritePlan::Unchanged((task_json, Vec::new(), payload)));
-        }
+            let (edits, payload) = op(doc, task, archive, agent, now)?;
+            if edits.is_empty() {
+                let task_json = build_task_json(doc, task, archive, false, now, &label_cfg);
+                return Ok(DocWritePlanInner::Unchanged((
+                    task_json,
+                    Vec::new(),
+                    payload,
+                )));
+            }
 
-        let pre_not_ready: BTreeSet<TaskId> = doc
-            .tasks
-            .iter()
-            .filter(|t| !is_task_ready(doc, t, archive, now, &label_cfg))
-            .map(|t| t.id)
-            .collect();
+            // Only another task that directly depends on `task_id` can transition from not-ready to
+            // ready when only `task_id` is modified.
+            let pre_not_ready_dependents: Vec<TaskId> = doc
+                .tasks
+                .iter()
+                .filter(|t| {
+                    t.id != task_id
+                        && t.depends.iter().any(|d| d.id == Some(task_id))
+                        && !is_task_ready(doc, t, archive, now, &label_cfg)
+                })
+                .map(|t| t.id)
+                .collect();
 
-        let arch_owned = archive.cloned();
-        let cfg_owned = label_cfg.clone();
-        let err_id = id_str.clone();
-        let intent = TaskChangeIntent::modify_one(task_id);
-        Ok(DocWritePlan::Edits {
-            edits,
-            intent,
-            build_value: Box::new(move |new_doc| {
-                let updated_task = new_doc.task_by_id(task_id).ok_or_else(|| {
-                    TodoError::new(
-                        ErrorCode::WriteFailed,
-                        format!("edited task {err_id} missing after verification"),
-                    )
-                })?;
-                let task_json = build_task_json(
-                    new_doc,
-                    updated_task,
-                    arch_owned.as_ref(),
-                    false,
-                    now,
-                    &cfg_owned,
-                );
-                let newly_ready = new_doc
-                    .tasks
-                    .iter()
-                    .filter(|t| {
-                        t.id != task_id
-                            && pre_not_ready.contains(&t.id)
-                            && is_task_ready(new_doc, t, arch_owned.as_ref(), now, &cfg_owned)
-                    })
-                    .map(|t| NewlyReadyTask {
-                        id: cfg_owned.id_config.format_id(t.id),
-                        priority: t.priority.clone(),
-                        title: t.title.clone(),
-                    })
-                    .collect();
-                Ok((task_json, newly_ready, payload))
-            }),
-        })
-    })?;
+            let cfg_owned = label_cfg.clone();
+            let err_id = id_str.clone();
+            let intent = TaskChangeIntent::modify_one(task_id);
+            Ok(DocWritePlanInner::Edits {
+                edits,
+                intent,
+                build_value: DocValueCallback::WithArchive(Box::new(
+                    move |new_doc, new_archive| {
+                        let updated_task = new_doc.task_by_id(task_id).ok_or_else(|| {
+                            TodoError::new(
+                                ErrorCode::WriteFailed,
+                                format!("edited task {err_id} missing after verification"),
+                            )
+                        })?;
+                        let task_json = build_task_json(
+                            new_doc,
+                            updated_task,
+                            new_archive,
+                            false,
+                            now,
+                            &cfg_owned,
+                        );
+                        let newly_ready = pre_not_ready_dependents
+                            .into_iter()
+                            .filter_map(|dep_id| {
+                                let t = new_doc.task_by_id(dep_id)?;
+                                is_task_ready(new_doc, t, new_archive, now, &cfg_owned).then(|| {
+                                    NewlyReadyTask {
+                                        id: cfg_owned.id_config.format_id(t.id),
+                                        priority: t.priority.clone(),
+                                        title: t.title.clone(),
+                                    }
+                                })
+                            })
+                            .collect();
+                        Ok((task_json, newly_ready, payload))
+                    },
+                )),
+            })
+        },
+    )?;
 
     Ok(WriteTaskResult {
         found: res.found,

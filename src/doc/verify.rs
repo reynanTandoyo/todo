@@ -1,10 +1,10 @@
 //! High-level write verification combining byte-level and parsed-task checks (R-EDIT-7).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
-use crate::doc::id::TaskId;
+use crate::doc::id::{FastU64Map, TaskId};
 use crate::doc::lines::{EditError, LineEdit, verify_byte_edits};
-use crate::doc::parser::{Document, FieldEntry, Note, Status, Task};
+use crate::doc::parser::{Document, Task};
 
 /// Declares which tasks a write command is allowed to modify, add, or remove (R-EDIT-7).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -87,12 +87,33 @@ impl Document {
         edits: &[LineEdit],
         intent: &TaskChangeIntent,
     ) -> Result<AppliedDocEdits, EditError> {
+        let t_orig = crate::timing::PhaseTimer::start("verify.to_bytes");
         let orig_bytes = self.to_bytes();
-        let applied = self.line_doc.apply_edits(edits)?;
-        verify_byte_edits(&orig_bytes, &applied.bytes, edits)?;
+        t_orig.finish();
+        self.apply_and_verify_with_orig_bytes(&orig_bytes, edits, intent)
+    }
 
+    /// Like [`Document::apply_and_verify`], reusing caller-supplied `orig_bytes` to avoid
+    /// re-serializing the original [`LineDoc`].
+    pub(crate) fn apply_and_verify_with_orig_bytes(
+        &self,
+        orig_bytes: &[u8],
+        edits: &[LineEdit],
+        intent: &TaskChangeIntent,
+    ) -> Result<AppliedDocEdits, EditError> {
+        let t_apply = crate::timing::PhaseTimer::start("verify.line_apply");
+        let applied = self.line_doc.apply_edits(edits)?;
+        t_apply.finish();
+        let t_vb = crate::timing::PhaseTimer::start("verify.verify_bytes");
+        verify_byte_edits(orig_bytes, &applied.bytes, edits)?;
+        t_vb.finish();
+
+        let t_reparse = crate::timing::PhaseTimer::start("verify.reparse");
         let edited_doc = Document::from_line_doc(applied.doc, self.id_config.clone());
+        t_reparse.finish();
+        let t_vt = crate::timing::PhaseTimer::start("verify.verify_tasks");
         verify_task_edits(self, &edited_doc, intent)?;
+        t_vt.finish();
 
         Ok(AppliedDocEdits {
             doc: edited_doc,
@@ -121,18 +142,27 @@ pub fn verify_task_edits(
         });
     }
 
-    let mut orig_by_id: BTreeMap<TaskId, Vec<&Task>> = BTreeMap::new();
-    for task in &orig.tasks {
-        orig_by_id.entry(task.id).or_default().push(task);
+    // Store (first_index, occurrence_count) per TaskId without per-task heap allocations.
+    let mut orig_by_id: FastU64Map<TaskId, (usize, usize)> =
+        FastU64Map::with_capacity_and_hasher(orig.tasks.len(), Default::default());
+    for (idx, task) in orig.tasks.iter().enumerate() {
+        orig_by_id
+            .entry(task.id)
+            .and_modify(|e| e.1 += 1)
+            .or_insert((idx, 1));
     }
 
-    let mut edited_by_id: BTreeMap<TaskId, Vec<&Task>> = BTreeMap::new();
-    for task in &edited.tasks {
-        edited_by_id.entry(task.id).or_default().push(task);
+    let mut edited_by_id: FastU64Map<TaskId, (usize, usize)> =
+        FastU64Map::with_capacity_and_hasher(edited.tasks.len(), Default::default());
+    for (idx, task) in edited.tasks.iter().enumerate() {
+        edited_by_id
+            .entry(task.id)
+            .and_modify(|e| e.1 += 1)
+            .or_insert((idx, 1));
     }
 
     // Check every original task.
-    let mut untouched_orig_order = Vec::new();
+    let mut untouched_orig_order = Vec::with_capacity(orig.tasks.len());
     for orig_task in &orig.tasks {
         if intent.removed_ids.contains(&orig_task.id) {
             if edited_by_id.contains_key(&orig_task.id) {
@@ -146,7 +176,7 @@ pub fn verify_task_edits(
             continue;
         }
 
-        let Some(edited_matches) = edited_by_id.get(&orig_task.id) else {
+        let Some(&(edited_first_idx, edited_count)) = edited_by_id.get(&orig_task.id) else {
             return Err(EditError::VerificationFailed {
                 reason: format!(
                     "untouched task {} disappeared after edit",
@@ -168,8 +198,8 @@ pub fn verify_task_edits(
         }
 
         // Untouched task must match identically (and keep count if it was unique).
-        let orig_count = orig_by_id.get(&orig_task.id).map_or(0, Vec::len);
-        if orig_count != edited_matches.len() {
+        let orig_count = orig_by_id.get(&orig_task.id).map_or(0, |&(_, c)| c);
+        if orig_count != edited_count {
             return Err(EditError::VerificationFailed {
                 reason: format!(
                     "occurrence count of untouched task {} changed",
@@ -177,9 +207,8 @@ pub fn verify_task_edits(
                 ),
             });
         }
-        if let Some(&edited_task) = edited_matches.first()
-            && orig_count == 1
-            && task_snapshot(orig, orig_task) != task_snapshot(edited, edited_task)
+        if orig_count == 1
+            && !tasks_semantically_equal(orig, orig_task, edited, &edited.tasks[edited_first_idx])
         {
             return Err(EditError::VerificationFailed {
                 reason: format!(
@@ -192,7 +221,7 @@ pub fn verify_task_edits(
     }
 
     // Check every edited task for unexpected additions and untouched order.
-    let mut untouched_edited_order = Vec::new();
+    let mut untouched_edited_order = Vec::with_capacity(edited.tasks.len());
     for edited_task in &edited.tasks {
         if !orig_by_id.contains_key(&edited_task.id) {
             if !intent.added_ids.contains(&edited_task.id) {
@@ -227,66 +256,40 @@ pub fn verify_task_edits(
     Ok(())
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct TaskSnapshot<'a> {
-    id: TaskId,
-    title: &'a str,
-    section: Option<&'a str>,
-    status: Status,
-    status_raw: Option<&'a str>,
-    owner: Option<&'a str>,
-    claimed: Option<&'a str>,
-    priority: Option<&'a str>,
-    task_type: Option<&'a str>,
-    area: Option<&'a str>,
-    depends: Vec<(Option<TaskId>, &'a str)>,
-    files: Option<&'a str>,
-    problem: Option<&'a str>,
-    fix: Option<&'a str>,
-    accept: Option<&'a str>,
-    commit: &'a [String],
-    unknown_fields: Vec<(&'a str, &'a str)>,
-    notes: Vec<(&'a str, &'a str, &'a str)>,
-}
-
-fn task_snapshot<'a>(doc: &'a Document, task: &'a Task) -> TaskSnapshot<'a> {
-    TaskSnapshot {
-        id: task.id,
-        title: &task.title,
-        section: doc.task_section_name(task),
-        status: task.status,
-        status_raw: task.status_raw.as_deref(),
-        owner: task.owner.as_deref(),
-        claimed: task.claimed.as_deref(),
-        priority: task.priority.as_deref(),
-        task_type: task.task_type.as_deref(),
-        area: task.area.as_deref(),
-        depends: task
-            .depends
+fn tasks_semantically_equal(
+    orig_doc: &Document,
+    a: &Task,
+    edited_doc: &Document,
+    b: &Task,
+) -> bool {
+    a.id == b.id
+        && a.title == b.title
+        && orig_doc.task_section_name(a) == edited_doc.task_section_name(b)
+        && a.status == b.status
+        && a.status_raw == b.status_raw
+        && a.owner == b.owner
+        && a.claimed == b.claimed
+        && a.priority == b.priority
+        && a.task_type == b.task_type
+        && a.area == b.area
+        && a.files == b.files
+        && a.problem == b.problem
+        && a.fix == b.fix
+        && a.accept == b.accept
+        && a.commit == b.commit
+        && a.depends.len() == b.depends.len()
+        && a.depends
             .iter()
-            .map(|d| (d.id, d.raw.as_str()))
-            .collect(),
-        files: task.files.as_deref(),
-        problem: task.problem.as_deref(),
-        fix: task.fix.as_deref(),
-        accept: task.accept.as_deref(),
-        commit: &task.commit,
-        unknown_fields: task
-            .unknown_fields
+            .zip(&b.depends)
+            .all(|(x, y)| x.id == y.id && x.raw == y.raw)
+        && a.unknown_fields.len() == b.unknown_fields.len()
+        && a.unknown_fields
             .iter()
-            .map(|FieldEntry { key, value, .. }| (key.as_str(), value.as_str()))
-            .collect(),
-        notes: task
-            .notes
+            .zip(&b.unknown_fields)
+            .all(|(x, y)| x.key == y.key && x.value == y.value)
+        && a.notes.len() == b.notes.len()
+        && a.notes
             .iter()
-            .map(
-                |Note {
-                     date_raw,
-                     agent,
-                     text,
-                     ..
-                 }| { (date_raw.as_str(), agent.as_str(), text.as_str()) },
-            )
-            .collect(),
-    }
+            .zip(&b.notes)
+            .all(|(x, y)| x.date_raw == y.date_raw && x.agent == y.agent && x.text == y.text)
 }

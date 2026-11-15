@@ -1,6 +1,5 @@
 //! Numbered snapshots, history index, outside-edit tracking, and write journal (`R-HIST-2`, `R-HIST-3`, `R-HIST-4`).
 
-use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::Path;
@@ -8,7 +7,8 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::atomic::{FileSnapshot, atomic_write_bytes, read_file_with_snapshot};
-use crate::doc::{Document, IdConfig, Line};
+use crate::doc::id::FastU64Map;
+use crate::doc::{Document, IdConfig, Line, TaskId};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::lock::{LockConfig, WriteLockGuard, current_time, is_lease_live};
@@ -421,6 +421,47 @@ pub fn read_journal(state: &StateDir) -> Result<Vec<JournalEntry>> {
     Ok(entries)
 }
 
+/// Computes the canonical task IDs added, modified, or removed between two parsed documents.
+#[must_use]
+pub fn diff_doc_task_ids(before: &Document, after: &Document) -> Vec<String> {
+    let mut before_map: FastU64Map<u64, &[Line]> =
+        FastU64Map::with_capacity_and_hasher(before.tasks.len(), Default::default());
+    for t in &before.tasks {
+        before_map.insert(t.id.number(), &before.line_doc.lines[t.block_range.clone()]);
+    }
+    let mut after_map: FastU64Map<u64, &[Line]> =
+        FastU64Map::with_capacity_and_hasher(after.tasks.len(), Default::default());
+    for t in &after.tasks {
+        after_map.insert(t.id.number(), &after.line_doc.lines[t.block_range.clone()]);
+    }
+
+    let mut touched_after = Vec::new();
+    for (&num, &after_lines) in &after_map {
+        match before_map.get(&num) {
+            Some(&before_lines) if before_lines == after_lines => {}
+            _ => touched_after.push(num),
+        }
+    }
+    touched_after.sort_unstable();
+
+    let mut removed_before = Vec::new();
+    for &num in before_map.keys() {
+        if !after_map.contains_key(&num) {
+            removed_before.push(num);
+        }
+    }
+    removed_before.sort_unstable();
+
+    let mut touched = Vec::with_capacity(touched_after.len() + removed_before.len());
+    for num in touched_after {
+        touched.push(after.id_config.format_id(TaskId(num)));
+    }
+    for num in removed_before {
+        touched.push(before.id_config.format_id(TaskId(num)));
+    }
+    touched
+}
+
 /// Computes the canonical task IDs added, modified, or removed between `before` and `after`.
 #[must_use]
 pub fn diff_task_ids(before: &[u8], after: &[u8], id_config: &IdConfig) -> Vec<String> {
@@ -430,47 +471,33 @@ pub fn diff_task_ids(before: &[u8], after: &[u8], id_config: &IdConfig) -> Vec<S
     let Ok(doc_after) = Document::parse_bytes_with_config(after, id_config.clone()) else {
         return Vec::new();
     };
+    diff_doc_task_ids(&doc_before, &doc_after)
+}
 
-    let before_map: BTreeMap<u64, &[Line]> = doc_before
-        .tasks
-        .iter()
-        .map(|t| {
-            (
-                t.id.number(),
-                &doc_before.line_doc.lines[t.block_range.clone()],
-            )
-        })
+/// Records one journal entry for a completed write (`R-HIST-4`), using precomputed `tasks`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn record_journal_with_tasks(
+    state: &StateDir,
+    agent: &str,
+    command: &str,
+    tasks: Vec<String>,
+    hash_before: &str,
+    hash_after: &str,
+) -> Result<()> {
+    let arguments: Vec<String> = std::env::args_os()
+        .skip(1)
+        .map(|s| s.to_string_lossy().into_owned())
         .collect();
-    let after_map: BTreeMap<u64, &[Line]> = doc_after
-        .tasks
-        .iter()
-        .map(|t| {
-            (
-                t.id.number(),
-                &doc_after.line_doc.lines[t.block_range.clone()],
-            )
-        })
-        .collect();
-
-    let mut touched = Vec::new();
-    for (&num, after_lines) in &after_map {
-        match before_map.get(&num) {
-            Some(before_lines) if before_lines == after_lines => {}
-            _ => {
-                if let Some(task) = doc_after.tasks.iter().find(|t| t.id.number() == num) {
-                    touched.push(id_config.format_id(task.id));
-                }
-            }
-        }
-    }
-    for &num in before_map.keys() {
-        if !after_map.contains_key(&num)
-            && let Some(task) = doc_before.tasks.iter().find(|t| t.id.number() == num)
-        {
-            touched.push(id_config.format_id(task.id));
-        }
-    }
-    touched
+    let entry = JournalEntry {
+        time: current_time().to_rfc3339(),
+        agent: agent.to_string(),
+        command: command.to_string(),
+        arguments,
+        tasks,
+        hash_before: hash_before.to_string(),
+        hash_after: hash_after.to_string(),
+    };
+    append_journal(state, &entry)
 }
 
 /// Records one journal entry for a completed write (`R-HIST-4`).
@@ -485,19 +512,6 @@ pub fn record_journal_for_write(
     hash_before: &str,
     hash_after: &str,
 ) -> Result<()> {
-    let arguments: Vec<String> = std::env::args_os()
-        .skip(1)
-        .map(|s| s.to_string_lossy().into_owned())
-        .collect();
     let tasks = diff_task_ids(before_bytes, after_bytes, id_config);
-    let entry = JournalEntry {
-        time: current_time().to_rfc3339(),
-        agent: agent.to_string(),
-        command: command.to_string(),
-        arguments,
-        tasks,
-        hash_before: hash_before.to_string(),
-        hash_after: hash_after.to_string(),
-    };
-    append_journal(state, &entry)
+    record_journal_with_tasks(state, agent, command, tasks, hash_before, hash_after)
 }

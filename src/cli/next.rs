@@ -8,9 +8,9 @@ use crate::doc::TaskChangeIntent;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::current_time;
 use crate::ops::{
-    DocWritePlan, NextFilter, TaskJson, WhereClause, build_claim_edits,
-    build_task_json, check_task_writable, edit_doc_and_write, load_for_read, plan_claim,
-    select_next_task,
+    DocWritePlan, NextFilter, TaskJson, WhereClause, build_claim_edits, build_task_json,
+    check_task_writable, edit_doc_with_found_and_state_and_write, load_for_read_with_found,
+    plan_claim, select_next_task,
 };
 use crate::output::Output;
 
@@ -67,7 +67,7 @@ struct NextJson {
 
 /// Runs `todo next`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let cfg = ctx.load_config()?;
+    let (found, cfg) = ctx.load_config_with_found()?;
     let where_clauses = args
         .where_clauses
         .iter()
@@ -76,12 +76,13 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     let payload = if args.claim {
         let _ = ctx.require_agent()?;
-        let write_res = edit_doc_and_write(
+        let write_res = edit_doc_with_found_and_state_and_write(
             ctx,
+            found,
             &cfg,
             META.name,
             out,
-            |doc, archive, label, agent, now| {
+            |doc, archive, _state, label, agent, now| {
                 let filter = NextFilter {
                     section: args.section.as_deref(),
                     task_type: args.task_type.as_deref(),
@@ -147,7 +148,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         )?;
         write_res.value
     } else {
-        let loaded = load_for_read(ctx, &cfg, false, true, out)?;
+        let loaded = load_for_read_with_found(found, &cfg, false, true, out)?;
         let now = current_time();
         let filter = NextFilter {
             section: args.section.as_deref(),

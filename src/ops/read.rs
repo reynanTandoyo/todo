@@ -1,6 +1,6 @@
 //! Shared read loading and JSON serialization helpers for task commands.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::io;
 use std::path::Path;
 
@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::atomic::{read_file_with_snapshot, validate_utf8};
 use crate::cli::Context;
-use crate::doc::{Document, IdConfig, Status, Task, TaskId};
+use crate::doc::{Document, IdConfig, Status, Task};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, fs_path};
 use crate::ops::config::OpsConfig;
@@ -74,8 +74,32 @@ pub fn load_for_read(
     load_archive_for_deps: bool,
     out: &mut Output,
 ) -> Result<LoadedRead> {
+    let find_timer = crate::timing::PhaseTimer::start("read.find_todo");
     let found = ctx.find_todo_with_mode(cfg.worktree, out)?;
+    find_timer.finish();
+    load_for_read_inner(found, cfg, from_archive, load_archive_for_deps, out)
+}
 
+/// Like [`load_for_read`], reusing an already-located [`FoundTodo`] so callers that also loaded
+/// `todo.toml` avoid running file discovery twice.
+pub(crate) fn load_for_read_with_found(
+    found: FoundTodo,
+    cfg: &OpsConfig,
+    from_archive: bool,
+    load_archive_for_deps: bool,
+    out: &mut Output,
+) -> Result<LoadedRead> {
+    crate::cli::emit_find_notices(&found, out);
+    load_for_read_inner(found, cfg, from_archive, load_archive_for_deps, out)
+}
+
+fn load_for_read_inner(
+    found: FoundTodo,
+    cfg: &OpsConfig,
+    from_archive: bool,
+    load_archive_for_deps: bool,
+    out: &mut Output,
+) -> Result<LoadedRead> {
     if from_archive {
         let archive_path = cfg.archive_path(&found.path);
         let label = file_label(&archive_path);
@@ -107,8 +131,13 @@ pub fn load_for_read(
     }
 
     let label = file_label(&found.path);
+    let read_timer = crate::timing::PhaseTimer::start("read.read_file_and_hash");
     let read = read_file_with_snapshot(&found.path)?;
+    read_timer.finish();
+    let state_timer = crate::timing::PhaseTimer::start("read.state_dir");
     let state = crate::state::StateDir::from_found(&found)?;
+    state_timer.finish();
+    let outside_timer = crate::timing::PhaseTimer::start("read.outside_edit");
     if let crate::history::OutsideEditOutcome::Recorded {
         warning: Some(warn),
     } =
@@ -116,18 +145,22 @@ pub fn load_for_read(
     {
         out.warn(warn);
     }
+    outside_timer.finish();
     let _ = validate_utf8(&read.bytes, &label)?;
+    let parse_timer = crate::timing::PhaseTimer::start("read.parse_doc");
     let doc =
         Document::parse_bytes_with_config(&read.bytes, cfg.id_config.clone()).map_err(|e| {
             TodoError::new(ErrorCode::UnsafeFile, e.to_string())
                 .with_file(label.clone())
                 .with_line(e.line)
         })?;
+    parse_timer.finish();
 
     for problem in &doc.problems {
         out.warn(problem.format_with_path(&label));
     }
 
+    let arch_timer = crate::timing::PhaseTimer::start("read.archive");
     let archive = if load_archive_for_deps {
         let archive_path = cfg.archive_path(&found.path);
         let arch = read_optional_archive(&archive_path, cfg.id_config.clone())?;
@@ -140,6 +173,7 @@ pub fn load_for_read(
     } else {
         None
     };
+    arch_timer.finish();
 
     Ok(LoadedRead {
         found,
@@ -322,43 +356,38 @@ pub fn build_task_json(
     now: DateTime<FixedOffset>,
     cfg: &OpsConfig,
 ) -> TaskJson {
-    let mut index: HashMap<TaskId, (&Task, bool)> = HashMap::new();
-    if let Some(sec) = secondary {
-        for t in &sec.tasks {
-            index.entry(t.id).or_insert((t, !archived));
-        }
-    }
-    for t in &primary.tasks {
-        index.insert(t.id, (t, archived));
-    }
-
-    let dependencies = task
-        .depends
-        .iter()
-        .map(|dep| {
-            let id_str = dep.id.map(|id| cfg.id_config.format_id(id));
-            match dep.id.and_then(|id| index.get(&id).copied()) {
-                Some((target, is_arch)) => DependencyStatusJson {
-                    raw: dep.raw.clone(),
-                    id: id_str,
-                    exists: true,
-                    archived: is_arch,
-                    status: Some(target.status.as_str().to_string()),
-                    title: Some(target.title.clone()),
-                    satisfied: target.status.is_finished(),
-                },
-                None => DependencyStatusJson {
-                    raw: dep.raw.clone(),
-                    id: id_str,
-                    exists: false,
-                    archived: false,
-                    status: None,
-                    title: None,
-                    satisfied: false,
-                },
-            }
-        })
-        .collect();
+    let dependencies =
+        task.depends
+            .iter()
+            .map(|dep| {
+                let id_str = dep.id.map(|id| cfg.id_config.format_id(id));
+                let resolved = dep.id.and_then(|id| {
+                    primary.task_by_id(id).map(|t| (t, archived)).or_else(|| {
+                        secondary.and_then(|s| s.task_by_id(id).map(|t| (t, !archived)))
+                    })
+                });
+                match resolved {
+                    Some((target, is_arch)) => DependencyStatusJson {
+                        raw: dep.raw.clone(),
+                        id: id_str,
+                        exists: true,
+                        archived: is_arch,
+                        status: Some(target.status.as_str().to_string()),
+                        title: Some(target.title.clone()),
+                        satisfied: target.status.is_finished(),
+                    },
+                    None => DependencyStatusJson {
+                        raw: dep.raw.clone(),
+                        id: id_str,
+                        exists: false,
+                        archived: false,
+                        status: None,
+                        title: None,
+                        satisfied: false,
+                    },
+                }
+            })
+            .collect();
 
     let mut dependents = Vec::new();
     let active_doc = if archived { secondary } else { Some(primary) };

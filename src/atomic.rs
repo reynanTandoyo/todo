@@ -117,6 +117,7 @@ pub fn check_writable(path: &Path) -> Result<()> {
 pub fn atomic_replace(target: &Path, expected: &FileSnapshot, new_bytes: &[u8]) -> Result<()> {
     check_writable(target)?;
 
+    let t_tmp = crate::timing::PhaseTimer::start("atomic.write_and_sync");
     let (tmp_path, mut tmp_file, mut guard) = create_temp_file_for(target)?;
     tmp_file
         .write_all(new_bytes)
@@ -130,12 +131,17 @@ pub fn atomic_replace(target: &Path, expected: &FileSnapshot, new_bytes: &[u8]) 
             .with_file(target.display().to_string())
         })?;
     drop(tmp_file);
+    t_tmp.finish();
 
     #[cfg(feature = "test-hooks")]
     maybe_run_before_rename_hook();
 
+    let t_ver = crate::timing::PhaseTimer::start("atomic.verify_unchanged");
     verify_unchanged(target, expected)?;
+    t_ver.finish();
+    let t_ren = crate::timing::PhaseTimer::start("atomic.rename");
     rename_with_retry(&tmp_path, target, true)?;
+    t_ren.finish();
     guard.disarm();
     Ok(())
 }

@@ -9,7 +9,7 @@ use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::doc::Status;
 use crate::error::Result;
 use crate::lock::current_time;
-use crate::ops::{OpsConfig, is_task_ready, load_for_read};
+use crate::ops::{is_task_ready, load_for_read_with_found};
 use crate::output::Output;
 
 /// Metadata for the `summary` command.
@@ -88,9 +88,8 @@ const MAX_TEXT_LINES: usize = 40;
 
 /// Runs `todo summary`.
 pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let found = ctx.find_todo(out)?;
-    let cfg = OpsConfig::load_next_to(&found.path)?;
-    let loaded = load_for_read(ctx, &cfg, false, true, out)?;
+    let (found, cfg) = ctx.load_config_with_found()?;
+    let loaded = load_for_read_with_found(found, &cfg, false, true, out)?;
     let doc = &loaded.doc;
     let archive = loaded.archive.as_ref();
     let now = current_time();

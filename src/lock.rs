@@ -94,6 +94,17 @@ pub enum WriteOutcome<T> {
     },
 }
 
+/// Internal outcome allowing callers that already parsed both before and after documents
+/// to supply precomputed `touched_tasks` for the write journal (avoiding double re-parse).
+pub(crate) enum WriteOutcomeFull<T> {
+    Unchanged(T),
+    Changed {
+        new_bytes: Vec<u8>,
+        touched_tasks: Option<Vec<String>>,
+        value: T,
+    },
+}
+
 /// RAII guard holding the operating-system exclusive lock on `write.lock`.
 ///
 /// Removes `holder.json` before releasing `write.lock` on drop.
@@ -219,9 +230,45 @@ pub fn locked_read_modify_write_with_warnings<T, F>(
 where
     F: FnMut(&[u8], &FileSnapshot) -> Result<WriteOutcome<T>>,
 {
+    locked_read_modify_write_full(
+        todo_path,
+        state,
+        agent,
+        command,
+        cfg,
+        None,
+        warnings,
+        |bytes, snap| {
+            Ok(match modify(bytes, snap)? {
+                WriteOutcome::Unchanged(val) => WriteOutcomeFull::Unchanged(val),
+                WriteOutcome::Changed { new_bytes, value } => WriteOutcomeFull::Changed {
+                    new_bytes,
+                    touched_tasks: None,
+                    value,
+                },
+            })
+        },
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn locked_read_modify_write_full<T, F>(
+    todo_path: &Path,
+    state: &StateDir,
+    agent: &str,
+    command: &str,
+    cfg: &LockConfig,
+    id_config: Option<&crate::doc::IdConfig>,
+    warnings: &mut Vec<String>,
+    mut modify: F,
+) -> Result<T>
+where
+    F: FnMut(&[u8], &FileSnapshot) -> Result<WriteOutcomeFull<T>>,
+{
     let wait_timeout = cfg.effective_wait();
     let deadline = Instant::now() + wait_timeout;
 
+    let lock_timer = crate::timing::PhaseTimer::start("lock.acquire");
     let guard = loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
         let guard = WriteLockGuard::acquire(state, agent, command, remaining)?;
@@ -245,12 +292,16 @@ where
 
         break guard;
     };
+    lock_timer.finish();
 
+    let read_timer = crate::timing::PhaseTimer::start("lock.read_file");
     let read = atomic::read_file_with_snapshot(todo_path)?;
+    read_timer.finish();
     let label = todo_path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "TODO.md".to_string());
+    let outside_timer = crate::timing::PhaseTimer::start("lock.outside_edit");
     if let crate::history::OutsideEditOutcome::Recorded {
         warning: Some(warn),
     } = crate::history::detect_outside_edit_locked(
@@ -262,22 +313,33 @@ where
     )? {
         warnings.push(warn);
     }
+    outside_timer.finish();
     match modify(&read.bytes, &read.snapshot)? {
-        WriteOutcome::Unchanged(val) => {
+        WriteOutcomeFull::Unchanged(val) => {
             drop(guard);
             Ok(val)
         }
-        WriteOutcome::Changed { new_bytes, value } => {
+        WriteOutcomeFull::Changed {
+            new_bytes,
+            touched_tasks,
+            value,
+        } => {
+            let before_sha_hex = read.snapshot.sha256_hex();
+            let snap_timer = crate::timing::PhaseTimer::start("lock.record_snapshot");
             crate::history::record_snapshot(
                 state,
                 &read.bytes,
-                &read.snapshot.sha256_hex(),
+                &before_sha_hex,
                 agent,
                 command,
                 false,
                 cfg.snapshots_keep,
             )?;
+            snap_timer.finish();
+            let replace_timer = crate::timing::PhaseTimer::start("lock.atomic_replace");
             atomic::atomic_replace(todo_path, &read.snapshot, &new_bytes)?;
+            replace_timer.finish();
+            let post_timer = crate::timing::PhaseTimer::start("lock.post_hash_and_last_write");
             let post_mtime = std::fs::metadata(fs_path(todo_path).as_ref())
                 .ok()
                 .and_then(|m| m.modified().ok());
@@ -287,19 +349,29 @@ where
                 sha256: atomic::sha256_bytes(&new_bytes),
             };
             state.write_last_write(&LastWrite::from_snapshot(&post_snap))?;
-            let id_config = crate::ops::OpsConfig::load_next_to(todo_path)
-                .map(|c| c.id_config)
-                .unwrap_or_default();
-            crate::history::record_journal_for_write(
+            post_timer.finish();
+            let journal_timer = crate::timing::PhaseTimer::start("lock.journal");
+            let after_sha_hex = post_snap.sha256_hex();
+            let tasks = match touched_tasks {
+                Some(t) => t,
+                None => {
+                    let resolved_id_config = id_config.cloned().unwrap_or_else(|| {
+                        crate::ops::OpsConfig::load_next_to(todo_path)
+                            .map(|c| c.id_config)
+                            .unwrap_or_default()
+                    });
+                    crate::history::diff_task_ids(&read.bytes, &new_bytes, &resolved_id_config)
+                }
+            };
+            crate::history::record_journal_with_tasks(
                 state,
-                &id_config,
                 agent,
                 command,
-                &read.bytes,
-                &new_bytes,
-                &read.snapshot.sha256_hex(),
-                &post_snap.sha256_hex(),
+                tasks,
+                &before_sha_hex,
+                &after_sha_hex,
             )?;
+            journal_timer.finish();
             drop(guard);
             Ok(value)
         }

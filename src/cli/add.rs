@@ -14,7 +14,7 @@ use crate::doc::{
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
-    DocWritePlan, OpsConfig, TaskJson, build_task_json, edit_doc_with_state_and_write,
+    DocWritePlan, OpsConfig, TaskJson, build_task_json, edit_doc_with_found_and_state_and_write,
     matching_section_indices,
 };
 use crate::output::Output;
@@ -113,7 +113,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     }
 
     let extra_fields = parse_extra_fields(&args.fields)?;
-    let cfg = ctx.load_config()?;
+    let (found, cfg) = ctx.load_config_with_found()?;
 
     // Validate priority, type, area, and required fields before taking the lock.
     let priority_val = resolve_priority(args.priority.as_deref(), &extra_fields, &cfg)?;
@@ -147,8 +147,9 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     )?;
 
     let cfg_clone = cfg.clone();
-    let res = edit_doc_with_state_and_write(
+    let res = edit_doc_with_found_and_state_and_write(
         ctx,
+        found,
         &cfg,
         META.name,
         out,
@@ -570,7 +571,7 @@ fn run_batch_from(
     out: &mut Output,
 ) -> Result<()> {
     let raw = read_batch_input(from_src)?;
-    let cfg = ctx.load_config()?;
+    let (found, cfg) = ctx.load_config_with_found()?;
 
     let mut entries = Vec::new();
     let mut seen_refs = HashMap::new();
@@ -744,8 +745,9 @@ fn run_batch_from(
     }
 
     let cfg_clone = cfg.clone();
-    let res = edit_doc_with_state_and_write(
+    let res = edit_doc_with_found_and_state_and_write(
         ctx,
+        found,
         &cfg,
         META.name,
         out,

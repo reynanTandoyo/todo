@@ -5,7 +5,7 @@ use clap::Args as ClapArgs;
 use crate::cli::{CommandKind, CommandMeta, Context, resolve_text_arg};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
-    OpsConfig, TaskCommand, TaskEditBuilder, check_ownership, edit_task_and_write,
+    OpsConfig, TaskCommand, TaskEditBuilder, check_ownership, edit_task_with_found_and_write,
 };
 use crate::output::Output;
 
@@ -51,9 +51,10 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         return Err(TodoError::new(ErrorCode::Usage, "note text cannot be empty"));
     }
 
-    let cfg = ctx.load_config()?;
-    let res = edit_task_and_write(
+    let (found, cfg) = ctx.load_config_with_found()?;
+    let res = edit_task_with_found_and_write(
         ctx,
+        found,
         &cfg,
         META.name,
         &args.task,

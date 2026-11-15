@@ -1,6 +1,37 @@
 //! Task IDs, flexible user-input parsing (R-ID-3), and canonical formatting (R-ID-1).
 
+use std::collections::HashMap;
 use std::fmt;
+use std::hash::{BuildHasherDefault, Hasher};
+
+/// Fast non-cryptographic hasher for integer keys (`TaskId` / `u64`) used in internal parse and
+/// verification hash maps.
+#[derive(Default)]
+pub(crate) struct FastU64Hasher(u64);
+
+impl Hasher for FastU64Hasher {
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        let mut h = self.0;
+        for &b in bytes {
+            h = h.rotate_left(5) ^ u64::from(b);
+        }
+        self.0 = h.wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+
+    #[inline]
+    fn write_u64(&mut self, i: u64) {
+        let x = i.wrapping_mul(0x9e37_79b9_7f4a_7c15);
+        self.0 = x ^ (x >> 32);
+    }
+}
+
+pub(crate) type FastU64Map<K, V> = HashMap<K, V, BuildHasherDefault<FastU64Hasher>>;
 
 /// Default task ID prefix.
 pub const DEFAULT_ID_PREFIX: &str = "T";
@@ -71,6 +102,16 @@ impl IdConfig {
     /// Numbers wider than `self.width` simply grow longer (e.g. `T-1000`).
     #[must_use]
     pub fn format_id(&self, id: TaskId) -> String {
+        if self.prefix.is_ascii() {
+            use std::fmt::Write as _;
+            let mut out = String::with_capacity(self.prefix.len() + 1 + self.width.max(4));
+            for b in self.prefix.bytes() {
+                out.push(b.to_ascii_uppercase() as char);
+            }
+            out.push('-');
+            let _ = write!(out, "{:0width$}", id.0, width = self.width);
+            return out;
+        }
         format!(
             "{}-{:0width$}",
             self.prefix.to_uppercase(),

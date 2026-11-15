@@ -253,7 +253,7 @@ impl LineDoc {
             None => (false, text),
         };
 
-        let mut lines = Vec::new();
+        let mut lines = Vec::with_capacity((bytes.len() / 24).max(16));
         for raw in rest.split_inclusive('\n') {
             if let Some(without_lf) = raw.strip_suffix('\n') {
                 if let Some(without_crlf) = without_lf.strip_suffix('\r') {
@@ -338,18 +338,25 @@ impl LineDoc {
     /// unterminated last line per `docs/format.md` §2.
     pub fn apply_edits(&self, edits: &[LineEdit]) -> Result<AppliedLineEdits, EditError> {
         let sorted = validate_and_sort(edits, self.lines.len(), |e| &e.range, |e| &e.lines)?;
-        let orig_bytes = self.to_bytes();
 
         if sorted.is_empty() {
             return Ok(AppliedLineEdits {
                 doc: self.clone(),
-                bytes: orig_bytes,
+                bytes: self.to_bytes(),
                 changed: false,
             });
         }
 
+        let removed_total: usize = sorted.iter().map(|e| e.range.len()).sum();
+        let inserted_total: usize = sorted.iter().map(|e| e.lines.len()).sum();
+        let expected_len = self
+            .lines
+            .len()
+            .saturating_sub(removed_total)
+            .saturating_add(inserted_total);
+
         let default_ending = self.default_ending();
-        let mut new_lines = Vec::with_capacity(self.lines.len());
+        let mut new_lines = Vec::with_capacity(expected_len);
         let mut cursor = 0usize;
 
         for edit in sorted {
@@ -399,12 +406,12 @@ impl LineDoc {
             return Err(EditError::EmptyUnterminatedLastLine);
         }
 
+        let changed = new_lines != self.lines;
         let new_doc = Self {
             has_bom: self.has_bom,
             lines: new_lines,
         };
         let new_bytes = new_doc.to_bytes();
-        let changed = new_bytes != orig_bytes;
 
         Ok(AppliedLineEdits {
             doc: new_doc,
@@ -469,16 +476,76 @@ pub fn verify_byte_edits(
     verify_expected_byte_changes(orig_bytes, edited_bytes, &expected)
 }
 
+struct LineSlice<'a> {
+    text: &'a str,
+    ending: LineEnding,
+    start: usize,
+    end: usize,
+}
+
+fn scan_line_slices(bytes: &[u8]) -> Result<(bool, Vec<LineSlice<'_>>), Utf8DecodeError> {
+    let text = std::str::from_utf8(bytes).map_err(|err| {
+        let byte_offset = err.valid_up_to();
+        let line = bytes[..byte_offset].iter().filter(|&&b| b == b'\n').count() + 1;
+        Utf8DecodeError { byte_offset, line }
+    })?;
+
+    let (has_bom, rest) = match text.strip_prefix('\u{FEFF}') {
+        Some(after_bom) => (true, after_bom),
+        None => (false, text),
+    };
+
+    let mut pos = if has_bom { UTF8_BOM.len() } else { 0 };
+    let mut slices = Vec::with_capacity((bytes.len() / 24).max(16));
+    for raw in rest.split_inclusive('\n') {
+        let start = pos;
+        pos += raw.len();
+        let (line_text, ending) = if let Some(without_lf) = raw.strip_suffix('\n') {
+            if let Some(without_crlf) = without_lf.strip_suffix('\r') {
+                (without_crlf, LineEnding::Crlf)
+            } else {
+                (without_lf, LineEnding::Lf)
+            }
+        } else {
+            (raw, LineEnding::None)
+        };
+        slices.push(LineSlice {
+            text: line_text,
+            ending,
+            start,
+            end: pos,
+        });
+    }
+    Ok((has_bom, slices))
+}
+
+fn default_ending_from_slices(slices: &[LineSlice<'_>]) -> LineEnding {
+    let mut lf_count = 0usize;
+    let mut crlf_count = 0usize;
+    for s in slices {
+        match s.ending {
+            LineEnding::Lf => lf_count += 1,
+            LineEnding::Crlf => crlf_count += 1,
+            LineEnding::None => {}
+        }
+    }
+    if crlf_count > lf_count {
+        LineEnding::Crlf
+    } else {
+        LineEnding::Lf
+    }
+}
+
 /// Same as [`verify_byte_edits`], accepting [`ExpectedByteChange`] slices directly.
 pub fn verify_expected_byte_changes(
     orig_bytes: &[u8],
     edited_bytes: &[u8],
     changes: &[ExpectedByteChange],
 ) -> Result<(), EditError> {
-    let orig_doc = LineDoc::from_bytes(orig_bytes)?;
-    let edited_doc = LineDoc::from_bytes(edited_bytes)?;
+    let (orig_bom, orig_slices) = scan_line_slices(orig_bytes)?;
+    let (edited_bom, edited_slices) = scan_line_slices(edited_bytes)?;
 
-    if orig_doc.has_bom != edited_doc.has_bom {
+    if orig_bom != edited_bom {
         return Err(EditError::VerificationFailed {
             reason: "UTF-8 BOM presence changed".to_string(),
         });
@@ -486,55 +553,49 @@ pub fn verify_expected_byte_changes(
 
     let sorted = validate_and_sort(
         changes,
-        orig_doc.lines.len(),
+        orig_slices.len(),
         |c| &c.orig_range,
         |c| &c.new_lines,
     )?;
 
     let removed_total: usize = sorted.iter().map(|c| c.orig_range.len()).sum();
     let inserted_total: usize = sorted.iter().map(|c| c.new_lines.len()).sum();
-    let expected_edited_len = orig_doc
-        .lines
+    let expected_edited_len = orig_slices
         .len()
         .saturating_sub(removed_total)
         .saturating_add(inserted_total);
 
-    if edited_doc.lines.len() != expected_edited_len {
+    if edited_slices.len() != expected_edited_len {
         return Err(EditError::VerificationFailed {
             reason: format!(
                 "expected {expected_edited_len} lines after edit, got {}",
-                edited_doc.lines.len()
+                edited_slices.len()
             ),
         });
     }
 
-    let orig_spans = line_byte_spans(orig_bytes, orig_doc.has_bom);
-    let edited_spans = line_byte_spans(edited_bytes, edited_doc.has_bom);
-    let default_ending = orig_doc.default_ending();
+    let default_ending = default_ending_from_slices(&orig_slices);
 
     let mut orig_cursor = 0usize;
     let mut edited_cursor = 0usize;
 
     for (idx, change) in sorted.iter().enumerate() {
         let appends_after_unterminated_eof = change.orig_range.is_empty()
-            && change.orig_range.start == orig_doc.lines.len()
+            && change.orig_range.start == orig_slices.len()
             && !change.new_lines.is_empty()
-            && orig_doc
-                .lines
+            && orig_slices
                 .last()
                 .is_some_and(|l| l.ending == LineEnding::None)
             // Only the first non-empty EOF append triggers the transition from None -> default_ending.
             && sorted[..idx]
                 .iter()
-                .all(|prev| !(prev.orig_range.start == orig_doc.lines.len() && !prev.new_lines.is_empty()));
+                .all(|prev| !(prev.orig_range.start == orig_slices.len() && !prev.new_lines.is_empty()));
 
         verify_unchanged_gap(
             orig_bytes,
             edited_bytes,
-            &orig_doc,
-            &edited_doc,
-            &orig_spans,
-            &edited_spans,
+            &orig_slices,
+            &edited_slices,
             orig_cursor..change.orig_range.start,
             edited_cursor,
             appends_after_unterminated_eof,
@@ -545,8 +606,8 @@ pub fn verify_expected_byte_changes(
         edited_cursor += gap_len;
 
         for (offset, expected_text) in change.new_lines.iter().enumerate() {
-            let actual = &edited_doc.lines[edited_cursor + offset];
-            if &actual.text != expected_text {
+            let actual = &edited_slices[edited_cursor + offset];
+            if actual.text != expected_text {
                 return Err(EditError::VerificationFailed {
                     reason: format!(
                         "edited line {} text did not match intended output",
@@ -563,11 +624,9 @@ pub fn verify_expected_byte_changes(
     verify_unchanged_gap(
         orig_bytes,
         edited_bytes,
-        &orig_doc,
-        &edited_doc,
-        &orig_spans,
-        &edited_spans,
-        orig_cursor..orig_doc.lines.len(),
+        &orig_slices,
+        &edited_slices,
+        orig_cursor..orig_slices.len(),
         edited_cursor,
         false,
         default_ending,
@@ -580,10 +639,8 @@ pub fn verify_expected_byte_changes(
 fn verify_unchanged_gap(
     orig_bytes: &[u8],
     edited_bytes: &[u8],
-    orig_doc: &LineDoc,
-    edited_doc: &LineDoc,
-    orig_spans: &[(usize, usize)],
-    edited_spans: &[(usize, usize)],
+    orig_slices: &[LineSlice<'_>],
+    edited_slices: &[LineSlice<'_>],
     orig_gap: Range<usize>,
     edited_start: usize,
     allow_last_line_ending_gain: bool,
@@ -595,7 +652,7 @@ fn verify_unchanged_gap(
     }
 
     let check_exact_end = if allow_last_line_ending_gain
-        && orig_gap.end == orig_doc.lines.len()
+        && orig_gap.end == orig_slices.len()
         && orig_gap.end > orig_gap.start
     {
         orig_gap.end - 1
@@ -606,9 +663,9 @@ fn verify_unchanged_gap(
     for offset in 0..(check_exact_end - orig_gap.start) {
         let oi = orig_gap.start + offset;
         let ei = edited_start + offset;
-        let (os, oe) = orig_spans[oi];
-        let (es, ee) = edited_spans[ei];
-        if orig_bytes[os..oe] != edited_bytes[es..ee] {
+        let os = &orig_slices[oi];
+        let es = &edited_slices[ei];
+        if orig_bytes[os.start..os.end] != edited_bytes[es.start..es.end] {
             return Err(EditError::VerificationFailed {
                 reason: format!("untouched line {} changed bytes", oi + 1),
             });
@@ -618,8 +675,8 @@ fn verify_unchanged_gap(
     if check_exact_end < orig_gap.end {
         let oi = orig_gap.end - 1;
         let ei = edited_start + (gap_len - 1);
-        let orig_line = &orig_doc.lines[oi];
-        let edited_line = &edited_doc.lines[ei];
+        let orig_line = &orig_slices[oi];
+        let edited_line = &edited_slices[ei];
         if orig_line.text != edited_line.text || edited_line.ending != default_ending {
             return Err(EditError::VerificationFailed {
                 reason: format!(
@@ -665,24 +722,6 @@ fn append_inserted_lines(
             new_lines.push(Line::new(text.clone(), default_ending));
         }
     }
-}
-
-fn line_byte_spans(bytes: &[u8], has_bom: bool) -> Vec<(usize, usize)> {
-    let mut pos = if has_bom { UTF8_BOM.len() } else { 0 };
-    let mut spans = Vec::new();
-    while pos < bytes.len() {
-        let start = pos;
-        match bytes[pos..].iter().position(|&b| b == b'\n') {
-            Some(rel) => {
-                pos += rel + 1;
-            }
-            None => {
-                pos = bytes.len();
-            }
-        }
-        spans.push((start, pos));
-    }
-    spans
 }
 
 fn validate_and_sort<'a, T>(

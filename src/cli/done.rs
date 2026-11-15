@@ -12,7 +12,7 @@ use crate::doc::Status;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
     NewlyReadyTask, OpsConfig, OwnershipDecision, StatusCommand, TaskEditBuilder, TaskJson,
-    edit_task_and_write, forced_note_text, validate_transition,
+    edit_task_with_found_and_write, forced_note_text, validate_transition,
 };
 use crate::output::Output;
 
@@ -67,9 +67,10 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     };
 
     let resolved_note = resolve_opt_text_arg(args.note.as_deref())?;
-    let cfg = ctx.load_config()?;
-    let res = edit_task_and_write(
+    let (found, cfg) = ctx.load_config_with_found()?;
+    let res = edit_task_with_found_and_write(
         ctx,
+        found,
         &cfg,
         META.name,
         &args.task,

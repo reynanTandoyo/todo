@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
 fn generate_5000_task_file() -> String {
-    let mut out = String::with_capacity(700 * 1024);
+    let mut out = String::with_capacity(950 * 1024);
     out.push_str("<!-- TEST FIXTURE: invented data, not a real task list -->\n");
     out.push_str("## Now\n");
     for i in 1..=5000usize {
@@ -28,9 +28,15 @@ fn generate_5000_task_file() -> String {
             "\n### T-{i:04} · Generated benchmark task {i}\n\
 - status: {status}\n\
 - owner: {owner}\n\
-- priority: {prio} · type: task · area: core\n\
-- accept: completes within NFR-3 budget"
+- priority: {prio} · type: task · area: core"
         );
+        if i > 1 && i % 5 == 0 {
+            let _ = writeln!(out, "- depends: T-{:04}", i - 1);
+        }
+        out.push_str("- accept: completes within NFR-3 budget\n");
+        if i % 4 == 0 {
+            out.push_str("- note (2026-01-15, alice): initial triage note for benchmark task\n");
+        }
     }
     out
 }
@@ -81,6 +87,13 @@ fn perf_5000_tasks_list_show_and_write_meet_nfr3_budgets() {
 
     let list_time = run(&["list"]);
     let show_time = run(&["show", "T-2500"]);
+    let note_time = run(&[
+        "note",
+        "T-2500",
+        "perf benchmark note",
+        "--agent",
+        "perf-bot",
+    ]);
     let write_time = run(&[
         "add",
         "--title",
@@ -92,10 +105,11 @@ fn perf_5000_tasks_list_show_and_write_meet_nfr3_budgets() {
     ]);
 
     eprintln!(
-        "NFR-3 timings (5,000 tasks, {} bytes): list={:?}, show={:?}, add={:?}",
+        "NFR-3 timings (5,000 tasks, {} bytes): list={:?}, show={:?}, note={:?}, add={:?}",
         body.len(),
         list_time,
         show_time,
+        note_time,
         write_time
     );
 
@@ -108,6 +122,11 @@ fn perf_5000_tasks_list_show_and_write_meet_nfr3_budgets() {
         show_time < Duration::from_millis(100),
         "show took {:?} (budget < 100 ms)",
         show_time
+    );
+    assert!(
+        note_time < Duration::from_millis(200),
+        "write (note) took {:?} (budget < 200 ms)",
+        note_time
     );
     assert!(
         write_time < Duration::from_millis(200),

@@ -161,8 +161,15 @@ impl Context {
 
     /// Loads `OpsConfig` from `todo.toml` next to `TODO.md` without emitting discovery notices.
     pub fn load_config(&self) -> Result<OpsConfig> {
+        let _t = crate::timing::PhaseTimer::start("ctx_load_config");
         let (_, cfg) = self.resolve_todo_and_config_quiet()?;
         Ok(cfg)
+    }
+
+    /// Locates `TODO.md` and loads `todo.toml` next to it without emitting discovery notices yet.
+    pub(crate) fn load_config_with_found(&self) -> Result<(FoundTodo, OpsConfig)> {
+        let _t = crate::timing::PhaseTimer::start("ctx_load_config");
+        self.resolve_todo_and_config_quiet()
     }
 
     fn resolve_todo_and_config_quiet(&self) -> Result<(FoundTodo, OpsConfig)> {
@@ -222,7 +229,7 @@ impl Context {
     }
 }
 
-fn emit_find_notices(found: &FoundTodo, out: &mut Output) {
+pub(crate) fn emit_find_notices(found: &FoundTodo, out: &mut Output) {
     for w in &found.warnings {
         out.warn(w);
     }
@@ -446,11 +453,14 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
+    let _total_timer = crate::timing::PhaseTimer::start("total");
+    let parse_timer = crate::timing::PhaseTimer::start("cli_parse");
     let raw_args: Vec<OsString> = args.into_iter().map(Into::into).collect();
     let json_hint = raw_args.iter().any(|a| a == "--json");
 
     match Cli::try_parse_from(&raw_args) {
         Ok(cli) => {
+            parse_timer.finish();
             let mut out = Output::stdio(cli.global.json);
             let cmd_name = cli.command.as_ref().map_or("overview", |c| c.meta().name);
 

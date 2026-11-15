@@ -1,11 +1,10 @@
 //! Parser and domain model for `TODO.md` format version 1 (`docs/format.md`).
 
-use std::collections::{BTreeMap, HashMap};
 use std::ops::Range;
 
 use chrono::{DateTime, FixedOffset, NaiveDate};
 
-use crate::doc::id::{IdConfig, TaskId, strip_prefix_ignore_case};
+use crate::doc::id::{FastU64Map, IdConfig, TaskId, strip_prefix_ignore_case};
 use crate::doc::lines::{LineDoc, Utf8DecodeError};
 
 /// Supported format version of `TODO.md`.
@@ -534,6 +533,8 @@ pub struct Document {
     pub tasks: Vec<Task>,
     /// Problems and warnings discovered while parsing.
     pub problems: Vec<Problem>,
+    /// O(1) index from task ID to first index in `tasks`.
+    id_index: FastU64Map<TaskId, usize>,
 }
 
 impl Document {
@@ -595,7 +596,8 @@ impl Document {
     /// (`docs/format.md` §13).
     #[must_use]
     pub fn check_archive_duplicates(&self, archive: &Self) -> Vec<Problem> {
-        let mut archive_first_line: HashMap<TaskId, usize> = HashMap::new();
+        let mut archive_first_line: FastU64Map<TaskId, usize> =
+            FastU64Map::with_capacity_and_hasher(archive.tasks.len(), Default::default());
         for task in &archive.tasks {
             archive_first_line
                 .entry(task.id)
@@ -629,7 +631,7 @@ impl Document {
     /// Finds a task by exact numeric ID.
     #[must_use]
     pub fn task_by_id(&self, id: TaskId) -> Option<&Task> {
-        self.tasks.iter().find(|t| t.id == id)
+        self.id_index.get(&id).and_then(|&idx| self.tasks.get(idx))
     }
 
     /// Returns the section name for `task`, if it belongs to a section.
@@ -764,6 +766,15 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
             RegionState::Normal => {}
         }
 
+        // Fast skip for normal prose, blank lines, and task field/note lines that cannot start
+        // any format line, managed block, fence, HTML comment, conflict marker, or heading.
+        if matches!(
+            text.as_bytes().first().copied(),
+            None | Some(b'-' | b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'*' | b'+')
+        ) {
+            continue;
+        }
+
         // Check format line and managed-block markers before treating HTML comments as ignored
         // (`docs/format.md` §3, §4, §12).
         if !seen_first_section_or_task && let Some(raw_ver) = parse_format_line(text) {
@@ -886,9 +897,16 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
         _ => None,
     };
 
-    // Second pass: sections, task headings, task blocks, fields, and notes.
+    // Second pass: sections, task headings, and task raw block end lines.
+    struct PendingTask {
+        start_idx: usize,
+        section: Option<usize>,
+        heading: ParsedHeading,
+        raw_end: usize,
+    }
+
     let mut sections: Vec<Section> = Vec::new();
-    let mut task_starts: Vec<(usize, Option<usize>, ParsedHeading)> = Vec::new();
+    let mut task_starts: Vec<PendingTask> = Vec::new();
     let mut first_heading_line: Option<usize> = None;
 
     for (idx, line) in line_doc.lines.iter().enumerate() {
@@ -897,6 +915,11 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
         }
         let text = &line.text;
         if let Some(name) = text.strip_prefix("## ") {
+            if let Some(prev_task) = task_starts.last_mut()
+                && prev_task.raw_end == line_count
+            {
+                prev_task.raw_end = idx;
+            }
             if first_heading_line.is_none() {
                 first_heading_line = Some(idx);
             }
@@ -910,13 +933,23 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
                 content_end: idx + 1,
             });
         } else if text.starts_with("### ") {
+            if let Some(prev_task) = task_starts.last_mut()
+                && prev_task.raw_end == line_count
+            {
+                prev_task.raw_end = idx;
+            }
             match parse_task_heading(text, &id_config) {
                 Some(parsed_heading) => {
                     if first_heading_line.is_none() {
                         first_heading_line = Some(idx);
                     }
                     let sec_idx = sections.len().checked_sub(1);
-                    task_starts.push((idx, sec_idx, parsed_heading));
+                    task_starts.push(PendingTask {
+                        start_idx: idx,
+                        section: sec_idx,
+                        heading: parsed_heading,
+                        raw_end: line_count,
+                    });
                 }
                 None => {
                     let after_hashes = text.strip_prefix("### ").unwrap_or("");
@@ -947,23 +980,18 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
 
     // Parse each task block and track duplicate task IDs.
     let mut tasks = Vec::with_capacity(task_starts.len());
-    let mut seen_ids: HashMap<TaskId, usize> = HashMap::new();
+    let mut seen_ids: FastU64Map<TaskId, usize> =
+        FastU64Map::with_capacity_and_hasher(task_starts.len(), Default::default());
+    let mut id_index: FastU64Map<TaskId, usize> =
+        FastU64Map::with_capacity_and_hasher(task_starts.len(), Default::default());
 
-    for (start_idx, sec_idx, heading) in task_starts {
-        let mut raw_end = line_count;
-        for (idx, &is_ignored) in ignored.iter().enumerate().skip(start_idx + 1) {
-            if is_ignored {
-                continue;
-            }
-            let text = &line_doc.lines[idx].text;
-            if text.starts_with("## ") || text.starts_with("### ") {
-                raw_end = idx;
-                break;
-            }
-        }
+    for pending in task_starts {
+        let start_idx = pending.start_idx;
+        let sec_idx = pending.section;
+        let heading = pending.heading;
 
         // Trailing blank lines don't belong to the task block (`docs/format.md` §7).
-        let mut block_end = raw_end;
+        let mut block_end = pending.raw_end;
         while block_end > start_idx + 1 && line_doc.lines[block_end - 1].text.trim().is_empty() {
             block_end -= 1;
         }
@@ -997,6 +1025,8 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
             heading,
             &mut problems,
         );
+        let task_idx = tasks.len();
+        id_index.entry(task.id).or_insert(task_idx);
         tasks.push(task);
     }
 
@@ -1012,6 +1042,7 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
         sections,
         tasks,
         problems,
+        id_index,
     }
 }
 
@@ -1108,11 +1139,33 @@ fn parse_task_block(
         commit_raw: None,
         commit_line: None,
         unknown_fields: Vec::new(),
-        field_lines: Vec::new(),
+        field_lines: Vec::with_capacity(block_range.end.saturating_sub(heading_line + 1)),
         notes: Vec::new(),
     };
 
-    let mut seen_fields: BTreeMap<String, usize> = BTreeMap::new();
+    let mut seen_known = [0usize; 12];
+    let mut seen_unknown: Vec<(String, usize)> = Vec::new();
+
+    let check_and_mark_seen = |key: &str,
+                               line_no: usize,
+                               seen_known: &mut [usize; 12],
+                               seen_unknown: &mut Vec<(String, usize)>|
+     -> Option<usize> {
+        if let Some(slot) = known_field_index(key) {
+            let prev = seen_known[slot];
+            if prev != 0 {
+                Some(prev)
+            } else {
+                seen_known[slot] = line_no;
+                None
+            }
+        } else if let Some(&(_, prev)) = seen_unknown.iter().find(|(k, _)| k == key) {
+            Some(prev)
+        } else {
+            seen_unknown.push((key.to_string(), line_no));
+            None
+        }
+    };
 
     for (idx, &is_ignored) in ignored
         .iter()
@@ -1131,47 +1184,52 @@ fn parse_task_block(
             continue;
         }
 
-        if let Some((key, value)) = parse_field_line(text) {
+        if let Some((key_str, value_str)) = parse_field_line(text) {
+            let owned_val = value_str.to_string();
             task.field_lines.push(FieldEntry {
-                key: key.clone(),
-                value: value.clone(),
+                key: key_str.to_string(),
+                value: owned_val.clone(),
                 line: idx,
             });
 
-            if let Some(&first_line) = seen_fields.get(&key) {
+            if let Some(first_line) =
+                check_and_mark_seen(key_str, line_no, &mut seen_known, &mut seen_unknown)
+            {
                 problems.push(Problem {
                     line: line_no,
                     severity: ProblemSeverity::BlockTask(task.id),
                     kind: ProblemKind::RepeatedField {
                         id: task.id,
-                        field: key.clone(),
+                        field: key_str.to_string(),
                         first_line,
                     },
                     message: format!(
-                        "repeated field '{key}' on {} (first seen on line {first_line})",
+                        "repeated field '{key_str}' on {} (first seen on line {first_line})",
                         id_config.format_id(task.id)
                     ),
                 });
                 continue;
             }
-            seen_fields.insert(key.clone(), line_no);
 
-            match key.as_str() {
+            match key_str {
                 "status" => {
-                    task.status_raw = Some(value.clone());
                     task.status_line = Some(idx);
-                    match Status::parse(&value) {
-                        Some(s) => task.status = s,
+                    match Status::parse(value_str) {
+                        Some(s) => {
+                            task.status = s;
+                            task.status_raw = Some(owned_val);
+                        }
                         None => {
+                            task.status_raw = Some(owned_val.clone());
                             problems.push(Problem {
                                 line: line_no,
                                 severity: ProblemSeverity::BlockTask(task.id),
                                 kind: ProblemKind::UnknownStatus {
                                     id: task.id,
-                                    value: value.clone(),
+                                    value: owned_val.clone(),
                                 },
                                 message: format!(
-                                    "unknown status '{value}' on {}",
+                                    "unknown status '{owned_val}' on {}",
                                     id_config.format_id(task.id)
                                 ),
                             });
@@ -1179,23 +1237,33 @@ fn parse_task_block(
                     }
                 }
                 "owner" => {
-                    task.owner_raw = Some(value.clone());
                     task.owner_line = Some(idx);
-                    task.owner = if is_nobody_owner(&value) {
-                        None
+                    if is_nobody_owner(value_str) {
+                        task.owner_raw = Some(owned_val);
+                        task.owner = None;
                     } else {
-                        Some(value)
-                    };
+                        task.owner_raw = Some(owned_val.clone());
+                        task.owner = Some(owned_val);
+                    }
                 }
                 "claimed" => {
-                    task.claimed = if value.is_empty() { None } else { Some(value) };
+                    task.claimed = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
                     task.claimed_line = Some(idx);
                 }
                 "priority" => {
-                    let detail = parse_combined_priority(idx, &value);
+                    let detail = parse_combined_priority(idx, value_str);
                     task.priority = detail.priority.clone();
                     for (part_key, part_val) in &detail.extra_parts {
-                        if let Some(&first_line) = seen_fields.get(part_key) {
+                        if let Some(first_line) = check_and_mark_seen(
+                            part_key,
+                            line_no,
+                            &mut seen_known,
+                            &mut seen_unknown,
+                        ) {
                             problems.push(Problem {
                                 line: line_no,
                                 severity: ProblemSeverity::BlockTask(task.id),
@@ -1211,7 +1279,6 @@ fn parse_task_block(
                             });
                             continue;
                         }
-                        seen_fields.insert(part_key.clone(), line_no);
                         match part_key.as_str() {
                             "type" => {
                                 task.task_type = non_empty_string(part_val);
@@ -1233,43 +1300,67 @@ fn parse_task_block(
                     task.priority_detail = Some(detail);
                 }
                 "type" => {
-                    task.task_type = non_empty_string(&value);
+                    task.task_type = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
                     task.task_type_loc = Some(FieldLocation::OwnLine(idx));
                 }
                 "area" => {
-                    task.area = non_empty_string(&value);
+                    task.area = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
                     task.area_loc = Some(FieldLocation::OwnLine(idx));
                 }
                 "depends" => {
-                    task.depends = parse_depends_list(&value, id_config);
-                    task.depends_raw = Some(value);
+                    task.depends = parse_depends_list(value_str, id_config);
+                    task.depends_raw = Some(owned_val);
                     task.depends_line = Some(idx);
                 }
                 "files" => {
-                    task.files = non_empty_string(&value);
+                    task.files = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
                     task.files_line = Some(idx);
                 }
                 "problem" => {
-                    task.problem = non_empty_string(&value);
+                    task.problem = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
                     task.problem_line = Some(idx);
                 }
                 "fix" => {
-                    task.fix = non_empty_string(&value);
+                    task.fix = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
                     task.fix_line = Some(idx);
                 }
                 "accept" => {
-                    task.accept = non_empty_string(&value);
+                    task.accept = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
                     task.accept_line = Some(idx);
                 }
                 "commit" => {
-                    task.commit = parse_comma_list(&value);
-                    task.commit_raw = Some(value);
+                    task.commit = parse_comma_list(value_str);
+                    task.commit_raw = Some(owned_val);
                     task.commit_line = Some(idx);
                 }
                 _ => {
                     task.unknown_fields.push(FieldEntry {
-                        key,
-                        value,
+                        key: key_str.to_string(),
+                        value: owned_val,
                         line: idx,
                     });
                 }
@@ -1280,6 +1371,27 @@ fn parse_task_block(
     task
 }
 
+const fn known_field_index(key: &str) -> Option<usize> {
+    if key.len() < 3 || key.len() > 8 {
+        return None;
+    }
+    match key.as_bytes() {
+        b"status" => Some(0),
+        b"owner" => Some(1),
+        b"claimed" => Some(2),
+        b"priority" => Some(3),
+        b"type" => Some(4),
+        b"area" => Some(5),
+        b"depends" => Some(6),
+        b"files" => Some(7),
+        b"problem" => Some(8),
+        b"fix" => Some(9),
+        b"accept" => Some(10),
+        b"commit" => Some(11),
+        _ => None,
+    }
+}
+
 fn non_empty_string(s: &str) -> Option<String> {
     if s.is_empty() {
         None
@@ -1288,17 +1400,17 @@ fn non_empty_string(s: &str) -> Option<String> {
     }
 }
 
-fn parse_field_line(line: &str) -> Option<(String, String)> {
+fn parse_field_line(line: &str) -> Option<(&str, &str)> {
     let rest = line.strip_prefix("- ")?;
     let (key, after_colon) = rest.split_once(':')?;
     if !is_valid_field_key(key) {
         return None;
     }
     if after_colon.is_empty() {
-        return Some((key.to_string(), String::new()));
+        return Some((key, ""));
     }
     let val = after_colon.strip_prefix(' ')?;
-    Some((key.to_string(), val.trim().to_string()))
+    Some((key, val.trim()))
 }
 
 fn is_valid_field_key(key: &str) -> bool {
@@ -1371,7 +1483,7 @@ fn parse_note_line(line: &str, line_idx: usize) -> Option<Note> {
     if agent.is_empty() {
         return None;
     }
-    let date = NaiveDate::parse_from_str(date_raw, "%Y-%m-%d").ok()?;
+    let date = parse_ascii_ymd(date_raw)?;
 
     Some(Note {
         date_raw: date_raw.to_string(),
@@ -1380,6 +1492,21 @@ fn parse_note_line(line: &str, line_idx: usize) -> Option<Note> {
         text: text.to_string(),
         line: line_idx,
     })
+}
+
+fn parse_ascii_ymd(s: &str) -> Option<NaiveDate> {
+    let b = s.as_bytes();
+    if b.len() == 10 && b[4] == b'-' && b[7] == b'-' {
+        let d = |i: usize| -> Option<u32> {
+            let v = b[i].wrapping_sub(b'0');
+            if v < 10 { Some(v as u32) } else { None }
+        };
+        let year = (d(0)? * 1000 + d(1)? * 100 + d(2)? * 10 + d(3)?) as i32;
+        let month = d(5)? * 10 + d(6)?;
+        let day = d(8)? * 10 + d(9)?;
+        return NaiveDate::from_ymd_opt(year, month, day);
+    }
+    NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
 }
 
 fn strip_up_to_3_spaces(line: &str) -> Option<&str> {
