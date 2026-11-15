@@ -17,6 +17,11 @@ expression: ok_json
       },
       {
         "kind": "write",
+        "name": "archive",
+        "summary": "Move done and dropped tasks to TODO-archive.md"
+      },
+      {
+        "kind": "write",
         "name": "ask",
         "summary": "Ask a question for a person to answer"
       },

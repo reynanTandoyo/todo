@@ -366,6 +366,7 @@ macro_rules! register_commands {
 register_commands! {
     Add => add,
     Answer => answer,
+    Archive => archive,
     Ask => ask,
     Block => block,
     Check => check,
