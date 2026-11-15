@@ -2,7 +2,7 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, resolve_text_arg};
 use crate::doc::Status;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
@@ -37,7 +37,8 @@ pub struct Args {
 
 /// Runs `todo block <task> --note <reason>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let reason = args.note.trim();
+    let resolved_note = resolve_text_arg(&args.note)?;
+    let reason = resolved_note.trim();
     if reason.is_empty() {
         return Err(TodoError::new(
             ErrorCode::Usage,

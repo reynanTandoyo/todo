@@ -2,7 +2,7 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, resolve_opt_text_arg, resolve_text_arg};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
     OpsConfig, OwnershipDecision, TaskCommand, TaskEditBuilder, check_ownership,
@@ -98,7 +98,13 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         ));
     }
 
-    if let Some(ref t) = args.title
+    let resolved_title = resolve_opt_text_arg(args.title.as_deref())?;
+    let resolved_files = resolve_opt_text_arg(args.files.as_deref())?;
+    let resolved_problem = resolve_opt_text_arg(args.problem.as_deref())?;
+    let resolved_fix = resolve_opt_text_arg(args.fix.as_deref())?;
+    let resolved_accept = resolve_opt_text_arg(args.accept.as_deref())?;
+
+    if let Some(ref t) = resolved_title
         && t.trim().is_empty()
     {
         return Err(TodoError::new(
@@ -120,7 +126,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
             let mut builder = TaskEditBuilder::new(doc, task);
 
-            if let Some(ref title) = args.title {
+            if let Some(ref title) = resolved_title {
                 builder.set_title(title);
             }
             if let Some(ref priority) = args.priority {
@@ -135,16 +141,16 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             if let Some(ref depends) = args.depends {
                 builder.set_field("depends", depends);
             }
-            if let Some(ref files) = args.files {
+            if let Some(ref files) = resolved_files {
                 builder.set_field("files", files);
             }
-            if let Some(ref problem) = args.problem {
+            if let Some(ref problem) = resolved_problem {
                 builder.set_field("problem", problem);
             }
-            if let Some(ref fix) = args.fix {
+            if let Some(ref fix) = resolved_fix {
                 builder.set_field("fix", fix);
             }
-            if let Some(ref accept) = args.accept {
+            if let Some(ref accept) = resolved_accept {
                 builder.set_field("accept", accept);
             }
             for (key, value) in &parsed_fields {
@@ -193,13 +199,14 @@ fn parse_field_pairs(raw: &[String]) -> Result<Vec<(String, String)>> {
             ));
         }
         check_protected_key(&key, false)?;
-        if key == "title" && v.trim().is_empty() {
+        let resolved_v = resolve_text_arg(v)?;
+        if key == "title" && resolved_v.trim().is_empty() {
             return Err(TodoError::new(
                 ErrorCode::BadValue,
                 "title cannot be empty",
             ));
         }
-        pairs.push((key, v.to_string()));
+        pairs.push((key, resolved_v));
     }
     Ok(pairs)
 }

@@ -2,7 +2,7 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, resolve_text_arg};
 use crate::doc::{Status, sanitize_trimmed_value};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
@@ -36,7 +36,8 @@ pub struct Args {
 
 /// Runs `todo answer <task> <text>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let answer_text = sanitize_trimmed_value(&args.text);
+    let raw_text = resolve_text_arg(&args.text)?;
+    let answer_text = sanitize_trimmed_value(&raw_text);
     if answer_text.is_empty() {
         return Err(TodoError::new(
             ErrorCode::BadValue,

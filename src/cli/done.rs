@@ -6,7 +6,7 @@ use std::process::Command as ProcessCommand;
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, resolve_opt_text_arg};
 use crate::doc::Status;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
@@ -57,6 +57,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         None => None,
     };
 
+    let resolved_note = resolve_opt_text_arg(args.note.as_deref())?;
     let cfg = ctx.load_config()?;
     let res = edit_task_and_write(
         ctx,
@@ -81,7 +82,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             if let OwnershipDecision::Forced { previous_owner } = ownership {
                 builder.add_note(&date, agent, &forced_note_text("done", &previous_owner));
             }
-            let note_text = match args.note.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            let note_text = match resolved_note.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
                 Some(text) => format!("done \u{2014} {text}"),
                 None => "done".to_string(),
             };

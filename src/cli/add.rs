@@ -2,7 +2,7 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, resolve_opt_text_arg, resolve_text_arg};
 use crate::doc::{
     CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER, Document, LineEdit, Status, TaskChangeIntent,
     TaskId, sanitize_trimmed_value,
@@ -77,7 +77,8 @@ pub struct Args {
 
 /// Runs `todo add --title ...`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let clean_title = sanitize_trimmed_value(&args.title);
+    let raw_title = resolve_text_arg(&args.title)?;
+    let clean_title = sanitize_trimmed_value(&raw_title);
     if clean_title.is_empty() {
         return Err(TodoError::new(
             ErrorCode::BadValue,
@@ -97,11 +98,15 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         &cfg.types,
     )?;
     let area_val = resolve_allowed("area", args.area.as_deref(), &extra_fields, &cfg.areas)?;
+    let files_arg = resolve_opt_text_arg(args.files.as_deref())?;
+    let problem_arg = resolve_opt_text_arg(args.problem.as_deref())?;
+    let fix_arg = resolve_opt_text_arg(args.fix.as_deref())?;
+    let accept_arg = resolve_opt_text_arg(args.accept.as_deref())?;
     let depends_val = resolve_opt(args.depends.as_deref(), &extra_fields, "depends");
-    let files_val = resolve_opt(args.files.as_deref(), &extra_fields, "files");
-    let problem_val = resolve_opt(args.problem.as_deref(), &extra_fields, "problem");
-    let fix_val = resolve_opt(args.fix.as_deref(), &extra_fields, "fix");
-    let accept_val = resolve_opt(args.accept.as_deref(), &extra_fields, "accept");
+    let files_val = resolve_opt(files_arg.as_deref(), &extra_fields, "files");
+    let problem_val = resolve_opt(problem_arg.as_deref(), &extra_fields, "problem");
+    let fix_val = resolve_opt(fix_arg.as_deref(), &extra_fields, "fix");
+    let accept_val = resolve_opt(accept_arg.as_deref(), &extra_fields, "accept");
     check_required_fields(
         &cfg.required_fields,
         priority_val.as_deref(),
@@ -265,7 +270,8 @@ fn parse_extra_fields(raw: &[String]) -> Result<Vec<(String, String)>> {
                 format!("cannot set `{key}` via --field on add"),
             ));
         }
-        pairs.push((key, sanitize_trimmed_value(v)));
+        let resolved_v = resolve_text_arg(v)?;
+        pairs.push((key, sanitize_trimmed_value(&resolved_v)));
     }
     Ok(pairs)
 }

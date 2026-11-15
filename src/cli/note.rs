@@ -2,7 +2,7 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, resolve_text_arg};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
     OpsConfig, TaskCommand, TaskEditBuilder, check_ownership, edit_task_and_write,
@@ -45,7 +45,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             "missing note text: pass <TEXT> or --text <TEXT>",
         )
     })?;
-    let note_text = raw_text.trim();
+    let resolved_text = resolve_text_arg(&raw_text)?;
+    let note_text = resolved_text.trim();
     if note_text.is_empty() {
         return Err(TodoError::new(ErrorCode::Usage, "note text cannot be empty"));
     }

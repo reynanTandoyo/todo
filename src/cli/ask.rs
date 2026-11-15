@@ -2,7 +2,7 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, resolve_text_arg};
 use crate::doc::{
     CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER, LineEdit, Status, TaskChangeIntent,
     TaskId, sanitize_trimmed_value,
@@ -44,7 +44,8 @@ pub struct Args {
 
 /// Runs `todo ask <question>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let clean_question = sanitize_trimmed_value(&args.question);
+    let raw_question = resolve_text_arg(&args.question)?;
+    let clean_question = sanitize_trimmed_value(&raw_question);
     if clean_question.is_empty() {
         return Err(TodoError::new(
             ErrorCode::BadValue,

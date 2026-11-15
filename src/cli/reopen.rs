@@ -2,7 +2,7 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, resolve_text_arg};
 use crate::doc::{Status, sanitize_trimmed_value};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
@@ -36,7 +36,8 @@ pub struct Args {
 
 /// Runs `todo reopen <task> --note <text>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let reason = sanitize_trimmed_value(&args.note);
+    let raw_note = resolve_text_arg(&args.note)?;
+    let reason = sanitize_trimmed_value(&raw_note);
     if reason.is_empty() {
         return Err(TodoError::new(
             ErrorCode::BadValue,

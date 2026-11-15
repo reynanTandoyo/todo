@@ -12,8 +12,8 @@
 //! (`R-CLAIM-5`) before `run` is called.
 
 use std::ffi::OsString;
-use std::io::Write as _;
-use std::path::PathBuf;
+use std::io::{Read as _, Write as _};
+use std::path::{Path, PathBuf};
 
 use clap::{Args as ClapArgs, Parser, Subcommand, error::ErrorKind};
 use serde::Serialize;
@@ -235,6 +235,60 @@ fn emit_find_notices(found: &FoundTodo, out: &mut Output) {
 
 fn non_empty_env(key: &str) -> Option<String> {
     std::env::var(key).ok().filter(|v| !v.is_empty())
+}
+
+/// Resolves a text option value: `-` reads standard input, `@path` reads a UTF-8 file,
+/// and any other value is returned unchanged (`R-WRITE-12`).
+pub fn resolve_text_arg(raw: &str) -> Result<String> {
+    if raw == "-" {
+        let mut buf = Vec::new();
+        std::io::stdin().read_to_end(&mut buf).map_err(|e| {
+            TodoError::new(
+                ErrorCode::BadValue,
+                format!("failed to read standard input: {e}"),
+            )
+        })?;
+        let text = String::from_utf8(buf).map_err(|e| {
+            TodoError::new(
+                ErrorCode::BadValue,
+                format!("standard input is not valid UTF-8: {e}"),
+            )
+        })?;
+        return Ok(text.strip_prefix('\u{feff}').unwrap_or(&text).to_string());
+    }
+    if let Some(path_str) = raw.strip_prefix('@') {
+        if path_str.is_empty() {
+            return Err(TodoError::new(
+                ErrorCode::Usage,
+                "empty file path after '@' in text option",
+            ));
+        }
+        let path = Path::new(path_str);
+        let bytes = std::fs::read(crate::find::fs_path(path).as_ref()).map_err(|e| {
+            TodoError::new(
+                ErrorCode::NoFile,
+                format!("could not read {}: {e}", path.display()),
+            )
+            .with_file(path.display().to_string())
+        })?;
+        let text = String::from_utf8(bytes).map_err(|e| {
+            TodoError::new(
+                ErrorCode::BadValue,
+                format!("file {} is not valid UTF-8: {e}", path.display()),
+            )
+            .with_file(path.display().to_string())
+        })?;
+        return Ok(text.strip_prefix('\u{feff}').unwrap_or(&text).to_string());
+    }
+    Ok(raw.to_string())
+}
+
+/// Convenience wrapper around [`resolve_text_arg`] for optional text flags (`R-WRITE-12`).
+pub fn resolve_opt_text_arg(raw: Option<&str>) -> Result<Option<String>> {
+    match raw {
+        Some(s) => Ok(Some(resolve_text_arg(s)?)),
+        None => Ok(None),
+    }
 }
 
 /// Validates an agent name per `docs/format.md` §11:
