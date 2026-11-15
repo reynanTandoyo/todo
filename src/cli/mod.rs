@@ -394,6 +394,7 @@ register_commands! {
     Search => search,
     Set => set,
     Show => show,
+    Skill => skill,
     Status => status,
     Summary => summary,
     Unblock => unblock,

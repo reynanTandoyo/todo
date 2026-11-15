@@ -80,6 +80,15 @@ pub fn render_managed_block(eol: &str) -> String {
     out
 }
 
+/// Renders the Claude Code `.claude/skills/todo/SKILL.md` file from [`RULES_TEXT`] (`R-AGENT-5`).
+#[must_use]
+pub fn render_claude_skill() -> String {
+    format!(
+        "---\nname: todo\ndescription: Share a TODO.md task list safely across agents and people using the `todo` CLI.\n---\n\n{}\n",
+        RULES_TEXT.trim()
+    )
+}
+
 /// Inserts or updates the managed agent-rules block in `existing_bytes` (`None` for a new file),
 /// preserving all bytes outside `<!-- todo:begin -->` ... `<!-- todo:end -->` (`R-AGENT-3`).
 pub fn upsert_managed_block(
