@@ -1,5 +1,9 @@
 //! Tests for `todo add --from <file|->` with `@ref` dependencies (T-034; R-WRITE-13).
 
+mod common;
+
+use common::{parse_json, read_text, stderr_text};
+
 use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -50,14 +54,9 @@ fn add_from_adds_30_tasks_with_at_refs_in_one_step() {
         .write_all(payload.as_bytes())
         .unwrap();
     let out = child.wait_with_output().unwrap();
-    assert_eq!(
-        out.status.code(),
-        Some(0),
-        "stderr: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
 
-    let json: Value = serde_json::from_slice(&out.stdout).unwrap();
+    let json: Value = parse_json(&out.stdout);
     assert_eq!(json["data"]["count"], 30);
     assert_eq!(json["data"]["ids"][0], "T-001");
     assert_eq!(json["data"]["ids"][29], "T-030");
@@ -97,7 +96,7 @@ fn add_from_rejects_whole_batch_on_one_bad_entry() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
-    assert_eq!(fs::read_to_string(&path).unwrap(), initial);
+    assert_eq!(read_text(&path), initial);
 
     // Next real `add` still gets T-001 (ids.json was not bumped).
     let next_add = cargo_bin_cmd!("todo")
@@ -115,6 +114,6 @@ fn add_from_rejects_whole_batch_on_one_bad_entry() {
         .output()
         .unwrap();
     assert_eq!(next_add.status.code(), Some(0));
-    let next_json: Value = serde_json::from_slice(&next_add.stdout).unwrap();
+    let next_json: Value = parse_json(&next_add.stdout);
     assert_eq!(next_json["data"]["id"], "T-001");
 }

@@ -5,7 +5,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::todo_bin;
+use common::{parse_json, stderr_text, stdout_text, todo_bin};
 
 #[test]
 fn summary_json_matches_snapshot() {
@@ -72,9 +72,9 @@ fn summary_json_matches_snapshot() {
     assert!(
         out.status.success(),
         "summary --json failed: {}",
-        String::from_utf8_lossy(&out.stderr)
+        stderr_text(&out)
     );
-    let json: Value = serde_json::from_slice(&out.stdout).expect("parse json");
+    let json: Value = parse_json(&out.stdout);
     insta::assert_json_snapshot!("summary_json", json);
 }
 
@@ -109,7 +109,7 @@ fn summary_on_5000_tasks_is_at_most_40_lines() {
         .output()
         .expect("run summary");
     assert!(out.status.success());
-    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stdout = stdout_text(&out);
     let line_count = stdout.lines().count();
     assert!(
         line_count <= 40,

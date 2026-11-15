@@ -143,10 +143,16 @@ pub fn write_todo(dir: &Path, content: &str) -> PathBuf {
     path
 }
 
+/// Reads the UTF-8 text of `path`; panics if it cannot be read.
+#[must_use]
+pub fn read_text(path: &Path) -> String {
+    fs::read_to_string(path).expect("read file")
+}
+
 /// Reads `<dir>/TODO.md` as text.
 #[must_use]
 pub fn read_todo(dir: &Path) -> String {
-    fs::read_to_string(dir.join("TODO.md")).expect("read TODO.md")
+    read_text(&dir.join("TODO.md"))
 }
 
 /// Writes `content` to `<dir>/todo.toml`.
@@ -191,20 +197,20 @@ pub fn git(dir: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&out.stdout).trim().to_string()
 }
 
-/// Parses `bytes` (usually `Output::stdout`) as JSON.
+/// Parses `bytes` (usually `Output::stdout`) as JSON; panics if they are not valid JSON.
 #[must_use]
-pub fn json(bytes: &[u8]) -> Value {
+pub fn parse_json(bytes: &[u8]) -> Value {
     serde_json::from_slice(bytes).expect("valid JSON on stdout")
 }
 
-/// `Output::stdout` as text.
+/// `Output::stdout` as text (lossy UTF-8).
 #[must_use]
-pub fn stdout(out: &Output) -> String {
+pub fn stdout_text(out: &Output) -> String {
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
-/// `Output::stderr` as text.
+/// `Output::stderr` as text (lossy UTF-8).
 #[must_use]
-pub fn stderr(out: &Output) -> String {
+pub fn stderr_text(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).into_owned()
 }

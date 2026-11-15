@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use tempfile::TempDir;
 
-use common::{git, setup_proj};
+use common::{git, parse_json, read_text, setup_proj, stderr_text, stdout_text};
 
 const LEASE_BODY: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->
 # Lease tests
@@ -21,7 +21,7 @@ fn status_works_before_any_state_exists_without_creating_dot_todo() {
 
     let out = common::run_todo(&home, &work, &["--json", "status"], &[]).unwrap();
     assert!(out.status.success());
-    let parsed: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let parsed: serde_json::Value = parse_json(&out.stdout);
     assert_eq!(parsed["schema"], "todo.status.v1");
     assert_eq!(parsed["ok"], true);
     assert_eq!(parsed["data"]["write_lock"]["held"], false);
@@ -30,7 +30,7 @@ fn status_works_before_any_state_exists_without_creating_dot_todo() {
 
     let text_out = common::run_todo(&home, &work, &["status"], &[]).unwrap();
     assert!(text_out.status.success());
-    let stdout = String::from_utf8_lossy(&text_out.stdout);
+    let stdout = stdout_text(&text_out);
     assert!(stdout.contains("Write lock: free"));
     assert!(stdout.contains("Lease: none"));
 }
@@ -42,7 +42,7 @@ fn lock_requires_agent_and_valid_minutes() {
 
     let no_agent = common::run_todo(&home, &work, &["--json", "lock"], &[]).unwrap();
     assert_eq!(no_agent.status.code(), Some(2));
-    let parsed: serde_json::Value = serde_json::from_slice(&no_agent.stdout).unwrap();
+    let parsed: serde_json::Value = parse_json(&no_agent.stdout);
     assert_eq!(parsed["error"]["code"], "NO_AGENT");
 
     let zero_min = common::run_todo(
@@ -53,7 +53,7 @@ fn lock_requires_agent_and_valid_minutes() {
     )
     .unwrap();
     assert_eq!(zero_min.status.code(), Some(1));
-    let parsed: serde_json::Value = serde_json::from_slice(&zero_min.stdout).unwrap();
+    let parsed: serde_json::Value = parse_json(&zero_min.stdout);
     assert_eq!(parsed["error"]["code"], "BAD_VALUE");
 
     let too_long = common::run_todo(
@@ -64,7 +64,7 @@ fn lock_requires_agent_and_valid_minutes() {
     )
     .unwrap();
     assert_eq!(too_long.status.code(), Some(1));
-    let parsed: serde_json::Value = serde_json::from_slice(&too_long.stdout).unwrap();
+    let parsed: serde_json::Value = parse_json(&too_long.stdout);
     assert_eq!(parsed["error"]["code"], "BAD_VALUE");
 }
 
@@ -84,7 +84,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     )
     .unwrap();
     assert!(lock_out.status.success());
-    let lock_json: serde_json::Value = serde_json::from_slice(&lock_out.stdout).unwrap();
+    let lock_json: serde_json::Value = parse_json(&lock_out.stdout);
     assert_eq!(lock_json["schema"], "todo.lock.v1");
     assert_eq!(lock_json["data"]["agent"], "alice");
     assert_eq!(lock_json["data"]["minutes"], 10);
@@ -99,7 +99,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     )
     .unwrap();
     assert!(status_out.status.success());
-    let status_json: serde_json::Value = serde_json::from_slice(&status_out.stdout).unwrap();
+    let status_json: serde_json::Value = parse_json(&status_out.stdout);
     assert_eq!(status_json["data"]["lease"]["agent"], "alice");
     assert_eq!(status_json["data"]["lease"]["remaining_seconds"], 480);
 
@@ -111,7 +111,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     )
     .unwrap();
     assert!(status_text.status.success());
-    let st = String::from_utf8_lossy(&status_text.stdout);
+    let st = stdout_text(&status_text);
     assert!(st.contains("Lease: held by alice"), "status:\n{st}");
 
     // Holder (alice, case-insensitive) can write normally.
@@ -123,11 +123,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     )
     .unwrap();
     assert!(holder_write.status.success());
-    assert!(
-        std::fs::read_to_string(&todo_file)
-            .unwrap()
-            .contains("by-alice")
-    );
+    assert!(read_text(&todo_file).contains("by-alice"));
 
     // Another agent (bob) waits and exits 3 with LEASE_HELD naming alice and the expiry time.
     let bob_write = common::run_todo(
@@ -148,7 +144,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     )
     .unwrap();
     assert_eq!(bob_write.status.code(), Some(3));
-    let bob_json: serde_json::Value = serde_json::from_slice(&bob_write.stdout).unwrap();
+    let bob_json: serde_json::Value = parse_json(&bob_write.stdout);
     assert_eq!(bob_json["error"]["code"], "LEASE_HELD");
     assert_eq!(bob_json["error"]["owner"], "alice");
     assert_eq!(bob_json["error"]["expires_at"], expires_at);
@@ -158,11 +154,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
             .unwrap()
             .contains("alice")
     );
-    assert!(
-        !std::fs::read_to_string(&todo_file)
-            .unwrap()
-            .contains("by-bob-blocked")
-    );
+    assert!(!read_text(&todo_file).contains("by-bob-blocked"));
 
     // After expiry (t0 + 11 minutes), status shows no lease and bob can write.
     let expired_status = common::run_todo(
@@ -172,7 +164,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
         &[("TODO_TEST_NOW", "2026-11-15T14:11:00+01:00")],
     )
     .unwrap();
-    let exp_json: serde_json::Value = serde_json::from_slice(&expired_status.stdout).unwrap();
+    let exp_json: serde_json::Value = parse_json(&expired_status.stdout);
     assert!(exp_json["data"]["lease"].is_null());
 
     let bob_after_expiry = common::run_todo(
@@ -189,11 +181,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     )
     .unwrap();
     assert!(bob_after_expiry.status.success());
-    assert!(
-        std::fs::read_to_string(&todo_file)
-            .unwrap()
-            .contains("by-bob-after-expiry")
-    );
+    assert!(read_text(&todo_file).contains("by-bob-after-expiry"));
 }
 
 #[cfg(feature = "test-hooks")]
@@ -221,7 +209,7 @@ fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
     )
     .unwrap();
     assert_eq!(deny.status.code(), Some(1));
-    let deny_json: serde_json::Value = serde_json::from_slice(&deny.stdout).unwrap();
+    let deny_json: serde_json::Value = parse_json(&deny.stdout);
     assert_eq!(deny_json["error"]["code"], "NOT_OWNER");
     assert_eq!(deny_json["error"]["owner"], "alice");
 
@@ -234,7 +222,7 @@ fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
     )
     .unwrap();
     assert!(forced.status.success());
-    let forced_json: serde_json::Value = serde_json::from_slice(&forced.stdout).unwrap();
+    let forced_json: serde_json::Value = parse_json(&forced.stdout);
     assert_eq!(forced_json["schema"], "todo.unlock.v1");
     assert_eq!(forced_json["data"]["unlocked"], true);
     assert_eq!(forced_json["data"]["forced"], true);
@@ -260,7 +248,7 @@ fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
     )
     .unwrap();
     assert!(forced_text.status.success());
-    assert!(String::from_utf8_lossy(&forced_text.stdout).contains("carol"));
+    assert!(stdout_text(&forced_text).contains("carol"));
 
     // Owner unlocking own lease works without --force.
     assert!(
@@ -282,7 +270,7 @@ fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
     )
     .unwrap();
     assert!(own_unlock.status.success());
-    assert!(String::from_utf8_lossy(&own_unlock.stdout).contains("dave"));
+    assert!(stdout_text(&own_unlock).contains("dave"));
 }
 
 #[cfg(feature = "test-hooks")]
@@ -320,7 +308,7 @@ fn status_shows_active_write_lock_holder_without_waiting() {
 
     assert!(status_out.status.success());
     assert!(elapsed < Duration::from_millis(500));
-    let parsed: serde_json::Value = serde_json::from_slice(&status_out.stdout).unwrap();
+    let parsed: serde_json::Value = parse_json(&status_out.stdout);
     assert_eq!(parsed["data"]["write_lock"]["held"], true);
     assert_eq!(
         parsed["data"]["write_lock"]["holder"]["agent"],
@@ -366,9 +354,9 @@ fn cli_changed_during_write_exits_3_and_leaves_no_tmp() {
 
     let output = writer.wait_with_output().unwrap();
     assert_eq!(output.status.code(), Some(3));
-    let parsed: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let parsed: serde_json::Value = parse_json(&output.stdout);
     assert_eq!(parsed["error"]["code"], "CHANGED_DURING_WRITE");
-    assert_eq!(std::fs::read_to_string(&todo_file).unwrap(), external);
+    assert_eq!(read_text(&todo_file), external);
 
     let tmp_count = std::fs::read_dir(&work)
         .unwrap()
@@ -406,9 +394,9 @@ fn linked_worktree_status_works_with_git_removed_from_path() {
     assert!(
         out.status.success(),
         "status failed without git on PATH: {}",
-        String::from_utf8_lossy(&out.stderr)
+        stderr_text(&out)
     );
-    let parsed: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let parsed: serde_json::Value = parse_json(&out.stdout);
     let reported = Path::new(parsed["data"]["file"].as_str().unwrap());
     assert_eq!(
         std::fs::canonicalize(reported).unwrap(),

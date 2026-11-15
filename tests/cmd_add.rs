@@ -9,7 +9,7 @@ use std::thread;
 
 use tempfile::TempDir;
 
-use common::setup_proj;
+use common::{parse_json, read_text, setup_proj, stderr_text, stdout_text};
 use todo::doc::Document;
 
 #[test]
@@ -62,7 +62,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
     )
     .unwrap();
     assert_eq!(unk.status.code(), Some(1));
-    let j_unk: serde_json::Value = serde_json::from_slice(&unk.stdout).unwrap();
+    let j_unk: serde_json::Value = parse_json(&unk.stdout);
     assert_eq!(j_unk["error"]["code"], "UNKNOWN_SECTION");
     let msg_unk = j_unk["error"]["message"].as_str().unwrap();
     assert!(msg_unk.contains("1. Now"), "msg: {msg_unk}");
@@ -89,7 +89,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
     )
     .unwrap();
     assert_eq!(amb.status.code(), Some(1));
-    let j_amb: serde_json::Value = serde_json::from_slice(&amb.stdout).unwrap();
+    let j_amb: serde_json::Value = parse_json(&amb.stdout);
     assert_eq!(j_amb["error"]["code"], "AMBIGUOUS_SECTION");
     let msg_amb = j_amb["error"]["message"].as_str().unwrap();
     assert!(msg_amb.contains("2. Next Release"), "msg: {msg_amb}");
@@ -134,7 +134,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
     )
     .unwrap();
     assert_eq!(dup.status.code(), Some(1));
-    let j_dup: serde_json::Value = serde_json::from_slice(&dup.stdout).unwrap();
+    let j_dup: serde_json::Value = parse_json(&dup.stdout);
     assert_eq!(j_dup["error"]["code"], "DUPLICATE_TITLE");
 
     // 5. Missing required priority -> MISSING_FIELD; invalid priority -> BAD_VALUE.
@@ -155,7 +155,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
     )
     .unwrap();
     assert_eq!(miss_p.status.code(), Some(1));
-    let j_mp: serde_json::Value = serde_json::from_slice(&miss_p.stdout).unwrap();
+    let j_mp: serde_json::Value = parse_json(&miss_p.stdout);
     assert_eq!(j_mp["error"]["code"], "MISSING_FIELD");
 
     let bad_p = common::run_todo(
@@ -177,7 +177,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
     )
     .unwrap();
     assert_eq!(bad_p.status.code(), Some(1));
-    let j_bp: serde_json::Value = serde_json::from_slice(&bad_p.stdout).unwrap();
+    let j_bp: serde_json::Value = parse_json(&bad_p.stdout);
     assert_eq!(j_bp["error"]["code"], "BAD_VALUE");
 
     // All refusals left TODO.md byte-identical.
@@ -217,14 +217,10 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
         &[("TODO_TEST_NOW", now)],
     )
     .unwrap();
-    assert!(
-        ok1.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&ok1.stderr)
-    );
-    assert_eq!(String::from_utf8_lossy(&ok1.stdout).trim(), "T-006: add ok");
+    assert!(ok1.status.success(), "stderr: {}", stderr_text(&ok1));
+    assert_eq!(stdout_text(&ok1).trim(), "T-006: add ok");
 
-    let after1 = fs::read_to_string(&todo_file).unwrap();
+    let after1 = read_text(&todo_file);
     assert!(
         after1.contains(
             "### T-006 · Already finished\n\
@@ -270,7 +266,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
     )
     .unwrap();
     assert!(ok2.status.success());
-    let j_ok2: serde_json::Value = serde_json::from_slice(&ok2.stdout).unwrap();
+    let j_ok2: serde_json::Value = parse_json(&ok2.stdout);
     assert_eq!(j_ok2["schema"], "todo.add.v1");
     assert_eq!(j_ok2["data"]["id"], "T-007");
 }
@@ -318,10 +314,10 @@ fn twenty_parallel_adds_lose_nothing_and_get_distinct_ids() {
                 out.status.success(),
                 "worker {i} failed: status={:?}, stdout={}, stderr={}",
                 out.status.code(),
-                String::from_utf8_lossy(&out.stdout),
-                String::from_utf8_lossy(&out.stderr)
+                stdout_text(&out),
+                stderr_text(&out)
             );
-            let j: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+            let j: serde_json::Value = parse_json(&out.stdout);
             j["data"]["id"].as_str().unwrap().to_string()
         }));
     }

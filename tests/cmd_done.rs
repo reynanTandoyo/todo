@@ -7,7 +7,7 @@ use std::path::Path;
 
 use tempfile::TempDir;
 
-use common::git;
+use common::{git, parse_json, read_text, stderr_text, stdout_text};
 
 use common::setup_proj;
 
@@ -57,18 +57,14 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
         &[("TODO_TEST_NOW", now)],
     )
     .unwrap();
-    assert!(
-        out1.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&out1.stderr)
-    );
-    let stdout1 = String::from_utf8_lossy(&out1.stdout);
+    assert!(out1.status.success(), "stderr: {}", stderr_text(&out1));
+    let stdout1 = stdout_text(&out1);
     assert!(stdout1.contains("T-001: done ok"), "stdout: {stdout1}");
     assert!(
         stdout1.contains("accept: all unit tests pass"),
         "stdout: {stdout1}"
     );
-    let after1 = fs::read_to_string(&todo_file).unwrap();
+    let after1 = read_text(&todo_file);
     assert!(after1.contains(
         "### T-001 · Open task\n\
 - status: done\n\
@@ -88,7 +84,7 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
     )
     .unwrap();
     assert_eq!(out_not_owner.status.code(), Some(1));
-    let j_no: serde_json::Value = serde_json::from_slice(&out_not_owner.stdout).unwrap();
+    let j_no: serde_json::Value = parse_json(&out_not_owner.stdout);
     assert_eq!(j_no["error"]["code"], "NOT_OWNER");
     assert_eq!(fs::read(&todo_file).unwrap(), before_refusal);
 
@@ -101,9 +97,9 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
     )
     .unwrap();
     assert!(out2.status.success());
-    let stdout2 = String::from_utf8_lossy(&out2.stdout);
+    let stdout2 = stdout_text(&out2);
     assert!(stdout2.contains("accept: zero warnings"));
-    let after2 = fs::read_to_string(&todo_file).unwrap();
+    let after2 = read_text(&todo_file);
     assert!(after2.contains(
         "### T-002 · Claimed by alice\n\
 - status: done\n\
@@ -124,7 +120,7 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
     )
     .unwrap();
     assert_eq!(out_blocked.status.code(), Some(1));
-    let j_bl: serde_json::Value = serde_json::from_slice(&out_blocked.stdout).unwrap();
+    let j_bl: serde_json::Value = parse_json(&out_blocked.stdout);
     assert_eq!(j_bl["error"]["code"], "BAD_TRANSITION");
     assert_eq!(fs::read(&todo_file).unwrap(), before_blocked);
 
@@ -136,11 +132,11 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
     )
     .unwrap();
     assert!(out_force.status.success());
-    let j_force: serde_json::Value = serde_json::from_slice(&out_force.stdout).unwrap();
+    let j_force: serde_json::Value = parse_json(&out_force.stdout);
     assert_eq!(j_force["schema"], "todo.done.v1");
     assert_eq!(j_force["data"]["status"], "done");
     assert_eq!(j_force["data"]["owner"], "bob");
-    let after3 = fs::read_to_string(&todo_file).unwrap();
+    let after3 = read_text(&todo_file);
     assert!(after3.contains("- note (2026-11-15, bob): forced done (owner was alice)\n"));
     assert!(after3.contains("- note (2026-11-15, bob): done\n"));
 
@@ -154,7 +150,7 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
     )
     .unwrap();
     assert_eq!(out_done.status.code(), Some(1));
-    let j_done: serde_json::Value = serde_json::from_slice(&out_done.stdout).unwrap();
+    let j_done: serde_json::Value = parse_json(&out_done.stdout);
     assert_eq!(j_done["error"]["code"], "BAD_TRANSITION");
     assert_eq!(fs::read(&todo_file).unwrap(), before_done);
 }
@@ -193,7 +189,7 @@ fn done_commit_resolves_head_rejects_unknown_and_accepts_when_git_missing() {
     )
     .unwrap();
     assert_eq!(bad_commit.status.code(), Some(1));
-    let j_bad: serde_json::Value = serde_json::from_slice(&bad_commit.stdout).unwrap();
+    let j_bad: serde_json::Value = parse_json(&bad_commit.stdout);
     assert_eq!(j_bad["error"]["code"], "BAD_VALUE");
     assert_eq!(fs::read(&todo_file).unwrap(), before_bad);
 
@@ -210,9 +206,9 @@ fn done_commit_resolves_head_rejects_unknown_and_accepts_when_git_missing() {
     assert!(
         good_head.status.success(),
         "stderr: {}",
-        String::from_utf8_lossy(&good_head.stderr)
+        stderr_text(&good_head)
     );
-    let after1 = fs::read_to_string(&todo_file).unwrap();
+    let after1 = read_text(&todo_file);
     assert!(
         after1.contains(&format!("- commit: {head_short}\n")),
         "missing resolved commit {head_short}:\n{after1}"
@@ -229,9 +225,9 @@ fn done_commit_resolves_head_rejects_unknown_and_accepts_when_git_missing() {
     assert!(
         without_git.status.success(),
         "stderr: {}",
-        String::from_utf8_lossy(&without_git.stderr)
+        stderr_text(&without_git)
     );
-    let after2 = fs::read_to_string(&todo_file).unwrap();
+    let after2 = read_text(&todo_file);
     assert!(after2.contains("- commit: cafebabe\n"));
 }
 
@@ -289,7 +285,7 @@ fn done_lists_tasks_that_became_ready() {
     )
     .unwrap();
     assert!(res2.status.success());
-    let json: serde_json::Value = serde_json::from_slice(&res2.stdout).unwrap();
+    let json: serde_json::Value = parse_json(&res2.stdout);
     let ready = json["data"]["newly_ready"].as_array().unwrap();
     assert_eq!(ready.len(), 1);
     assert_eq!(ready[0]["id"], "T-004");

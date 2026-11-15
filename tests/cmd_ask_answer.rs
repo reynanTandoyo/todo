@@ -1,5 +1,9 @@
 //! Tests for `todo ask` and `todo answer` (T-031; R-WRITE-11).
 
+mod common;
+
+use common::{parse_json, read_text, stderr_text};
+
 use std::fs;
 
 use assert_cmd::cargo::cargo_bin_cmd;
@@ -28,15 +32,15 @@ fn ask_adds_questions_section_next_skips_questions_and_answer_completes() {
         ask_out.status.code(),
         Some(0),
         "stderr: {}",
-        String::from_utf8_lossy(&ask_out.stderr)
+        stderr_text(&ask_out)
     );
-    let ask_json: Value = serde_json::from_slice(&ask_out.stdout).unwrap();
+    let ask_json: Value = parse_json(&ask_out.stdout);
     assert_eq!(ask_json["data"]["id"], "T-001");
     assert_eq!(ask_json["data"]["type"], "question");
     assert_eq!(ask_json["data"]["section"], "Questions");
     assert_eq!(ask_json["data"]["status"], "open");
 
-    let content = fs::read_to_string(&path).unwrap();
+    let content = read_text(&path);
     assert!(content.contains("## Questions\n"));
 
     // `next` never hands out questions, even when it's the only open task.
@@ -46,7 +50,7 @@ fn ask_adds_questions_section_next_skips_questions_and_answer_completes() {
         .output()
         .unwrap();
     assert_eq!(next_out.status.code(), Some(0));
-    let next_json: Value = serde_json::from_slice(&next_out.stdout).unwrap();
+    let next_json: Value = parse_json(&next_out.stdout);
     assert!(next_json["data"]["task"].is_null());
 
     // `answer` records the answer note and marks it done.
@@ -63,7 +67,7 @@ fn ask_adds_questions_section_next_skips_questions_and_answer_completes() {
         .output()
         .unwrap();
     assert_eq!(ans_out.status.code(), Some(0));
-    let ans_json: Value = serde_json::from_slice(&ans_out.stdout).unwrap();
+    let ans_json: Value = parse_json(&ans_out.stdout);
     assert_eq!(ans_json["data"]["status"], "done");
     let notes = ans_json["data"]["notes"].as_array().unwrap();
     assert!(
@@ -93,6 +97,6 @@ fn ask_respects_question_section_in_todo_toml() {
         .output()
         .unwrap();
     assert_eq!(ask_out.status.code(), Some(0));
-    let ask_json: Value = serde_json::from_slice(&ask_out.stdout).unwrap();
+    let ask_json: Value = parse_json(&ask_out.stdout);
     assert_eq!(ask_json["data"]["section"], "Open Questions");
 }

@@ -3,6 +3,10 @@
 //! Run in release mode with:
 //! `cargo test --release --test perf -- --ignored`
 
+mod common;
+
+use common::stderr_text;
+
 use std::fmt::Write as _;
 use std::fs;
 use std::process::Command;
@@ -77,7 +81,7 @@ fn perf_5000_tasks_list_show_and_write_meet_nfr3_budgets() {
             output.status.success(),
             "command {:?} failed: {}",
             args,
-            String::from_utf8_lossy(&output.stderr)
+            stderr_text(&output)
         );
         elapsed
     };

@@ -1,5 +1,9 @@
 //! CLI integration tests for T-004 and T-005 (TEST-8).
 
+mod common;
+
+use common::parse_json;
+
 use std::process::{Command, Stdio};
 
 use assert_cmd::cargo::cargo_bin_cmd;
@@ -42,7 +46,7 @@ fn version_flag_prints_version() {
         .output()
         .unwrap();
     assert!(json_out.status.success());
-    let parsed: serde_json::Value = serde_json::from_slice(&json_out.stdout).unwrap();
+    let parsed: serde_json::Value = parse_json(&json_out.stdout);
     assert_eq!(parsed["schema"], "todo.version.v1");
     assert_eq!(parsed["data"]["version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(parsed["data"]["commit"], env!("TODO_GIT_COMMIT"));
@@ -125,7 +129,7 @@ fn json_overview_and_error_envelopes_match_snapshots() {
 
     let ok_out = todo_cmd(&home).arg("--json").output().unwrap();
     assert!(ok_out.status.success());
-    let ok_json: serde_json::Value = serde_json::from_slice(&ok_out.stdout).unwrap();
+    let ok_json: serde_json::Value = parse_json(&ok_out.stdout);
     insta::assert_json_snapshot!("cli_overview_json", ok_json);
 
     let err_out = todo_cmd(&home)
@@ -134,7 +138,7 @@ fn json_overview_and_error_envelopes_match_snapshots() {
         .unwrap();
     assert_eq!(err_out.status.code(), Some(2));
     assert!(err_out.stderr.is_empty());
-    let err_json: serde_json::Value = serde_json::from_slice(&err_out.stdout).unwrap();
+    let err_json: serde_json::Value = parse_json(&err_out.stdout);
     insta::assert_json_snapshot!("cli_help_unknown_json", err_json);
 }
 
@@ -174,7 +178,7 @@ fn help_agents_prints_builtin_rules_text() {
         .output()
         .unwrap();
     assert!(json_out.status.success());
-    let parsed: serde_json::Value = serde_json::from_slice(&json_out.stdout).unwrap();
+    let parsed: serde_json::Value = parse_json(&json_out.stdout);
     assert_eq!(parsed["schema"], "todo.help.v1");
     assert_eq!(parsed["ok"], true);
     assert_eq!(parsed["data"]["topic"], "agents");

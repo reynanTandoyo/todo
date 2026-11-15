@@ -1,5 +1,9 @@
 //! Tests for title matching on task arguments (T-029; R-ID-4).
 
+mod common;
+
+use common::parse_json;
+
 use std::fs;
 
 use assert_cmd::cargo::cargo_bin_cmd;
@@ -44,7 +48,7 @@ fn title_matching_unique_ambiguous_none_and_skips_done_dropped() {
         .output()
         .unwrap();
     assert_eq!(show_out.status.code(), Some(0));
-    let show_json: Value = serde_json::from_slice(&show_out.stdout).unwrap();
+    let show_json: Value = parse_json(&show_out.stdout);
     assert_eq!(show_json["data"]["id"], "T-001");
 
     // Write command by title ("login timeout") claims T-001.
@@ -54,7 +58,7 @@ fn title_matching_unique_ambiguous_none_and_skips_done_dropped() {
         .output()
         .unwrap();
     assert_eq!(claim_out.status.code(), Some(0));
-    let claim_json: Value = serde_json::from_slice(&claim_out.stdout).unwrap();
+    let claim_json: Value = parse_json(&claim_out.stdout);
     assert_eq!(claim_json["data"]["id"], "T-001");
     assert_eq!(claim_json["data"]["status"], "claimed");
 
@@ -65,7 +69,7 @@ fn title_matching_unique_ambiguous_none_and_skips_done_dropped() {
         .output()
         .unwrap();
     assert_eq!(ambig_out.status.code(), Some(1));
-    let ambig_json: Value = serde_json::from_slice(&ambig_out.stdout).unwrap();
+    let ambig_json: Value = parse_json(&ambig_out.stdout);
     assert_eq!(ambig_json["error"]["code"], "AMBIGUOUS");
     let candidates = ambig_json["error"]["candidates"].as_array().unwrap();
     assert_eq!(candidates.len(), 2);

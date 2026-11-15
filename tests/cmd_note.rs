@@ -6,7 +6,7 @@ use std::fs;
 
 use tempfile::TempDir;
 
-use common::setup_proj;
+use common::{parse_json, read_text, setup_proj, stderr_text, stdout_text};
 
 #[test]
 fn note_appends_after_last_line_on_any_status_by_any_agent() {
@@ -42,12 +42,8 @@ fn note_appends_after_last_line_on_any_status_by_any_agent() {
         &[("TODO_TEST_NOW", now)],
     )
     .unwrap();
-    assert!(
-        n1.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&n1.stderr)
-    );
-    assert_eq!(String::from_utf8_lossy(&n1.stdout).trim(), "T-002: note ok");
+    assert!(n1.status.success(), "stderr: {}", stderr_text(&n1));
+    assert_eq!(stdout_text(&n1).trim(), "T-002: note ok");
 
     // --text flag on done and dropped tasks, plus open task.
     for (id, msg) in [
@@ -63,11 +59,11 @@ fn note_appends_after_last_line_on_any_status_by_any_agent() {
         )
         .unwrap();
         assert!(res.status.success());
-        let j: serde_json::Value = serde_json::from_slice(&res.stdout).unwrap();
+        let j: serde_json::Value = parse_json(&res.stdout);
         assert_eq!(j["schema"], "todo.note.v1");
     }
 
-    let after = fs::read_to_string(&todo_file).unwrap();
+    let after = read_text(&todo_file);
     assert!(after.contains(
         "### T-002 · Claimed by alice\n\
 - status: claimed\n\

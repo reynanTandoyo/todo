@@ -8,7 +8,7 @@ use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{git, write_todo, write_toml};
+use common::{git, parse_json, read_todo, stderr_text, write_todo, write_toml};
 use todo::find::WorktreeMode;
 use todo::ops::OpsConfig;
 
@@ -82,7 +82,7 @@ fn unknown_key_and_bad_values_report_todo_toml_line_and_message() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
-    let stderr = String::from_utf8_lossy(&out.stderr);
+    let stderr = stderr_text(&out);
     assert!(
         stderr.contains("todo.toml:3:"),
         "expected todo.toml:3: in stderr, got: {stderr}"
@@ -97,7 +97,7 @@ fn unknown_key_and_bad_values_report_todo_toml_line_and_message() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
-    let json: Value = serde_json::from_slice(&out.stdout).unwrap();
+    let json: Value = parse_json(&out.stdout);
     assert_eq!(json["ok"], false);
     assert_eq!(json["error"]["code"], "BAD_VALUE");
     assert_eq!(json["error"]["file"], "todo.toml");
@@ -219,9 +219,9 @@ lease_max_minutes = 15
         added.status.code(),
         Some(0),
         "stderr: {}",
-        String::from_utf8_lossy(&added.stderr)
+        stderr_text(&added)
     );
-    let added_json: Value = serde_json::from_slice(&added.stdout).unwrap();
+    let added_json: Value = parse_json(&added.stdout);
     assert_eq!(added_json["data"]["id"], "REQ-0006");
     assert_eq!(added_json["data"]["section"], "Inbox");
 
@@ -232,7 +232,7 @@ lease_max_minutes = 15
         .output()
         .unwrap();
     assert_eq!(arch.status.code(), Some(0));
-    let arch_json: Value = serde_json::from_slice(&arch.stdout).unwrap();
+    let arch_json: Value = parse_json(&arch.stdout);
     assert_eq!(arch_json["data"]["tasks"][0]["id"], "REQ-0005");
 
     // `lock` defaults to `lease_minutes = 5` and rejects `--minutes 20` (> `lease_max_minutes = 15`).
@@ -249,7 +249,7 @@ lease_max_minutes = 15
         .output()
         .unwrap();
     assert_eq!(locked.status.code(), Some(0));
-    let locked_json: Value = serde_json::from_slice(&locked.stdout).unwrap();
+    let locked_json: Value = parse_json(&locked.stdout);
     assert_eq!(locked_json["data"]["minutes"], 5);
 
     let _ = cargo_bin_cmd!("todo")
@@ -259,7 +259,7 @@ lease_max_minutes = 15
         .unwrap();
 
     // `claim_ttl_hours = 1`: a claim from 2 hours ago is stale.
-    let todo_text = fs::read_to_string(dir.path().join("TODO.md")).unwrap();
+    let todo_text = read_todo(dir.path());
     let stale_claim = todo_text
         .replace("- status: open", "- status: claimed")
         .replace(
@@ -273,7 +273,7 @@ lease_max_minutes = 15
         .output()
         .unwrap();
     assert_eq!(stale_list.status.code(), Some(0));
-    let stale_json: Value = serde_json::from_slice(&stale_list.stdout).unwrap();
+    let stale_json: Value = parse_json(&stale_list.stdout);
     assert_eq!(stale_json["data"]["count"], 1);
 }
 
@@ -317,6 +317,6 @@ fn worktree_local_in_todo_toml_uses_worktrees_own_todo() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(0));
-    let json: Value = serde_json::from_slice(&out.stdout).unwrap();
+    let json: Value = parse_json(&out.stdout);
     assert_eq!(json["data"]["tasks"][0]["id"], "T-099");
 }

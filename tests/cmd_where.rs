@@ -8,7 +8,7 @@ use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::git;
+use common::{git, parse_json, stderr_text, stdout_text};
 
 #[test]
 fn where_prints_all_r_find_7_items_in_text_and_json() {
@@ -40,7 +40,7 @@ fn where_prints_all_r_find_7_items_in_text_and_json() {
         .output()
         .unwrap();
     assert_eq!(text_out.status.code(), Some(0));
-    let stdout = String::from_utf8_lossy(&text_out.stdout);
+    let stdout = stdout_text(&text_out);
     assert!(stdout.contains("File:"), "stdout: {stdout}");
     assert!(stdout.contains("found by: walk"), "stdout: {stdout}");
     assert!(stdout.contains("Repo root:"), "stdout: {stdout}");
@@ -60,7 +60,7 @@ fn where_prints_all_r_find_7_items_in_text_and_json() {
         .output()
         .unwrap();
     assert_eq!(json_out.status.code(), Some(0));
-    let json: Value = serde_json::from_slice(&json_out.stdout).unwrap();
+    let json: Value = parse_json(&json_out.stdout);
     assert_eq!(json["ok"], true);
     assert_eq!(json["data"]["found_by"], "walk");
     assert!(json["data"]["file"].as_str().unwrap().ends_with("TODO.md"));
@@ -88,7 +88,7 @@ fn where_works_outside_git_repo() {
         .output()
         .unwrap();
     assert_eq!(json_out.status.code(), Some(0));
-    let json: Value = serde_json::from_slice(&json_out.stdout).unwrap();
+    let json: Value = parse_json(&json_out.stdout);
     assert_eq!(json["data"]["found_by"], "walk");
     assert!(json["data"]["repo_root"].is_null());
     assert!(json["data"]["format_version"].is_null());
@@ -132,10 +132,10 @@ fn warns_on_onedrive_and_dropbox_in_where_and_writes() {
     assert!(
         add_out.status.success(),
         "add failed: stdout={}, stderr={}",
-        String::from_utf8_lossy(&add_out.stdout),
-        String::from_utf8_lossy(&add_out.stderr)
+        stdout_text(&add_out),
+        stderr_text(&add_out)
     );
-    let json: Value = serde_json::from_slice(&add_out.stdout).unwrap();
+    let json: Value = parse_json(&add_out.stdout);
     let warnings = json["warnings"].as_array().unwrap();
     assert!(
         warnings

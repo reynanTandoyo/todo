@@ -1,5 +1,9 @@
 //! Tests for `-` (stdin) and `@path` text options (T-032; R-WRITE-12).
 
+mod common;
+
+use common::{parse_json, stderr_text};
+
 use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -45,7 +49,7 @@ fn text_with_quotes_backticks_and_dollar_arrives_intact_via_stdin_and_at_file() 
         TRICKY,
     );
     assert_eq!(note_out.status.code(), Some(0));
-    let note_json: Value = serde_json::from_slice(&note_out.stdout).unwrap();
+    let note_json: Value = parse_json(&note_out.stdout);
     assert_eq!(note_json["data"]["notes"][0]["text"], TRICKY);
 
     // 2. `add` reading `--title` from `@path` (with spaces and non-ASCII in path).
@@ -75,9 +79,9 @@ fn text_with_quotes_backticks_and_dollar_arrives_intact_via_stdin_and_at_file() 
         add_out.status.code(),
         Some(0),
         "stderr: {}",
-        String::from_utf8_lossy(&add_out.stderr)
+        stderr_text(&add_out)
     );
-    let add_json: Value = serde_json::from_slice(&add_out.stdout).unwrap();
+    let add_json: Value = parse_json(&add_out.stdout);
     assert_eq!(add_json["data"]["title"], TRICKY);
     assert_eq!(add_json["data"]["problem"], TRICKY);
 
@@ -88,7 +92,7 @@ fn text_with_quotes_backticks_and_dollar_arrives_intact_via_stdin_and_at_file() 
         TRICKY,
     );
     assert_eq!(done_out.status.code(), Some(0));
-    let done_json: Value = serde_json::from_slice(&done_out.stdout).unwrap();
+    let done_json: Value = parse_json(&done_out.stdout);
     let notes = done_json["data"]["notes"].as_array().unwrap();
     assert!(
         notes

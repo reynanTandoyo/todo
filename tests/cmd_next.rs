@@ -7,7 +7,7 @@ use std::fs;
 
 use tempfile::TempDir;
 
-use common::setup_proj;
+use common::{parse_json, read_text, setup_proj, stderr_text, stdout_text};
 use todo::doc::{Document, Status, TaskId};
 
 #[cfg(feature = "test-hooks")]
@@ -74,7 +74,7 @@ fn next_respects_priority_dependencies_questions_stale_and_filters() {
     let top =
         common::run_todo(&home, &work, &["--json", "next"], &[("TODO_TEST_NOW", now)]).unwrap();
     assert!(top.status.success());
-    let j: serde_json::Value = serde_json::from_slice(&top.stdout).unwrap();
+    let j: serde_json::Value = parse_json(&top.stdout);
     assert_eq!(j["data"]["task"]["id"], "T-008");
     assert_eq!(j["data"]["claimed"], false);
     assert_eq!(j["data"]["already_claimed"], false);
@@ -87,7 +87,7 @@ fn next_respects_priority_dependencies_questions_stale_and_filters() {
         &[("TODO_TEST_NOW", now)],
     )
     .unwrap();
-    let j_api: serde_json::Value = serde_json::from_slice(&api.stdout).unwrap();
+    let j_api: serde_json::Value = parse_json(&api.stdout);
     assert_eq!(j_api["data"]["task"]["id"], "T-006");
 
     // Filter `--section Frontend` checks archive deps too -> picks T-007.
@@ -98,7 +98,7 @@ fn next_respects_priority_dependencies_questions_stale_and_filters() {
         &[("TODO_TEST_NOW", now)],
     )
     .unwrap();
-    let j_fe: serde_json::Value = serde_json::from_slice(&fe.stdout).unwrap();
+    let j_fe: serde_json::Value = parse_json(&fe.stdout);
     assert_eq!(j_fe["data"]["task"]["id"], "T-007");
 
     // Filter `--where flavor=hot`: picks T-006.
@@ -109,7 +109,7 @@ fn next_respects_priority_dependencies_questions_stale_and_filters() {
         &[("TODO_TEST_NOW", now)],
     )
     .unwrap();
-    let j_wh: serde_json::Value = serde_json::from_slice(&wh.stdout).unwrap();
+    let j_wh: serde_json::Value = parse_json(&wh.stdout);
     assert_eq!(j_wh["data"]["task"]["id"], "T-006");
 }
 
@@ -147,7 +147,7 @@ fn next_returns_own_claim_first_unless_new_and_claims_atomically() {
         &[("TODO_TEST_NOW", now)],
     )
     .unwrap();
-    let j_own: serde_json::Value = serde_json::from_slice(&own.stdout).unwrap();
+    let j_own: serde_json::Value = parse_json(&own.stdout);
     assert_eq!(j_own["data"]["task"]["id"], "T-003");
     assert_eq!(j_own["data"]["already_claimed"], true);
     assert_eq!(j_own["data"]["claimed"], false);
@@ -160,7 +160,7 @@ fn next_returns_own_claim_first_unless_new_and_claims_atomically() {
         &[("TODO_TEST_NOW", now)],
     )
     .unwrap();
-    let txt = String::from_utf8_lossy(&own_txt.stdout);
+    let txt = stdout_text(&own_txt);
     assert!(txt.contains("T-003"), "txt: {txt}");
     assert!(txt.contains("already claimed by you"), "txt: {txt}");
 
@@ -173,7 +173,7 @@ fn next_returns_own_claim_first_unless_new_and_claims_atomically() {
     )
     .unwrap();
     assert_eq!(no_agent.status.code(), Some(2));
-    assert_eq!(fs::read_to_string(&todo_file).unwrap(), body);
+    assert_eq!(read_text(&todo_file), body);
 
     // `next --claim --new --agent alice` skips T-003 and claims highest-priority P0 T-001.
     let claim_new = common::run_todo(
@@ -184,7 +184,7 @@ fn next_returns_own_claim_first_unless_new_and_claims_atomically() {
     )
     .unwrap();
     assert!(claim_new.status.success());
-    let j_new: serde_json::Value = serde_json::from_slice(&claim_new.stdout).unwrap();
+    let j_new: serde_json::Value = parse_json(&claim_new.stdout);
     assert_eq!(j_new["data"]["task"]["id"], "T-001");
     assert_eq!(j_new["data"]["claimed"], true);
     assert_eq!(j_new["data"]["already_claimed"], false);
@@ -208,7 +208,7 @@ fn next_returns_own_claim_first_unless_new_and_claims_atomically() {
     )
     .unwrap();
     assert!(none.status.success());
-    let j_none: serde_json::Value = serde_json::from_slice(&none.stdout).unwrap();
+    let j_none: serde_json::Value = parse_json(&none.stdout);
     assert!(j_none["data"]["task"].is_null());
     assert_eq!(j_none["data"]["claimed"], false);
 }
@@ -253,10 +253,10 @@ fn ten_parallel_next_claim_get_ten_different_tasks() {
             out.status.success(),
             "worker-{i:02} failed ({:?}): stdout={} stderr={}",
             out.status.code(),
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr)
+            stdout_text(out),
+            stderr_text(out)
         );
-        let j: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        let j: serde_json::Value = parse_json(&out.stdout);
         assert_eq!(j["ok"], true);
         assert_eq!(j["data"]["claimed"], true);
         let id = j["data"]["task"]["id"].as_str().unwrap().to_string();

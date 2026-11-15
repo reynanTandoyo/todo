@@ -6,7 +6,7 @@ use std::fs;
 
 use tempfile::TempDir;
 
-use common::setup_proj;
+use common::{parse_json, read_text, setup_proj};
 
 #[test]
 fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
@@ -61,7 +61,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     )
     .unwrap();
     assert!(b1.status.success());
-    let after_b1 = fs::read_to_string(&todo_file).unwrap();
+    let after_b1 = read_text(&todo_file);
     assert!(after_b1.contains(
         "### T-001 · Open task\n\
 - status: blocked\n\
@@ -79,7 +79,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     )
     .unwrap();
     assert_eq!(reblock.status.code(), Some(1));
-    let j_rb: serde_json::Value = serde_json::from_slice(&reblock.stdout).unwrap();
+    let j_rb: serde_json::Value = parse_json(&reblock.stdout);
     assert_eq!(j_rb["error"]["code"], "BAD_TRANSITION");
     assert_eq!(fs::read(&todo_file).unwrap(), before_reblock);
 
@@ -92,7 +92,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     )
     .unwrap();
     assert!(u1.status.success());
-    let after_u1 = fs::read_to_string(&todo_file).unwrap();
+    let after_u1 = read_text(&todo_file);
     assert!(after_u1.contains(
         "### T-001 · Open task\n\
 - status: open\n\
@@ -124,7 +124,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     )
     .unwrap();
     assert_eq!(block_other.status.code(), Some(1));
-    let j_bo: serde_json::Value = serde_json::from_slice(&block_other.stdout).unwrap();
+    let j_bo: serde_json::Value = parse_json(&block_other.stdout);
     assert_eq!(j_bo["error"]["code"], "NOT_OWNER");
 
     // Alice blocks T-002 (keeps owner & claimed), then unblocks -> claimed with refreshed time!
@@ -146,7 +146,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     )
     .unwrap();
     assert!(u2.status.success());
-    let j_u2: serde_json::Value = serde_json::from_slice(&u2.stdout).unwrap();
+    let j_u2: serde_json::Value = parse_json(&u2.stdout);
     assert_eq!(j_u2["schema"], "todo.unblock.v1");
     assert_eq!(j_u2["data"]["status"], "claimed");
     assert_eq!(j_u2["data"]["owner"], "alice");
@@ -184,7 +184,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     )
     .unwrap();
     assert!(drop_force.status.success());
-    let after_drop2 = fs::read_to_string(&todo_file).unwrap();
+    let after_drop2 = read_text(&todo_file);
     assert!(after_drop2.contains("- status: dropped\n- owner: alice\n- note (2026-11-15, alice):"));
     assert!(!after_drop2.contains("2026-11-15T15:45+01:00"));
     assert!(after_drop2.contains("- note (2026-11-15, bob): forced drop (owner was alice)\n"));
@@ -210,7 +210,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
         ] {
             let res = common::run_todo(&home, &work, &args, &[("TODO_TEST_NOW", t2)]).unwrap();
             assert_eq!(res.status.code(), Some(1), "args: {args:?}");
-            let j: serde_json::Value = serde_json::from_slice(&res.stdout).unwrap();
+            let j: serde_json::Value = parse_json(&res.stdout);
             assert_eq!(j["error"]["code"], "BAD_TRANSITION");
         }
     }

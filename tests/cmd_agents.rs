@@ -5,7 +5,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::todo_bin;
+use common::{parse_json, stderr_text, stdout_text, todo_bin};
 
 #[test]
 fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_outdated() {
@@ -19,7 +19,7 @@ fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_out
         .output()
         .expect("run agents check on missing file");
     assert_eq!(missing_check.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&missing_check.stdout).contains("missing"));
+    assert!(stdout_text(&missing_check).contains("missing"));
 
     // 2. Existing file with CRLF and no block -> agents check exits 1.
     let prefix = "# Repo Rules\r\n\r\nKeep this exact CRLF header.\r\n";
@@ -30,7 +30,7 @@ fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_out
         .output()
         .expect("run agents check without block");
     assert_eq!(no_block_check.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&no_block_check.stdout).contains("missing agent rules block"));
+    assert!(stdout_text(&no_block_check).contains("missing agent rules block"));
 
     // 3. Preview without --yes makes no changes.
     let preview = todo_bin()
@@ -39,7 +39,7 @@ fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_out
         .output()
         .expect("run agents install preview");
     assert!(preview.status.success());
-    assert!(String::from_utf8_lossy(&preview.stdout).contains("pass --yes"));
+    assert!(stdout_text(&preview).contains("pass --yes"));
     assert_eq!(fs::read(&agents_path).expect("read"), prefix.as_bytes());
 
     // 4. Install --yes adds block while preserving prefix bytes.
@@ -51,7 +51,7 @@ fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_out
     assert!(
         install.status.success(),
         "install failed: {}",
-        String::from_utf8_lossy(&install.stderr)
+        stderr_text(&install)
     );
     let installed_bytes = fs::read(&agents_path).expect("read installed");
     assert!(
@@ -66,7 +66,7 @@ fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_out
         .output()
         .expect("run agents check ok");
     assert!(ok_check.status.success());
-    let ok_json: Value = serde_json::from_slice(&ok_check.stdout).expect("parse json");
+    let ok_json: Value = parse_json(&ok_check.stdout);
     assert_eq!(ok_json["data"]["status"], "current");
 
     // 6. Outdated block in CLAUDE.md with preserved prefix + suffix CRLF bytes.
@@ -82,7 +82,7 @@ fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_out
         .output()
         .expect("run agents check outdated");
     assert_eq!(outdated_check.status.code(), Some(1));
-    let outdated_stdout = String::from_utf8_lossy(&outdated_check.stdout);
+    let outdated_stdout = stdout_text(&outdated_check);
     assert!(
         outdated_stdout.contains("CLAUDE.md:3: outdated agent rules block"),
         "stdout: {outdated_stdout}"

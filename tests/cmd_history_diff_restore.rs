@@ -5,7 +5,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{todo_bin, write_todo};
+use common::{parse_json, read_todo, stderr_text, stdout_text, todo_bin, write_todo};
 
 const SAMPLE_TODO: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
@@ -44,7 +44,7 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
         assert!(
             out.status.success(),
             "add {i} failed: {}",
-            String::from_utf8_lossy(&out.stderr)
+            stderr_text(&out)
         );
     }
 
@@ -54,7 +54,7 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
         .output()
         .expect("run history");
     assert!(hist_out.status.success());
-    let hist_json: Value = serde_json::from_slice(&hist_out.stdout).expect("parse history json");
+    let hist_json: Value = parse_json(&hist_out.stdout);
     assert_eq!(hist_json["ok"], true);
     let snaps = hist_json["data"]["snapshots"]
         .as_array()
@@ -80,7 +80,7 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
         .output()
         .expect("run diff 2");
     assert!(diff_out.status.success());
-    let diff_text = String::from_utf8_lossy(&diff_out.stdout);
+    let diff_text = stdout_text(&diff_out);
     assert!(diff_text.contains("Task number 3"));
     assert!(diff_text.contains("Task number 4"));
 
@@ -91,25 +91,22 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
         .output()
         .expect("run diff 2 3");
     assert!(diff_2_3.status.success());
-    let diff_json: Value = serde_json::from_slice(&diff_2_3.stdout).expect("parse diff json");
+    let diff_json: Value = parse_json(&diff_2_3.stdout);
     assert_eq!(diff_json["data"]["from"], 2);
     assert_eq!(diff_json["data"]["to"], 3);
     assert_eq!(diff_json["data"]["changed"], true);
 
     // Restore without --yes previews only and does not modify TODO.md.
-    let before_preview = fs::read_to_string(dir.path().join("TODO.md")).expect("read before");
+    let before_preview = read_todo(dir.path());
     let preview_out = todo_bin()
         .current_dir(dir.path())
         .args(["restore", "2", "--agent", "agent-1"])
         .output()
         .expect("run restore preview");
     assert!(preview_out.status.success());
-    let preview_stdout = String::from_utf8_lossy(&preview_out.stdout);
+    let preview_stdout = stdout_text(&preview_out);
     assert!(preview_stdout.contains("pass --yes"));
-    assert_eq!(
-        fs::read_to_string(dir.path().join("TODO.md")).expect("read after preview"),
-        before_preview
-    );
+    assert_eq!(read_todo(dir.path()), before_preview);
 
     // Restore with --yes applies snapshot 2 and records snapshot 5 (pre-restore) so it can be undone.
     let restore_out = todo_bin()
@@ -120,9 +117,9 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
     assert!(
         restore_out.status.success(),
         "restore failed: {}",
-        String::from_utf8_lossy(&restore_out.stderr)
+        stderr_text(&restore_out)
     );
-    let after_restore = fs::read_to_string(dir.path().join("TODO.md")).expect("read after restore");
+    let after_restore = read_todo(dir.path());
     assert!(!after_restore.contains("Task number 2"));
     assert!(!after_restore.contains("Task number 4"));
 
@@ -132,8 +129,7 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
         .args(["history", "--json"])
         .output()
         .expect("run history after restore");
-    let hist_after_json: Value =
-        serde_json::from_slice(&hist_after.stdout).expect("parse history json");
+    let hist_after_json: Value = parse_json(&hist_after.stdout);
     let latest_num = hist_after_json["data"]["snapshots"]
         .as_array()
         .expect("snaps")
@@ -149,6 +145,6 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
         .output()
         .expect("undo restore");
     assert!(undo_out.status.success());
-    let after_undo = fs::read_to_string(dir.path().join("TODO.md")).expect("read after undo");
+    let after_undo = read_todo(dir.path());
     assert_eq!(after_undo, before_preview);
 }

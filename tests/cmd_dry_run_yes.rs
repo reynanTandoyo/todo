@@ -1,5 +1,9 @@
 //! Tests for `--dry-run` on every write command and `--yes` helper (T-035; R-EDIT-10, R-WRITE-14).
 
+mod common;
+
+use common::{parse_json, stderr_text, stdout_text};
+
 use std::fs;
 
 use assert_cmd::cargo::cargo_bin_cmd;
@@ -88,9 +92,9 @@ fn dry_run_prints_diff_and_leaves_file_byte_identical_across_all_write_commands(
             out.status.code(),
             Some(0),
             "command {cmd_args:?} failed: {}",
-            String::from_utf8_lossy(&out.stderr)
+            stderr_text(&out)
         );
-        let stdout = String::from_utf8_lossy(&out.stdout);
+        let stdout = stdout_text(&out);
         assert!(
             stdout.contains("--- a/") && stdout.contains("+++ b/") && stdout.contains("@@ "),
             "expected unified diff for {cmd_args:?}, got:\n{stdout}"
@@ -121,7 +125,7 @@ fn dry_run_prints_diff_and_leaves_file_byte_identical_across_all_write_commands(
         .output()
         .unwrap();
     assert_eq!(json_out.status.code(), Some(0));
-    let json: Value = serde_json::from_slice(&json_out.stdout).unwrap();
+    let json: Value = parse_json(&json_out.stdout);
     assert_eq!(json["ok"], true);
     assert_eq!(json["dry_run"], true);
     assert!(json["diff"].as_str().unwrap().contains("+### T-006"));

@@ -1,6 +1,8 @@
 //! Integration tests for `todo skill install` (T-054; R-AGENT-5).
 
-use std::fs;
+mod common;
+
+use common::{parse_json, read_text};
 
 use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
@@ -32,12 +34,12 @@ fn skill_install_writes_claude_skill_from_rules_text() {
         .output()
         .unwrap();
     assert!(install.status.success());
-    let json: Value = serde_json::from_slice(&install.stdout).unwrap();
+    let json: Value = parse_json(&install.stdout);
     assert_eq!(json["schema"], "todo.skill.v1");
     assert_eq!(json["data"]["applied"], true);
     assert_eq!(json["data"]["created"], true);
 
-    let content = fs::read_to_string(&skill_path).unwrap();
+    let content = read_text(&skill_path);
     assert!(content.starts_with("---\nname: todo\n"), "{content}");
     assert!(
         content.contains(todo::agents::RULES_TEXT.trim()),

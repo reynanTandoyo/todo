@@ -5,7 +5,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::todo_bin;
+use common::{parse_json, stderr_text, stdout_text, todo_bin};
 
 const ARCHIVE_FIXTURE: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
@@ -58,7 +58,7 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
         .output()
         .expect("run archive preview");
     assert!(preview.status.success());
-    assert!(String::from_utf8_lossy(&preview.stdout).contains("pass --yes"));
+    assert!(stdout_text(&preview).contains("pass --yes"));
     assert!(!dir.path().join("TODO-archive.md").exists());
 
     // Archive with --older-than 10 --yes: only T-001 and T-004 (Oct 2026) should move; T-002 (2026-11-15) stays.
@@ -79,9 +79,9 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
     assert!(
         arch_old.status.success(),
         "archive failed: {}",
-        String::from_utf8_lossy(&arch_old.stderr)
+        stderr_text(&arch_old)
     );
-    let old_json: Value = serde_json::from_slice(&arch_old.stdout).expect("parse archive json");
+    let old_json: Value = parse_json(&arch_old.stdout);
     assert_eq!(old_json["data"]["count"], 2);
 
     let archive_text =
@@ -108,7 +108,7 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
         .output()
         .expect("run list --archive");
     assert!(list_arch.status.success());
-    let list_json: Value = serde_json::from_slice(&list_arch.stdout).expect("parse list json");
+    let list_json: Value = parse_json(&list_arch.stdout);
     let tasks = list_json["data"]["tasks"].as_array().expect("tasks");
     assert!(tasks.iter().any(|t| t["id"] == "T-001"));
     assert!(tasks.iter().any(|t| t["id"] == "T-004"));
@@ -122,7 +122,7 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
     assert!(
         check.status.success(),
         "check failed: {}",
-        String::from_utf8_lossy(&check.stdout)
+        stdout_text(&check)
     );
 
     // Archive remaining done task T-002 (into existing Backend section in TODO-archive.md).
@@ -154,6 +154,6 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
         .output()
         .expect("run add");
     assert!(add.status.success());
-    let add_json: Value = serde_json::from_slice(&add.stdout).expect("parse add json");
+    let add_json: Value = parse_json(&add.stdout);
     assert_eq!(add_json["data"]["id"], "T-006");
 }

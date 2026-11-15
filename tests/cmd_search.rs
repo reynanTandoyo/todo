@@ -1,5 +1,9 @@
 //! Integration tests for `todo search` (T-046; R-READ-6).
 
+mod common;
+
+use common::parse_json;
+
 use std::fs;
 
 use assert_cmd::cargo::cargo_bin_cmd;
@@ -69,7 +73,7 @@ fn search_finds_text_in_titles_fields_and_notes_and_archive() {
         .output()
         .unwrap();
     assert!(field_out.status.success());
-    let json: Value = serde_json::from_slice(&field_out.stdout).unwrap();
+    let json: Value = parse_json(&field_out.stdout);
     assert_eq!(json["schema"], "todo.search.v1");
     assert_eq!(json["data"]["count"], 1);
     assert_eq!(json["data"]["matches"][0]["id"], "T-002");
@@ -84,7 +88,7 @@ fn search_finds_text_in_titles_fields_and_notes_and_archive() {
         .output()
         .unwrap();
     assert!(arch_out.status.success());
-    let arch_json: Value = serde_json::from_slice(&arch_out.stdout).unwrap();
+    let arch_json: Value = parse_json(&arch_out.stdout);
     assert_eq!(arch_json["data"]["archive"], true);
     assert_eq!(arch_json["data"]["count"], 1);
     assert_eq!(arch_json["data"]["matches"][0]["id"], "T-099");

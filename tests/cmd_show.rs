@@ -2,6 +2,8 @@
 
 mod common;
 
+use common::{parse_json, read_todo, stderr_text, stdout_text};
+
 use std::fs;
 use std::path::Path;
 
@@ -21,7 +23,7 @@ fn show_text_output_equals_task_lines_in_file_and_accepts_flexible_ids() {
     fs::create_dir_all(&work).unwrap();
     copy_clean_fixture(&work).unwrap();
 
-    let file_text = fs::read_to_string(work.join("TODO.md")).unwrap();
+    let file_text = read_todo(&work);
     let file_lines: Vec<&str> = file_text.lines().collect();
     // T-001 occupies 1-based lines 9..=24 (0-based 8..24).
     let expected = format!("{}\n", file_lines[8..24].join("\n"));
@@ -31,7 +33,7 @@ fn show_text_output_equals_task_lines_in_file_and_accepts_flexible_ids() {
         assert!(
             out.status.success(),
             "show {query} failed: {}",
-            String::from_utf8_lossy(&out.stderr)
+            stderr_text(&out)
         );
         let stdout = String::from_utf8(out.stdout).unwrap();
         assert_eq!(stdout, expected, "mismatch for query `{query}`");
@@ -57,7 +59,7 @@ fn show_json_includes_unknown_fields_notes_lines_dependencies_and_dependents() {
     )
     .unwrap();
     assert!(out1.status.success());
-    let j1: serde_json::Value = serde_json::from_slice(&out1.stdout).unwrap();
+    let j1: serde_json::Value = parse_json(&out1.stdout);
     assert_eq!(j1["schema"], "todo.show.v1");
     assert_eq!(j1["ok"], true);
     assert_eq!(j1["data"]["id"], "T-001");
@@ -84,7 +86,7 @@ fn show_json_includes_unknown_fields_notes_lines_dependencies_and_dependents() {
     )
     .unwrap();
     assert!(out2.status.success());
-    let j2: serde_json::Value = serde_json::from_slice(&out2.stdout).unwrap();
+    let j2: serde_json::Value = parse_json(&out2.stdout);
     assert_eq!(j2["data"]["dependencies"].as_array().unwrap().len(), 1);
     assert_eq!(j2["data"]["dependencies"][0]["id"], "T-001");
     assert_eq!(j2["data"]["dependencies"][0]["exists"], true);
@@ -115,14 +117,14 @@ fn show_finds_archived_tasks_and_archived_dependencies() {
 
     let arch_show = common::run_todo(&home, &work, &["--json", "show", "T-001"], &[]).unwrap();
     assert!(arch_show.status.success());
-    let aj: serde_json::Value = serde_json::from_slice(&arch_show.stdout).unwrap();
+    let aj: serde_json::Value = parse_json(&arch_show.stdout);
     assert_eq!(aj["data"]["archived"], true);
     assert_eq!(aj["data"]["status"], "done");
     assert_eq!(aj["data"]["dependents"][0]["id"], "T-002");
 
     let active_show = common::run_todo(&home, &work, &["--json", "show", "T-002"], &[]).unwrap();
     assert!(active_show.status.success());
-    let tj: serde_json::Value = serde_json::from_slice(&active_show.stdout).unwrap();
+    let tj: serde_json::Value = parse_json(&active_show.stdout);
     assert_eq!(tj["data"]["dependencies"][0]["id"], "T-001");
     assert_eq!(tj["data"]["dependencies"][0]["archived"], true);
     assert_eq!(tj["data"]["dependencies"][0]["status"], "done");
@@ -143,7 +145,7 @@ fn show_missing_task_returns_not_found_and_unsafe_file_still_warns() {
 
     let missing = common::run_todo(&home, &work, &["--json", "show", "T-999"], &[]).unwrap();
     assert_eq!(missing.status.code(), Some(1));
-    let mj: serde_json::Value = serde_json::from_slice(&missing.stdout).unwrap();
+    let mj: serde_json::Value = parse_json(&missing.stdout);
     assert_eq!(mj["error"]["code"], "NOT_FOUND");
     assert_eq!(mj["error"]["task"], "T-999");
 
@@ -156,6 +158,6 @@ fn show_missing_task_returns_not_found_and_unsafe_file_still_warns() {
     .unwrap();
     let unsafe_show = common::run_todo(&home, &work, &["show", "T-001"], &[]).unwrap();
     assert!(unsafe_show.status.success());
-    assert!(String::from_utf8_lossy(&unsafe_show.stdout).contains("Readable despite marker"));
-    assert!(String::from_utf8_lossy(&unsafe_show.stderr).contains("warning: TODO.md:"));
+    assert!(stdout_text(&unsafe_show).contains("Readable despite marker"));
+    assert!(stderr_text(&unsafe_show).contains("warning: TODO.md:"));
 }

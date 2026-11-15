@@ -5,7 +5,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{todo_bin, write_todo};
+use common::{parse_json, read_text, todo_bin, write_todo};
 
 const SAMPLE_TODO: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
@@ -43,7 +43,7 @@ fn hand_edit_between_commands_is_saved_and_reported_once() {
 
     // Simulate a hand edit outside the tool.
     let path = dir.path().join("TODO.md");
-    let mut text = fs::read_to_string(&path).expect("read TODO.md");
+    let mut text = read_text(&path);
     text.push_str("- note (2026-11-15, human): edited by hand\n");
     fs::write(&path, text).expect("write hand edit");
 
@@ -54,7 +54,7 @@ fn hand_edit_between_commands_is_saved_and_reported_once() {
         .output()
         .expect("run list 1");
     assert!(list1.status.success());
-    let list1_json: Value = serde_json::from_slice(&list1.stdout).expect("parse list1 json");
+    let list1_json: Value = parse_json(&list1.stdout);
     let warnings1 = list1_json["warnings"].as_array().expect("warnings array");
     assert_eq!(
         warnings1.len(),
@@ -75,7 +75,7 @@ fn hand_edit_between_commands_is_saved_and_reported_once() {
         .output()
         .expect("run list 2");
     assert!(list2.status.success());
-    let list2_json: Value = serde_json::from_slice(&list2.stdout).expect("parse list2 json");
+    let list2_json: Value = parse_json(&list2.stdout);
     let warnings2 = list2_json["warnings"].as_array().expect("warnings array");
     assert!(
         warnings2.is_empty(),
@@ -89,7 +89,7 @@ fn hand_edit_between_commands_is_saved_and_reported_once() {
         .output()
         .expect("run history");
     assert!(hist.status.success());
-    let hist_json: Value = serde_json::from_slice(&hist.stdout).expect("parse history");
+    let hist_json: Value = parse_json(&hist.stdout);
     let snaps = hist_json["data"]["snapshots"].as_array().expect("snaps");
     assert_eq!(snaps.len(), 2);
     assert_eq!(snaps[1]["command"], "outside edit");
@@ -127,7 +127,7 @@ fn edits_during_lease_are_recorded_without_warning() {
 
     // Edit by hand while lease is live.
     let path = dir.path().join("TODO.md");
-    let mut text = fs::read_to_string(&path).expect("read TODO.md");
+    let mut text = read_text(&path);
     text.push_str("- note (2026-11-15, human): edited under lease\n");
     fs::write(&path, text).expect("write lease edit");
 
@@ -138,8 +138,7 @@ fn edits_during_lease_are_recorded_without_warning() {
         .output()
         .expect("run list during lease");
     assert!(list_during.status.success());
-    let list_during_json: Value =
-        serde_json::from_slice(&list_during.stdout).expect("parse list json");
+    let list_during_json: Value = parse_json(&list_during.stdout);
     assert!(
         list_during_json["warnings"]
             .as_array()
@@ -154,7 +153,7 @@ fn edits_during_lease_are_recorded_without_warning() {
         .output()
         .expect("run unlock");
     assert!(unlock.status.success());
-    let unlock_json: Value = serde_json::from_slice(&unlock.stdout).expect("parse unlock json");
+    let unlock_json: Value = parse_json(&unlock.stdout);
     assert!(
         unlock_json["warnings"]
             .as_array()
@@ -169,8 +168,7 @@ fn edits_during_lease_are_recorded_without_warning() {
         .output()
         .expect("run list after unlock");
     assert!(list_after.status.success());
-    let list_after_json: Value =
-        serde_json::from_slice(&list_after.stdout).expect("parse list json");
+    let list_after_json: Value = parse_json(&list_after.stdout);
     assert!(
         list_after_json["warnings"]
             .as_array()
@@ -184,7 +182,7 @@ fn edits_during_lease_are_recorded_without_warning() {
         .args(["history", "--json"])
         .output()
         .expect("run history");
-    let hist_json: Value = serde_json::from_slice(&hist.stdout).expect("parse history");
+    let hist_json: Value = parse_json(&hist.stdout);
     let snaps = hist_json["data"]["snapshots"].as_array().expect("snaps");
     assert_eq!(snaps.len(), 2);
     assert_eq!(snaps[1]["command"], "lease edit");

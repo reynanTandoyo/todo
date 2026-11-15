@@ -2,6 +2,8 @@
 
 mod common;
 
+use common::{parse_json, read_text, stderr_text};
+
 use std::time::Duration;
 
 use tempfile::TempDir;
@@ -175,13 +177,13 @@ fn killed_holder_delays_next_writer_by_less_than_2_seconds() {
     assert!(
         out.status.success(),
         "expected survivor to succeed, stderr: {}",
-        String::from_utf8_lossy(&out.stderr)
+        stderr_text(&out)
     );
     assert!(
         elapsed < Duration::from_secs(2),
         "expected < 2s delay after killed holder, took {elapsed:?}"
     );
-    let content = std::fs::read_to_string(&todo_file).unwrap();
+    let content = read_text(&todo_file);
     assert!(content.contains("after-kill"));
     assert!(!content.contains("never-committed"));
 }
@@ -245,7 +247,7 @@ fn held_lock_causes_exit_3_naming_holder_without_writing_and_reads_do_not_wait()
     .unwrap();
 
     assert_eq!(waiter_json.status.code(), Some(3));
-    let parsed: serde_json::Value = serde_json::from_slice(&waiter_json.stdout).unwrap();
+    let parsed: serde_json::Value = parse_json(&waiter_json.stdout);
     assert_eq!(parsed["ok"], false);
     assert_eq!(parsed["error"]["code"], "BUSY");
     assert_eq!(parsed["error"]["owner"], "busy-holder");
@@ -267,7 +269,7 @@ fn held_lock_causes_exit_3_naming_holder_without_writing_and_reads_do_not_wait()
     )
     .unwrap();
     assert_eq!(waiter_text.status.code(), Some(3));
-    let stderr = String::from_utf8_lossy(&waiter_text.stderr);
+    let stderr = stderr_text(&waiter_text);
     assert!(stderr.contains("busy-holder"), "stderr: {stderr}");
     assert!(stderr.contains("__test-append"), "stderr: {stderr}");
     assert!(stderr.contains(&holder_pid.to_string()), "stderr: {stderr}");
@@ -275,7 +277,7 @@ fn held_lock_causes_exit_3_naming_holder_without_writing_and_reads_do_not_wait()
     // Kill holder before it writes; file must remain untouched.
     holder.kill().unwrap();
     let _ = holder.wait();
-    assert_eq!(std::fs::read_to_string(&todo_file).unwrap(), initial);
+    assert_eq!(read_text(&todo_file), initial);
 }
 
 #[cfg(feature = "test-hooks")]
@@ -312,11 +314,11 @@ fn parallel_writes_serialize_without_losing_updates() {
             out.status.success(),
             "worker-{i} failed ({:?}): {}",
             out.status.code(),
-            String::from_utf8_lossy(&out.stderr)
+            stderr_text(out)
         );
     }
 
-    let final_text = std::fs::read_to_string(&todo_file).unwrap();
+    let final_text = read_text(&todo_file);
     for i in 0..count {
         assert!(
             final_text.contains(&format!("entry-{i}")),

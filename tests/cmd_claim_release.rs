@@ -6,7 +6,7 @@ use std::fs;
 
 use tempfile::TempDir;
 
-use common::setup_proj;
+use common::{parse_json, read_text, setup_proj, stderr_text, stdout_text};
 use todo::doc::{Document, Status, TaskId};
 
 #[cfg(feature = "test-hooks")]
@@ -28,7 +28,7 @@ fn claim_open_refresh_stale_takeover_and_force_cases() {
     // Missing agent -> NO_AGENT exit 2 and file untouched.
     let no_agent = common::run_todo(&home, &work, &["--json", "claim", "T-001"], &[]).unwrap();
     assert_eq!(no_agent.status.code(), Some(2));
-    assert_eq!(fs::read_to_string(&todo_file).unwrap(), initial);
+    assert_eq!(read_text(&todo_file), initial);
 
     // 1. Claim open task as alice at 14:00+01:00; heading on T-001 stays lenient (not rewritten!).
     let t0 = "2026-11-15T14:00:00+01:00";
@@ -39,17 +39,10 @@ fn claim_open_refresh_stale_takeover_and_force_cases() {
         &[("TODO_TEST_NOW", t0)],
     )
     .unwrap();
-    assert!(
-        c1.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&c1.stderr)
-    );
-    assert_eq!(
-        String::from_utf8_lossy(&c1.stdout).trim(),
-        "T-001: claim ok"
-    );
+    assert!(c1.status.success(), "stderr: {}", stderr_text(&c1));
+    assert_eq!(stdout_text(&c1).trim(), "T-001: claim ok");
 
-    let after1 = fs::read_to_string(&todo_file).unwrap();
+    let after1 = read_text(&todo_file);
     assert!(
         after1.contains("### t-1 - Lenient open task\n"),
         "untouched heading changed:\n{after1}"
@@ -68,7 +61,7 @@ fn claim_open_refresh_stale_takeover_and_force_cases() {
     )
     .unwrap();
     assert!(c2.status.success());
-    let j2: serde_json::Value = serde_json::from_slice(&c2.stdout).unwrap();
+    let j2: serde_json::Value = parse_json(&c2.stdout);
     assert_eq!(j2["schema"], "todo.claim.v1");
     assert_eq!(j2["data"]["status"], "claimed");
     assert_eq!(j2["data"]["owner"], "alice");
@@ -85,7 +78,7 @@ fn claim_open_refresh_stale_takeover_and_force_cases() {
     )
     .unwrap();
     assert_eq!(c3.status.code(), Some(1));
-    let j3: serde_json::Value = serde_json::from_slice(&c3.stdout).unwrap();
+    let j3: serde_json::Value = parse_json(&c3.stdout);
     assert_eq!(j3["error"]["code"], "ALREADY_CLAIMED");
     assert_eq!(j3["error"]["owner"], "alice");
     assert_eq!(j3["error"]["age_hours"], 2);
@@ -100,7 +93,7 @@ fn claim_open_refresh_stale_takeover_and_force_cases() {
     )
     .unwrap();
     assert!(c4.status.success());
-    let after4 = fs::read_to_string(&todo_file).unwrap();
+    let after4 = read_text(&todo_file);
     assert!(after4.contains("- owner: bob\n- claimed: 2026-11-15T18:00+01:00\n"));
     assert!(after4.contains("- note (2026-11-15, bob): forced claim (owner was alice)"));
 
@@ -114,7 +107,7 @@ fn claim_open_refresh_stale_takeover_and_force_cases() {
     )
     .unwrap();
     assert!(c5.status.success());
-    let after5 = fs::read_to_string(&todo_file).unwrap();
+    let after5 = read_text(&todo_file);
     assert!(after5.contains("- owner: carol\n- claimed: 2026-11-16T19:30+01:00\n"));
     assert!(after5.contains("- note (2026-11-16, carol): took over from bob (claim was 25 h old)"));
 
@@ -127,7 +120,7 @@ fn claim_open_refresh_stale_takeover_and_force_cases() {
     )
     .unwrap();
     assert!(c6.status.success());
-    let after6 = fs::read_to_string(&todo_file).unwrap();
+    let after6 = read_text(&todo_file);
     assert!(after6.contains("took over from ghost-bot (claim had no valid timestamp)"));
 }
 
@@ -188,12 +181,12 @@ fn claim_and_release_transition_table_and_refusals() {
     for (args, expected_code) in refused_cases {
         let out = common::run_todo(&home, &work, args, &[("TODO_TEST_NOW", now)]).unwrap();
         assert_eq!(out.status.code(), Some(1), "args: {args:?}");
-        let j: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        let j: serde_json::Value = parse_json(&out.stdout);
         assert_eq!(
             j["error"]["code"], *expected_code,
             "args: {args:?}, body: {j}"
         );
-        assert_eq!(fs::read_to_string(&todo_file).unwrap(), initial);
+        assert_eq!(read_text(&todo_file), initial);
     }
 
     // Release T-002 as owner (alice) -> status: open, owner: —, claimed removed.
@@ -205,10 +198,7 @@ fn claim_and_release_transition_table_and_refusals() {
     )
     .unwrap();
     assert!(r2.status.success());
-    assert_eq!(
-        String::from_utf8_lossy(&r2.stdout).trim(),
-        "T-002: release ok"
-    );
+    assert_eq!(stdout_text(&r2).trim(), "T-002: release ok");
 
     // Release T-003 (blocked, owned by alice) as bob --force -> stays blocked, owner: —, claimed removed, forced note added.
     let r3 = common::run_todo(
@@ -219,7 +209,7 @@ fn claim_and_release_transition_table_and_refusals() {
     )
     .unwrap();
     assert!(r3.status.success());
-    let j3: serde_json::Value = serde_json::from_slice(&r3.stdout).unwrap();
+    let j3: serde_json::Value = parse_json(&r3.stdout);
     assert_eq!(j3["data"]["status"], "blocked");
     assert!(j3["data"]["owner"].is_null());
     assert!(j3["data"]["claimed"].is_null());
@@ -265,9 +255,9 @@ fn claim_refuses_unsafe_files_and_duplicate_archive_ids_without_writing() {
     )
     .unwrap();
     assert_eq!(bad.status.code(), Some(4));
-    let jb: serde_json::Value = serde_json::from_slice(&bad.stdout).unwrap();
+    let jb: serde_json::Value = parse_json(&bad.stdout);
     assert_eq!(jb["error"]["code"], "UNSAFE_FILE");
-    assert_eq!(fs::read_to_string(&todo_file).unwrap(), unsafe_body);
+    assert_eq!(read_text(&todo_file), unsafe_body);
 
     // Duplicate ID in TODO-archive.md also refuses writing T-002.
     fs::write(
@@ -283,9 +273,9 @@ fn claim_refuses_unsafe_files_and_duplicate_archive_ids_without_writing() {
     )
     .unwrap();
     assert_eq!(dup.status.code(), Some(4));
-    let jd: serde_json::Value = serde_json::from_slice(&dup.stdout).unwrap();
+    let jd: serde_json::Value = parse_json(&dup.stdout);
     assert_eq!(jd["error"]["code"], "UNSAFE_FILE");
-    assert_eq!(fs::read_to_string(&todo_file).unwrap(), unsafe_body);
+    assert_eq!(read_text(&todo_file), unsafe_body);
 }
 
 #[test]
@@ -320,8 +310,8 @@ fn twenty_parallel_claims_of_one_task_have_exactly_one_winner() {
             panic!(
                 "invalid json for racer-{i:02} (status {:?}): {e}\nstdout: {}\nstderr: {}",
                 out.status.code(),
-                String::from_utf8_lossy(&out.stdout),
-                String::from_utf8_lossy(&out.stderr)
+                stdout_text(out),
+                stderr_text(out)
             )
         });
         if out.status.success() {

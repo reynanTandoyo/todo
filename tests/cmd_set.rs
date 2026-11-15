@@ -6,7 +6,7 @@ use std::fs;
 
 use tempfile::TempDir;
 
-use common::setup_proj;
+use common::{parse_json, read_text, setup_proj, stderr_text, stdout_text};
 
 #[test]
 fn set_edits_all_options_combined_priority_field_and_unset() {
@@ -61,17 +61,10 @@ fn set_edits_all_options_combined_priority_field_and_unset() {
         &[("TODO_TEST_NOW", now)],
     )
     .unwrap();
-    assert!(
-        res1.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&res1.stderr)
-    );
-    assert_eq!(
-        String::from_utf8_lossy(&res1.stdout).trim(),
-        "T-001: set ok"
-    );
+    assert!(res1.status.success(), "stderr: {}", stderr_text(&res1));
+    assert_eq!(stdout_text(&res1).trim(), "T-001: set ok");
 
-    let after1 = fs::read_to_string(&todo_file).unwrap();
+    let after1 = read_text(&todo_file);
     assert!(
         after1.contains(
             "### T-001 · Updated title\n\
@@ -101,12 +94,12 @@ fn set_edits_all_options_combined_priority_field_and_unset() {
     )
     .unwrap();
     assert!(res2.status.success());
-    let j2: serde_json::Value = serde_json::from_slice(&res2.stdout).unwrap();
+    let j2: serde_json::Value = parse_json(&res2.stdout);
     assert_eq!(j2["schema"], "todo.set.v1");
     assert_eq!(j2["data"]["type"], "chore");
     assert!(j2["data"]["area"].is_null());
 
-    let after2 = fs::read_to_string(&todo_file).unwrap();
+    let after2 = read_text(&todo_file);
     assert!(after2.contains("- priority: P0 · type: chore\n"));
     assert!(!after2.contains("- custom:"));
 
@@ -128,7 +121,7 @@ fn set_edits_all_options_combined_priority_field_and_unset() {
     )
     .unwrap();
     assert_eq!(no_force.status.code(), Some(1));
-    let j_nf: serde_json::Value = serde_json::from_slice(&no_force.stdout).unwrap();
+    let j_nf: serde_json::Value = parse_json(&no_force.stdout);
     assert_eq!(j_nf["error"]["code"], "NOT_OWNER");
     assert_eq!(fs::read(&todo_file).unwrap(), before_refusal);
 
@@ -148,7 +141,7 @@ fn set_edits_all_options_combined_priority_field_and_unset() {
     )
     .unwrap();
     assert!(forced.status.success());
-    let after_forced = fs::read_to_string(&todo_file).unwrap();
+    let after_forced = read_text(&todo_file);
     assert!(after_forced.contains("- priority: P0\n"));
     assert!(after_forced.contains("- note (2026-11-15, bob): forced set (owner was alice)\n"));
 }
@@ -182,7 +175,7 @@ fn set_refuses_status_owner_claimed_and_invalid_args() {
         )
         .unwrap();
         assert_eq!(f.status.code(), Some(1), "key={key}");
-        let j: serde_json::Value = serde_json::from_slice(&f.stdout).unwrap();
+        let j: serde_json::Value = parse_json(&f.stdout);
         assert_eq!(j["error"]["code"], "BAD_VALUE");
 
         let u = common::run_todo(
@@ -193,7 +186,7 @@ fn set_refuses_status_owner_claimed_and_invalid_args() {
         )
         .unwrap();
         assert_eq!(u.status.code(), Some(1), "unset key={key}");
-        let ju: serde_json::Value = serde_json::from_slice(&u.stdout).unwrap();
+        let ju: serde_json::Value = parse_json(&u.stdout);
         assert_eq!(ju["error"]["code"], "BAD_VALUE");
     }
 

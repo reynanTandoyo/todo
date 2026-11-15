@@ -1,5 +1,9 @@
 //! Integration tests for `todo hooks` and `todo guard` (T-053; R-AGENT-4).
 
+mod common;
+
+use common::{parse_json, read_text};
+
 use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -26,7 +30,7 @@ fn hooks_install_and_uninstall_preserve_other_entries_and_formatting() {
         .output()
         .unwrap();
     assert!(preview.status.success());
-    assert_eq!(fs::read_to_string(&settings_path).unwrap(), initial);
+    assert_eq!(read_text(&settings_path), initial);
 
     // With --yes: installs hooks, creates backup, preserves 4-space indentation & custom hook.
     let install = cargo_bin_cmd!("todo")
@@ -36,9 +40,9 @@ fn hooks_install_and_uninstall_preserve_other_entries_and_formatting() {
         .unwrap();
     assert!(install.status.success());
     let backup = claude_dir.join("settings.json.bak");
-    assert_eq!(fs::read_to_string(&backup).unwrap(), initial);
+    assert_eq!(read_text(&backup), initial);
 
-    let after = fs::read_to_string(&settings_path).unwrap();
+    let after = read_text(&settings_path);
     assert!(after.contains("    \"custom\": true"), "{after}");
     assert!(after.contains("\"command\": \"todo summary\""), "{after}");
     assert!(after.contains("\"command\": \"todo guard\""), "{after}");
@@ -51,7 +55,7 @@ fn hooks_install_and_uninstall_preserve_other_entries_and_formatting() {
         .output()
         .unwrap();
     assert!(un_prev.status.success());
-    assert_eq!(fs::read_to_string(&settings_path).unwrap(), after);
+    assert_eq!(read_text(&settings_path), after);
 
     // Uninstall with --yes: removes only todo entries, keeps custom hook.
     let uninstall = cargo_bin_cmd!("todo")
@@ -60,7 +64,7 @@ fn hooks_install_and_uninstall_preserve_other_entries_and_formatting() {
         .output()
         .unwrap();
     assert!(uninstall.status.success());
-    let final_text = fs::read_to_string(&settings_path).unwrap();
+    let final_text = read_text(&settings_path);
     assert!(!final_text.contains("todo summary"), "{final_text}");
     assert!(!final_text.contains("todo guard"), "{final_text}");
     assert!(
@@ -132,6 +136,6 @@ fn guard_blocks_todo_and_archive_unless_leased_and_allows_other_files() {
         .output()
         .unwrap();
     assert_eq!(leased.status.code(), Some(0));
-    let json: Value = serde_json::from_slice(&leased.stdout).unwrap();
+    let json: Value = parse_json(&leased.stdout);
     assert_eq!(json["data"]["allowed"], true);
 }

@@ -1,5 +1,9 @@
 //! Integration tests for journal and `todo log` (T-047; R-HIST-4, R-READ-7).
 
+mod common;
+
+use common::{parse_json, read_text};
+
 use std::fs;
 
 use assert_cmd::cargo::cargo_bin_cmd;
@@ -60,7 +64,7 @@ fn writes_append_journal_and_log_shows_task_entries() {
 
     // Check `journal.jsonl` has 3 lines
     let journal_path = work.join(".todo").join("journal.jsonl");
-    let journal_text = fs::read_to_string(&journal_path).unwrap();
+    let journal_text = read_text(&journal_path);
     let lines: Vec<&str> = journal_text.lines().collect();
     assert_eq!(lines.len(), 3, "journal:\n{journal_text}");
     let first: Value = serde_json::from_str(lines[0]).unwrap();
@@ -80,7 +84,7 @@ fn writes_append_journal_and_log_shows_task_entries() {
         .output()
         .unwrap();
     assert!(log_json.status.success());
-    let parsed: Value = serde_json::from_slice(&log_json.stdout).unwrap();
+    let parsed: Value = parse_json(&log_json.stdout);
     assert_eq!(parsed["schema"], "todo.log.v1");
     assert_eq!(parsed["data"]["task"], "T-001");
     assert_eq!(parsed["data"]["count"], 2);

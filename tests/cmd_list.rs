@@ -2,6 +2,8 @@
 
 mod common;
 
+use common::{parse_json, stderr_text, stdout_text};
+
 use std::fs;
 use std::path::Path;
 
@@ -28,12 +30,8 @@ fn list_hides_done_and_dropped_by_default_and_prints_count() {
         &[("TODO_TEST_NOW", "2026-11-15T15:00:00+01:00")],
     )
     .unwrap();
-    assert!(
-        out.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let stdout = stdout_text(&out);
     assert!(stdout.contains("T-001"), "stdout:\n{stdout}");
     assert!(stdout.contains("T-002"), "stdout:\n{stdout}");
     assert!(stdout.contains("T-003"), "stdout:\n{stdout}");
@@ -60,7 +58,7 @@ fn list_status_filter_supports_comma_list_all_and_rejects_invalid() {
     )
     .unwrap();
     assert!(out_done_drop.status.success());
-    let parsed: serde_json::Value = serde_json::from_slice(&out_done_drop.stdout).unwrap();
+    let parsed: serde_json::Value = parse_json(&out_done_drop.stdout);
     assert_eq!(parsed["data"]["count"], 2);
     let ids: Vec<&str> = parsed["data"]["tasks"]
         .as_array()
@@ -73,13 +71,13 @@ fn list_status_filter_supports_comma_list_all_and_rejects_invalid() {
     let out_all =
         common::run_todo(&home, &work, &["--json", "list", "--status", "all"], &[]).unwrap();
     assert!(out_all.status.success());
-    let parsed_all: serde_json::Value = serde_json::from_slice(&out_all.stdout).unwrap();
+    let parsed_all: serde_json::Value = parse_json(&out_all.stdout);
     assert_eq!(parsed_all["data"]["count"], 6);
 
     let bad =
         common::run_todo(&home, &work, &["--json", "list", "--status", "bogus"], &[]).unwrap();
     assert_eq!(bad.status.code(), Some(1));
-    let bad_json: serde_json::Value = serde_json::from_slice(&bad.stdout).unwrap();
+    let bad_json: serde_json::Value = parse_json(&bad.stdout);
     assert_eq!(bad_json["error"]["code"], "BAD_VALUE");
 }
 
@@ -94,14 +92,14 @@ fn list_attribute_and_where_filters_work() {
 
     // --priority
     let p0 = common::run_todo(&home, &work, &["--json", "list", "--priority", "p0"], &[]).unwrap();
-    let p0_json: serde_json::Value = serde_json::from_slice(&p0.stdout).unwrap();
+    let p0_json: serde_json::Value = parse_json(&p0.stdout);
     assert_eq!(p0_json["data"]["count"], 1);
     assert_eq!(p0_json["data"]["tasks"][0]["id"], "T-001");
 
     // --section (ignores leading number `1.` and `2)`)
     let sec =
         common::run_todo(&home, &work, &["--json", "list", "--section", "later"], &[]).unwrap();
-    let sec_json: serde_json::Value = serde_json::from_slice(&sec.stdout).unwrap();
+    let sec_json: serde_json::Value = parse_json(&sec.stdout);
     assert_eq!(sec_json["data"]["count"], 1);
     assert_eq!(sec_json["data"]["tasks"][0]["id"], "T-003");
 
@@ -113,7 +111,7 @@ fn list_attribute_and_where_filters_work() {
         &[],
     )
     .unwrap();
-    let ty_json: serde_json::Value = serde_json::from_slice(&ty.stdout).unwrap();
+    let ty_json: serde_json::Value = parse_json(&ty.stdout);
     assert_eq!(ty_json["data"]["count"], 1);
     assert_eq!(ty_json["data"]["tasks"][0]["id"], "T-002");
 
@@ -125,7 +123,7 @@ fn list_attribute_and_where_filters_work() {
         &[],
     )
     .unwrap();
-    let area_json: serde_json::Value = serde_json::from_slice(&area.stdout).unwrap();
+    let area_json: serde_json::Value = parse_json(&area.stdout);
     assert_eq!(area_json["data"]["count"], 1);
     assert_eq!(area_json["data"]["tasks"][0]["id"], "T-001");
 
@@ -137,14 +135,14 @@ fn list_attribute_and_where_filters_work() {
         &[],
     )
     .unwrap();
-    let owner_json: serde_json::Value = serde_json::from_slice(&owner.stdout).unwrap();
+    let owner_json: serde_json::Value = parse_json(&owner.stdout);
     assert_eq!(owner_json["data"]["count"], 1);
     assert_eq!(owner_json["data"]["tasks"][0]["id"], "T-001");
 
     // --owner none (nobody)
     let unowned =
         common::run_todo(&home, &work, &["--json", "list", "--owner", "none"], &[]).unwrap();
-    let unowned_json: serde_json::Value = serde_json::from_slice(&unowned.stdout).unwrap();
+    let unowned_json: serde_json::Value = parse_json(&unowned.stdout);
     assert_eq!(unowned_json["data"]["count"], 3);
 
     // --where repeatable, unknown field, case-insensitive
@@ -162,7 +160,7 @@ fn list_attribute_and_where_filters_work() {
         &[],
     )
     .unwrap();
-    let where_json: serde_json::Value = serde_json::from_slice(&where_out.stdout).unwrap();
+    let where_json: serde_json::Value = parse_json(&where_out.stdout);
     assert_eq!(where_json["data"]["count"], 1);
     assert_eq!(where_json["data"]["tasks"][0]["id"], "T-001");
 
@@ -213,7 +211,7 @@ fn list_mine_stale_and_ready_filters_work() {
     )
     .unwrap();
     assert!(mine.status.success());
-    let mine_json: serde_json::Value = serde_json::from_slice(&mine.stdout).unwrap();
+    let mine_json: serde_json::Value = parse_json(&mine.stdout);
     assert_eq!(mine_json["data"]["count"], 1);
     assert_eq!(mine_json["data"]["tasks"][0]["id"], "T-001");
 
@@ -225,7 +223,7 @@ fn list_mine_stale_and_ready_filters_work() {
         &[("TODO_TEST_NOW", "2026-11-15T15:00:00+01:00")],
     )
     .unwrap();
-    let ready_json: serde_json::Value = serde_json::from_slice(&ready_fresh.stdout).unwrap();
+    let ready_json: serde_json::Value = parse_json(&ready_fresh.stdout);
     let ready_ids: Vec<&str> = ready_json["data"]["tasks"]
         .as_array()
         .unwrap()
@@ -241,7 +239,7 @@ fn list_mine_stale_and_ready_filters_work() {
         &[("TODO_TEST_NOW", "2026-11-15T15:00:00+01:00")],
     )
     .unwrap();
-    let stale_fresh_json: serde_json::Value = serde_json::from_slice(&stale_fresh.stdout).unwrap();
+    let stale_fresh_json: serde_json::Value = parse_json(&stale_fresh.stdout);
     assert_eq!(stale_fresh_json["data"]["count"], 0);
 
     // After 25 hours, T-001 IS stale and therefore also appears in --ready.
@@ -252,7 +250,7 @@ fn list_mine_stale_and_ready_filters_work() {
         &[("TODO_TEST_NOW", "2026-11-16T10:31:00+01:00")],
     )
     .unwrap();
-    let stale_old_json: serde_json::Value = serde_json::from_slice(&stale_old.stdout).unwrap();
+    let stale_old_json: serde_json::Value = parse_json(&stale_old.stdout);
     assert_eq!(stale_old_json["data"]["count"], 1);
     assert_eq!(stale_old_json["data"]["tasks"][0]["id"], "T-001");
 
@@ -263,7 +261,7 @@ fn list_mine_stale_and_ready_filters_work() {
         &[("TODO_TEST_NOW", "2026-11-16T10:31:00+01:00")],
     )
     .unwrap();
-    let ready_old_json: serde_json::Value = serde_json::from_slice(&ready_old.stdout).unwrap();
+    let ready_old_json: serde_json::Value = parse_json(&ready_old.stdout);
     let ready_old_ids: Vec<&str> = ready_old_json["data"]["tasks"]
         .as_array()
         .unwrap()
@@ -284,7 +282,7 @@ fn list_archive_reads_archive_when_present_and_empty_when_absent() {
 
     let absent = common::run_todo(&home, &work, &["--json", "list", "--archive"], &[]).unwrap();
     assert!(absent.status.success());
-    let absent_json: serde_json::Value = serde_json::from_slice(&absent.stdout).unwrap();
+    let absent_json: serde_json::Value = parse_json(&absent.stdout);
     assert_eq!(absent_json["data"]["archive"], true);
     assert_eq!(absent_json["data"]["count"], 0);
 
@@ -298,7 +296,7 @@ fn list_archive_reads_archive_when_present_and_empty_when_absent() {
 
     let present = common::run_todo(&home, &work, &["--json", "list", "--archive"], &[]).unwrap();
     assert!(present.status.success());
-    let present_json: serde_json::Value = serde_json::from_slice(&present.stdout).unwrap();
+    let present_json: serde_json::Value = parse_json(&present.stdout);
     assert_eq!(present_json["data"]["archive"], true);
     assert_eq!(present_json["data"]["count"], 2);
 }
@@ -323,8 +321,8 @@ fn list_shortens_titles_unless_wide_and_warns_on_unsafe_files() {
 
     let narrow = common::run_todo(&home, &work, &["list"], &[("COLUMNS", "50")]).unwrap();
     assert!(narrow.status.success());
-    let narrow_out = String::from_utf8_lossy(&narrow.stdout);
-    let narrow_err = String::from_utf8_lossy(&narrow.stderr);
+    let narrow_out = stdout_text(&narrow);
+    let narrow_err = stderr_text(&narrow);
     assert!(narrow_err.contains("warning: TODO.md:"));
     let first_line = narrow_out.lines().next().unwrap();
     assert!(first_line.chars().count() <= 50, "line: {first_line}");
@@ -332,7 +330,7 @@ fn list_shortens_titles_unless_wide_and_warns_on_unsafe_files() {
 
     let wide = common::run_todo(&home, &work, &["list", "--wide"], &[("COLUMNS", "50")]).unwrap();
     assert!(wide.status.success());
-    let wide_out = String::from_utf8_lossy(&wide.stdout);
+    let wide_out = stdout_text(&wide);
     assert!(wide_out.contains("when terminal width is narrow"));
 }
 
@@ -354,6 +352,6 @@ fn list_json_matches_snapshot() {
     )
     .unwrap();
     assert!(out.status.success());
-    let parsed: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let parsed: serde_json::Value = parse_json(&out.stdout);
     insta::assert_json_snapshot!("cmd_list_json", parsed);
 }

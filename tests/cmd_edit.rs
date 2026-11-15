@@ -1,5 +1,9 @@
 //! Integration tests for `todo edit` (T-048; R-LOCK-8).
 
+mod common;
+
+use common::{parse_json, stderr_text, stdout_text};
+
 use std::fs;
 
 use assert_cmd::cargo::cargo_bin_cmd;
@@ -73,16 +77,16 @@ fn edit_takes_lease_runs_editor_checks_snapshots_and_unlocks() {
         out.status.code(),
         Some(0),
         "stdout={}, stderr={}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
+        stdout_text(&out),
+        stderr_text(&out)
     );
 
-    let json: Value = serde_json::from_slice(&out.stdout).unwrap();
+    let json: Value = parse_json(&out.stdout);
     assert_eq!(json["schema"], "todo.edit.v1");
     assert_eq!(json["data"]["clean"], true);
 
     // Lease was live while editor ran.
-    let status_during: Value = serde_json::from_slice(&fs::read(&flag_file).unwrap()).unwrap();
+    let status_during: Value = parse_json(&fs::read(&flag_file).unwrap());
     assert_eq!(status_during["data"]["lease"]["agent"], "alice");
 
     // Lease is ended after edit finishes.
@@ -94,6 +98,6 @@ fn edit_takes_lease_runs_editor_checks_snapshots_and_unlocks() {
         .args(["--json", "history"])
         .output()
         .unwrap();
-    let hist_json: Value = serde_json::from_slice(&hist.stdout).unwrap();
+    let hist_json: Value = parse_json(&hist.stdout);
     assert_eq!(hist_json["data"]["count"], 1);
 }

@@ -1,5 +1,9 @@
 //! Integration tests for `todo apply <file|->` (T-036; R-WRITE-15).
 
+mod common;
+
+use common::{parse_json, read_text, stderr_text, stdout_text};
+
 use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -43,13 +47,13 @@ fn apply_runs_multiple_ops_with_one_snapshot_and_is_atomic_on_error() {
         .output()
         .unwrap();
     assert_eq!(bad_out.status.code(), Some(1));
-    assert_eq!(fs::read_to_string(&path).unwrap(), initial);
+    assert_eq!(read_text(&path), initial);
     let hist_out = cargo_bin_cmd!("todo")
         .current_dir(dir.path())
         .args(["--json", "history"])
         .output()
         .unwrap();
-    let hist_json: Value = serde_json::from_slice(&hist_out.stdout).unwrap();
+    let hist_json: Value = parse_json(&hist_out.stdout);
     assert_eq!(hist_json["data"]["count"], 0);
 
     // 2. Valid batch via stdin: add @new, claim T-001, note T-001, done T-001, claim @new
@@ -79,10 +83,10 @@ fn apply_runs_multiple_ops_with_one_snapshot_and_is_atomic_on_error() {
         good_out.status.code(),
         Some(0),
         "stdout={}, stderr={}",
-        String::from_utf8_lossy(&good_out.stdout),
-        String::from_utf8_lossy(&good_out.stderr)
+        stdout_text(&good_out),
+        stderr_text(&good_out)
     );
-    let json: Value = serde_json::from_slice(&good_out.stdout).unwrap();
+    let json: Value = parse_json(&good_out.stdout);
     assert_eq!(json["schema"], "todo.apply.v1");
     assert_eq!(json["data"]["count"], 5);
     assert_eq!(json["data"]["applied"][0]["task"], "T-003");
@@ -94,6 +98,6 @@ fn apply_runs_multiple_ops_with_one_snapshot_and_is_atomic_on_error() {
         .args(["--json", "history"])
         .output()
         .unwrap();
-    let hist_json2: Value = serde_json::from_slice(&hist_out2.stdout).unwrap();
+    let hist_json2: Value = parse_json(&hist_out2.stdout);
     assert_eq!(hist_json2["data"]["count"], 1);
 }

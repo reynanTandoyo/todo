@@ -6,7 +6,7 @@ use std::path::Path;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::todo_bin;
+use common::{parse_json, read_todo, stdout_text, todo_bin};
 
 fn run_check(dir: &Path) -> (i32, String, Value) {
     let text_out = todo_bin()
@@ -20,8 +20,8 @@ fn run_check(dir: &Path) -> (i32, String, Value) {
         .output()
         .expect("run check --json");
     let code = text_out.status.code().unwrap_or(-1);
-    let stdout = String::from_utf8_lossy(&text_out.stdout).into_owned();
-    let json: Value = serde_json::from_slice(&json_out.stdout).expect("parse check json");
+    let stdout = stdout_text(&text_out);
+    let json: Value = parse_json(&json_out.stdout);
     assert_eq!(json_out.status.code().unwrap_or(-1), code);
     (code, stdout, json)
 }
@@ -271,7 +271,7 @@ Stale rules.
     assert!(!stdout.contains("leftover temporary file"), "{stdout}");
 
     assert!(!tmp_file.exists(), "tmp file should be deleted");
-    let updated = fs::read_to_string(dir.path().join("TODO.md")).expect("read TODO.md");
+    let updated = read_todo(dir.path());
     assert!(updated.contains("### T-001 \u{00b7} Needs canonical heading and status\n- status: open\n- priority: P1\n"), "{updated}");
     assert!(!updated.contains("Stale rules."), "{updated}");
     assert!(

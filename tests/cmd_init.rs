@@ -5,7 +5,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::todo_bin;
+use common::{parse_json, read_todo, stderr_text, stdout_text, todo_bin};
 
 #[test]
 fn init_creates_valid_todo_that_passes_check_and_refuses_overwrite() {
@@ -16,16 +16,12 @@ fn init_creates_valid_todo_that_passes_check_and_refuses_overwrite() {
         .args(["init", "--title", "Sample Project"])
         .output()
         .expect("run init");
-    assert!(
-        out.status.success(),
-        "init failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "init failed: {}", stderr_text(&out));
+    let stdout = stdout_text(&out);
     assert!(stdout.contains("<!-- todo:begin -->"));
     assert!(stdout.contains("<!-- todo:end -->"));
 
-    let created = fs::read_to_string(dir.path().join("TODO.md")).expect("read TODO.md");
+    let created = read_todo(dir.path());
     assert!(created.starts_with("<!-- todo-format: 1 -->"));
     assert!(created.contains("# Sample Project"));
     assert!(created.contains("<!-- todo:begin -->"));
@@ -41,7 +37,7 @@ fn init_creates_valid_todo_that_passes_check_and_refuses_overwrite() {
     assert!(
         check.status.success(),
         "check failed on newly initialized TODO.md: {}",
-        String::from_utf8_lossy(&check.stdout)
+        stdout_text(&check)
     );
 
     // Modify TODO.md and verify `todo init` refuses and never overwrites it.
@@ -54,12 +50,9 @@ fn init_creates_valid_todo_that_passes_check_and_refuses_overwrite() {
         .output()
         .expect("run second init");
     assert_eq!(second.status.code(), Some(4));
-    let json: Value = serde_json::from_slice(&second.stdout).expect("parse init error json");
+    let json: Value = parse_json(&second.stdout);
     assert_eq!(json["ok"], false);
     assert_eq!(json["error"]["code"], "UNSAFE_FILE");
 
-    assert_eq!(
-        fs::read_to_string(dir.path().join("TODO.md")).expect("read TODO.md after"),
-        sentinel
-    );
+    assert_eq!(read_todo(dir.path()), sentinel);
 }

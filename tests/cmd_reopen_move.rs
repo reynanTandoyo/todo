@@ -1,5 +1,9 @@
 //! Tests for `todo reopen` and `todo move` (T-030; R-WRITE-10).
 
+mod common;
+
+use common::{parse_json, read_text, stderr_text};
+
 use std::fs;
 
 use assert_cmd::cargo::cargo_bin_cmd;
@@ -63,7 +67,7 @@ fn reopen_requires_note_clears_owner_and_claimed_and_follows_transitions() {
         .output()
         .unwrap();
     assert_eq!(bad_trans.status.code(), Some(1));
-    let bad_json: Value = serde_json::from_slice(&bad_trans.stdout).unwrap();
+    let bad_json: Value = parse_json(&bad_trans.stdout);
     assert_eq!(bad_json["error"]["code"], "BAD_TRANSITION");
 
     // Reopen done task T-001.
@@ -81,7 +85,7 @@ fn reopen_requires_note_clears_owner_and_claimed_and_follows_transitions() {
         .output()
         .unwrap();
     assert_eq!(ok_done.status.code(), Some(0));
-    let done_json: Value = serde_json::from_slice(&ok_done.stdout).unwrap();
+    let done_json: Value = parse_json(&ok_done.stdout);
     assert_eq!(done_json["data"]["status"], "open");
     assert!(done_json["data"]["owner"].is_null());
     assert!(done_json["data"]["claimed"].is_null());
@@ -101,7 +105,7 @@ fn reopen_requires_note_clears_owner_and_claimed_and_follows_transitions() {
         .output()
         .unwrap();
     assert_eq!(ok_drop.status.code(), Some(0));
-    let drop_json: Value = serde_json::from_slice(&ok_drop.stdout).unwrap();
+    let drop_json: Value = parse_json(&ok_drop.stdout);
     assert_eq!(drop_json["data"]["status"], "open");
     assert!(drop_json["data"]["owner"].is_null());
 }
@@ -119,7 +123,7 @@ fn move_keeps_every_line_and_leaves_rest_of_file_unchanged() {
         .output()
         .unwrap();
     assert_eq!(same.status.code(), Some(0));
-    assert_eq!(fs::read_to_string(&path).unwrap(), FIXTURE);
+    assert_eq!(read_text(&path), FIXTURE);
 
     // Move T-003 to Now.
     let moved = cargo_bin_cmd!("todo")
@@ -139,12 +143,12 @@ fn move_keeps_every_line_and_leaves_rest_of_file_unchanged() {
         moved.status.code(),
         Some(0),
         "stderr: {}",
-        String::from_utf8_lossy(&moved.stderr)
+        stderr_text(&moved)
     );
-    let moved_json: Value = serde_json::from_slice(&moved.stdout).unwrap();
+    let moved_json: Value = parse_json(&moved.stdout);
     assert_eq!(moved_json["data"]["section"], "Now");
 
-    let after = fs::read_to_string(&path).unwrap();
+    let after = read_text(&path);
     assert!(after.contains("- custom_field: keep-me"));
     assert!(after.contains("- note (2026-01-01, alice): original note"));
     assert!(after.contains("  Arbitrary prose paragraph inside T-003."));
