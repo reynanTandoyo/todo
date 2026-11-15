@@ -327,44 +327,54 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 ## 4. Recovery, checks and overview
 
 ### T-040 · Snapshots: history, diff and restore
-- status: open
-- owner: —
+- status: done
+- owner: w6-hydrogen
 - priority: P1 · type: feature · area: history
 - reqs: R-HIST-2
 - depends: T-012, T-014, T-035
 - accept: every write leaves a snapshot; only the newest `snapshots_keep` remain; restore needs --yes, runs under the lock and can itself be undone
+- commit: 0f379c9
+- note (2026-11-15, w6-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 138 tests pass; check and summary run cleanly on this repository's TODO.md
 
 ### T-041 · Detect edits made outside the tool
-- status: open
-- owner: —
+- status: done
+- owner: w6-hydrogen
 - priority: P1 · type: feature · area: history
 - reqs: R-HIST-3
 - depends: T-040
 - accept: a hand edit between two commands is saved and reported once; edits during a lease are recorded without a warning
+- commit: f6db442
+- note (2026-11-15, w6-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 138 tests pass; check and summary run cleanly on this repository's TODO.md
 
 ### T-042 · check
-- status: open
-- owner: —
+- status: done
+- owner: w6-hydrogen
 - priority: P1 · type: feature · area: check
 - reqs: R-CHECK-1, R-DEP-3
 - depends: T-003
 - accept: a fixture for each problem listed in R-CHECK-1 is reported with its line; a clean fixture exits 0
+- commit: 5eee24f
+- note (2026-11-15, w6-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 138 tests pass; check and summary run cleanly on this repository's TODO.md
 
 ### T-043 · summary
-- status: open
-- owner: —
+- status: done
+- owner: w6-hydrogen
 - priority: P1 · type: feature · area: cli
 - reqs: R-READ-5
 - depends: T-020, T-023
 - accept: at most 40 lines on a 5,000-task file; JSON output matches its snapshot
+- commit: ff7111f
+- note (2026-11-15, w6-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 138 tests pass; check and summary run cleanly on this repository's TODO.md
 
 ### T-044 · archive
-- status: open
-- owner: —
+- status: done
+- owner: w6-hydrogen
 - priority: P1 · type: feature · area: cli
 - reqs: R-ARCH-1
 - depends: T-024, T-025, T-035
 - accept: done and dropped tasks move to the archive under the same section names; show, list --archive and dependency checks still find them; their IDs are never given out again
+- commit: 876cbda
+- note (2026-11-15, w6-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 138 tests pass; check and summary run cleanly on this repository's TODO.md
 
 ### T-045 · check --fix
 - status: open
@@ -419,20 +429,24 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 21 tests pass
 
 ### T-051 · init
-- status: open
-- owner: —
+- status: done
+- owner: w6-hydrogen
 - priority: P1 · type: feature · area: agent
 - reqs: R-AGENT-2
 - depends: T-042, T-050
 - accept: the new file passes `todo check`; an existing TODO.md is never overwritten
+- commit: c673250
+- note (2026-11-15, w6-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 138 tests pass; check and summary run cleanly on this repository's TODO.md
 
 ### T-052 · agents install and agents check
-- status: open
-- owner: —
+- status: done
+- owner: w6-hydrogen
 - priority: P1 · type: feature · area: agent
 - reqs: R-AGENT-3
 - depends: T-035, T-050
 - accept: the block is added or replaced without changing any other byte of the file; check reports missing and outdated blocks
+- commit: 42e9c47
+- note (2026-11-15, w6-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 138 tests pass; check and summary run cleanly on this repository's TODO.md
 
 ### T-053 · Claude Code hooks
 - status: open
@@ -481,20 +495,24 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 21 tests pass
 
 ### T-063 · docs/json.md and CHANGELOG.md
-- status: open
-- owner: —
+- status: done
+- owner: w6-hydrogen
 - priority: P1 · type: docs · area: release
 - reqs: REL-5
 - depends: T-004
 - accept: every JSON shape and error code is documented with an example; CHANGELOG.md has an entry for each released version
+- commit: 829e2ec
+- note (2026-11-15, w6-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 138 tests pass; check and summary run cleanly on this repository's TODO.md
 
 ### T-064 · Release workflow
-- status: open
-- owner: —
+- status: done
+- owner: w6-hydrogen
 - priority: P1 · type: chore · area: release
 - reqs: REL-6
 - depends: T-060
 - accept: a `v*` tag publishes todo.exe and the Linux binary with SHA-256 files; a tag that doesn't match Cargo.toml fails
+- commit: c3ca7e3
+- note (2026-11-15, w6-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 138 tests pass; check and summary run cleanly on this repository's TODO.md
 
 ### T-065 · Performance test
 - status: done
