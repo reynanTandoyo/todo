@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ci:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify direct dependencies match NFR-9
+        shell: bash
+        run: |
+          set -euo pipefail
+          allowed="chrono clap serde serde_json sha2 similar toml assert_cmd insta predicates proptest tempfile"
+          deps=$(cargo tree --depth 1 --prefix none | awk '
+            NR == 1 { next }
+            /^\[dev-dependencies\]$/ { next }
+            /^\[build-dependencies\]$/ { next }
+            NF > 0 { print $1 }
+          ')
+          for dep in $deps; do
+            if ! grep -qw "$dep" <<< "$allowed"; then
+              echo "::error::Unexpected direct dependency outside NFR-9: $dep"
+              exit 1
+            fi
+          done
+          echo "Direct dependencies OK:"
+          echo "$deps"
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --all-features
+
+      - name: Build release binary (Windows)
+        if: runner.os == 'Windows'
+        run: cargo build --release
+
+      - name: Check release binary size (< 5 MB) and DLL imports (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Get-Item 'target\release\todo.exe'
+          $maxBytes = 5 * 1024 * 1024
+          Write-Host "todo.exe size: $($exe.Length) bytes (limit: $maxBytes bytes)"
+          if ($exe.Length -ge $maxBytes) {
+            Write-Error "todo.exe is $($exe.Length) bytes, which reaches or exceeds 5 MB ($maxBytes bytes)"
+          }
+
+          $dumpbin = Get-ChildItem 'C:\Program Files*\Microsoft Visual Studio' -Recurse -Filter 'dumpbin.exe' -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $dumpbin) {
+            Write-Error 'dumpbin.exe not found on runner'
+          }
+
+          $output = & $dumpbin /dependents $exe.FullName
+          $output | ForEach-Object { Write-Host $_ }
+
+          $inDeps = $false
+          $dlls = @()
+          foreach ($line in $output) {
+            if ($line -match 'Image has the following dependencies:') {
+              $inDeps = $true
+              continue
+            }
+            if ($inDeps -and $line -match '^\s*Summary\s*$') {
+              break
+            }
+            if ($inDeps -and $line -match '^\s*([A-Za-z0-9_.\-]+\.dll)\s*$') {
+              $dlls += $Matches[1]
+            }
+          }
+
+          if ($dlls.Count -eq 0) {
+            Write-Error 'Failed to parse any DLL dependencies from dumpbin output'
+          }
+
+          $system32 = Join-Path $env:SystemRoot 'System32'
+          foreach ($dll in $dlls) {
+            $lower = $dll.ToLowerInvariant()
+            if ($lower -like 'vcruntime*' -or $lower -like 'msvcp*') {
+              Write-Error "Non-OS C++ runtime DLL imported: $dll"
+            }
+            $isApiSet = $lower -like 'api-ms-win-core-*'
+            $inSystem32 = Test-Path (Join-Path $system32 $dll)
+            if (-not ($isApiSet -or $inSystem32)) {
+              Write-Error "Unexpected non-Windows DLL imported: $dll"
+            }
+          }
+          Write-Host "DLL check passed: $($dlls -join ', ')"
