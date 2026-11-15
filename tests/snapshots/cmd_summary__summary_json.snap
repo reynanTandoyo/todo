@@ -1,0 +1,76 @@
+---
+source: tests/cmd_summary.rs
+expression: json
+---
+{
+  "data": {
+    "blocked": [
+      {
+        "id": "T-004",
+        "reason": "blocked — waiting on API key",
+        "title": "Blocked task"
+      }
+    ],
+    "claimed": [
+      {
+        "age_hours": 2,
+        "claimed": "2026-11-15T18:00+01:00",
+        "id": "T-002",
+        "owner": "alice",
+        "stale": false,
+        "title": "Claimed fresh task"
+      },
+      {
+        "age_hours": 58,
+        "claimed": "2026-11-13T10:00+01:00",
+        "id": "T-003",
+        "owner": "bob",
+        "stale": true,
+        "title": "Claimed stale task"
+      }
+    ],
+    "counts": {
+      "blocked": 1,
+      "claimed": 2,
+      "done": 1,
+      "dropped": 1,
+      "open": 2,
+      "total": 7
+    },
+    "file": "TODO.md",
+    "next_ready": [
+      {
+        "id": "T-001",
+        "priority": "P0",
+        "section": "Tasks",
+        "title": "Ready critical task"
+      },
+      {
+        "id": "T-003",
+        "priority": "P1",
+        "section": "Tasks",
+        "title": "Claimed stale task"
+      }
+    ],
+    "open_by_priority": [
+      {
+        "count": 1,
+        "priority": "P0"
+      },
+      {
+        "count": 1,
+        "priority": "P1"
+      }
+    ],
+    "open_questions": [
+      {
+        "id": "T-007",
+        "status": "open",
+        "title": "Should we ship v0.2 today?"
+      }
+    ]
+  },
+  "ok": true,
+  "schema": "todo.todo.summary.v1.v1",
+  "warnings": []
+}

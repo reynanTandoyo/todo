@@ -386,6 +386,7 @@ register_commands! {
     Set => set,
     Show => show,
     Status => status,
+    Summary => summary,
     Unblock => unblock,
     Unlock => unlock,
     Where => where_cmd,

@@ -116,6 +116,11 @@ expression: ok_json
         "summary": "Show write lock and manual lease status"
       },
       {
+        "kind": "read",
+        "name": "summary",
+        "summary": "Show a compact session-start overview of TODO.md"
+      },
+      {
         "kind": "write",
         "name": "unblock",
         "summary": "Unblock a blocked task back to claimed or open"
