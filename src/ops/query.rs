@@ -329,7 +329,13 @@ pub fn select_next_task<'a>(
     let candidate = doc
         .tasks
         .iter()
-        .filter(|t| is_task_ready(doc, t, archive, now, cfg) && matches_common_filters(t))
+        .filter(|t| {
+            !t.task_type
+                .as_deref()
+                .is_some_and(|ty| ty.eq_ignore_ascii_case("question"))
+                && is_task_ready(doc, t, archive, now, cfg)
+                && matches_common_filters(t)
+        })
         .min_by_key(|t| (cfg.priority_rank(t.priority.as_deref()), t.heading_line))?;
 
     Some(SelectedNext {
