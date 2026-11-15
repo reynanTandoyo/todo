@@ -427,7 +427,7 @@ fn check_required_fields(
     Ok(())
 }
 
-fn resolve_target_section(
+pub(crate) fn resolve_target_section(
     doc: &Document,
     section_flag: Option<&str>,
     cfg: &OpsConfig,

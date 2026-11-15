@@ -367,6 +367,7 @@ register_commands! {
     Add => add,
     Agents => agents,
     Answer => answer,
+    Apply => apply,
     Archive => archive,
     Ask => ask,
     Block => block,
