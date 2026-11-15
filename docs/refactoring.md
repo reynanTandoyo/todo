@@ -51,8 +51,25 @@ Items are ordered by estimated lines saved.
 - Behaviour deltas in `apply` caused by sharing the single-command code (no test covered them):
   `unblock` to `claimed` now sets the `claimed` timestamp like `todo unblock`; extra `fields` named
   like a built-in key (`priority`, `type`, ...) are no longer written twice in `add`.
-- `todo answer` writes `answered — <text>` while `apply` writes `answer — <text>` (and
-  `docs/format.md` §9 says `answer —`). Both kept via `TaskOp::Answer { verb }`; decide and remove
-  the parameter.
 - Not shared yet: `move` (single and `apply` differ in blank-line handling), the read commands and
   the remaining ~25 commands (chunk 2).
+- Resolved in chunk 2 step 1: `todo answer` and `apply` both write `answer — <text>` (format.md §9);
+  `TaskOp::Answer` no longer has a verb parameter. No test expected `answered —`.
+
+## Status after chunk 2, step 2 (T-083, item 1: test scaffolding)
+- `tests/common/mod.rs` is the one helper module (it replaces `tests/lock_support`): `todo_bin`,
+  `run_in`, `run_todo`, `run_with_stdin`, `spawn_todo`, `run_parallel_todos`, `wait_for_file`,
+  `clean_todo_command`, `assert_todo`, `setup_proj`, `setup_fixture_proj`, `write_todo`,
+  `write_toml`, `read_todo`, `read_text`, `fixture`, `copy_fixture`, `copy_clean_fixture`, `git`,
+  `parse_json`, `stdout_text`, `stderr_text`. Every test file that needs one of them uses it.
+- Removed: 7 local `todo_bin`, 8 local `setup_proj`, 6 local git helpers, 2 `copy_clean_fixture`,
+  the `serde_json::from_slice(..).unwrap()` and `from_utf8_lossy` read-backs, 39 `todo_bin()` run
+  chains (now `run_in`). Non-blank lines in `tests/`: 7,852 → 7,526; `src/`: 16,152 → 16,146.
+- Assertions: `assert!`/`assert_eq!`/`assert_ne!` occurrences in `tests/` went 1,166 → 1,164. The two
+  fewer are three `assert!` bodies of the old local git helpers, which are now one `assert!` in
+  `common::git`; nothing else was removed or weakened.
+- Still repeated (left for a later pass): inline `home`/`work` folder setup in files that do not use
+  `setup_proj` (`join("home")` 13 times), `TempDir::new().unwrap()` boilerplate, and the
+  `cargo_bin_cmd!` chains in `cmd_*` tests that need assert_cmd matchers (67 uses).
+- Files with no shared helper: `atomic_io.rs`, `doc_fixtures.rs`, `doc_lines.rs`, `ops_rules.rs`
+  (they test the library, not the binary, and need no process helpers).
