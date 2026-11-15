@@ -2,13 +2,13 @@
 
 use clap::Args as ClapArgs;
 
+use crate::cli::add::find_section;
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::doc::{LineEdit, TaskChangeIntent};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
     DocWritePlan, OpsConfig, OwnershipDecision, TaskCommand, build_task_json, check_ownership,
-    check_task_writable, edit_doc_and_write, forced_note_text, matching_section_indices,
-    resolve_task_in_doc,
+    check_task_writable, edit_doc_and_write, forced_note_text, resolve_task_in_doc,
 };
 use crate::output::Output;
 
@@ -56,33 +56,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                     "TODO.md has no `## ` sections",
                 ));
             }
-            let all_names: Vec<&str> = doc.sections.iter().map(|s| s.name.as_str()).collect();
-            let all_joined = all_names.join(", ");
-            let matches = matching_section_indices(&doc.sections, &args.section);
-            let target_idx = match matches.as_slice() {
-                [] => {
-                    return Err(TodoError::new(
-                        ErrorCode::UnknownSection,
-                        format!(
-                            "unknown section '{}'; available sections: {all_joined}",
-                            args.section
-                        ),
-                    ));
-                }
-                [only] => *only,
-                many => {
-                    let matched: Vec<&str> =
-                        many.iter().map(|&i| doc.sections[i].name.as_str()).collect();
-                    return Err(TodoError::new(
-                        ErrorCode::AmbiguousSection,
-                        format!(
-                            "section '{}' is ambiguous (matches: {}); available sections: {all_joined}",
-                            args.section,
-                            matched.join(", ")
-                        ),
-                    ));
-                }
-            };
+            let target_idx = find_section(doc, &args.section)?;
 
             if task.section == Some(target_idx) {
                 let task_json = build_task_json(doc, task, archive, false, now, &cfg_clone);

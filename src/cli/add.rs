@@ -393,15 +393,13 @@ pub(crate) fn resolve_target_section(
         ));
     }
 
-    let all_names: Vec<&str> = doc.sections.iter().map(|s| s.name.as_str()).collect();
-    let all_joined = all_names.join(", ");
-
     let query = match section_flag {
         Some(s) => s,
         None => match cfg.default_section.as_deref() {
             Some(def) => def,
             None if doc.sections.len() == 1 => return Ok(0),
             None => {
+                let all_joined = section_names_joined(doc);
                 return Err(TodoError::new(
                     ErrorCode::UnknownSection,
                     format!(
@@ -412,6 +410,15 @@ pub(crate) fn resolve_target_section(
         },
     };
 
+    find_section(doc, query)
+}
+
+/// The index of the one `## ` section that `query` names (exact name or unique substring).
+///
+/// Unknown and ambiguous queries fail with `UnknownSection` / `AmbiguousSection` and list the
+/// available sections. Shared by `todo add`, `todo move` and `todo apply`.
+pub(crate) fn find_section(doc: &Document, query: &str) -> Result<usize> {
+    let all_joined = section_names_joined(doc);
     let matches = matching_section_indices(&doc.sections, query);
     match matches.as_slice() {
         [] => Err(TodoError::new(
@@ -431,6 +438,15 @@ pub(crate) fn resolve_target_section(
             ))
         }
     }
+}
+
+/// Section names of `doc` separated by `, ` (for error messages).
+fn section_names_joined(doc: &Document) -> String {
+    doc.sections
+        .iter()
+        .map(|s| s.name.as_str())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 #[derive(Debug, Deserialize)]
