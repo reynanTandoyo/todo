@@ -365,6 +365,7 @@ macro_rules! register_commands {
 // One-line command registration: add `Variant => module,` here.
 register_commands! {
     Add => add,
+    Agents => agents,
     Answer => answer,
     Archive => archive,
     Ask => ask,

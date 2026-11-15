@@ -11,6 +11,11 @@ expression: ok_json
         "summary": "Add a new task to a section"
       },
       {
+        "kind": "meta",
+        "name": "agents",
+        "summary": "Install or check the managed agent-rules block in AGENTS.md"
+      },
+      {
         "kind": "write",
         "name": "answer",
         "summary": "Answer a question and mark it done"

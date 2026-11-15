@@ -80,6 +80,77 @@ pub fn render_managed_block(eol: &str) -> String {
     out
 }
 
+/// Inserts or updates the managed agent-rules block in `existing_bytes` (`None` for a new file),
+/// preserving all bytes outside `<!-- todo:begin -->` ... `<!-- todo:end -->` (`R-AGENT-3`).
+pub fn upsert_managed_block(
+    existing_bytes: Option<&[u8]>,
+    label: &str,
+) -> crate::error::Result<Vec<u8>> {
+    use crate::doc::lines::{LineDoc, LineEdit};
+    use crate::error::{ErrorCode, TodoError};
+
+    let canonical_lines: Vec<String> = RULES_TEXT.trim().lines().map(str::to_string).collect();
+
+    let Some(bytes) = existing_bytes else {
+        let mut s = render_managed_block("\n");
+        s.push('\n');
+        return Ok(s.into_bytes());
+    };
+
+    let line_doc = LineDoc::from_bytes(bytes).map_err(|e| {
+        TodoError::new(ErrorCode::UnsafeFile, e.to_string())
+            .with_file(label.to_string())
+            .with_line(e.line)
+    })?;
+
+    let mut begin_idx: Option<usize> = None;
+    let mut end_idx: Option<usize> = None;
+    for (idx, line) in line_doc.lines.iter().enumerate() {
+        let trimmed = line.text.trim();
+        if begin_idx.is_none() && trimmed == BEGIN_MARKER {
+            begin_idx = Some(idx);
+        } else if begin_idx.is_some() && trimmed == END_MARKER {
+            end_idx = Some(idx);
+            break;
+        }
+    }
+
+    let edit = if let (Some(b), Some(e)) = (begin_idx, end_idx) {
+        let existing_inner: Vec<&str> = line_doc.lines[b + 1..e]
+            .iter()
+            .map(|l| l.text.as_str())
+            .collect();
+        let matches = existing_inner.len() == canonical_lines.len()
+            && existing_inner
+                .iter()
+                .zip(canonical_lines.iter())
+                .all(|(a, b)| *a == b.as_str());
+        if matches {
+            return Ok(bytes.to_vec());
+        }
+        LineEdit::replace_range((b + 1)..e, canonical_lines)
+    } else {
+        let mut to_insert = Vec::new();
+        if !line_doc.lines.is_empty()
+            && !line_doc
+                .lines
+                .last()
+                .is_some_and(|l| l.text.trim().is_empty())
+        {
+            to_insert.push(String::new());
+        }
+        to_insert.push(BEGIN_MARKER.to_string());
+        to_insert.extend(canonical_lines);
+        to_insert.push(END_MARKER.to_string());
+        LineEdit::insert(line_doc.lines.len(), to_insert)
+    };
+
+    let applied = line_doc.apply_edits(&[edit]).map_err(|e| {
+        TodoError::new(ErrorCode::WriteFailed, e.to_string()).with_file(label.to_string())
+    })?;
+    Ok(applied.bytes)
+}
+
 #[cfg(test)]
 mod tests {
     use super::RULES_TEXT;
