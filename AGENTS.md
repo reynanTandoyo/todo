@@ -13,16 +13,16 @@
 
 ## How to work
 
-1. Take the first open task in priority order (P0 first) whose `depends` tasks are all done.
-2. Until v0.1 is released, `TODO.md` is edited by hand, so **only one agent works on this repository
-   at a time**. Set `status: claimed` and your name as `owner` before you start. From v0.1 on,
-   `TODO.md` is changed only through `todo` itself.
+1. Run `todo summary`, then take work with `todo next --claim --agent <your name>` (or
+   `todo claim T-0xx --agent <your name>`). Every agent uses its own unique name.
+2. `TODO.md` is changed only through `todo` (the rules are in the block at the end of this file).
+   Never edit it directly; several agents may be working at once.
 3. Build what the task's `reqs` and `accept` lines say, nothing more. If a requirement turns out to
    be wrong or unclear, fix `docs/requirements.md` (and `docs/format.md`) in the same commit, keep
-   existing IDs stable, and say so in a note on the task.
-4. When every check below passes, set `status: done` and add a note:
-   `- note (YYYY-MM-DD, <your name>): done — <what changed>`.
-5. One commit per task, starting with its ID: `T-002: line model with verified writes`.
+   existing IDs stable, and say so with `todo note`.
+4. When every check below passes, commit: one commit per task, starting with its ID
+   (`T-002: line model with verified writes`).
+5. Then `todo done T-0xx --agent <your name> --commit HEAD --note "<what changed>"`.
 6. Never push. The owner decides when to push.
 
 ## Checks
@@ -31,9 +31,13 @@ All must pass before a task counts as done:
 
 ```
 cargo fmt --all -- --check
-cargo clippy --all-targets -- -D warnings
-cargo test
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-features
 ```
+
+CI also runs clippy for Linux. To check that locally:
+`cargo clippy --target x86_64-unknown-linux-gnu --all-targets --all-features -- -D warnings`
+(once: `rustup target add x86_64-unknown-linux-gnu`).
 
 ## Code rules
 
@@ -57,3 +61,19 @@ cargo test
 
 `cargo build --release` produces `target\release\todo.exe`. The C runtime is linked in
 (`.cargo/config.toml`), so the program runs on a PC without Visual C++ installed.
+
+<!-- todo:begin -->
+# Working with TODO.md
+
+- Never edit `TODO.md` (or `TODO-archive.md`) directly; always use `todo`.
+- Use one unique agent name per agent via `--agent <name>` or `TODO_AGENT`.
+- Start by running `todo summary` or `todo next`.
+- Claim a task before working on it (`todo claim <id>`, or `todo next --claim` to pick and claim in one step).
+- Exit code `1` means someone else claimed it or the rule refused the change — pick another task.
+- Exit code `3` means the lock or lease is busy — try the command again.
+- Add notes as you learn things (`todo note <id> "..."`).
+- Finish a task with `todo done <id> --note "..." --commit`.
+- Use `todo add "..."` to record problems you find instead of fixing them silently.
+- Use `todo ask "..."` for questions only a person can decide.
+- Start every git commit message with the task ID (for example `T-012: short summary`).
+<!-- todo:end -->

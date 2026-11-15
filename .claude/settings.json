@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "_managed_by": "todo",
+        "hooks": [
+          {
+            "command": "todo guard",
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write|MultiEdit"
+      }
+    ],
+    "SessionStart": [
+      {
+        "_managed_by": "todo",
+        "hooks": [
+          {
+            "command": "todo summary",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}
