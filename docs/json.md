@@ -80,7 +80,7 @@ Returned by `show` (plus `block_lines`), `add`, `claim`, `release`, `done`, `dro
   "ok": true,
   "data": {
     "name": "todo",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "about": "Concurrency-safe editor for TODO.md task lists",
     "commands": [
       { "kind": "read", "name": "list", "summary": "List and filter tasks" }
@@ -96,7 +96,7 @@ Returned by `show` (plus `block_lines`), `add`, `claim`, `release`, `done`, `dro
 {
   "schema": "todo.version.v1",
   "ok": true,
-  "data": { "version": "0.3.0", "commit": "abc1234" },
+  "data": { "version": "0.4.0", "commit": "abc1234" },
   "warnings": []
 }
 ```

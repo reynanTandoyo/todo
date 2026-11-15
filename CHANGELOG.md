@@ -7,11 +7,12 @@ All notable changes to `todo` are documented in this file.
 ### Added
 - `todo import --from checkbox <source> [--out <path>] [--yes]`: convert a Markdown checkbox task list into format version 1 with a preview, a `<name>.pre-import` backup, and a `todo check` plus task-count proof of the result (`R-IMP-1`).
 - Claims tagged with an agent session: `claim`, `next --claim` and `unblock` write `- session: <id>` from `--session`, `TODO_SESSION` or `CLAUDE_CODE_SESSION_ID`; `release --session <id>` releases every claim of that session; `todo hooks install` adds a Claude Code `SessionEnd` hook (the hidden command `todo session-end`) that does this when a session ends; `hooks uninstall` removes it (`R-CLAIM-7`).
-
 - `todo completions <shell>`: tab-completion scripts for powershell, bash, zsh, fish and elvish, generated with `clap_complete` (new dependency, `NFR-9`); hidden commands are left out (`R-OUT-10`).
 
 ### Changed
 - The `session` field is written right after `claimed` (format.md §10); the global option `--session <ID>` is new.
+- `todo hooks install` now installs three hooks (`SessionStart`, `PreToolUse` and `SessionEnd`); run it again in a project to add the new one. The release `todo.exe` is 3.1 MB.
+- Tests run `todo` without `TODO_SESSION` and `CLAUDE_CODE_SESSION_ID`, so they give the same results inside Claude Code.
 
 ## [0.3.0] - 2026-11-15
 

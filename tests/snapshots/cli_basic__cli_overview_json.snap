@@ -196,7 +196,7 @@ expression: ok_json
         "summary": "Show resolved TODO.md, repo root, state folder, lock status, and task counts"
       }
     ],
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "ok": true,
   "schema": "todo.overview.v1",

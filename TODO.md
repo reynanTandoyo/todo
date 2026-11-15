@@ -651,12 +651,13 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - reqs: I-9
 
 ### T-079 · PowerShell tab completion
-- status: claimed
+- status: done
 - owner: r4-sonnet
-- claimed: 2026-11-16T00:26+01:00
 - priority: P2 · type: idea · area: cli
 - accept: todo completions <shell> prints scripts for powershell, bash, zsh, fish, elvish via clap_complete; README explains the PowerShell profile line
+- commit: 6fce0b7
 - reqs: R-OUT-10
+- note (2026-11-16, r4-sonnet): done — todo completions <shell> (powershell, bash, zsh, fish, elvish) with clap_complete; README profile line
 
 ### T-080 · todo scan
 - status: open
