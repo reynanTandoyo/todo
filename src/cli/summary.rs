@@ -5,11 +5,11 @@ use std::collections::BTreeMap;
 use clap::Args as ClapArgs;
 use serde::Serialize;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, load_read};
 use crate::doc::Status;
 use crate::error::Result;
 use crate::lock::current_time;
-use crate::ops::{is_task_ready, load_for_read_with_found};
+use crate::ops::is_task_ready;
 use crate::output::Output;
 
 /// Metadata for the `summary` command.
@@ -88,8 +88,7 @@ const MAX_TEXT_LINES: usize = 40;
 
 /// Runs `todo summary`.
 pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let (found, cfg) = ctx.load_config_with_found()?;
-    let loaded = load_for_read_with_found(found, &cfg, false, true, out)?;
+    let (cfg, loaded) = load_read(ctx, out, false, true)?;
     let doc = &loaded.doc;
     let archive = loaded.archive.as_ref();
     let now = current_time();

@@ -325,6 +325,28 @@ pub fn validate_agent_name(name: &str) -> Result<&str> {
     Ok(name)
 }
 
+/// Loads the settings and the parsed `TODO.md` (or its archive) for a read command.
+///
+/// One discovery pass: `todo.toml` and `TODO.md` are located together, and the discovery notices
+/// are printed once. Commands that must parse their own arguments before loading keep the two
+/// steps apart; see `docs/refactoring.md`, chunk 3.
+pub(crate) fn load_read(
+    ctx: &Context,
+    out: &mut Output,
+    from_archive: bool,
+    load_archive_for_deps: bool,
+) -> Result<(OpsConfig, crate::ops::LoadedRead)> {
+    let (found, cfg) = ctx.load_config_with_found()?;
+    let loaded = crate::ops::load_for_read_with_found(
+        found,
+        &cfg,
+        from_archive,
+        load_archive_for_deps,
+        out,
+    )?;
+    Ok((cfg, loaded))
+}
+
 /// Edits one task with a shared [`TaskOp`] and runs the write pipeline.
 ///
 /// `found` is a [`FoundTodo`] already located together with `cfg` (see

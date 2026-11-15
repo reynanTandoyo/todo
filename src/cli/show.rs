@@ -2,12 +2,10 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, load_read};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::current_time;
-use crate::ops::{
-    build_task_json, file_label, load_for_read_with_found, resolve_task_by_title,
-};
+use crate::ops::{build_task_json, file_label, resolve_task_by_title};
 use crate::output::Output;
 
 /// Metadata for the `show` command.
@@ -33,8 +31,7 @@ pub struct Args {
 
 /// Runs `todo show <task>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let (found, cfg) = ctx.load_config_with_found()?;
-    let loaded = load_for_read_with_found(found, &cfg, false, true, out)?;
+    let (cfg, loaded) = load_read(ctx, out, false, true)?;
 
     let (primary_doc, secondary_doc, task, archived) =
         if let Some(task_id) = cfg.id_config.parse_user_id(&args.task) {
