@@ -1,4 +1,5 @@
 //! Reusable process-spawning helpers for multi-process locking tests (TEST-5, TEST-8).
+#![allow(dead_code)]
 
 use std::path::Path;
 use std::process::{Child, Command, Output, Stdio};
