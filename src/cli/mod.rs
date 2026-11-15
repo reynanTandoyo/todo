@@ -247,6 +247,7 @@ macro_rules! register_commands {
 // One-line command registration: add `Variant => module,` here.
 register_commands! {
     Claim => claim,
+    Done => done,
     Help => help,
     List => list,
     Lock => lock,

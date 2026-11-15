@@ -1,0 +1,263 @@
+//! CLI integration tests for `todo done` (T-024; R-WRITE-4, NFR-5, TEST-4).
+
+mod lock_support;
+
+use std::fs;
+use std::path::Path;
+use std::process::Command;
+
+use tempfile::TempDir;
+
+fn setup_proj(
+    tmp: &TempDir,
+    body: &str,
+) -> std::io::Result<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
+    let home = tmp.path().join("home");
+    let work = tmp.path().join("work");
+    fs::create_dir_all(&home)?;
+    fs::create_dir_all(&work)?;
+    let todo_file = work.join("TODO.md");
+    fs::write(&todo_file, body)?;
+    Ok((home, work, todo_file))
+}
+
+fn init_git_repo_with_commit(dir: &Path) -> String {
+    let run_git = |args: &[&str]| {
+        let out = Command::new("git")
+            .current_dir(dir)
+            .args(args)
+            .output()
+            .expect("git must be installed for this test");
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+        out
+    };
+
+    run_git(&["init"]);
+    run_git(&["config", "user.email", "test@example.com"]);
+    run_git(&["config", "user.name", "Test User"]);
+    run_git(&["add", "TODO.md"]);
+    run_git(&["commit", "-m", "initial"]);
+
+    let head = run_git(&["rev-parse", "--short", "HEAD"]);
+    String::from_utf8_lossy(&head.stdout).trim().to_string()
+}
+
+#[test]
+fn done_transitions_ownership_notes_and_accept_reminder() {
+    let tmp = TempDir::new().unwrap();
+    let initial = "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
+## Now\n\n\
+### T-001 · Open task\n\
+- status: open\n\
+- owner: —\n\
+- priority: P1\n\
+- accept: all unit tests pass\n\
+\n\
+### T-002 · Claimed by alice\n\
+- status: claimed\n\
+- owner: alice\n\
+- claimed: 2026-11-15T10:00+01:00\n\
+- priority: P0\n\
+- accept: zero warnings\n\
+\n\
+### T-003 · Blocked task\n\
+- status: blocked\n\
+- owner: alice\n\
+- claimed: 2026-11-15T10:00+01:00\n\
+\n\
+### T-004 · Already done\n\
+- status: done\n\
+- owner: alice\n";
+    let (home, work, todo_file) = setup_proj(&tmp, initial).unwrap();
+    let now = "2026-11-15T14:30:00+01:00";
+
+    // 1. Open task -> done with --note; prints accept line.
+    let out1 = lock_support::run_todo(
+        &home,
+        &work,
+        &["done", "T-001", "--agent", "bob", "--note", "implemented"],
+        &[("TODO_TEST_NOW", now)],
+    )
+    .unwrap();
+    assert!(
+        out1.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out1.stderr)
+    );
+    let stdout1 = String::from_utf8_lossy(&out1.stdout);
+    assert!(stdout1.contains("T-001: done ok"), "stdout: {stdout1}");
+    assert!(
+        stdout1.contains("accept: all unit tests pass"),
+        "stdout: {stdout1}"
+    );
+    let after1 = fs::read_to_string(&todo_file).unwrap();
+    assert!(after1.contains(
+        "### T-001 · Open task\n\
+- status: done\n\
+- owner: bob\n\
+- priority: P1\n\
+- accept: all unit tests pass\n\
+- note (2026-11-15, bob): done \u{2014} implemented\n"
+    ));
+
+    // 2. Claimed by alice: bob without --force is refused (NOT_OWNER, exit 1), file byte-identical.
+    let before_refusal = fs::read(&todo_file).unwrap();
+    let out_not_owner = lock_support::run_todo(
+        &home,
+        &work,
+        &["--json", "done", "T-002", "--agent", "bob"],
+        &[("TODO_TEST_NOW", now)],
+    )
+    .unwrap();
+    assert_eq!(out_not_owner.status.code(), Some(1));
+    let j_no: serde_json::Value = serde_json::from_slice(&out_not_owner.stdout).unwrap();
+    assert_eq!(j_no["error"]["code"], "NOT_OWNER");
+    assert_eq!(fs::read(&todo_file).unwrap(), before_refusal);
+
+    // 3. Claimed by alice: alice completes it without --note -> `done`, claimed removed.
+    let out2 = lock_support::run_todo(
+        &home,
+        &work,
+        &["done", "2", "--agent", "alice"],
+        &[("TODO_TEST_NOW", now)],
+    )
+    .unwrap();
+    assert!(out2.status.success());
+    let stdout2 = String::from_utf8_lossy(&out2.stdout);
+    assert!(stdout2.contains("accept: zero warnings"));
+    let after2 = fs::read_to_string(&todo_file).unwrap();
+    assert!(after2.contains(
+        "### T-002 · Claimed by alice\n\
+- status: done\n\
+- owner: alice\n\
+- priority: P0\n\
+- accept: zero warnings\n\
+- note (2026-11-15, alice): done\n"
+    ));
+    assert!(!after2.contains("2026-11-15T10:00+01:00\n- priority: P0"));
+
+    // 4. Blocked task: refused without --force (BAD_TRANSITION), allowed with --force + forced note.
+    let before_blocked = fs::read(&todo_file).unwrap();
+    let out_blocked = lock_support::run_todo(
+        &home,
+        &work,
+        &["--json", "done", "T-003", "--agent", "alice"],
+        &[("TODO_TEST_NOW", now)],
+    )
+    .unwrap();
+    assert_eq!(out_blocked.status.code(), Some(1));
+    let j_bl: serde_json::Value = serde_json::from_slice(&out_blocked.stdout).unwrap();
+    assert_eq!(j_bl["error"]["code"], "BAD_TRANSITION");
+    assert_eq!(fs::read(&todo_file).unwrap(), before_blocked);
+
+    let out_force = lock_support::run_todo(
+        &home,
+        &work,
+        &["--json", "done", "T-003", "--agent", "bob", "--force"],
+        &[("TODO_TEST_NOW", now)],
+    )
+    .unwrap();
+    assert!(out_force.status.success());
+    let j_force: serde_json::Value = serde_json::from_slice(&out_force.stdout).unwrap();
+    assert_eq!(j_force["schema"], "todo.done.v1");
+    assert_eq!(j_force["data"]["status"], "done");
+    assert_eq!(j_force["data"]["owner"], "bob");
+    let after3 = fs::read_to_string(&todo_file).unwrap();
+    assert!(after3.contains("- note (2026-11-15, bob): forced done (owner was alice)\n"));
+    assert!(after3.contains("- note (2026-11-15, bob): done\n"));
+
+    // 5. Already done -> BAD_TRANSITION even with --force, file byte-identical.
+    let before_done = fs::read(&todo_file).unwrap();
+    let out_done = lock_support::run_todo(
+        &home,
+        &work,
+        &["--json", "done", "T-004", "--agent", "alice", "--force"],
+        &[("TODO_TEST_NOW", now)],
+    )
+    .unwrap();
+    assert_eq!(out_done.status.code(), Some(1));
+    let j_done: serde_json::Value = serde_json::from_slice(&out_done.stdout).unwrap();
+    assert_eq!(j_done["error"]["code"], "BAD_TRANSITION");
+    assert_eq!(fs::read(&todo_file).unwrap(), before_done);
+}
+
+#[test]
+fn done_commit_resolves_head_rejects_unknown_and_accepts_when_git_missing() {
+    let tmp = TempDir::new().unwrap();
+    let initial = "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
+## Now\n\n\
+### T-001 · First task\n\
+- status: open\n\
+- owner: —\n\
+\n\
+### T-002 · Second task\n\
+- status: open\n\
+- owner: —\n";
+    let (home, work, todo_file) = setup_proj(&tmp, initial).unwrap();
+    let head_short = init_git_repo_with_commit(&work);
+    let now = "2026-11-15T14:30:00+01:00";
+
+    // Unknown commit is refused when git is available, leaving file byte-identical.
+    let before_bad = fs::read(&todo_file).unwrap();
+    let bad_commit = lock_support::run_todo(
+        &home,
+        &work,
+        &[
+            "--json",
+            "done",
+            "T-001",
+            "--agent",
+            "alice",
+            "--commit",
+            "deadbeef9999",
+        ],
+        &[("TODO_TEST_NOW", now)],
+    )
+    .unwrap();
+    assert_eq!(bad_commit.status.code(), Some(1));
+    let j_bad: serde_json::Value = serde_json::from_slice(&bad_commit.stdout).unwrap();
+    assert_eq!(j_bad["error"]["code"], "BAD_VALUE");
+    assert_eq!(fs::read(&todo_file).unwrap(), before_bad);
+
+    // HEAD is resolved to the current commit hash.
+    let good_head = lock_support::run_todo(
+        &home,
+        &work,
+        &[
+            "done", "T-001", "--agent", "alice", "--commit", "HEAD", "--note", "shipped",
+        ],
+        &[("TODO_TEST_NOW", now)],
+    )
+    .unwrap();
+    assert!(
+        good_head.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&good_head.stderr)
+    );
+    let after1 = fs::read_to_string(&todo_file).unwrap();
+    assert!(
+        after1.contains(&format!("- commit: {head_short}\n")),
+        "missing resolved commit {head_short}:\n{after1}"
+    );
+
+    // When git is not on PATH, an unchecked commit hash is accepted.
+    let without_git = lock_support::run_todo(
+        &home,
+        &work,
+        &["done", "T-002", "--agent", "alice", "--commit", "cafebabe"],
+        &[("PATH", ""), ("TODO_TEST_NOW", now)],
+    )
+    .unwrap();
+    assert!(
+        without_git.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&without_git.stderr)
+    );
+    let after2 = fs::read_to_string(&todo_file).unwrap();
+    assert!(after2.contains("- commit: cafebabe\n"));
+}
