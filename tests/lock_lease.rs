@@ -3,36 +3,16 @@
 mod common;
 
 use std::path::Path;
-use std::process::Command;
 #[cfg(feature = "test-hooks")]
 use std::time::Duration;
 
 use tempfile::TempDir;
 
-use common::setup_proj;
+use common::{git, setup_proj};
 
 const LEASE_BODY: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->
 # Lease tests
 ";
-
-fn run_git(dir: &Path, args: &[&str]) -> std::io::Result<()> {
-    let out = Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .env("GIT_AUTHOR_NAME", "Test")
-        .env("GIT_AUTHOR_EMAIL", "test@example.invalid")
-        .env("GIT_COMMITTER_NAME", "Test")
-        .env("GIT_COMMITTER_EMAIL", "test@example.invalid")
-        .output()?;
-    if !out.status.success() {
-        return Err(std::io::Error::other(format!(
-            "git {:?} failed: {}",
-            args,
-            String::from_utf8_lossy(&out.stderr)
-        )));
-    }
-    Ok(())
-}
 
 #[test]
 fn status_works_before_any_state_exists_without_creating_dot_todo() {
@@ -407,20 +387,19 @@ fn linked_worktree_status_works_with_git_removed_from_path() {
     let wt_dir = tmp.path().join("wt-no-git");
     std::fs::create_dir_all(&main_repo).unwrap();
 
-    run_git(&main_repo, &["init"]).unwrap();
+    git(&main_repo, &["init"]);
     let main_todo = main_repo.join("TODO.md");
     std::fs::write(
         &main_todo,
         "<!-- TEST FIXTURE: invented data, not a real task list -->\n# Main\n",
     )
     .unwrap();
-    run_git(&main_repo, &["add", "."]).unwrap();
-    run_git(&main_repo, &["commit", "-m", "init"]).unwrap();
-    run_git(
+    git(&main_repo, &["add", "."]);
+    git(&main_repo, &["commit", "-m", "init"]);
+    git(
         &main_repo,
         &["worktree", "add", "-b", "wt", wt_dir.to_str().unwrap()],
-    )
-    .unwrap();
+    );
 
     // Run `todo status --json` with PATH cleared so git cannot be found.
     let out = common::run_todo(&home, &wt_dir, &["--json", "status"], &[("PATH", "")]).unwrap();

@@ -1,31 +1,19 @@
 //! Tests for `todo where` (T-016; R-FIND-7).
 
+mod common;
+
 use std::fs;
-use std::path::Path;
-use std::process::Command;
 
 use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
-fn run_git(dir: &Path, args: &[&str]) {
-    let out = Command::new("git")
-        .current_dir(dir)
-        .args(args)
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "git {:?} failed: {}",
-        args,
-        String::from_utf8_lossy(&out.stderr)
-    );
-}
+use common::git;
 
 #[test]
 fn where_prints_all_r_find_7_items_in_text_and_json() {
     let dir = TempDir::new().unwrap();
-    run_git(dir.path(), &["init", "-q"]);
+    git(dir.path(), &["init", "-q"]);
     fs::write(
         dir.path().join("TODO.md"),
         "<!-- todo-format: 1 -->\n\n## Tasks\n\n\

@@ -1,31 +1,15 @@
 //! Tests for the per-file state folder and state JSON helpers (T-012; R-HIST-1, R-LOCK-7).
 
+mod common;
+
 use std::path::Path;
-use std::process::Command;
 
 use tempfile::TempDir;
+
+use common::git;
 use todo::atomic::read_file_with_snapshot;
 use todo::find::{ExplicitSource, FindOptions, find_todo};
 use todo::state::{IdsState, LastWrite, Lease, LockHolder, StateDir};
-
-fn run_git(dir: &Path, args: &[&str]) -> std::io::Result<()> {
-    let out = Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .env("GIT_AUTHOR_NAME", "Test")
-        .env("GIT_AUTHOR_EMAIL", "test@example.invalid")
-        .env("GIT_COMMITTER_NAME", "Test")
-        .env("GIT_COMMITTER_EMAIL", "test@example.invalid")
-        .output()?;
-    if !out.status.success() {
-        return Err(std::io::Error::other(format!(
-            "git {:?} failed: {}",
-            args,
-            String::from_utf8_lossy(&out.stderr)
-        )));
-    }
-    Ok(())
-}
 
 #[test]
 fn main_checkout_worktree_and_different_path_spellings_share_state_dir() {
@@ -35,20 +19,19 @@ fn main_checkout_worktree_and_different_path_spellings_share_state_dir() {
     let sub = main_repo.join("nested").join("dir");
     std::fs::create_dir_all(&sub).unwrap();
 
-    run_git(&main_repo, &["init"]).unwrap();
+    git(&main_repo, &["init"]);
     let main_todo = main_repo.join("TODO.md");
     std::fs::write(
         &main_todo,
         "<!-- TEST FIXTURE: invented data, not a real task list -->\n# Main\n",
     )
     .unwrap();
-    run_git(&main_repo, &["add", "."]).unwrap();
-    run_git(&main_repo, &["commit", "-m", "init"]).unwrap();
-    run_git(
+    git(&main_repo, &["add", "."]);
+    git(&main_repo, &["commit", "-m", "init"]);
+    git(
         &main_repo,
         &["worktree", "add", "-b", "wt", wt_dir.to_str().unwrap()],
-    )
-    .unwrap();
+    );
 
     let found_main = find_todo(&FindOptions {
         start_dir: Some(&main_repo),

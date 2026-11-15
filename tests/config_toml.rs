@@ -1,36 +1,16 @@
 //! Tests for `todo.toml` configuration loading and wiring (T-007; R-CFG-1, R-CFG-2).
 
+mod common;
+
 use std::fs;
-use std::path::Path;
-use std::process::Command;
 
 use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
+
+use common::{git, write_todo, write_toml};
 use todo::find::WorktreeMode;
 use todo::ops::OpsConfig;
-
-fn write_todo(dir: &Path, content: &str) {
-    fs::write(dir.join("TODO.md"), content).unwrap();
-}
-
-fn write_toml(dir: &Path, content: &str) {
-    fs::write(dir.join("todo.toml"), content).unwrap();
-}
-
-fn run_git(dir: &Path, args: &[&str]) {
-    let out = Command::new("git")
-        .current_dir(dir)
-        .args(args)
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "git {:?} failed: {}",
-        args,
-        String::from_utf8_lossy(&out.stderr)
-    );
-}
 
 #[test]
 fn all_fifteen_keys_parse_and_have_expected_defaults() {
@@ -304,16 +284,16 @@ fn worktree_local_in_todo_toml_uses_worktrees_own_todo() {
     let wt_dir = tmp.path().join("wt");
     fs::create_dir_all(&main_dir).unwrap();
 
-    run_git(&main_dir, &["init", "-q"]);
-    run_git(&main_dir, &["config", "user.email", "test@example.com"]);
-    run_git(&main_dir, &["config", "user.name", "Test"]);
+    git(&main_dir, &["init", "-q"]);
+    git(&main_dir, &["config", "user.email", "test@example.com"]);
+    git(&main_dir, &["config", "user.name", "Test"]);
     write_todo(
         &main_dir,
         "<!-- todo:format=1 -->\n\n## Tasks\n\n### T-001 · Main task\n- status: open\n- owner: —\n- priority: P1\n",
     );
-    run_git(&main_dir, &["add", "TODO.md"]);
-    run_git(&main_dir, &["commit", "-m", "init", "-q"]);
-    run_git(
+    git(&main_dir, &["add", "TODO.md"]);
+    git(&main_dir, &["commit", "-m", "init", "-q"]);
+    git(
         &main_dir,
         &[
             "worktree",

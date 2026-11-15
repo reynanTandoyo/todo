@@ -4,36 +4,20 @@ mod common;
 
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use tempfile::TempDir;
+
+use common::git;
 
 use common::setup_proj;
 
 fn init_git_repo_with_commit(dir: &Path) -> String {
-    let run_git = |args: &[&str]| {
-        let out = Command::new("git")
-            .current_dir(dir)
-            .args(args)
-            .output()
-            .expect("git must be installed for this test");
-        assert!(
-            out.status.success(),
-            "git {:?} failed: {}",
-            args,
-            String::from_utf8_lossy(&out.stderr)
-        );
-        out
-    };
-
-    run_git(&["init"]);
-    run_git(&["config", "user.email", "test@example.com"]);
-    run_git(&["config", "user.name", "Test User"]);
-    run_git(&["add", "TODO.md"]);
-    run_git(&["commit", "-m", "initial"]);
-
-    let head = run_git(&["rev-parse", "--short", "HEAD"]);
-    String::from_utf8_lossy(&head.stdout).trim().to_string()
+    git(dir, &["init"]);
+    git(dir, &["config", "user.email", "test@example.com"]);
+    git(dir, &["config", "user.name", "Test User"]);
+    git(dir, &["add", "TODO.md"]);
+    git(dir, &["commit", "-m", "initial"]);
+    git(dir, &["rev-parse", "--short", "HEAD"])
 }
 
 #[test]

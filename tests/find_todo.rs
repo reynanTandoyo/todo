@@ -1,19 +1,16 @@
 //! Tests for finding TODO.md (T-010, T-011; R-FIND-1..6, NFR-7, TEST-6).
 
-use std::path::{Path, PathBuf};
+mod common;
+
+use std::path::Path;
+#[cfg(windows)]
+use std::path::PathBuf;
 
 use tempfile::TempDir;
+
+use common::write_todo;
 use todo::error::{ErrorCode, ExitCode};
 use todo::find::{ExplicitSource, FindOptions, FoundBy, WorktreeMode, find_todo};
-
-fn write_todo(dir: &Path) -> std::io::Result<PathBuf> {
-    let path = dir.join("TODO.md");
-    std::fs::write(
-        &path,
-        "<!-- TEST FIXTURE: invented data, not a real task list -->\n# Tasks\n",
-    )?;
-    Ok(path)
-}
 
 #[cfg(windows)]
 fn long_safe_create_dir_all(path: &Path) -> std::io::Result<()> {
@@ -49,6 +46,10 @@ fn long_safe_write(path: &Path, content: &str) -> std::io::Result<()> {
     std::fs::write(path, content)
 }
 
+const FIND_BODY: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->
+# Tasks
+";
+
 #[test]
 fn finds_todo_at_root_and_from_subfolder() {
     let tmp = TempDir::new().unwrap();
@@ -56,7 +57,7 @@ fn finds_todo_at_root_and_from_subfolder() {
     let sub = root.join("crates").join("core").join("src");
     std::fs::create_dir_all(root.join(".git")).unwrap();
     std::fs::create_dir_all(&sub).unwrap();
-    let expected = write_todo(&root).unwrap();
+    let expected = write_todo(&root, FIND_BODY);
 
     let from_root = find_todo(&FindOptions {
         start_dir: Some(&root),
@@ -80,7 +81,7 @@ fn finds_todo_at_root_and_from_subfolder() {
 fn stops_at_git_repository_root_and_does_not_pick_parent_todo() {
     let tmp = TempDir::new().unwrap();
     let outer = tmp.path();
-    write_todo(outer).unwrap();
+    write_todo(outer, FIND_BODY);
 
     let inner_repo = outer.join("child-repo");
     let inner_sub = inner_repo.join("nested").join("dir");
@@ -107,7 +108,7 @@ fn outside_git_walks_up_to_parent_todo() {
     let parent = tmp.path().join("workspace");
     let child = parent.join("a").join("b");
     std::fs::create_dir_all(&child).unwrap();
-    let expected = write_todo(&parent).unwrap();
+    let expected = write_todo(&parent, FIND_BODY);
 
     let found = find_todo(&FindOptions {
         start_dir: Some(&child),
@@ -124,7 +125,7 @@ fn explicit_file_flag_and_env_skip_search() {
     let tmp = TempDir::new().unwrap();
     let repo = tmp.path().join("repo");
     std::fs::create_dir_all(repo.join(".git")).unwrap();
-    write_todo(&repo).unwrap();
+    write_todo(&repo, FIND_BODY);
 
     let custom_dir = tmp.path().join("other");
     std::fs::create_dir_all(&custom_dir).unwrap();
@@ -172,7 +173,7 @@ fn paths_with_spaces_non_ascii_and_over_260_chars_work() {
     let tmp = TempDir::new().unwrap();
     let special = tmp.path().join("project with spaces").join("日本語 — äöü");
     std::fs::create_dir_all(special.join(".git")).unwrap();
-    let expected_special = write_todo(&special).unwrap();
+    let expected_special = write_todo(&special, FIND_BODY);
 
     let found_special = find_todo(&FindOptions {
         start_dir: Some(&special),

@@ -1,30 +1,14 @@
 //! Tests for linked git worktree resolution (T-011; R-FIND-5, NFR-5, TEST-6).
 
+mod common;
+
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use tempfile::TempDir;
+
+use common::git;
 use todo::error::{ErrorCode, ExitCode};
 use todo::find::{FindOptions, FoundBy, WorktreeMode, find_todo};
-
-fn run_git(dir: &Path, args: &[&str]) -> std::io::Result<()> {
-    let out = Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .env("GIT_AUTHOR_NAME", "Test")
-        .env("GIT_AUTHOR_EMAIL", "test@example.invalid")
-        .env("GIT_COMMITTER_NAME", "Test")
-        .env("GIT_COMMITTER_EMAIL", "test@example.invalid")
-        .output()?;
-    if !out.status.success() {
-        return Err(std::io::Error::other(format!(
-            "git {:?} failed: {}",
-            args,
-            String::from_utf8_lossy(&out.stderr)
-        )));
-    }
-    Ok(())
-}
 
 fn canonical_no_verbatim(path: &Path) -> std::io::Result<PathBuf> {
     let p = std::fs::canonicalize(path)?;
@@ -49,7 +33,7 @@ fn real_linked_worktree_resolves_to_main_checkout_and_subfolder() {
     let wt_dir = tmp.path().join("wt-feature");
     std::fs::create_dir_all(&main_repo).unwrap();
 
-    run_git(&main_repo, &["init"]).unwrap();
+    git(&main_repo, &["init"]);
     let main_todo = main_repo.join("TODO.md");
     std::fs::write(
         &main_todo,
@@ -59,14 +43,13 @@ fn real_linked_worktree_resolves_to_main_checkout_and_subfolder() {
     let sub_rel = Path::new("crates").join("engine");
     std::fs::create_dir_all(main_repo.join(&sub_rel)).unwrap();
     std::fs::write(main_repo.join(&sub_rel).join("lib.rs"), "// fixture\n").unwrap();
-    run_git(&main_repo, &["add", "."]).unwrap();
-    run_git(&main_repo, &["commit", "-m", "initial"]).unwrap();
+    git(&main_repo, &["add", "."]);
+    git(&main_repo, &["commit", "-m", "initial"]);
 
-    run_git(
+    git(
         &main_repo,
         &["worktree", "add", "-b", "feature", wt_dir.to_str().unwrap()],
-    )
-    .unwrap();
+    );
 
     let expected_main_todo = canonical_no_verbatim(&main_todo).unwrap();
 
@@ -148,16 +131,15 @@ fn linked_worktree_stops_at_main_checkout_when_main_has_no_todo() {
     let main_repo = tmp.path().join("main-repo");
     let wt_dir = tmp.path().join("wt-no-todo");
     std::fs::create_dir_all(&main_repo).unwrap();
-    run_git(&main_repo, &["init"]).unwrap();
+    git(&main_repo, &["init"]);
     std::fs::write(main_repo.join("README.md"), "# Test\n").unwrap();
-    run_git(&main_repo, &["add", "."]).unwrap();
-    run_git(&main_repo, &["commit", "-m", "init"]).unwrap();
+    git(&main_repo, &["add", "."]);
+    git(&main_repo, &["commit", "-m", "init"]);
 
-    run_git(
+    git(
         &main_repo,
         &["worktree", "add", "-b", "feature", wt_dir.to_str().unwrap()],
-    )
-    .unwrap();
+    );
 
     // Even if the worktree itself has an untracked/stale TODO.md, shared mode searches main checkout.
     std::fs::write(
@@ -183,16 +165,16 @@ fn bare_repo_worktree_falls_back_to_local_file_with_warning() {
     let wt = tmp.path().join("wt-from-bare");
     std::fs::create_dir_all(&seed).unwrap();
 
-    run_git(&seed, &["init"]).unwrap();
+    git(&seed, &["init"]);
     std::fs::write(
         seed.join("TODO.md"),
         "<!-- TEST FIXTURE: invented data, not a real task list -->\n# Seed\n",
     )
     .unwrap();
-    run_git(&seed, &["add", "."]).unwrap();
-    run_git(&seed, &["commit", "-m", "seed"]).unwrap();
+    git(&seed, &["add", "."]);
+    git(&seed, &["commit", "-m", "seed"]);
 
-    run_git(
+    git(
         tmp.path(),
         &[
             "clone",
@@ -200,9 +182,8 @@ fn bare_repo_worktree_falls_back_to_local_file_with_warning() {
             seed.to_str().unwrap(),
             bare.to_str().unwrap(),
         ],
-    )
-    .unwrap();
-    run_git(&bare, &["worktree", "add", wt.to_str().unwrap()]).unwrap();
+    );
+    git(&bare, &["worktree", "add", wt.to_str().unwrap()]);
 
     let found = find_todo(&FindOptions {
         start_dir: Some(&wt),
