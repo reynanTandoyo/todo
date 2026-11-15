@@ -68,6 +68,7 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - reqs: R-OUT-6
 - depends: T-005
 - accept: `·`, `—` and Japanese text checked by hand in PowerShell 5, PowerShell 7, cmd and Windows Terminal, with the result recorded in a note; piped output is UTF-8 (automated test)
+- note (2026-11-15, coordinator): automated part done in 8029ac3 (test: piped output is UTF-8); still open: a person runs scripts/console-check.ps1 in PowerShell 5, PowerShell 7, cmd and Windows Terminal and records the result here
 
 ### T-007 · Settings file todo.toml
 - status: open
@@ -190,44 +191,54 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 101 tests pass; list, show and next read this repository's TODO.md correctly
 
 ### T-024 · done
-- status: open
-- owner: —
+- status: done
+- owner: w4b-hydrogen
 - priority: P0 · type: feature · area: cli
 - reqs: R-WRITE-4, NFR-5, TEST-4
 - depends: T-022
 - accept: `--commit HEAD` is resolved before the lock is taken; an unknown commit is refused when git is available and accepted unchecked when it isn't; the accept line is printed; refusals leave the file byte-identical
+- commit: c076de7
+- note (2026-11-15, w4b-hydrogen): done — verified by coordinator: fmt, clippy and 110 tests pass
 
 ### T-025 · block, unblock and drop
-- status: open
-- owner: —
+- status: done
+- owner: w4b-hydrogen
 - priority: P0 · type: feature · area: cli
 - reqs: R-WRITE-5, R-WRITE-6, TEST-4
 - depends: T-022
 - accept: a reason is required for block and drop; unblock returns to claimed or open; every remaining case of the transition table has a test
+- commit: e3ef996
+- note (2026-11-15, w4b-hydrogen): done — verified by coordinator: fmt, clippy and 110 tests pass
 
 ### T-026 · note
-- status: open
-- owner: —
+- status: done
+- owner: w4b-hydrogen
 - priority: P0 · type: feature · area: cli
 - reqs: R-WRITE-7, R-IO-6, TEST-4
 - depends: T-013, T-014
 - accept: notes are added after the last line of the task, on any status, by any agent, with the local date
+- commit: d795bc2
+- note (2026-11-15, w4b-hydrogen): done — verified by coordinator: fmt, clippy and 110 tests pass
 
 ### T-027 · set
-- status: open
-- owner: —
+- status: done
+- owner: w4b-hydrogen
 - priority: P0 · type: feature · area: cli
 - reqs: R-WRITE-8, R-CLAIM-3, TEST-4
 - depends: T-022
 - accept: every option, `--field` and `--unset` are tested; the combined priority line is edited in place; changing status, owner or claimed is refused
+- commit: 655962f
+- note (2026-11-15, w4b-hydrogen): done — verified by coordinator: fmt, clippy and 110 tests pass
 
 ### T-028 · add
-- status: open
-- owner: —
+- status: done
+- owner: w4b-hydrogen
 - priority: P0 · type: feature · area: cli
 - reqs: R-WRITE-1, R-ID-2, TEST-4, TEST-5
 - depends: T-013, T-014
 - accept: 20 parallel adds lose nothing and get distinct IDs; unknown and ambiguous sections are refused with the list of sections; a duplicate title is refused; a highest ID deleted by hand is not given out again
+- commit: ba355b8
+- note (2026-11-15, w4b-hydrogen): done — verified by coordinator: fmt, clippy and 110 tests pass
 
 ### T-029 · Match tasks by title
 - status: open
@@ -431,12 +442,14 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 21 tests pass
 
 ### T-061 · README
-- status: open
-- owner: —
+- status: done
+- owner: w4b-hydrogen
 - priority: P0 · type: docs · area: release
 - reqs: REL-2, NFR-11
 - depends: T-023, T-050
 - accept: build, install, use, adding to a project and the limits are explained in plain language, and the steps were followed on a clean folder
+- commit: 8d606fa
+- note (2026-11-15, w4b-hydrogen): done — verified by coordinator: fmt, clippy and 110 tests pass
 
 ### T-062 · MIT licence
 - status: done
@@ -464,12 +477,14 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - accept: a `v*` tag publishes todo.exe and the Linux binary with SHA-256 files; a tag that doesn't match Cargo.toml fails
 
 ### T-065 · Performance test
-- status: open
-- owner: —
+- status: done
+- owner: w4b-hydrogen
 - priority: P0 · type: test · area: core
 - reqs: NFR-3, TEST-9
 - depends: T-020, T-028
 - accept: on a generated 5,000-task file, list and show take under 100 ms and a write under 200 ms; runs in CI
+- commit: 40b4d67
+- note (2026-11-15, w4b-hydrogen): done — verified by coordinator: fmt, clippy and 110 tests pass
 
 ### T-066 · Version with build commit
 - status: open
