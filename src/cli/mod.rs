@@ -376,6 +376,7 @@ register_commands! {
     Diff => diff,
     Done => done,
     Drop => drop,
+    Edit => edit,
     Help => help,
     History => history,
     Init => init,

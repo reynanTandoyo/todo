@@ -75,6 +75,45 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         apply_mechanical_fixes(ctx, out)?;
     }
 
+    let (label, problems) = collect_problems(ctx, out)?;
+
+    if problems.is_empty() {
+        if out.is_json() {
+            out.emit_json_ok(
+                META.name,
+                &CheckOkJson {
+                    clean: true,
+                    count: 0,
+                    problems: Vec::new(),
+                },
+            );
+        } else {
+            out.write_line(&format!("{label}: ok (0 problems)"));
+        }
+        return Ok(());
+    }
+
+    if !out.is_json() {
+        for p in &problems {
+            out.write_line(&p.format());
+        }
+    }
+
+    let count = problems.len();
+    Err(TodoError::new(
+        ErrorCode::BadValue,
+        format!("{count} problem(s) found"),
+    )
+    .with_exit_code(ExitCode::Refused)
+    .with_detail("count", json!(count))
+    .with_detail("problems", json!(problems)))
+}
+
+/// Runs all `check` validations on the active `TODO.md` and returns `(file_label, problems)`.
+pub(crate) fn collect_problems(
+    ctx: &Context,
+    out: &mut Output,
+) -> Result<(String, Vec<CheckProblem>)> {
     let found = ctx.find_todo(out)?;
     let cfg = OpsConfig::load_next_to(&found.path)?;
     let state = StateDir::from_found(&found)?;
@@ -143,8 +182,9 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 problems.push(CheckProblem {
                     file: label.clone(),
                     line: begin_line,
-                    message: "outdated agent rules block (run `todo agents install --yes` or update)"
-                        .to_string(),
+                    message:
+                        "outdated agent rules block (run `todo agents install --yes` or update)"
+                            .to_string(),
                 });
             }
         }
@@ -174,36 +214,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         check_state_temps(state.path(), &mut problems);
     }
 
-    if problems.is_empty() {
-        if out.is_json() {
-            out.emit_json_ok(
-                META.name,
-                &CheckOkJson {
-                    clean: true,
-                    count: 0,
-                    problems: Vec::new(),
-                },
-            );
-        } else {
-            out.write_line(&format!("{label}: ok (0 problems)"));
-        }
-        return Ok(());
-    }
-
-    if !out.is_json() {
-        for p in &problems {
-            out.write_line(&p.format());
-        }
-    }
-
-    let count = problems.len();
-    Err(TodoError::new(
-        ErrorCode::BadValue,
-        format!("{count} problem(s) found"),
-    )
-    .with_exit_code(ExitCode::Refused)
-    .with_detail("count", json!(count))
-    .with_detail("problems", json!(problems)))
+    Ok((label, problems))
 }
 
 fn check_tasks(
