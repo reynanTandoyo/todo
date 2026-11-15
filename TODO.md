@@ -14,27 +14,33 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 ## 1. Foundations
 
 ### T-001 · Test fixtures
-- status: open
-- owner: —
+- status: done
+- owner: w1-hydrogen
 - priority: P0 · type: test · area: core
 - reqs: TEST-1
 - accept: invented fixtures cover every rule in docs/format.md, each starting with the fixture line; one deliberately messy fixture (CRLF with byte-order mark, code fences, tables, fake tasks, trailing spaces); none contains real task data
+- commit: 9931c66
+- note (2026-11-15, coordinator): done — merged into dev and verified: fmt, clippy and 79 tests pass
 
 ### T-002 · Line model, edits and verified writes
-- status: open
-- owner: —
+- status: done
+- owner: w1-hydrogen
 - priority: P0 · type: feature · area: core
 - reqs: R-EDIT-1, R-EDIT-2, R-EDIT-4, R-EDIT-5, R-EDIT-6, R-EDIT-7, TEST-3
 - depends: T-001
 - accept: every fixture reads and writes back byte-identical; the random-edit property test passes; a deliberately wrong edit is caught by the verification and nothing is written
+- commit: b4347ba
+- note (2026-11-15, coordinator): done — merged into dev and verified: fmt, clippy and 79 tests pass
 
 ### T-003 · Parser for format version 1
-- status: open
-- owner: —
+- status: done
+- owner: w1-hydrogen
 - priority: P0 · type: feature · area: core
 - reqs: R-EDIT-3, R-EDIT-8, R-EDIT-9, R-ID-1, R-ID-3, R-DEP-1, R-OUT-4, REL-4, NFR-8, TEST-2
 - depends: T-001, T-002
 - accept: every rule and every refusal in docs/format.md has a test, including a file whose format line names version 2; problems are reported as `file:line: message`
+- commit: 80833f9
+- note (2026-11-15, coordinator): done — merged into dev and verified: fmt, clippy and 79 tests pass
 
 ### T-004 · Errors, exit codes, JSON envelope and safe output
 - status: done
@@ -74,52 +80,64 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 ## 2. Safety: finding, locking, writing
 
 ### T-010 · Find TODO.md
-- status: open
-- owner: —
+- status: done
+- owner: w3-hydrogen
 - priority: P0 · type: feature · area: find
 - reqs: R-FIND-1, R-FIND-2, R-FIND-3, R-FIND-4, R-FIND-6, NFR-7, TEST-6
 - depends: T-005
 - accept: the search cases of TEST-6 pass, including a repository without TODO.md inside a parent folder that has one; paths with spaces, non-ASCII characters and more than 260 characters work
+- commit: 9b71809
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 79 tests pass
 
 ### T-011 · Linked worktrees use the main checkout's file
-- status: open
-- owner: —
+- status: done
+- owner: w3-hydrogen
 - priority: P0 · type: feature · area: find
 - reqs: R-FIND-5, NFR-5, TEST-6
 - depends: T-010
 - accept: a test creates a real linked worktree in a temporary folder and resolves to the main checkout's file, also from a subfolder; the fallback warning is tested; works with git removed from PATH
+- commit: 2c6381c
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 79 tests pass
 
 ### T-012 · State folder
-- status: open
-- owner: —
+- status: done
+- owner: w3-hydrogen
 - priority: P0 · type: feature · area: lock
 - reqs: R-HIST-1, R-LOCK-7
 - depends: T-011
 - accept: the main checkout, a worktree and different spellings of the path get the same state folder; outside git it is `.todo/` with a `.gitignore`
+- commit: 15236de
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 79 tests pass
 
 ### T-013 · Write lock
-- status: open
-- owner: —
+- status: done
+- owner: w3-hydrogen
 - priority: P0 · type: feature · area: lock
 - reqs: R-LOCK-1, R-LOCK-2, R-LOCK-3, R-LOCK-4, R-LOCK-5, TEST-5
 - depends: T-012
 - accept: tested through a test-only write command (cargo feature `test-hooks`): a killed holder delays others by less than 2 s; a held lock makes a command exit 3 naming the holder, without writing; reads never wait
+- commit: 63ca72d
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 79 tests pass
 
 ### T-014 · Atomic replace
-- status: open
-- owner: —
+- status: done
+- owner: w3-hydrogen
 - priority: P0 · type: feature · area: io
 - reqs: R-IO-1, R-IO-2, R-IO-3, R-IO-4, R-IO-5, TEST-7
 - depends: T-002
 - accept: the TEST-7 cases pass; no temporary file remains after any failure
+- commit: 04a493f
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 79 tests pass
 
 ### T-015 · Lease: lock, unlock and status
-- status: open
-- owner: —
+- status: done
+- owner: w3-hydrogen
 - priority: P0 · type: feature · area: lock
 - reqs: R-LOCK-6
 - depends: T-013
 - accept: a lease stops other agents but not its holder; it expires (tested with a shortened time); `unlock --force` names the previous holder; `status` shows the lock and the lease
+- commit: 8fc7a05,55a816e
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 79 tests pass
 
 ### T-016 · todo where
 - status: open
