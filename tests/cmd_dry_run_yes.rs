@@ -144,6 +144,8 @@ fn require_yes_or_preview_gates_bulk_changes() {
         yes: false,
         force: false,
         no_color: true,
+        session: None,
+        session_arg: None,
     };
     let mut out = Output::with_writers(false, Box::new(Vec::new()), Box::new(Vec::new()));
     assert!(!require_yes_or_preview(

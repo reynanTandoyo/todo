@@ -94,10 +94,33 @@ impl<'a> TaskEditBuilder<'a> {
         }
     }
 
-    /// Removes the `- claimed:` line if present (`R-WRITE-9`, `docs/format.md` §10).
+    /// Removes the `- claimed:` line if present (`R-WRITE-9`, `docs/format.md` §10), and with it
+    /// the `- session:` line, which only describes a claim (`R-CLAIM-7`).
     pub fn remove_claimed(&mut self) {
         if let Some(line) = self.task.claimed_line {
             self.line_changes.insert(line, None);
+        }
+        self.remove_session();
+    }
+
+    /// Writes `- session: <id>` for a new claim, or removes an existing `session` line when the
+    /// claim has no session (`R-CLAIM-7`).
+    pub fn set_session(&mut self, session: Option<&str>) {
+        match session {
+            Some(id) => self.set_field("session", id),
+            None => self.remove_session(),
+        }
+    }
+
+    fn remove_session(&mut self) {
+        if let Some(entry) = self.task.unknown_fields.iter().find(|f| f.key == "session")
+            && self
+                .task
+                .priority_detail
+                .as_ref()
+                .is_none_or(|d| d.line != entry.line)
+        {
+            self.line_changes.insert(entry.line, None);
         }
     }
 

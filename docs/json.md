@@ -469,6 +469,15 @@ When finishing or dropping a task makes other tasks ready, their summaries appea
 ]
 ```
 
+### Sessions: `fields.session`, `todo release --session --json`, `todo session-end --json` (`R-CLAIM-7`)
+
+- A claim made with a session shows it in the task's `fields`: `{"fields":{"session":"6f0c1c2e-…"}}`.
+- `release --session <id> --json` has the same shape as the other bulk releases
+  (`todo.release.v1`): `{"released":[<TaskJson>…],"count":2}`.
+- The hidden `session-end` command (the `SessionEnd` hook; `--json` is for tests and scripts) prints
+  `todo.session-end.v1` with `{"session":"6f0c1c2e-…","released":[<TaskJson>…],"count":1}`;
+  `session` is `null` when neither the hook input nor the environment names one.
+
 ### `todo edit --json`, `todo hooks --json`, `todo guard --json`, `todo skill --json`
 
 - `edit`: `{"file":"TODO.md","editor":"notepad","clean":true,"problems":0}`

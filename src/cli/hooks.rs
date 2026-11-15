@@ -25,7 +25,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "hooks",
     summary: "Install or uninstall Claude Code hooks in .claude/settings.json",
     kind: CommandKind::Meta,
-    details: "`hooks install --yes` adds a `SessionStart` hook (`todo summary`) and a `PreToolUse` hook (`todo guard` for `Edit|Write|MultiEdit`) to `.claude/settings.json`, keeping a backup and preserving formatting. `hooks uninstall --yes` removes only the entries added by `todo`.",
+    details: "`hooks install --yes` adds a `SessionStart` hook (`todo summary`), a `PreToolUse` hook (`todo guard` for `Edit|Write|MultiEdit`) and a `SessionEnd` hook (`todo session-end`, which releases the ending session's claims) to `.claude/settings.json`, keeping a backup and preserving formatting. `hooks uninstall --yes` removes only the entries added by `todo`.",
     examples: &[
         "todo hooks install",
         "todo hooks install --yes",
@@ -44,7 +44,7 @@ pub struct Args {
 /// Subcommands under `todo hooks`.
 #[derive(Debug, Subcommand)]
 pub enum HooksAction {
-    /// Add `todo` SessionStart and PreToolUse hooks to `.claude/settings.json`.
+    /// Add `todo` SessionStart, PreToolUse and SessionEnd hooks to `.claude/settings.json`.
     Install,
     /// Remove only the `todo`-managed hooks from `.claude/settings.json`.
     Uninstall,
@@ -236,6 +236,18 @@ fn install_hooks(root: &mut Value) -> Result<()> {
     });
     upsert_hook_entry(hooks_obj, "PreToolUse", guard_entry)?;
 
+    // 3. SessionEnd -> todo session-end (releases the claims of the ending session; R-CLAIM-7)
+    let end_entry = json!({
+        MANAGED_KEY: MANAGED_VAL,
+        "hooks": [
+            {
+                "type": "command",
+                "command": "todo session-end"
+            }
+        ]
+    });
+    upsert_hook_entry(hooks_obj, "SessionEnd", end_entry)?;
+
     Ok(())
 }
 
@@ -272,7 +284,7 @@ fn uninstall_hooks(root: &mut Value) -> Result<()> {
         return Ok(());
     };
 
-    for event in ["SessionStart", "PreToolUse"] {
+    for event in ["SessionStart", "PreToolUse", "SessionEnd"] {
         if let Some(Value::Array(arr)) = hooks_obj.get_mut(event) {
             arr.retain(|v| !is_managed_entry(v));
         }

@@ -133,7 +133,7 @@ expression: ok_json
       {
         "kind": "write",
         "name": "release",
-        "summary": "Release a claimed task, all stale claims, or all claims of an agent"
+        "summary": "Release a claimed task, all stale claims, all claims of an agent or of a session"
       },
       {
         "kind": "write",

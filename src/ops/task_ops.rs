@@ -27,6 +27,8 @@ pub struct OpEnv<'a> {
     pub force: bool,
     /// Time used for notes and claim timestamps.
     pub now: DateTime<FixedOffset>,
+    /// Agent session written on new claims (`R-CLAIM-7`), if known.
+    pub session: Option<&'a str>,
 }
 
 /// One change to apply with `set` (applied in the order given).
@@ -128,7 +130,7 @@ impl TaskOp<'_> {
         match self {
             Self::Claim => {
                 let plan = plan_claim(task, agent, env.force, now, cfg)?;
-                return Ok(build_claim_edits(doc, task, &plan, now).0);
+                return Ok(build_claim_edits(doc, task, &plan, env.session, now).0);
             }
             Self::Release => {
                 let plan = plan_release(task, agent, env.force, cfg)?;
@@ -164,6 +166,7 @@ impl TaskOp<'_> {
                     Self::Drop { .. } => builder.remove_claimed(),
                     Self::Unblock { .. } if next == Status::Claimed => {
                         builder.set_claimed(&OpsConfig::format_claimed_timestamp(now));
+                        builder.set_session(env.session);
                     }
                     Self::Unblock { .. } => builder.remove_claimed(),
                     Self::Reopen { .. } => {

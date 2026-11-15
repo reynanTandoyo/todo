@@ -560,18 +560,21 @@ where
 
 /// Converts a [`ClaimPlan`] into canonical [`LineEdit`]s and [`TaskChangeIntent`].
 ///
-/// Shared by `todo claim` and `todo next --claim`.
+/// Shared by `todo claim` and `todo next --claim`. `session` is the claiming agent session
+/// (`R-CLAIM-7`); `None` removes a leftover `session` line.
 #[must_use]
 pub fn build_claim_edits(
     doc: &Document,
     task: &Task,
     plan: &ClaimPlan,
+    session: Option<&str>,
     now: DateTime<FixedOffset>,
 ) -> (Vec<LineEdit>, TaskChangeIntent) {
     let mut builder = TaskEditBuilder::new(doc, task);
     builder.set_status(plan.new_status);
     builder.set_owner(Some(&plan.new_owner));
     builder.set_claimed(&plan.claimed_timestamp);
+    builder.set_session(session);
     if let Some(ref note_text) = plan.auto_note {
         let date = OpsConfig::format_note_date(now);
         let author = if plan.new_owner.is_empty() {

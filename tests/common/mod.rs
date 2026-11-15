@@ -22,7 +22,11 @@ pub const FIXTURE_MARKER: &str = "<!-- TEST FIXTURE: invented data, not a real t
 /// A `todo` command with the inherited environment as the test process has it.
 #[must_use]
 pub fn todo_bin() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_todo"))
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_todo"));
+    // Claude Code exports its session ID to the commands it runs; tests must not tag claims.
+    cmd.env_remove("TODO_SESSION")
+        .env_remove("CLAUDE_CODE_SESSION_ID");
+    cmd
 }
 
 /// Runs `todo` with `args` in `dir` and returns its output. The environment is inherited.
@@ -43,6 +47,8 @@ pub fn clean_todo_command(home: &Path, work_dir: &Path) -> Command {
     cmd.current_dir(work_dir)
         .env_remove("TODO_FILE")
         .env_remove("TODO_AGENT")
+        .env_remove("TODO_SESSION")
+        .env_remove("CLAUDE_CODE_SESSION_ID")
         .env("HOME", home)
         .env("APPDATA", home)
         .env("NO_COLOR", "1");
@@ -55,6 +61,8 @@ pub fn assert_todo(home: &Path) -> assert_cmd::Command {
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("todo");
     cmd.env_remove("TODO_FILE")
         .env_remove("TODO_AGENT")
+        .env_remove("TODO_SESSION")
+        .env_remove("CLAUDE_CODE_SESSION_ID")
         .env("HOME", home)
         .env("APPDATA", home)
         .env("NO_COLOR", "1");

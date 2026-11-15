@@ -82,6 +82,11 @@ pub struct GlobalOpts {
     /// Override another agent's claim.
     #[arg(long, global = true)]
     pub force: bool,
+
+    /// Agent session: tags new claims (overrides `TODO_SESSION` and `CLAUDE_CODE_SESSION_ID`);
+    /// with `release`, releases every claim of that session.
+    #[arg(long, global = true, value_name = "ID")]
+    pub session: Option<String>,
 }
 
 /// Resolved runtime context built from CLI flags, environment variables, and defaults (R-CFG-3).
@@ -103,6 +108,11 @@ pub struct Context {
     pub force: bool,
     /// Whether `NO_COLOR` is set and non-empty.
     pub no_color: bool,
+    /// Session written on new claims: `--session`, else `TODO_SESSION`, else
+    /// `CLAUDE_CODE_SESSION_ID` (`R-CLAIM-7`). Invalid values from the environment are ignored.
+    pub session: Option<String>,
+    /// The session given with `--session` only (what `release --session` acts on).
+    pub session_arg: Option<String>,
 }
 
 impl Context {
@@ -126,6 +136,17 @@ impl Context {
 
         let no_color = non_empty_env("NO_COLOR").is_some();
 
+        let session_arg = match &opts.session {
+            Some(raw) => Some(validate_session_id(raw)?.to_owned()),
+            None => None,
+        };
+        let session = session_arg.clone().or_else(|| {
+            ["TODO_SESSION", "CLAUDE_CODE_SESSION_ID"]
+                .into_iter()
+                .filter_map(non_empty_env)
+                .find(|raw| validate_session_id(raw).is_ok())
+        });
+
         Ok(Self {
             file,
             file_source,
@@ -135,6 +156,8 @@ impl Context {
             yes: opts.yes,
             force: opts.force,
             no_color,
+            session,
+            session_arg,
         })
     }
 
@@ -325,6 +348,26 @@ pub fn validate_agent_name(name: &str) -> Result<&str> {
     Ok(name)
 }
 
+/// Validates an agent session ID (`R-CLAIM-7`): 1 to 128 characters from `A-Z`, `a-z`, `0-9`,
+/// `.`, `_`, `-`, `:`. Claude Code's `session_id` (a UUID) fits.
+pub fn validate_session_id(id: &str) -> Result<&str> {
+    let ok = !id.is_empty()
+        && id.len() <= 128
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-' | b':'));
+    if ok {
+        Ok(id)
+    } else {
+        Err(TodoError::new(
+            ErrorCode::Usage,
+            format!(
+                "invalid session ID {id:?}: must be 1 to 128 characters from A-Z, a-z, 0-9, ., _, -, :"
+            ),
+        ))
+    }
+}
+
 /// Loads the settings and the parsed `TODO.md` (or its archive) for a read command.
 ///
 /// One discovery pass: `todo.toml` and `TODO.md` are located together, and the discovery notices
@@ -366,6 +409,7 @@ pub(crate) fn edit_one_task(
             agent,
             force: ctx.force,
             now,
+            session: ctx.session.as_deref(),
         };
         Ok((op.build_edits(doc, t, &env)?, ()))
     };
@@ -434,6 +478,8 @@ pub(crate) fn report_task_with_ready(
 #[cfg(feature = "test-hooks")]
 pub mod test_append;
 
+pub mod session_end;
+
 macro_rules! register_commands {
     ($($variant:ident => $module:ident),* $(,)?) => {
         $(pub mod $module;)*
@@ -451,6 +497,9 @@ macro_rules! register_commands {
             #[cfg(feature = "test-hooks")]
             #[command(name = "__test-append", hide = true)]
             TestAppend(test_append::Args),
+            /// Hidden: the Claude Code `SessionEnd` hook (`R-CLAIM-7`).
+            #[command(name = "session-end", hide = true)]
+            SessionEnd(session_end::Args),
         }
 
         impl Command {
@@ -461,6 +510,7 @@ macro_rules! register_commands {
                     $(Self::$variant(_) => &$module::META,)*
                     #[cfg(feature = "test-hooks")]
                     Self::TestAppend(_) => &test_append::META,
+                    Self::SessionEnd(_) => &session_end::META,
                 }
             }
 
@@ -473,6 +523,7 @@ macro_rules! register_commands {
                     $(Self::$variant(args) => $module::run(args, ctx, out),)*
                     #[cfg(feature = "test-hooks")]
                     Self::TestAppend(args) => test_append::run(args, ctx, out),
+                    Self::SessionEnd(args) => session_end::run(args, ctx, out),
                 }
             }
         }

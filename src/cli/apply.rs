@@ -219,6 +219,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                     &label,
                     &agent,
                     ctx.force,
+                    ctx.session.as_deref(),
                     now,
                     &mut highest_id,
                     &mut refs,
@@ -405,6 +406,7 @@ fn apply_one_op(
     label: &str,
     agent: &str,
     force: bool,
+    session: Option<&str>,
     now: chrono::DateTime<chrono::FixedOffset>,
     highest_id: &mut u64,
     refs: &mut BTreeMap<String, String>,
@@ -531,6 +533,7 @@ fn apply_one_op(
                 agent,
                 force,
                 now,
+                session,
             };
             apply_task_op(other, op_num, doc, archive, label, &env, refs)
         }

@@ -12,8 +12,8 @@ pub const SUPPORTED_FORMAT_VERSION: u32 = 1;
 
 /// Canonical field order for inserting missing fields (`docs/format.md` §10).
 pub const CANONICAL_FIELD_ORDER: &[&str] = &[
-    "status", "owner", "claimed", "priority", "type", "area", "depends", "files", "problem", "fix",
-    "accept", "commit",
+    "status", "owner", "claimed", "session", "priority", "type", "area", "depends", "files",
+    "problem", "fix", "accept", "commit",
 ];
 
 /// Accepted heading separators between `<ID>` and `<title>` (`docs/format.md` §6),

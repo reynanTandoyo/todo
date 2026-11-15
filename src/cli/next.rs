@@ -105,7 +105,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 check_task_writable(doc, task, label, archive)?;
 
                 let plan = plan_claim(task, agent, ctx.force, now, &cfg)?;
-                let (edits, _) = build_claim_edits(doc, task, &plan, now);
+                let (edits, _) = build_claim_edits(doc, task, &plan, ctx.session.as_deref(), now);
                 if edits.is_empty() {
                     let task_json = build_task_json(doc, task, archive, false, now, &cfg);
                     return Ok(DocWritePlan::Unchanged(NextJson {

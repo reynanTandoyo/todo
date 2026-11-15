@@ -17,15 +17,16 @@ use crate::output::Output;
 /// Metadata for the `release` command.
 pub const META: CommandMeta = CommandMeta {
     name: "release",
-    summary: "Release a claimed task, all stale claims, or all claims of an agent",
+    summary: "Release a claimed task, all stale claims, all claims of an agent or of a session",
     kind: CommandKind::Write,
-    details: "Gives a task back: a `claimed` task becomes `open`, while a `blocked` task stays `blocked`. Removes the owner and claim time. With `--stale`, releases every stale claim in one locked step. With `--all`, releases all claims of the calling agent (or of `--owner <NAME>` with `--force`).",
+    details: "Gives a task back: a `claimed` task becomes `open`, while a `blocked` task stays `blocked`. Removes the owner and claim time. With `--stale`, releases every stale claim in one locked step. With `--all`, releases all claims of the calling agent (or of `--owner <NAME>` with `--force`). With `--session <ID>`, releases every claim tagged with that agent session and adds the note `released — session <ID> ended`.",
     examples: &[
         "todo release T-012 --agent agent-1",
         "todo release T-012 --agent coordinator --force",
         "todo release --stale --agent coordinator",
         "todo release --all --agent agent-1",
         "todo release --all --owner agent-1 --agent coordinator --force",
+        "todo release --session 6f0c1c2e-1111-4222-8333-944455556666 --agent coordinator",
     ],
 };
 
@@ -57,6 +58,18 @@ struct BulkReleaseJson {
 
 /// Runs `todo release`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
+    if let Some(session) = ctx.session_arg.as_deref() {
+        if args.stale || args.all || args.task.is_some() || args.owner.is_some() {
+            return Err(TodoError::new(
+                ErrorCode::Usage,
+                "--session releases every claim of that session and cannot be combined with a task, --stale, --all or --owner",
+            ));
+        }
+        let released = release_session_claims(ctx, out, session)?;
+        emit_bulk_result(&released, out);
+        return Ok(());
+    }
+
     if args.stale && args.all {
         return Err(TodoError::new(
             ErrorCode::Usage,
@@ -259,6 +272,95 @@ fn run_bulk_all(target_owner: Option<String>, ctx: &Context, out: &mut Output) -
 
     emit_bulk_result(&res.value, out);
     Ok(())
+}
+
+/// Releases every claimed or blocked task whose `session` field is `session`, in one locked step
+/// (`R-CLAIM-7`): the owner, claim time and session are removed (a claimed task becomes `open`) and
+/// the note `released — session <id> ended` is added. Needs `ctx.agent` for the notes.
+///
+/// Shared by `todo release --session` and the `SessionEnd` hook command.
+pub(crate) fn release_session_claims(
+    ctx: &Context,
+    out: &mut Output,
+    session: &str,
+) -> Result<Vec<TaskJson>> {
+    let cfg = ctx.load_config()?;
+    let cfg_clone = cfg.clone();
+
+    let res = edit_doc_and_write(
+        ctx,
+        &cfg,
+        META.name,
+        out,
+        |doc, archive, label, agent, now| {
+            let matching: Vec<_> = doc
+                .tasks
+                .iter()
+                .filter(|t| {
+                    matches!(t.status, Status::Claimed | Status::Blocked)
+                        && t.field_value("session") == Some(session)
+                })
+                .collect();
+
+            if matching.is_empty() {
+                return Ok(DocWritePlan::Unchanged(Vec::new()));
+            }
+
+            let mut all_edits = Vec::new();
+            let mut modified_ids = BTreeSet::new();
+            let date = OpsConfig::format_note_date(now);
+
+            for task in &matching {
+                check_task_writable(doc, task, label, archive)?;
+                modified_ids.insert(task.id);
+
+                let mut builder = TaskEditBuilder::new(doc, task);
+                if task.status == Status::Claimed {
+                    builder.set_status(Status::Open);
+                }
+                builder.clear_owner_if_present();
+                builder.remove_claimed();
+                builder.add_note(
+                    &date,
+                    agent,
+                    &format!("released — session {session} ended"),
+                );
+                let (edits, _) = builder.build();
+                all_edits.extend(edits);
+            }
+
+            all_edits.sort_by_key(|e| e.range.start);
+            let intent = TaskChangeIntent {
+                modified_ids: modified_ids.clone(),
+                ..TaskChangeIntent::default()
+            };
+            let arch_owned = archive.cloned();
+            let cfg_owned = cfg_clone.clone();
+
+            Ok(DocWritePlan::Edits {
+                edits: all_edits,
+                intent,
+                build_value: Box::new(move |new_doc| {
+                    let mut released = Vec::with_capacity(modified_ids.len());
+                    for id in modified_ids {
+                        if let Some(t) = new_doc.task_by_id(id) {
+                            released.push(build_task_json(
+                                new_doc,
+                                t,
+                                arch_owned.as_ref(),
+                                false,
+                                now,
+                                &cfg_owned,
+                            ));
+                        }
+                    }
+                    Ok(released)
+                }),
+            })
+        },
+    )?;
+
+    Ok(res.value)
 }
 
 fn emit_bulk_result(released: &[TaskJson], out: &mut Output) {

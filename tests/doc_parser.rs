@@ -359,8 +359,8 @@ fn canonical_field_order_and_insertion_lines_follow_format_section_10() {
     assert_eq!(
         CANONICAL_FIELD_ORDER,
         &[
-            "status", "owner", "claimed", "priority", "type", "area", "depends", "files",
-            "problem", "fix", "accept", "commit"
+            "status", "owner", "claimed", "session", "priority", "type", "area", "depends",
+            "files", "problem", "fix", "accept", "commit"
         ]
     );
 

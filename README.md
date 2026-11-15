@@ -140,6 +140,27 @@ file order. The command checks the result like `todo check`, compares the task c
 of converted lines and reports both. It does not take the write lock; use it on lists that agents
 are not using yet.
 
+### Claims tagged with an agent session
+
+A claim can carry the agent session that made it, so claims of a session that has ended are not
+left behind. `claim`, `next --claim` and `unblock` (back to claimed) write `- session: <id>` right
+after the `claimed` line. The ID comes from `--session`, else the `TODO_SESSION` environment
+variable, else `CLAUDE_CODE_SESSION_ID` (Claude Code sets this for every command an agent runs, and
+it is the `session_id` it passes to hooks). Without any of them no `session` line is written. The
+line is removed whenever the claim is (`release`, `done`, `drop`, …).
+
+```powershell
+todo claim T-012 --agent agent-1 --session 6f0c1c2e-1111-4222-8333-944455556666
+todo release --session 6f0c1c2e-1111-4222-8333-944455556666 --agent coordinator
+```
+
+`release --session <id>` releases every claim of that session (a blocked task stays blocked) and
+adds the note `released — session <id> ended`. `todo hooks install --yes` also installs a Claude
+Code `SessionEnd` hook (`todo session-end`, a hidden command) that reads the hook's JSON from
+standard input and does exactly that for the ending session; `todo hooks uninstall --yes` removes
+it again. Test it from PowerShell with
+`'{"session_id":"6f0c1c2e-1111-4222-8333-944455556666"}' | todo session-end`.
+
 ### Manual edit leases, editor integration, and Claude Code
 
 ```powershell
