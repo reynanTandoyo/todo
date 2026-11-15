@@ -74,10 +74,8 @@ pub enum TaskOp<'a> {
         /// Optional note text.
         note: Option<&'a str>,
     },
-    /// Answer a question task (marks it done).
+    /// Answer a question task (marks it done). The note reads `answer — <text>` (format.md §9).
     Answer {
-        /// Verb that starts the note (`answered` for `todo answer`, `answer` for `apply`).
-        verb: &'static str,
         /// Answer text.
         text: &'a str,
     },
@@ -207,7 +205,7 @@ impl TaskOp<'_> {
             Self::Block { reason } => Some(note_with("blocked", Some(reason))),
             Self::Unblock { note } => Some(note_with("unblocked", note)),
             Self::Reopen { note } => Some(note_with("reopened", note)),
-            Self::Answer { verb, text } => Some(note_with(verb, Some(text))),
+            Self::Answer { text } => Some(note_with("answer", Some(text))),
             Self::Note { text } => Some(text.to_string()),
             _ => None,
         };

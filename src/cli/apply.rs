@@ -612,7 +612,6 @@ fn apply_task_op(
         ApplyOp::Answer { task, text, note } => (
             task,
             TaskOp::Answer {
-                verb: "answer",
                 text: text_or_note(op_num, "answer", text, note)?,
             },
         ),

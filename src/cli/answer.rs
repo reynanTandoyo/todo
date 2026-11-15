@@ -41,9 +41,6 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             "answer text cannot be empty",
         ));
     }
-    let op = TaskOp::Answer {
-        verb: "answered",
-        text: &answer_text,
-    };
+    let op = TaskOp::Answer { text: &answer_text };
     run_task_op(ctx, out, META.name, &args.task, &op)
 }
