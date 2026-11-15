@@ -8,15 +8,19 @@ use clap::Args as ClapArgs;
 use serde::Serialize;
 use serde_json::json;
 
-use crate::agents::{ManagedBlockStatus, check_managed_block_in_text};
-use crate::atomic::{read_file_with_snapshot, validate_utf8};
+use crate::agents::{
+    ManagedBlockStatus, RULES_TEXT, check_managed_block_in_text, upsert_managed_block,
+};
+use crate::atomic::{atomic_write_bytes, read_file_with_snapshot, validate_utf8};
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::{Document, Status, TaskId};
+use crate::doc::{Document, LineEdit, Status, TaskChangeIntent, TaskId};
 use crate::error::{ErrorCode, ExitCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::history::{OutsideEditOutcome, detect_outside_edit};
 use crate::lock::current_time;
-use crate::ops::{OpsConfig, file_label, read_optional_archive};
+use crate::ops::{
+    DocWritePlan, OpsConfig, edit_doc_and_write, file_label, read_optional_archive,
+};
 use crate::output::Output;
 use crate::state::StateDir;
 
@@ -25,13 +29,21 @@ pub const META: CommandMeta = CommandMeta {
     name: "check",
     summary: "Check TODO.md for format, dependency, claim, and state problems",
     kind: CommandKind::Read,
-    details: "Reports problems as `file:line: message` and exits 1 if any are found, or 0 when clean.",
-    examples: &["todo check", "todo check --json"],
+    details: "Reports problems as `file:line: message` and exits 1 if any are found, or 0 when clean. Pass `--fix` (with `--agent`) to make mechanical repairs only: canonical IDs and separators, missing `status: open`, leftover temporary files, and outdated rules blocks.",
+    examples: &[
+        "todo check",
+        "todo check --fix --agent agent-1",
+        "todo check --json",
+    ],
 };
 
 /// Arguments for `todo check`.
 #[derive(Debug, ClapArgs)]
-pub struct Args {}
+pub struct Args {
+    /// Make mechanical repairs only (canonical IDs/separators, missing `status: open`, leftover `.tmp` files, outdated rules blocks).
+    #[arg(long)]
+    pub fix: bool,
+}
 
 /// One problem reported by `todo check` (`R-CHECK-1`, `R-OUT-4`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -58,7 +70,11 @@ struct CheckOkJson {
 }
 
 /// Runs `todo check`.
-pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
+pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
+    if args.fix {
+        apply_mechanical_fixes(ctx, out)?;
+    }
+
     let found = ctx.find_todo(out)?;
     let cfg = OpsConfig::load_next_to(&found.path)?;
     let state = StateDir::from_found(&found)?;
@@ -450,4 +466,122 @@ fn check_state_temps(state_dir: &Path, problems: &mut Vec<CheckProblem>) {
             });
         }
     }
+}
+
+fn apply_mechanical_fixes(ctx: &Context, out: &mut Output) -> Result<()> {
+    let _ = ctx.require_agent()?;
+    let cfg = ctx.load_config()?;
+
+    let write_res = edit_doc_and_write(ctx, &cfg, "check", out, |doc, _archive, _label, _agent, _now| {
+        let mut edits: Vec<LineEdit> = Vec::new();
+        let mut intent = TaskChangeIntent::default();
+
+        for task in &doc.tasks {
+            if !doc.blocking_problems_for_task(task.id).is_empty() {
+                continue;
+            }
+            let canonical_id = cfg.id_config.format_id(task.id);
+            let needs_heading = task.raw_id != canonical_id || task.separator != " \u{00b7} ";
+            let needs_status = task.status_line.is_none();
+
+            if needs_heading && needs_status {
+                edits.push(LineEdit::replace_range(
+                    task.heading_line..task.heading_line + 1,
+                    vec![
+                        format!("### {canonical_id} \u{00b7} {}", task.title),
+                        "- status: open".to_string(),
+                    ],
+                ));
+                intent.modified_ids.insert(task.id);
+            } else if needs_heading {
+                edits.push(LineEdit::replace_line(
+                    task.heading_line,
+                    format!("### {canonical_id} \u{00b7} {}", task.title),
+                ));
+                intent.modified_ids.insert(task.id);
+            } else if needs_status {
+                edits.push(LineEdit::insert(
+                    task.heading_line + 1,
+                    vec!["- status: open".to_string()],
+                ));
+                intent.modified_ids.insert(task.id);
+            }
+        }
+
+        let doc_text = doc
+            .line_doc
+            .lines
+            .iter()
+            .map(|l| l.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        if let ManagedBlockStatus::Outdated {
+            begin_line,
+            end_line,
+        } = check_managed_block_in_text(&doc_text)
+        {
+            let canonical_lines: Vec<String> =
+                RULES_TEXT.trim().lines().map(str::to_string).collect();
+            edits.push(LineEdit::replace_range(
+                begin_line..(end_line - 1),
+                canonical_lines,
+            ));
+        }
+
+        if edits.is_empty() {
+            Ok(DocWritePlan::Unchanged(()))
+        } else {
+            Ok(DocWritePlan::Edits {
+                edits,
+                intent,
+                build_value: Box::new(|_| Ok(())),
+            })
+        }
+    })?;
+
+    if !ctx.dry_run {
+        let state = StateDir::from_found(&write_res.found)?;
+        if let Some(parent) = write_res.found.path.parent() {
+            let todo_name = file_label(&write_res.found.path);
+            let todo_prefix = format!("{todo_name}.");
+            let arch_prefix = format!("{}.", cfg.archive_file);
+            if let Ok(entries) = fs::read_dir(fs_path(parent).as_ref()) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().into_owned();
+                    if name.ends_with(".tmp")
+                        && (name.starts_with(&todo_prefix) || name.starts_with(&arch_prefix))
+                    {
+                        let _ = fs::remove_file(fs_path(&entry.path()).as_ref());
+                    }
+                }
+            }
+
+            for filename in ["AGENTS.md", "CLAUDE.md"] {
+                let candidate = parent.join(filename);
+                if let Ok(bytes) = fs::read(fs_path(&candidate).as_ref())
+                    && let Ok(text) = std::str::from_utf8(&bytes)
+                    && matches!(
+                        check_managed_block_in_text(text),
+                        ManagedBlockStatus::Outdated { .. }
+                    )
+                {
+                    let updated = upsert_managed_block(Some(&bytes), filename)?;
+                    atomic_write_bytes(&candidate, &updated)?;
+                }
+            }
+        }
+
+        if fs_path(state.path()).exists()
+            && let Ok(entries) = fs::read_dir(fs_path(state.path()).as_ref())
+        {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if name.ends_with(".tmp") {
+                    let _ = fs::remove_file(fs_path(&entry.path()).as_ref());
+                }
+            }
+        }
+    }
+
+    Ok(())
 }

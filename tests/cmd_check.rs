@@ -225,3 +225,60 @@ Outdated rules text.
         }
     }
 }
+
+#[test]
+fn check_fix_repairs_only_mechanical_issues_and_reports_the_rest() {
+    let dir = TempDir::new().expect("tempdir");
+    let tmp_file = dir.path().join("TODO.md.999.abcd.tmp");
+    fs::write(&tmp_file, "leftover").expect("write tmp");
+    fs::write(
+        dir.path().join("TODO.md"),
+        "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 1 -->
+
+<!-- todo:begin -->
+Stale rules.
+<!-- todo:end -->
+
+## Tasks
+
+### t-1: Needs canonical heading and status
+- priority: P1
+
+### T-002 · Still blocked without reason
+- status: blocked
+- depends: T-999
+",
+    )
+    .expect("write TODO.md");
+
+    let out = todo_bin()
+        .current_dir(dir.path())
+        .args(["check", "--fix", "--agent", "alice"])
+        .output()
+        .expect("run check --fix");
+    assert_eq!(out.status.code(), Some(1));
+    let stdout = String::from_utf8(out.stdout).expect("utf8");
+    assert!(
+        stdout.contains("T-002: blocked task has no reason note"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("T-002: dependency T-999 does not exist"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("outdated agent rules block"), "{stdout}");
+    assert!(!stdout.contains("leftover temporary file"), "{stdout}");
+
+    assert!(!tmp_file.exists(), "tmp file should be deleted");
+    let updated = fs::read_to_string(dir.path().join("TODO.md")).expect("read TODO.md");
+    assert!(updated.contains("### T-001 \u{00b7} Needs canonical heading and status\n- status: open\n- priority: P1\n"), "{updated}");
+    assert!(!updated.contains("Stale rules."), "{updated}");
+    assert!(
+        updated.contains(
+            "### T-002 \u{00b7} Still blocked without reason\n- status: blocked\n- depends: T-999\n"
+        ),
+        "{updated}"
+    );
+}
