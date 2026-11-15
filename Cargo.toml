@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.89"
 description = "Concurrency-safe command-line editor for TODO.md task files"
+license = "MIT"
 publish = false
 
 [[bin]]

@@ -13,3 +13,7 @@ don't work yet. Build, install and usage instructions will be added with v0.1.
 - [`docs/research.md`](docs/research.md): what was studied before writing the requirements.
 - [`TODO.md`](TODO.md): the work plan.
 - [`AGENTS.md`](AGENTS.md): rules for agents working on this repository.
+
+## Licence
+
+MIT — see [`LICENSE`](LICENSE).
