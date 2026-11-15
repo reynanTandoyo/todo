@@ -317,12 +317,14 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, w5-hydrogen): done — verified by coordinator: fmt, clippy and 128 tests pass; where, title matching, --dry-run and ask tried on a copy
 
 ### T-036 · apply: several operations in one step
-- status: open
-- owner: —
+- status: done
+- owner: w7-hydrogen
 - priority: P2 · type: feature · area: cli
 - reqs: R-WRITE-15
 - depends: T-034
 - accept: all operations apply or none do, with one snapshot
+- commit: 24995b5
+- note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
 
 ## 4. Recovery, checks and overview
 
@@ -377,44 +379,54 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, w6-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 138 tests pass; check and summary run cleanly on this repository's TODO.md
 
 ### T-045 · check --fix
-- status: open
-- owner: —
+- status: done
+- owner: w7-hydrogen
 - priority: P2 · type: feature · area: check
 - reqs: R-CHECK-2
 - depends: T-042
 - accept: only the repairs listed in R-CHECK-2 are made; everything else is still reported
+- commit: 208685b
+- note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
 
 ### T-046 · search
-- status: open
-- owner: —
+- status: done
+- owner: w7-hydrogen
 - priority: P2 · type: feature · area: cli
 - reqs: R-READ-6
 - depends: T-020
 - accept: finds text in titles, fields and notes; --archive searches the archive file
+- commit: d4c075a
+- note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
 
 ### T-047 · Journal and log
-- status: open
-- owner: —
+- status: done
+- owner: w7-hydrogen
 - priority: P2 · type: feature · area: history
 - reqs: R-HIST-4, R-READ-7
 - depends: T-040
 - accept: each write adds one journal line; `log <task>` shows that task's entries
+- commit: 2445fbc
+- note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
 
 ### T-048 · edit
-- status: open
-- owner: —
+- status: done
+- owner: w7-hydrogen
 - priority: P2 · type: feature · area: lock
 - reqs: R-LOCK-8
 - depends: T-015, T-042
 - accept: the lease is taken before the editor opens and ended after it closes, with check and a snapshot in between
+- commit: 886b41f
+- note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
 
 ### T-049 · Show tasks that became ready
-- status: open
-- owner: —
+- status: done
+- owner: w7-hydrogen
 - priority: P2 · type: feature · area: cli
 - reqs: R-DEP-4
 - depends: T-024, T-025
 - accept: done and drop list the tasks whose last open dependency they finished
+- commit: 095a83d
+- note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
 
 ## 5. Agent setup
 
@@ -449,20 +461,24 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, w6-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 138 tests pass; check and summary run cleanly on this repository's TODO.md
 
 ### T-053 · Claude Code hooks
-- status: open
-- owner: —
+- status: done
+- owner: w7-hydrogen
 - priority: P2 · type: feature · area: agent
 - reqs: R-AGENT-4
 - depends: T-043, T-050
 - accept: a new session starts with the summary; an Edit or Write of TODO.md is stopped with the command to use; other files are unaffected; uninstall removes only the tool's entries; works from PowerShell
+- commit: 231c68e
+- note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
 
 ### T-054 · Claude Code skill
-- status: open
-- owner: —
+- status: done
+- owner: w7-hydrogen
 - priority: P2 · type: feature · area: agent
 - reqs: R-AGENT-5
 - depends: T-050
 - accept: the skill file is generated from the same rules text
+- commit: 7fcf2f9
+- note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
 
 ## 6. Build, release and documentation
 
@@ -525,28 +541,43 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, w4b-hydrogen): done — verified by coordinator: fmt, clippy and 110 tests pass
 
 ### T-066 · Version with build commit
-- status: open
-- owner: —
+- status: done
+- owner: w7-hydrogen
 - priority: P2 · type: chore · area: release
 - reqs: REL-7
 - depends: T-005
 - accept: `todo --version` prints the version and the commit
+- commit: 571a960
+- note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
 
 ### T-067 · Warn about synced folders
-- status: open
-- owner: —
+- status: done
+- owner: w7-hydrogen
 - priority: P2 · type: feature · area: find
 - reqs: NFR-12
 - depends: T-016
 - accept: a TODO.md inside a OneDrive or Dropbox folder produces a warning in where and in write commands
+- commit: 770cece
+- note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
 
 ### T-068 · Colour output
-- status: open
-- owner: —
+- status: done
+- owner: w7-hydrogen
 - priority: P2 · type: feature · area: cli
 - reqs: R-OUT-9
 - depends: T-020
 - accept: colour appears only on a terminal, never in piped output or with NO_COLOR set
+- commit: 501c372
+- note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
+
+### T-082 · Make writes fast again on large files
+- status: open
+- owner: —
+- priority: P0 · type: fix · area: core
+- problem: after v0.3 a write takes 150 ms (perf test: add 199 ms against the 200 ms limit) while v0.1 took 59 ms; note --dry-run takes 93 ms although it writes nothing, so the write path does several full parses or other repeated work; release todo.exe grew from 0.7 MB to 4.2 MB
+- accept: on a generated 5,000-task file (about 1 MB) in a release build, add and note take under 100 ms and list and show under 60 ms on this PC, with the perf test asserting the NFR-3 limits; the release todo.exe size is explained and reduced if easy
+- reqs: NFR-3, TEST-9
+- note (2026-11-15, coordinator): added
 
 ## 7. Ideas, not planned
 
