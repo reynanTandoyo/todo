@@ -73,3 +73,33 @@ Items are ordered by estimated lines saved.
   `cargo_bin_cmd!` chains in `cmd_*` tests that need assert_cmd matchers (67 uses).
 - Files with no shared helper: `atomic_io.rs`, `doc_fixtures.rs`, `doc_lines.rs`, `ops_rules.rs`
   (they test the library, not the binary, and need no process helpers).
+
+## Status after chunk 3 (T-083, items 2, 3 and 6: command layer)
+- Line counts (non-blank): `src/` 16,146 → 16,135 after step 1 (`0d35774`) → 16,152 after step 2
+  (`4216833`); `tests/` unchanged at 7,526. Test results: 152 passed, 1 ignored (unchanged).
+- Step 1 (write commands), done: `move` and `add` share `cli::add::find_section`, the one matcher for
+  `## ` section names (exact or unique substring, with the `UnknownSection` / `AmbiguousSection`
+  messages). `resolve_target_section` now calls it after its own default-section lookup. `move`
+  keeps its own "TODO.md has no `## ` sections" message, so output is byte-identical.
+- Step 1, not moved to the shared layer, with reasons:
+  - `move` edit builder vs `apply`'s move: `todo move` deletes the task block plus one adjacent blank
+    line and inserts a blank line before the target only when needed; `apply` removes from
+    `remove_start` and builds its inserts differently. Sharing one builder would change blank lines
+    in `apply` output, which no test pins. Only the section lookup is shared.
+  - `ask`, `archive`, `restore`, `check --fix`, `release --stale/--all`, `lock`, `unlock`, `edit`:
+    not evaluated in depth in this chunk. They keep their own code. The next worker should check
+    each for a repeated doc-level edit or report pattern before adding to `TaskOp`.
+- Step 2 (read commands), done: `cli::load_read` (in `cli/mod.rs`) loads the settings, `TODO.md`
+  and the archive in one discovery pass. `show` and `summary` use it.
+- Step 2, left as they are, with reasons:
+  - `list` and `next` load settings before they parse their own arguments. Moving the load would
+    change which error (bad filter or broken `todo.toml`) is reported first, so they keep the two
+    calls.
+  - `log`, `search` and `where` use `load_for_read`, which discovers `TODO.md` with
+    `find_todo_with_mode(cfg.worktree)`. `load_read` uses the `load_config_with_found` discovery,
+    which is different when `todo.toml` sets `worktree = "local"` and no `--file` is given. Merging
+    them could change which file is read, so this is for the owner to decide, not a silent change.
+  - Text and JSON output of the read commands differ per command, so no shared renderer was added.
+- Remaining for the next chunks: the rest of step 1 (listed above), item 4 (write pipeline
+  variants), item 5 (lock and history), item 7 (`FindOptions` construction), and the `loaded`/`found`
+  discovery split described above.
