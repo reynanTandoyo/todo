@@ -57,6 +57,9 @@ jobs:
       - name: Run tests
         run: cargo test --all-features
 
+      - name: Run 5,000-task performance test (NFR-3, TEST-9)
+        run: cargo test --release --test perf -- --ignored --nocapture
+
       - name: Build release binary (Windows)
         if: runner.os == 'Windows'
         run: cargo build --release
