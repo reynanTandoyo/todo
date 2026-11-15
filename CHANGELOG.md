@@ -2,6 +2,21 @@
 
 All notable changes to `todo` are documented in this file.
 
+## [0.3.0] - 2026-11-15
+
+### Added
+- `todo apply <file|->`: run multiple operations from JSON lines in one locked, all-or-nothing step with a single snapshot (`R-WRITE-15`).
+- `todo check --fix`: mechanical repairs only (canonical IDs and separators, missing `status: open`, leftover temporary files, outdated rules blocks) while still reporting everything else (`R-CHECK-2`).
+- `todo search <text> [--archive]`: search task titles, fields, and notes (`R-READ-6`).
+- Write journal (`journal.jsonl`) and `todo log <task>`: record every write with timestamp, agent, command, arguments, tasks, and before/after hashes (`R-HIST-4`, `R-READ-7`).
+- `todo edit --agent <name>`: acquire a manual lease, open `VISUAL`/`EDITOR`/Notepad, run `check`, record a snapshot, and end the lease (`R-LOCK-8`).
+- `done` and `drop` now list tasks whose last open dependency was just satisfied (`R-DEP-4`).
+- `todo hooks install/uninstall` and `todo guard`: Claude Code `SessionStart` (`todo summary`) and `PreToolUse` (`todo guard`) hooks with backup, formatting preservation, and PowerShell compatibility (`R-AGENT-4`).
+- `todo skill install`: generate `.claude/skills/todo/SKILL.md` from the built-in rules text (`R-AGENT-5`).
+- `todo --version`: include the build commit hash (`REL-7`).
+- Synced-folder warning in `where` and write commands when `TODO.md` is inside OneDrive or Dropbox (`NFR-12`).
+- Terminal-only ANSI colour output, disabled when piped or with `NO_COLOR` set (`R-OUT-9`).
+
 ## [0.2.0] - 2026-11-15
 
 ### Added

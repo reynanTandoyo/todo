@@ -22,6 +22,11 @@ expression: ok_json
       },
       {
         "kind": "write",
+        "name": "apply",
+        "summary": "Apply a batch of operations from JSON lines in one locked step"
+      },
+      {
+        "kind": "write",
         "name": "archive",
         "summary": "Move done and dropped tasks to TODO-archive.md"
       },
@@ -61,6 +66,16 @@ expression: ok_json
         "summary": "Mark a task dropped with a reason"
       },
       {
+        "kind": "write",
+        "name": "edit",
+        "summary": "Take a lease, open TODO.md in an editor, check, snapshot, and unlock"
+      },
+      {
+        "kind": "meta",
+        "name": "guard",
+        "summary": "Claude Code PreToolUse hook that blocks direct edits to TODO.md"
+      },
+      {
         "kind": "meta",
         "name": "help",
         "summary": "Show overview or detailed help for a command"
@@ -69,6 +84,11 @@ expression: ok_json
         "kind": "read",
         "name": "history",
         "summary": "List saved snapshots of TODO.md"
+      },
+      {
+        "kind": "meta",
+        "name": "hooks",
+        "summary": "Install or uninstall Claude Code hooks in .claude/settings.json"
       },
       {
         "kind": "meta",
@@ -84,6 +104,11 @@ expression: ok_json
         "kind": "write",
         "name": "lock",
         "summary": "Take a manual editing lease on TODO.md"
+      },
+      {
+        "kind": "read",
+        "name": "log",
+        "summary": "Show journal entries for a task"
       },
       {
         "kind": "write",
@@ -116,6 +141,11 @@ expression: ok_json
         "summary": "Restore TODO.md from a saved snapshot"
       },
       {
+        "kind": "read",
+        "name": "search",
+        "summary": "Search titles, fields, and notes for matching text"
+      },
+      {
         "kind": "write",
         "name": "set",
         "summary": "Edit fields or title of a task"
@@ -124,6 +154,11 @@ expression: ok_json
         "kind": "read",
         "name": "show",
         "summary": "Show full details of a task"
+      },
+      {
+        "kind": "meta",
+        "name": "skill",
+        "summary": "Install the Claude Code skill for working with TODO.md"
       },
       {
         "kind": "read",
@@ -151,7 +186,7 @@ expression: ok_json
         "summary": "Show resolved TODO.md, repo root, state folder, lock status, and task counts"
       }
     ],
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "ok": true,
   "schema": "todo.overview.v1",

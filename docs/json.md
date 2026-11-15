@@ -80,7 +80,7 @@ Returned by `show` (plus `block_lines`), `add`, `claim`, `release`, `done`, `dro
   "ok": true,
   "data": {
     "name": "todo",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "about": "Concurrency-safe editor for TODO.md task lists",
     "commands": [
       { "kind": "read", "name": "list", "summary": "List and filter tasks" }
@@ -96,7 +96,7 @@ Returned by `show` (plus `block_lines`), `add`, `claim`, `release`, `done`, `dro
 {
   "schema": "todo.version.v1",
   "ok": true,
-  "data": { "version": "0.2.0" },
+  "data": { "version": "0.3.0", "commit": "abc1234" },
   "warnings": []
 }
 ```
@@ -362,6 +362,90 @@ Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `T
 
 - `install`: `{"file":"AGENTS.md","applied":true,"changed":true,"created":false}`
 - `check` (clean): `{"file":"AGENTS.md","status":"current","line":3}`
+
+### `todo search --json` (`todo.search.v1`)
+
+```json
+{
+  "schema": "todo.search.v1",
+  "ok": true,
+  "data": {
+    "archive": false,
+    "query": "parser",
+    "count": 1,
+    "matches": [
+      {
+        "id": "T-001",
+        "status": "open",
+        "title": "Fix parser",
+        "field": "title",
+        "line": 7,
+        "text": "Fix parser"
+      }
+    ]
+  },
+  "warnings": []
+}
+```
+
+### `todo log --json` (`todo.log.v1`)
+
+```json
+{
+  "schema": "todo.log.v1",
+  "ok": true,
+  "data": {
+    "task": "T-001",
+    "count": 1,
+    "entries": [
+      {
+        "time": "2026-11-15T20:00:00+01:00",
+        "agent": "alice",
+        "command": "claim",
+        "arguments": ["claim", "T-001", "--agent", "alice"],
+        "tasks": ["T-001"],
+        "hash_before": "...",
+        "hash_after": "..."
+      }
+    ]
+  },
+  "warnings": []
+}
+```
+
+### `todo apply --json` (`todo.apply.v1`)
+
+```json
+{
+  "schema": "todo.apply.v1",
+  "ok": true,
+  "data": {
+    "count": 2,
+    "applied": [
+      { "index": 1, "op": "claim", "task": "T-001" },
+      { "index": 2, "op": "done", "task": "T-001" }
+    ]
+  },
+  "warnings": []
+}
+```
+
+### `todo done --json` and `todo drop --json` (`newly_ready`, `R-DEP-4`)
+
+When finishing or dropping a task makes other tasks ready, their summaries appear in `"newly_ready"`:
+
+```json
+"newly_ready": [
+  { "id": "T-003", "priority": "P1", "title": "Follow-up task" }
+]
+```
+
+### `todo edit --json`, `todo hooks --json`, `todo guard --json`, `todo skill --json`
+
+- `edit`: `{"file":"TODO.md","editor":"notepad","clean":true,"problems":0}`
+- `hooks`: `{"file":".claude/settings.json","action":"install","applied":true,"changed":true,"backup":".claude/settings.json.bak"}`
+- `guard`: `{"allowed":true,"target":"src/main.rs"}`
+- `skill`: `{"file":".claude/skills/todo/SKILL.md","applied":true,"changed":true,"created":true}`
 
 ---
 

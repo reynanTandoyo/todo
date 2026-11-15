@@ -93,30 +93,40 @@ todo reopen T-013 --note "needed after all" --agent agent-1
 todo move T-012 --section Done --agent agent-1
 ```
 
-### Questions, batch add, and inspection
+### Questions, batch operations, and inspection
 
 ```powershell
 todo where
+todo search "timeout"
+todo search "timeout" --archive
+todo log T-012
+todo check
+todo check --fix --agent agent-1
 todo ask "Should retries use exponential backoff?" --agent agent-1
 todo answer T-014 "Yes, cap at 30s" --agent human
 Get-Content tasks.jsonl | todo add --from - --agent coordinator
+Get-Content ops.jsonl | todo apply - --agent coordinator
 ```
 
 Task arguments also match unique case-insensitive title substrings (excluding `done` and `dropped`
 tasks). Text options accept `-` (standard input) or `@path` (a UTF-8 file) so quotes, backticks,
 and `$` pass cleanly through PowerShell.
 
-### Manual edit leases and lock status
+### Manual edit leases, editor integration, and Claude Code
 
 ```powershell
 todo status
 todo lock --minutes 10 --agent agent-1
 todo unlock --agent agent-1
+todo edit --agent agent-1
+todo hooks install --yes
+todo skill install --yes
 ```
 
 Pass `--json` to any command for machine-readable output, `--dry-run` to preview a write command's
 diff without modifying `TODO.md`, `--yes` to confirm bulk commands, `--file <path>` (or
-`TODO_FILE`) to target a specific file, and `--force` to override another agent's claim.
+`TODO_FILE`) to target a specific file, and `--force` to override another agent's claim. Colour
+output is enabled only on terminals and is disabled when piped or when `NO_COLOR` is set.
 
 ## Configuration (`todo.toml`)
 
