@@ -117,6 +117,7 @@ the tool knows can be read, with a warning, but not written.
 | `status` | `open`, `claimed`, `blocked`, `done` or `dropped` | `open` |
 | `owner` | an agent name (§11); `—` means nobody (`-`, `none` and empty are read the same way) | nobody |
 | `claimed` | local date and time with UTC offset, `2026-11-15T14:03+01:00` | no claim time; a claimed task without one counts as stale |
+| `session` | the agent session that made the claim (an opaque ID such as Claude Code's `session_id`); written by `claim`, `next --claim` and `unblock` when a session is known, removed whenever `claimed` is removed | no session |
 | `priority` | one of the configured priorities (default `P0`, `P1`, `P2`, `P3`, most urgent first); may carry other parts, see below | no priority; sorted after all priorities |
 | `type` | free text, or one of the configured `types`; `question` is always allowed | none |
 | `area` | free text, or one of the configured `areas` | none |
@@ -153,6 +154,7 @@ Notes the tool writes itself:
 | `drop` | `dropped — <reason>` |
 | `reopen` | `reopened — <reason>` |
 | `answer` | `answer — <text>` |
+| `release --session` | `released — session <id> ended` |
 | claim of a stale claim | `took over from <previous owner> (claim was <N> h old)` |
 | any change made with `--force` | `forced <command> (owner was <owner>)` |
 
@@ -160,7 +162,7 @@ Notes the tool writes itself:
 
 - **Order of fields.** When a field is missing and must be added, it goes after the nearest existing
   field that comes before it in this order, or directly under the heading if there is none:
-  `status`, `owner`, `claimed`, `priority`, `type`, `area`, `depends`, `files`, `problem`, `fix`,
+  `status`, `owner`, `claimed`, `session`, `priority`, `type`, `area`, `depends`, `files`, `problem`, `fix`,
   `accept`, `commit`, then other fields. Removing a field removes its line only.
 - **New tasks** go at the end of their section: after the section's last non-blank line, with one
   blank line before the heading. Blank lines that followed the section stay after the new task. A

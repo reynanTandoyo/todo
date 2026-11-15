@@ -608,8 +608,9 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 ### T-072 · Claims tagged with an agent session
 - status: open
 - owner: —
-- priority: P3 · type: idea · area: agent
-- reqs: I-3
+- priority: P2 · type: idea · area: agent
+- accept: claim, next --claim, unblock write session from --session / TODO_SESSION / CLAUDE_CODE_SESSION_ID; release --session; hidden SessionEnd hook command; hooks install/uninstall handle it
+- reqs: R-CLAIM-7
 
 ### T-073 · todo schema
 - status: open
@@ -650,8 +651,9 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 ### T-079 · PowerShell tab completion
 - status: open
 - owner: —
-- priority: P3 · type: idea · area: cli
-- reqs: I-10
+- priority: P2 · type: idea · area: cli
+- accept: todo completions <shell> prints scripts for powershell, bash, zsh, fish, elvish via clap_complete; README explains the PowerShell profile line
+- reqs: R-OUT-10
 
 ### T-080 · todo scan
 - status: open
@@ -662,5 +664,6 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 ### T-081 · Import from other task-list formats
 - status: open
 - owner: —
-- priority: P3 · type: idea · area: cli
-- reqs: I-12
+- priority: P2 · type: idea · area: cli
+- accept: Checkbox list converts to format 1 per R-IMP-1: markers, title/description, suffixes, notes, question sections; non-task lines byte for byte; todo check passes; counts reported; preview without --yes; .pre-import backup
+- reqs: R-IMP-1

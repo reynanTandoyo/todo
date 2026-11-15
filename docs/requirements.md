@@ -308,6 +308,14 @@ or with `--json` the task as it is after the change.
   environment variable; otherwise it exits 2 (`NO_AGENT`). Names follow format.md §11.
 - **R-CLAIM-6 SHOULD** `release --stale` releases every stale claim; `release --all --agent X`
   releases all of agent X's claims (another agent needs `--force`).
+- **R-CLAIM-7 COULD** Claims carry the agent session. `claim`, `next --claim` and `unblock` (back to
+  claimed) write `- session: <id>`, taken from `--session`, else the `TODO_SESSION` environment
+  variable, else `CLAUDE_CODE_SESSION_ID` (Claude Code exports this to every command an agent runs;
+  it is the same ID Claude Code passes to hooks as `session_id`). Without any of them, no session
+  field is written. `release --session <id>` releases every claim of that session, adding the note
+  `released — session <id> ended`. `todo hooks install` also adds a Claude Code `SessionEnd` hook
+  running a hidden command that reads the hook's JSON from standard input and releases that
+  session's claims; `hooks uninstall` removes it. Hook commands must work from PowerShell.
 
 ### 5.9 Dependencies — DEP
 
@@ -347,6 +355,10 @@ or with `--json` the task as it is after the change.
   one command with examples; `todo help agents` prints the agent rules (R-AGENT-1);
   `todo --version` prints the version.
 - **R-OUT-9 COULD** Colour on a terminal only: never when piped, never with `NO_COLOR` set.
+- **R-OUT-10 COULD** `todo completions <shell>` prints a tab-completion script for powershell, bash,
+  zsh, fish or elvish, generated from the command definitions with `clap_complete`. The README
+  explains how to add it to the PowerShell profile
+  (`todo completions powershell | Out-String | Invoke-Expression`).
 
 ### 5.11 History and recovery — HIST
 
@@ -431,6 +443,29 @@ or with `--json` the task as it is after the change.
 - **R-AGENT-5 COULD** `skill install --yes` writes `.claude/skills/todo/SKILL.md` from the same rules
   text.
 
+### 5.16 Import — IMP
+
+- **R-IMP-1 COULD** `todo import --from checkbox <source> [--out <path>] [--yes]` converts a Markdown
+  checkbox task list into format version 1. Without `--yes` it prints the converted text (or a diff
+  when the target exists) and writes nothing.
+  - Only top-level checkbox lines (`- [ ]`, `- [~]`, `- [!]`, `- [x]`) under `##` sections become
+    tasks. Checkboxes in the preamble, in code fences, or indented stay as text.
+  - Mark to status: space = open, `~` = claimed, `!` = blocked, `x` = done.
+  - Title: the bold part (`**…**`) if present, otherwise the text before ` — `. The rest of the line
+    goes into a `description` field. Trailing `(added: agent, date)`, `(claimed: agent, date)` and
+    `(done: agent, date[, commit])` become the added note; owner and claim time; and the done note
+    plus the `commit` field.
+  - Indented sub-bullets of the form `  - YYYY-MM-DD agent: text` become notes; other indented lines
+    stay as text inside the task.
+  - Tasks in a section whose name contains "decision" or "question" (any case) get `type: question`,
+    so `next` skips them.
+  - IDs are `T-001`, `T-002`, … in file order. Every other line (title, preamble, section headings,
+    prose) is kept byte for byte, and a format line is added at the top.
+  - The result must pass `todo check`, and the task count must equal the number of converted
+    checkbox lines; the command reports both.
+  - `--out` defaults to the source file itself (converting in place). When the target exists, the old
+    file is first saved next to it as `<name>.pre-import`.
+
 ---
 
 ## 6. Commands at a glance
@@ -448,6 +483,8 @@ or with `--json` the task as it is after the change.
 | `apply`, `check --fix` | batch changes, repairs | write | COULD |
 | `edit` | lease plus editor | lease | COULD |
 | `hooks install`, `hooks uninstall`, `guard`, `skill install` | Claude Code extras | setup | COULD |
+| `import --from checkbox` | convert a Markdown checkbox list | write | COULD |
+| `completions <shell>` | tab-completion script | — | COULD |
 
 Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write commands), `--yes`
 (bulk commands), `--force` (where allowed).
@@ -487,7 +524,7 @@ Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write
   are versioned interfaces. A breaking change needs a new major version and an entry in
   `CHANGELOG.md`; the file format has its own version line.
 - **NFR-9 SHOULD** Few, well-known dependencies: `clap`, `serde`, `serde_json`, `toml`, `sha2`,
-  `similar` and `chrono`; for tests `assert_cmd`, `predicates`, `tempfile`, `proptest` and `insta`.
+  `similar`, `chrono` and `clap_complete`; for tests `assert_cmd`, `predicates`, `tempfile`, `proptest` and `insta`.
   Anything else needs a reason in its commit message. The release `todo.exe` stays under 5 MB.
 - **NFR-10 MUST** Builds with stable Rust 1.89 or newer, edition 2024.
 - **NFR-11 SHOULD** The README explains that the lock protects one machine, that folders synced by
@@ -566,6 +603,8 @@ Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write
   `agents install`, release builds.
 - **v0.3** — every COULD: `search`, the journal and `log`, `apply`, `check --fix`, `edit`, Claude
   Code hooks and skill, colour, the synced-folder warning.
+- **v0.4** — ideas the owner promoted on 2026-11-16: `import --from checkbox` (R-IMP-1), session-tagged
+  claims (R-CLAIM-7) and tab completion (R-OUT-10).
 
 ---
 
@@ -576,6 +615,7 @@ Recorded so they aren't lost; each becomes a requirement only by a decision reco
 - **I-1** An MCP server exposing the commands as tools.
 - **I-2** A list of projects and an overview across them.
 - **I-3** Claims tagged with an agent session, released by a Claude Code `SessionEnd` hook.
+  *Moved to requirements (R-CLAIM-7) by the owner's decision of 2026-11-16.*
 - **I-4** `todo schema`: a machine-readable description of commands, JSON shapes and exit codes.
 - **I-5** `todo handoff`: a summary note of an agent's open claims for whoever continues.
 - **I-6** `todo renumber`: change a task's ID and every reference to it.
@@ -584,8 +624,11 @@ Recorded so they aren't lost; each becomes a requirement only by a decision reco
   (exit 5 when the history is missing).
 - **I-9** `todo undo`: revert an agent's last change if nothing has happened since.
 - **I-10** PowerShell tab completion.
+  *Moved to requirements (R-OUT-10) by the owner's decision of 2026-11-16.*
 - **I-11** `todo scan`: find `TODO:` comments in source code and offer them as tasks.
 - **I-12** Import from other task-list formats (checkbox lists, todo.txt).
+  *Checkbox lists moved to requirements (R-IMP-1) by the owner's decision of 2026-11-16; todo.txt
+  stays an idea.*
 
 ---
 
