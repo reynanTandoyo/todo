@@ -34,7 +34,18 @@ fn version_flag_prints_version() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
+        .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")))
+        .stdout(predicate::str::contains(env!("TODO_GIT_COMMIT")));
+
+    let json_out = todo_cmd(&home)
+        .args(["--version", "--json"])
+        .output()
+        .unwrap();
+    assert!(json_out.status.success());
+    let parsed: serde_json::Value = serde_json::from_slice(&json_out.stdout).unwrap();
+    assert_eq!(parsed["schema"], "todo.version.v1");
+    assert_eq!(parsed["data"]["version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(parsed["data"]["commit"], env!("TODO_GIT_COMMIT"));
 }
 
 #[test]

@@ -395,11 +395,19 @@ register_commands! {
     Where => where_cmd,
 }
 
+/// Version string including the build commit (`REL-7`).
+pub const VERSION_STRING: &str = concat!(
+    env!("CARGO_PKG_VERSION"),
+    " (",
+    env!("TODO_GIT_COMMIT"),
+    ")"
+);
+
 /// Top-level `todo` CLI parser.
 #[derive(Debug, Parser)]
 #[command(
     name = "todo",
-    version,
+    version = VERSION_STRING,
     about = "Concurrency-safe editor for TODO.md task lists",
     disable_help_subcommand = true
 )]
@@ -416,6 +424,7 @@ pub struct Cli {
 #[derive(Serialize)]
 struct VersionJson {
     version: &'static str,
+    commit: &'static str,
 }
 
 /// Runs the CLI with process arguments and returns the [`ExitCode`].
@@ -478,6 +487,7 @@ where
                             "version",
                             &VersionJson {
                                 version: env!("CARGO_PKG_VERSION"),
+                                commit: env!("TODO_GIT_COMMIT"),
                             },
                         );
                     } else {
