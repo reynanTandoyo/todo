@@ -72,8 +72,8 @@ CI also runs clippy for Linux. To check that locally:
 - Exit code `1` means someone else claimed it or the rule refused the change — pick another task.
 - Exit code `3` means the lock or lease is busy — try the command again.
 - Add notes as you learn things (`todo note <id> "..."`).
-- Finish a task with `todo done <id> --note "..." --commit`.
-- Use `todo add "..."` to record problems you find instead of fixing them silently.
+- Finish a task after committing: `todo done <id> --note "..." --commit HEAD`.
+- Use `todo add --title "..." --priority P2` to record problems you find instead of fixing them silently.
 - Use `todo ask "..."` for questions only a person can decide.
 - Start every git commit message with the task ID (for example `T-012: short summary`).
 <!-- todo:end -->
