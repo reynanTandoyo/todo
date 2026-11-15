@@ -12,16 +12,15 @@ use similar::TextDiff;
 use crate::cli::add::resolve_target_section;
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::doc::{
-    CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER, Document, LineEdit, Status,
-    TaskChangeIntent, TaskId, verify_task_edits,
+    Document, LineEdit, TaskChangeIntent, TaskId, verify_task_edits,
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{fs_path, synced_folder_warning};
 use crate::lock::{WriteOutcome, current_time, locked_read_modify_write_with_warnings};
 use crate::ops::{
-    OpsConfig, OwnershipDecision, StatusCommand, TaskCommand, TaskEditBuilder, check_ownership,
-    check_task_writable, file_label, forced_note_text, parse_doc_for_write, plan_claim,
-    plan_release, read_optional_archive, resolve_task_in_doc, validate_transition,
+    NewTask, OpEnv, OpsConfig, OwnershipDecision, SetChange, TaskCommand, TaskOp, check_ownership,
+    check_task_writable, file_label, forced_note_text, highest_task_number, parse_doc_for_write, read_optional_archive,
+    resolve_task_in_doc,
 };
 use crate::output::Output;
 use crate::state::{IdsState, StateDir};
@@ -203,12 +202,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             let archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
             let now = current_time();
 
-            let max_doc = doc.tasks.iter().map(|t| t.id.number()).max().unwrap_or(0);
-            let max_arch = archive
-                .as_ref()
-                .map_or(0, |a| a.tasks.iter().map(|t| t.id.number()).max().unwrap_or(0));
             let initial_state = state.read_ids()?.map_or(0, |s| s.highest_id);
-            let mut highest_id = max_doc.max(max_arch).max(initial_state);
+            let mut highest_id = highest_task_number(&doc, archive.as_ref(), initial_state);
 
             let mut refs: BTreeMap<String, String> = BTreeMap::new();
             let mut results = Vec::with_capacity(ops.len());
@@ -455,41 +450,27 @@ fn apply_one_op(
                 refs.insert(r.clone(), id_str.clone());
             }
 
-            let mut lines = vec![
-                String::new(),
-                format!("### {id_str}{CANONICAL_HEADING_SEPARATOR}{clean_title}"),
-                "- status: open".to_string(),
-                format!("- owner: {CANONICAL_NOBODY_OWNER}"),
-            ];
-            let mut combined = vec![format!("priority: {}", priority.trim())];
-            if let Some(t) = task_type {
-                combined.push(format!("type: {}", t.trim()));
+            let dep_str = match depends {
+                Some(dep) => Some(resolve_depends(dep, refs)?).filter(|d| !d.is_empty()),
+                None => None,
+            };
+            let extra: Vec<(String, String)> = fields
+                .iter()
+                .map(|(k, v)| (k.clone(), v.trim().to_string()))
+                .collect();
+            let lines = NewTask {
+                title: clean_title,
+                priority: Some(priority.trim()),
+                task_type: trim(task_type),
+                area: trim(area),
+                depends: dep_str.as_deref(),
+                files: trim(files),
+                problem: trim(problem),
+                fix: trim(fix),
+                accept: trim(accept),
+                extra: &extra,
             }
-            if let Some(a) = area {
-                combined.push(format!("area: {}", a.trim()));
-            }
-            lines.push(format!("- {}", combined.join(" \u{00b7} ")));
-
-            if let Some(dep) = depends {
-                let dep_str = resolve_depends(dep, refs)?;
-                if !dep_str.is_empty() {
-                    lines.push(format!("- depends: {dep_str}"));
-                }
-            }
-            for (k, v) in [
-                ("files", files),
-                ("problem", problem),
-                ("fix", fix),
-                ("accept", accept),
-            ] {
-                if let Some(val) = v {
-                    lines.push(format!("- {k}: {}", val.trim()));
-                }
-            }
-            for (k, v) in fields {
-                lines.push(format!("- {k}: {}", v.trim()));
-            }
-            lines.push(format!("- note ({date}, {agent}): added"));
+            .lines(&id_str, &date, agent);
 
             let edit = LineEdit::insert(sec.content_end, lines);
             Ok((
@@ -497,257 +478,6 @@ fn apply_one_op(
                 id_str,
                 vec![edit],
                 TaskChangeIntent::add_one(new_id),
-            ))
-        }
-        ApplyOp::Claim { task: raw_task } => {
-            let task_ref = resolve_task_ref(raw_task, refs)?;
-            let task = resolve_task_in_doc(doc, &task_ref)?;
-            check_task_writable(doc, task, label, archive)?;
-            let id_str = cfg.id_config.format_id(task.id);
-            let plan = plan_claim(task, agent, force, now, cfg)?;
-            let (edits, _) = crate::ops::build_claim_edits(doc, task, &plan, now);
-            Ok((
-                "claim",
-                id_str,
-                edits,
-                TaskChangeIntent::modify_one(task.id),
-            ))
-        }
-        ApplyOp::Release { task: raw_task } => {
-            let task_ref = resolve_task_ref(raw_task, refs)?;
-            let task = resolve_task_in_doc(doc, &task_ref)?;
-            check_task_writable(doc, task, label, archive)?;
-            let id_str = cfg.id_config.format_id(task.id);
-            let plan = plan_release(task, agent, force, cfg)?;
-            let (edits, _) = crate::ops::build_release_edits(doc, task, &plan, agent, now);
-            Ok((
-                "release",
-                id_str,
-                edits,
-                TaskChangeIntent::modify_one(task.id),
-            ))
-        }
-        ApplyOp::Done {
-            task: raw_task,
-            note,
-            commit,
-        } => {
-            let task_ref = resolve_task_ref(raw_task, refs)?;
-            let task = resolve_task_in_doc(doc, &task_ref)?;
-            check_task_writable(doc, task, label, archive)?;
-            let id_str = cfg.id_config.format_id(task.id);
-            let (_, ownership) =
-                validate_transition(task, StatusCommand::Done, agent, force, &id_str)?;
-            let mut builder = TaskEditBuilder::new(doc, task);
-            builder.set_status(Status::Done);
-            builder.set_owner(Some(agent));
-            builder.remove_claimed();
-            if let Some(c) = commit {
-                builder.set_field("commit", c.trim());
-            }
-            if let OwnershipDecision::Forced { previous_owner } = ownership {
-                builder.add_note(&date, agent, &forced_note_text("done", &previous_owner));
-            }
-            let note_text = match note.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-                Some(t) => format!("done \u{2014} {t}"),
-                None => "done".to_string(),
-            };
-            builder.add_note(&date, agent, &note_text);
-            let (edits, _) = builder.build();
-            Ok((
-                "done",
-                id_str,
-                edits,
-                TaskChangeIntent::modify_one(task.id),
-            ))
-        }
-        ApplyOp::Drop {
-            task: raw_task,
-            note,
-        } => {
-            let reason = note.trim();
-            if reason.is_empty() {
-                return Err(TodoError::new(
-                    ErrorCode::Usage,
-                    format!("operation #{op_num} (drop): note cannot be empty"),
-                ));
-            }
-            let task_ref = resolve_task_ref(raw_task, refs)?;
-            let task = resolve_task_in_doc(doc, &task_ref)?;
-            check_task_writable(doc, task, label, archive)?;
-            let id_str = cfg.id_config.format_id(task.id);
-            let (_, ownership) =
-                validate_transition(task, StatusCommand::Drop, agent, force, &id_str)?;
-            let mut builder = TaskEditBuilder::new(doc, task);
-            builder.set_status(Status::Dropped);
-            builder.remove_claimed();
-            if let OwnershipDecision::Forced { previous_owner } = ownership {
-                builder.add_note(&date, agent, &forced_note_text("drop", &previous_owner));
-            }
-            builder.add_note(&date, agent, &format!("dropped \u{2014} {reason}"));
-            let (edits, _) = builder.build();
-            Ok((
-                "drop",
-                id_str,
-                edits,
-                TaskChangeIntent::modify_one(task.id),
-            ))
-        }
-        ApplyOp::Block {
-            task: raw_task,
-            note,
-        } => {
-            let reason = note.trim();
-            if reason.is_empty() {
-                return Err(TodoError::new(
-                    ErrorCode::Usage,
-                    format!("operation #{op_num} (block): note cannot be empty"),
-                ));
-            }
-            let task_ref = resolve_task_ref(raw_task, refs)?;
-            let task = resolve_task_in_doc(doc, &task_ref)?;
-            check_task_writable(doc, task, label, archive)?;
-            let id_str = cfg.id_config.format_id(task.id);
-            let (_, ownership) =
-                validate_transition(task, StatusCommand::Block, agent, force, &id_str)?;
-            let mut builder = TaskEditBuilder::new(doc, task);
-            builder.set_status(Status::Blocked);
-            if let OwnershipDecision::Forced { previous_owner } = ownership {
-                builder.add_note(&date, agent, &forced_note_text("block", &previous_owner));
-            }
-            builder.add_note(&date, agent, &format!("blocked \u{2014} {reason}"));
-            let (edits, _) = builder.build();
-            Ok((
-                "block",
-                id_str,
-                edits,
-                TaskChangeIntent::modify_one(task.id),
-            ))
-        }
-        ApplyOp::Unblock {
-            task: raw_task,
-            note,
-        } => {
-            let task_ref = resolve_task_ref(raw_task, refs)?;
-            let task = resolve_task_in_doc(doc, &task_ref)?;
-            check_task_writable(doc, task, label, archive)?;
-            let id_str = cfg.id_config.format_id(task.id);
-            let (_, ownership) =
-                validate_transition(task, StatusCommand::Unblock, agent, force, &id_str)?;
-            let mut builder = TaskEditBuilder::new(doc, task);
-            let target_status = if task.owner.is_some() {
-                Status::Claimed
-            } else {
-                Status::Open
-            };
-            builder.set_status(target_status);
-            if let OwnershipDecision::Forced { previous_owner } = ownership {
-                builder.add_note(&date, agent, &forced_note_text("unblock", &previous_owner));
-            }
-            let note_text = match note.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-                Some(t) => format!("unblocked \u{2014} {t}"),
-                None => "unblocked".to_string(),
-            };
-            builder.add_note(&date, agent, &note_text);
-            let (edits, _) = builder.build();
-            Ok((
-                "unblock",
-                id_str,
-                edits,
-                TaskChangeIntent::modify_one(task.id),
-            ))
-        }
-        ApplyOp::Note {
-            task: raw_task,
-            text,
-            note,
-        } => {
-            let body = text
-                .as_deref()
-                .or(note.as_deref())
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .ok_or_else(|| {
-                    TodoError::new(
-                        ErrorCode::Usage,
-                        format!("operation #{op_num} (note): text cannot be empty"),
-                    )
-                })?;
-            let task_ref = resolve_task_ref(raw_task, refs)?;
-            let task = resolve_task_in_doc(doc, &task_ref)?;
-            check_task_writable(doc, task, label, archive)?;
-            let id_str = cfg.id_config.format_id(task.id);
-            let mut builder = TaskEditBuilder::new(doc, task);
-            builder.add_note(&date, agent, body);
-            let (edits, _) = builder.build();
-            Ok((
-                "note",
-                id_str,
-                edits,
-                TaskChangeIntent::modify_one(task.id),
-            ))
-        }
-        ApplyOp::Set {
-            task: raw_task,
-            title,
-            priority,
-            task_type,
-            area,
-            depends,
-            files,
-            problem,
-            fix,
-            accept,
-            fields,
-        } => {
-            let task_ref = resolve_task_ref(raw_task, refs)?;
-            let task = resolve_task_in_doc(doc, &task_ref)?;
-            check_task_writable(doc, task, label, archive)?;
-            let id_str = cfg.id_config.format_id(task.id);
-            let ownership = check_ownership(task, TaskCommand::Set, agent, force, &id_str)?;
-            let mut builder = TaskEditBuilder::new(doc, task);
-            if let Some(t) = title {
-                builder.set_title(t.trim());
-            }
-            if let Some(p) = priority {
-                builder.set_field("priority", p.trim());
-            }
-            if let Some(t) = task_type {
-                builder.set_field("type", t.trim());
-            }
-            if let Some(a) = area {
-                builder.set_field("area", a.trim());
-            }
-            if let Some(dep) = depends {
-                let dep_str = resolve_depends(dep, refs)?;
-                if dep_str.is_empty() {
-                    builder.unset_field("depends");
-                } else {
-                    builder.set_field("depends", &dep_str);
-                }
-            }
-            for (k, v) in [
-                ("files", files),
-                ("problem", problem),
-                ("fix", fix),
-                ("accept", accept),
-            ] {
-                if let Some(val) = v {
-                    builder.set_field(k, val.trim());
-                }
-            }
-            for (k, v) in fields {
-                builder.set_field(k, v.trim());
-            }
-            if let OwnershipDecision::Forced { previous_owner } = ownership {
-                builder.add_note(&date, agent, &forced_note_text("set", &previous_owner));
-            }
-            let (edits, _) = builder.build();
-            Ok((
-                "set",
-                id_str,
-                edits,
-                TaskChangeIntent::modify_one(task.id),
             ))
         }
         ApplyOp::Move {
@@ -795,73 +525,161 @@ fn apply_one_op(
                 TaskChangeIntent::modify_one(task.id),
             ))
         }
-        ApplyOp::Reopen {
-            task: raw_task,
-            note,
-        } => {
-            let task_ref = resolve_task_ref(raw_task, refs)?;
-            let task = resolve_task_in_doc(doc, &task_ref)?;
-            check_task_writable(doc, task, label, archive)?;
-            let id_str = cfg.id_config.format_id(task.id);
-            let (_, ownership) =
-                validate_transition(task, StatusCommand::Reopen, agent, force, &id_str)?;
-            let mut builder = TaskEditBuilder::new(doc, task);
-            builder.set_status(Status::Open);
-            builder.set_owner(None);
-            builder.remove_claimed();
-            if let OwnershipDecision::Forced { previous_owner } = ownership {
-                builder.add_note(&date, agent, &forced_note_text("reopen", &previous_owner));
-            }
-            let note_text = match note.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-                Some(t) => format!("reopened \u{2014} {t}"),
-                None => "reopened".to_string(),
+        other => {
+            let env = OpEnv {
+                cfg,
+                agent,
+                force,
+                now,
             };
-            builder.add_note(&date, agent, &note_text);
-            let (edits, _) = builder.build();
-            Ok((
-                "reopen",
-                id_str,
-                edits,
-                TaskChangeIntent::modify_one(task.id),
-            ))
-        }
-        ApplyOp::Answer {
-            task: raw_task,
-            text,
-            note,
-        } => {
-            let body = text
-                .as_deref()
-                .or(note.as_deref())
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .ok_or_else(|| {
-                    TodoError::new(
-                        ErrorCode::Usage,
-                        format!("operation #{op_num} (answer): text cannot be empty"),
-                    )
-                })?;
-            let task_ref = resolve_task_ref(raw_task, refs)?;
-            let task = resolve_task_in_doc(doc, &task_ref)?;
-            check_task_writable(doc, task, label, archive)?;
-            let id_str = cfg.id_config.format_id(task.id);
-            let (_, ownership) =
-                validate_transition(task, StatusCommand::Done, agent, force, &id_str)?;
-            let mut builder = TaskEditBuilder::new(doc, task);
-            builder.set_status(Status::Done);
-            builder.set_owner(Some(agent));
-            builder.remove_claimed();
-            if let OwnershipDecision::Forced { previous_owner } = ownership {
-                builder.add_note(&date, agent, &forced_note_text("answer", &previous_owner));
-            }
-            builder.add_note(&date, agent, &format!("answer \u{2014} {body}"));
-            let (edits, _) = builder.build();
-            Ok((
-                "answer",
-                id_str,
-                edits,
-                TaskChangeIntent::modify_one(task.id),
-            ))
+            apply_task_op(other, op_num, doc, archive, label, &env, refs)
         }
     }
+}
+
+/// A field value trimmed, if present.
+fn trim(v: &Option<String>) -> Option<&str> {
+    v.as_deref().map(str::trim)
+}
+
+/// Trimmed `text`, or the `operation #N (name)` usage error when it is empty.
+fn non_empty<'a>(op_num: usize, what: &str, name: &str, text: &'a str) -> Result<&'a str> {
+    let text = text.trim();
+    if text.is_empty() {
+        return Err(TodoError::new(
+            ErrorCode::Usage,
+            format!("operation #{op_num} ({name}): {what} cannot be empty"),
+        ));
+    }
+    Ok(text)
+}
+
+/// The `text` field of `note` and `answer`, falling back to `note`.
+fn text_or_note<'a>(
+    op_num: usize,
+    name: &str,
+    text: &'a Option<String>,
+    note: &'a Option<String>,
+) -> Result<&'a str> {
+    non_empty(op_num, "text", name, text.as_deref().or(note.as_deref()).unwrap_or(""))
+}
+
+/// Runs every single-task operation through the shared [`TaskOp`] edits (`ops::task_ops`).
+///
+/// Only the parts specific to `apply` live here: reading the JSON fields, `@ref` names and the
+/// `operation #N` error messages.
+fn apply_task_op(
+    op: &ApplyOp,
+    op_num: usize,
+    doc: &Document,
+    archive: Option<&Document>,
+    label: &str,
+    env: &OpEnv<'_>,
+    refs: &BTreeMap<String, String>,
+) -> Result<(&'static str, String, Vec<LineEdit>, TaskChangeIntent)> {
+    let mut dep_owned = String::new();
+    let mut changes: Vec<SetChange<'_>> = Vec::new();
+    let (raw_task, task_op) = match op {
+        ApplyOp::Claim { task } => (task, TaskOp::Claim),
+        ApplyOp::Release { task } => (task, TaskOp::Release),
+        ApplyOp::Done { task, note, commit } => (
+            task,
+            TaskOp::Done {
+                note: note.as_deref(),
+                commit: commit.as_deref().map(str::trim),
+            },
+        ),
+        ApplyOp::Drop { task, note } => (
+            task,
+            TaskOp::Drop {
+                reason: non_empty(op_num, "note", "drop", note)?,
+            },
+        ),
+        ApplyOp::Block { task, note } => (
+            task,
+            TaskOp::Block {
+                reason: non_empty(op_num, "note", "block", note)?,
+            },
+        ),
+        ApplyOp::Unblock { task, note } => (task, TaskOp::Unblock { note: note.as_deref() }),
+        ApplyOp::Reopen { task, note } => (task, TaskOp::Reopen { note: note.as_deref() }),
+        ApplyOp::Note { task, text, note } => (
+            task,
+            TaskOp::Note {
+                text: text_or_note(op_num, "note", text, note)?,
+            },
+        ),
+        ApplyOp::Answer { task, text, note } => (
+            task,
+            TaskOp::Answer {
+                verb: "answer",
+                text: text_or_note(op_num, "answer", text, note)?,
+            },
+        ),
+        ApplyOp::Set {
+            task,
+            title,
+            priority,
+            task_type,
+            area,
+            depends,
+            files,
+            problem,
+            fix,
+            accept,
+            fields,
+        } => {
+            if let Some(dep) = depends {
+                dep_owned = resolve_depends(dep, refs)?;
+            }
+            if let Some(t) = title {
+                changes.push(SetChange::Title(t.trim()));
+            }
+            let named = [
+                ("priority", priority),
+                ("type", task_type),
+                ("area", area),
+            ];
+            for (key, value) in named {
+                if let Some(v) = value {
+                    changes.push(SetChange::Field(key, v.trim()));
+                }
+            }
+            if depends.is_some() {
+                changes.push(if dep_owned.is_empty() {
+                    SetChange::Unset("depends")
+                } else {
+                    SetChange::Field("depends", &dep_owned)
+                });
+            }
+            let rest = [("files", files), ("problem", problem), ("fix", fix), ("accept", accept)];
+            for (key, value) in rest {
+                if let Some(v) = value {
+                    changes.push(SetChange::Field(key, v.trim()));
+                }
+            }
+            for (k, v) in fields {
+                changes.push(SetChange::Field(k, v.trim()));
+            }
+            (task, TaskOp::Set { changes: &changes })
+        }
+        ApplyOp::Add { .. } | ApplyOp::Move { .. } => {
+            return Err(TodoError::new(
+                ErrorCode::WriteFailed,
+                format!("operation #{op_num}: not a single-task operation"),
+            ));
+        }
+    };
+
+    let task_ref = resolve_task_ref(raw_task, refs)?;
+    let task = resolve_task_in_doc(doc, &task_ref)?;
+    check_task_writable(doc, task, label, archive)?;
+    let id_str = env.cfg.id_config.format_id(task.id);
+    let edits = task_op.build_edits(doc, task, env)?;
+    Ok((
+        task_op.name(),
+        id_str,
+        edits,
+        TaskChangeIntent::modify_one(task.id),
+    ))
 }

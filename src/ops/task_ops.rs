@@ -217,3 +217,83 @@ impl TaskOp<'_> {
         Ok(builder.build().0)
     }
 }
+
+/// Highest task number in `doc`, the archive and the ID state (`R-ID-2`); the next ID is one more.
+#[must_use]
+pub fn highest_task_number(doc: &Document, archive: Option<&Document>, state_highest: u64) -> u64 {
+    let max_of = |d: &Document| d.tasks.iter().map(|t| t.id.number()).max().unwrap_or(0);
+    max_of(doc)
+        .max(archive.map_or(0, max_of))
+        .max(state_highest)
+}
+
+/// The values of a new task, already validated and trimmed (`todo add`, `add --from`, `apply`).
+#[derive(Debug, Default)]
+pub struct NewTask<'a> {
+    /// Title text.
+    pub title: &'a str,
+    /// `priority` value.
+    pub priority: Option<&'a str>,
+    /// `type` value.
+    pub task_type: Option<&'a str>,
+    /// `area` value.
+    pub area: Option<&'a str>,
+    /// `depends` value (comma-separated IDs).
+    pub depends: Option<&'a str>,
+    /// `files` value.
+    pub files: Option<&'a str>,
+    /// `problem` value.
+    pub problem: Option<&'a str>,
+    /// `fix` value.
+    pub fix: Option<&'a str>,
+    /// `accept` value.
+    pub accept: Option<&'a str>,
+    /// Further `key: value` fields; keys that have their own member above are skipped.
+    pub extra: &'a [(String, String)],
+}
+
+impl NewTask<'_> {
+    /// Canonical lines of the new task block (`docs/format.md` §10), starting with a blank line.
+    #[must_use]
+    pub fn lines(&self, id_str: &str, date: &str, agent: &str) -> Vec<String> {
+        use crate::doc::{CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER};
+        let mut lines = vec![
+            String::new(),
+            format!("### {id_str}{CANONICAL_HEADING_SEPARATOR}{}", self.title),
+            "- status: open".to_string(),
+            format!("- owner: {CANONICAL_NOBODY_OWNER}"),
+        ];
+        let combined: Vec<String> = [
+            ("priority", self.priority),
+            ("type", self.task_type),
+            ("area", self.area),
+        ]
+        .into_iter()
+        .filter_map(|(k, v)| v.map(|v| format!("{k}: {v}")))
+        .collect();
+        if !combined.is_empty() {
+            lines.push(format!("- {}", combined.join(" \u{00b7} ")));
+        }
+        for (key, value) in [
+            ("depends", self.depends),
+            ("files", self.files),
+            ("problem", self.problem),
+            ("fix", self.fix),
+            ("accept", self.accept),
+        ] {
+            if let Some(v) = value {
+                lines.push(format!("- {key}: {v}"));
+            }
+        }
+        let known = [
+            "priority", "type", "area", "depends", "files", "problem", "fix", "accept",
+        ];
+        for (k, v) in self.extra {
+            if !known.contains(&k.as_str()) {
+                lines.push(format!("- {k}: {v}"));
+            }
+        }
+        lines.push(format!("- note ({date}, {agent}): added"));
+        lines
+    }
+}

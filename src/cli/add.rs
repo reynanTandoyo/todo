@@ -8,14 +8,11 @@ use clap::Args as ClapArgs;
 use serde::{Deserialize, Serialize};
 
 use crate::cli::{CommandKind, CommandMeta, Context, resolve_opt_text_arg, resolve_text_arg};
-use crate::doc::{
-    CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER, Document, LineEdit, Status, TaskChangeIntent,
-    TaskId, sanitize_trimmed_value,
-};
+use crate::doc::{Document, LineEdit, Status, TaskChangeIntent, TaskId, sanitize_trimmed_value};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
-    DocWritePlan, OpsConfig, TaskJson, build_task_json, edit_doc_with_found_and_state_and_write,
-    matching_section_indices,
+    DocWritePlan, NewTask, OpsConfig, TaskJson, build_task_json, edit_doc_with_found_and_state_and_write,
+    highest_task_number, matching_section_indices,
 };
 use crate::output::Output;
 use crate::state::IdsState;
@@ -172,17 +169,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             let section = &doc.sections[section_idx];
 
             // 3. Allocate next monotonic ID across TODO.md, archive, and ids.json (R-ID-2).
-            let max_doc = doc.tasks.iter().map(|t| t.id.number()).max().unwrap_or(0);
-            let max_arch = archive
-                .iter()
-                .flat_map(|a| a.tasks.iter())
-                .map(|t| t.id.number())
-                .max()
-                .unwrap_or(0);
             let max_state = state.read_ids()?.map_or(0, |s| s.highest_id);
-            let next_num = max_doc
-                .max(max_arch)
-                .max(max_state)
+            let next_num = highest_task_number(doc, archive, max_state)
                 .checked_add(1)
                 .ok_or_else(|| TodoError::new(ErrorCode::WriteFailed, "task ID overflow"))?;
             let new_id = TaskId(next_num);
@@ -196,48 +184,20 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             }
 
             // 4. Build canonical lines for the new task (docs/format.md §10).
-            let mut lines = Vec::new();
-            lines.push(String::new());
-            lines.push(format!(
-                "### {id_str}{CANONICAL_HEADING_SEPARATOR}{clean_title}"
-            ));
-            lines.push("- status: open".to_string());
-            lines.push(format!("- owner: {CANONICAL_NOBODY_OWNER}"));
-
-            let mut combined_parts = Vec::new();
-            if let Some(ref p) = priority_val {
-                combined_parts.push(format!("priority: {p}"));
-            }
-            if let Some(ref t) = type_val {
-                combined_parts.push(format!("type: {t}"));
-            }
-            if let Some(ref a) = area_val {
-                combined_parts.push(format!("area: {a}"));
-            }
-            if !combined_parts.is_empty() {
-                lines.push(format!("- {}", combined_parts.join(" \u{00b7} ")));
-            }
-
-            for (key, val_opt) in [
-                ("depends", &depends_val),
-                ("files", &files_val),
-                ("problem", &problem_val),
-                ("fix", &fix_val),
-                ("accept", &accept_val),
-            ] {
-                if let Some(v) = val_opt {
-                    lines.push(format!("- {key}: {v}"));
-                }
-            }
-
-            for (k, v) in &extra_fields {
-                if !is_known_add_key(k) {
-                    lines.push(format!("- {k}: {v}"));
-                }
-            }
-
             let date = OpsConfig::format_note_date(now);
-            lines.push(format!("- note ({date}, {agent}): added"));
+            let lines = NewTask {
+                title: &clean_title,
+                priority: priority_val.as_deref(),
+                task_type: type_val.as_deref(),
+                area: area_val.as_deref(),
+                depends: depends_val.as_deref(),
+                files: files_val.as_deref(),
+                problem: problem_val.as_deref(),
+                fix: fix_val.as_deref(),
+                accept: accept_val.as_deref(),
+                extra: &extra_fields,
+            }
+            .lines(&id_str, &date, agent);
 
             let edit = LineEdit::insert(section.content_end, lines);
             let intent = TaskChangeIntent::add_one(new_id);
@@ -303,13 +263,6 @@ fn parse_extra_fields(raw: &[String]) -> Result<Vec<(String, String)>> {
         pairs.push((key, sanitize_trimmed_value(&resolved_v)));
     }
     Ok(pairs)
-}
-
-fn is_known_add_key(key: &str) -> bool {
-    matches!(
-        key,
-        "priority" | "type" | "area" | "depends" | "files" | "problem" | "fix" | "accept"
-    )
 }
 
 fn resolve_opt(
@@ -768,15 +721,8 @@ fn run_batch_from(
             }
 
             // 2. Allocate monotonic IDs for the entire batch.
-            let max_doc = doc.tasks.iter().map(|t| t.id.number()).max().unwrap_or(0);
-            let max_arch = archive
-                .iter()
-                .flat_map(|a| a.tasks.iter())
-                .map(|t| t.id.number())
-                .max()
-                .unwrap_or(0);
             let max_state = state.read_ids()?.map_or(0, |s| s.highest_id);
-            let mut next_num = max_doc.max(max_arch).max(max_state);
+            let mut next_num = highest_task_number(doc, archive, max_state);
 
             let mut allocated_ids = Vec::with_capacity(entries.len());
             let mut ref_to_id = HashMap::new();
@@ -822,48 +768,20 @@ fn run_batch_from(
                     Some(resolved_deps.join(", "))
                 };
 
-                let buf = grouped_lines.entry(insert_at).or_default();
-                buf.push(String::new());
-                buf.push(format!(
-                    "### {id_str}{CANONICAL_HEADING_SEPARATOR}{}",
-                    entry.title
-                ));
-                buf.push("- status: open".to_string());
-                buf.push(format!("- owner: {CANONICAL_NOBODY_OWNER}"));
-
-                let mut combined_parts = Vec::new();
-                if let Some(ref p) = entry.priority {
-                    combined_parts.push(format!("priority: {p}"));
+                let lines = NewTask {
+                    title: &entry.title,
+                    priority: entry.priority.as_deref(),
+                    task_type: entry.task_type.as_deref(),
+                    area: entry.area.as_deref(),
+                    depends: depends_val.as_deref(),
+                    files: entry.files.as_deref(),
+                    problem: entry.problem.as_deref(),
+                    fix: entry.fix.as_deref(),
+                    accept: entry.accept.as_deref(),
+                    extra: &entry.extra,
                 }
-                if let Some(ref t) = entry.task_type {
-                    combined_parts.push(format!("type: {t}"));
-                }
-                if let Some(ref a) = entry.area {
-                    combined_parts.push(format!("area: {a}"));
-                }
-                if !combined_parts.is_empty() {
-                    buf.push(format!("- {}", combined_parts.join(" \u{00b7} ")));
-                }
-
-                for (key, val_opt) in [
-                    ("depends", &depends_val),
-                    ("files", &entry.files),
-                    ("problem", &entry.problem),
-                    ("fix", &entry.fix),
-                    ("accept", &entry.accept),
-                ] {
-                    if let Some(v) = val_opt {
-                        buf.push(format!("- {key}: {v}"));
-                    }
-                }
-
-                for (k, v) in &entry.extra {
-                    if !is_known_add_key(k) {
-                        buf.push(format!("- {k}: {v}"));
-                    }
-                }
-
-                buf.push(format!("- note ({date}, {agent}): added"));
+                .lines(id_str, &date, agent);
+                grouped_lines.entry(insert_at).or_default().extend(lines);
 
                 added_ids.insert(*new_id);
                 ordered_ids.push((*new_id, id_str.clone()));

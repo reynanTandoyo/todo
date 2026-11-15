@@ -42,3 +42,17 @@ Items are ordered by estimated lines saved.
 2. Write-pipeline variants (item 4) and the read commands (item 6).
 3. Lock and history (item 5), parser and config lookup (item 7).
 4. Test suite helpers (item 1).
+
+## Status after chunk 1 (this run)
+- Done: `ops::task_ops` (`TaskOp`, `NewTask`, `highest_task_number`) is the one implementation of
+  claim, release, done, drop, block, unblock, reopen, answer, note, set and the task block of `add`
+  (single `add`, `add --from` and `apply`). `cli::run_task_op`, `edit_one_task` and `report_task_*`
+  replace the repeated scaffolding of those commands.
+- Behaviour deltas in `apply` caused by sharing the single-command code (no test covered them):
+  `unblock` to `claimed` now sets the `claimed` timestamp like `todo unblock`; extra `fields` named
+  like a built-in key (`priority`, `type`, ...) are no longer written twice in `add`.
+- `todo answer` writes `answered — <text>` while `apply` writes `answer — <text>` (and
+  `docs/format.md` §9 says `answer —`). Both kept via `TaskOp::Answer { verb }`; decide and remove
+  the parameter.
+- Not shared yet: `move` (single and `apply` differ in blank-line handling), the read commands and
+  the remaining ~25 commands (chunk 2).
