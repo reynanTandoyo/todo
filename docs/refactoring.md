@@ -103,3 +103,11 @@ Items are ordered by estimated lines saved.
 - Remaining for the next chunks: the rest of step 1 (listed above), item 4 (write pipeline
   variants), item 5 (lock and history), item 7 (`FindOptions` construction), and the `loaded`/`found`
   discovery split described above.
+
+## Outcome (stopped by the owner after chunk 3)
+
+Measured with jscpd (minimum 6 lines / 60 tokens) after chunk 3: 48 exact clones, 575 duplicated
+lines, 2.3% of src/ and tests/. The size comes from the feature set (35 commands with help,
+validation and text and JSON output, about 180 lines each), the safety machinery and the tests, not
+from copy-paste. Chunks 1-3 removed about 520 lines (src 16,346 -> 16,152, tests 7,852 -> 7,526
+non-blank) with identical behaviour; the remaining items above were not worth their cost.
