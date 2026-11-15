@@ -41,3 +41,7 @@ test-hooks = []
 unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
+
+[profile.dev]
+# Line tables only: backtraces keep file and line, debug files stay small (the build cache reached 11 GB).
+debug = "line-tables-only"

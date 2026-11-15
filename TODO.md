@@ -581,6 +581,15 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, coordinator): added
 - note (2026-11-15, w8-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass; perf test list 41 ms, show 36 ms, note 72 ms, add 73 ms (5,000 tasks); release todo.exe 4.2 MB -> 3.06 MB (clap/toml/sha2 default features off, panic=abort; help, suggestions and error context kept)
 
+### T-083 · Refactor: remove duplication without changing behaviour
+- status: open
+- owner: —
+- priority: P1 · type: refactor · area: core
+- problem: about 16,300 lines in src/ and 7,900 in tests/, with the same logic repeated across commands, batch paths and pipeline variants
+- accept: same features, output, exit codes and error codes; all tests pass unchanged; clear shared abstractions instead of repeated code; src/ and tests/ noticeably smaller; docs/refactoring.md records what was consolidated
+- reqs: NFR-6, NFR-8
+- note (2026-11-15, coordinator): added
+
 ## 7. Ideas, not planned
 
 ### T-070 · MCP server
