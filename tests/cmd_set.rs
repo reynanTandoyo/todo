@@ -1,6 +1,6 @@
 //! CLI integration tests for `todo set` (T-027; R-WRITE-8, R-CLAIM-3, TEST-4).
 
-mod lock_support;
+mod common;
 
 use std::fs;
 
@@ -40,7 +40,7 @@ fn set_edits_all_options_combined_priority_field_and_unset() {
     let now = "2026-11-15T14:00:00+01:00";
 
     // Update combined priority line in place (--priority + --area, keeping --type), plus all other options.
-    let res1 = lock_support::run_todo(
+    let res1 = common::run_todo(
         &home,
         &work,
         &[
@@ -101,7 +101,7 @@ fn set_edits_all_options_combined_priority_field_and_unset() {
     assert!(!after1.contains("- fix: old fix"));
 
     // Update --type and --unset custom and --unset area on T-001.
-    let res2 = lock_support::run_todo(
+    let res2 = common::run_todo(
         &home,
         &work,
         &[
@@ -123,7 +123,7 @@ fn set_edits_all_options_combined_priority_field_and_unset() {
 
     // Ownership check on T-002 (claimed by alice): bob without --force -> NOT_OWNER; with --force -> forced note.
     let before_refusal = fs::read(&todo_file).unwrap();
-    let no_force = lock_support::run_todo(
+    let no_force = common::run_todo(
         &home,
         &work,
         &[
@@ -143,7 +143,7 @@ fn set_edits_all_options_combined_priority_field_and_unset() {
     assert_eq!(j_nf["error"]["code"], "NOT_OWNER");
     assert_eq!(fs::read(&todo_file).unwrap(), before_refusal);
 
-    let forced = lock_support::run_todo(
+    let forced = common::run_todo(
         &home,
         &work,
         &[
@@ -177,7 +177,7 @@ fn set_refuses_status_owner_claimed_and_invalid_args() {
     let before = fs::read(&todo_file).unwrap();
 
     for key in ["status", "owner", "claimed", "STATUS", "Owner"] {
-        let f = lock_support::run_todo(
+        let f = common::run_todo(
             &home,
             &work,
             &[
@@ -196,7 +196,7 @@ fn set_refuses_status_owner_claimed_and_invalid_args() {
         let j: serde_json::Value = serde_json::from_slice(&f.stdout).unwrap();
         assert_eq!(j["error"]["code"], "BAD_VALUE");
 
-        let u = lock_support::run_todo(
+        let u = common::run_todo(
             &home,
             &work,
             &["--json", "set", "T-001", "--agent", "bob", "--unset", key],
@@ -209,8 +209,7 @@ fn set_refuses_status_owner_claimed_and_invalid_args() {
     }
 
     // No fields specified -> exit 2 (Usage).
-    let no_opts =
-        lock_support::run_todo(&home, &work, &["set", "T-001", "--agent", "bob"], &[]).unwrap();
+    let no_opts = common::run_todo(&home, &work, &["set", "T-001", "--agent", "bob"], &[]).unwrap();
     assert_eq!(no_opts.status.code(), Some(2));
 
     assert_eq!(fs::read(&todo_file).unwrap(), before);

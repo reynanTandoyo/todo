@@ -1,6 +1,6 @@
 //! Integration tests for `todo list` (T-020; R-READ-1, R-READ-4).
 
-mod lock_support;
+mod common;
 
 use std::fs;
 use std::path::Path;
@@ -21,7 +21,7 @@ fn list_hides_done_and_dropped_by_default_and_prints_count() {
     fs::create_dir_all(&work).unwrap();
     copy_clean_fixture(&work).unwrap();
 
-    let out = lock_support::run_todo(
+    let out = common::run_todo(
         &home,
         &work,
         &["list"],
@@ -52,7 +52,7 @@ fn list_status_filter_supports_comma_list_all_and_rejects_invalid() {
     fs::create_dir_all(&work).unwrap();
     copy_clean_fixture(&work).unwrap();
 
-    let out_done_drop = lock_support::run_todo(
+    let out_done_drop = common::run_todo(
         &home,
         &work,
         &["--json", "list", "--status", "done,dropped"],
@@ -71,13 +71,13 @@ fn list_status_filter_supports_comma_list_all_and_rejects_invalid() {
     assert_eq!(ids, vec!["T-004", "T-005"]);
 
     let out_all =
-        lock_support::run_todo(&home, &work, &["--json", "list", "--status", "all"], &[]).unwrap();
+        common::run_todo(&home, &work, &["--json", "list", "--status", "all"], &[]).unwrap();
     assert!(out_all.status.success());
     let parsed_all: serde_json::Value = serde_json::from_slice(&out_all.stdout).unwrap();
     assert_eq!(parsed_all["data"]["count"], 6);
 
-    let bad = lock_support::run_todo(&home, &work, &["--json", "list", "--status", "bogus"], &[])
-        .unwrap();
+    let bad =
+        common::run_todo(&home, &work, &["--json", "list", "--status", "bogus"], &[]).unwrap();
     assert_eq!(bad.status.code(), Some(1));
     let bad_json: serde_json::Value = serde_json::from_slice(&bad.stdout).unwrap();
     assert_eq!(bad_json["error"]["code"], "BAD_VALUE");
@@ -93,21 +93,20 @@ fn list_attribute_and_where_filters_work() {
     copy_clean_fixture(&work).unwrap();
 
     // --priority
-    let p0 =
-        lock_support::run_todo(&home, &work, &["--json", "list", "--priority", "p0"], &[]).unwrap();
+    let p0 = common::run_todo(&home, &work, &["--json", "list", "--priority", "p0"], &[]).unwrap();
     let p0_json: serde_json::Value = serde_json::from_slice(&p0.stdout).unwrap();
     assert_eq!(p0_json["data"]["count"], 1);
     assert_eq!(p0_json["data"]["tasks"][0]["id"], "T-001");
 
     // --section (ignores leading number `1.` and `2)`)
-    let sec = lock_support::run_todo(&home, &work, &["--json", "list", "--section", "later"], &[])
-        .unwrap();
+    let sec =
+        common::run_todo(&home, &work, &["--json", "list", "--section", "later"], &[]).unwrap();
     let sec_json: serde_json::Value = serde_json::from_slice(&sec.stdout).unwrap();
     assert_eq!(sec_json["data"]["count"], 1);
     assert_eq!(sec_json["data"]["tasks"][0]["id"], "T-003");
 
     // --type
-    let ty = lock_support::run_todo(
+    let ty = common::run_todo(
         &home,
         &work,
         &["--json", "list", "--type", "MAINTENANCE"],
@@ -119,7 +118,7 @@ fn list_attribute_and_where_filters_work() {
     assert_eq!(ty_json["data"]["tasks"][0]["id"], "T-002");
 
     // --area
-    let area = lock_support::run_todo(
+    let area = common::run_todo(
         &home,
         &work,
         &["--json", "list", "--area", "greenhouse"],
@@ -131,7 +130,7 @@ fn list_attribute_and_where_filters_work() {
     assert_eq!(area_json["data"]["tasks"][0]["id"], "T-001");
 
     // --owner
-    let owner = lock_support::run_todo(
+    let owner = common::run_todo(
         &home,
         &work,
         &["--json", "list", "--owner", "GARDENER-BOT"],
@@ -144,12 +143,12 @@ fn list_attribute_and_where_filters_work() {
 
     // --owner none (nobody)
     let unowned =
-        lock_support::run_todo(&home, &work, &["--json", "list", "--owner", "none"], &[]).unwrap();
+        common::run_todo(&home, &work, &["--json", "list", "--owner", "none"], &[]).unwrap();
     let unowned_json: serde_json::Value = serde_json::from_slice(&unowned.stdout).unwrap();
     assert_eq!(unowned_json["data"]["count"], 3);
 
     // --where repeatable, unknown field, case-insensitive
-    let where_out = lock_support::run_todo(
+    let where_out = common::run_todo(
         &home,
         &work,
         &[
@@ -168,7 +167,7 @@ fn list_attribute_and_where_filters_work() {
     assert_eq!(where_json["data"]["tasks"][0]["id"], "T-001");
 
     // invalid --where exits 2
-    let bad_where = lock_support::run_todo(
+    let bad_where = common::run_todo(
         &home,
         &work,
         &["--json", "list", "--where", "noequals"],
@@ -203,11 +202,10 @@ fn list_mine_stale_and_ready_filters_work() {
     .unwrap();
 
     // --mine requires agent
-    let no_agent =
-        lock_support::run_todo(&home, &work, &["--json", "list", "--mine"], &[]).unwrap();
+    let no_agent = common::run_todo(&home, &work, &["--json", "list", "--mine"], &[]).unwrap();
     assert_eq!(no_agent.status.code(), Some(2));
 
-    let mine = lock_support::run_todo(
+    let mine = common::run_todo(
         &home,
         &work,
         &["--json", "list", "--mine", "--agent", "gardener-bot"],
@@ -220,7 +218,7 @@ fn list_mine_stale_and_ready_filters_work() {
     assert_eq!(mine_json["data"]["tasks"][0]["id"], "T-001");
 
     // At 15:00 same day, T-001 is NOT stale; ready tasks are T-007 and T-008.
-    let ready_fresh = lock_support::run_todo(
+    let ready_fresh = common::run_todo(
         &home,
         &work,
         &["--json", "list", "--ready"],
@@ -236,7 +234,7 @@ fn list_mine_stale_and_ready_filters_work() {
         .collect();
     assert_eq!(ready_ids, vec!["T-007", "T-008"]);
 
-    let stale_fresh = lock_support::run_todo(
+    let stale_fresh = common::run_todo(
         &home,
         &work,
         &["--json", "list", "--stale"],
@@ -247,7 +245,7 @@ fn list_mine_stale_and_ready_filters_work() {
     assert_eq!(stale_fresh_json["data"]["count"], 0);
 
     // After 25 hours, T-001 IS stale and therefore also appears in --ready.
-    let stale_old = lock_support::run_todo(
+    let stale_old = common::run_todo(
         &home,
         &work,
         &["--json", "list", "--stale"],
@@ -258,7 +256,7 @@ fn list_mine_stale_and_ready_filters_work() {
     assert_eq!(stale_old_json["data"]["count"], 1);
     assert_eq!(stale_old_json["data"]["tasks"][0]["id"], "T-001");
 
-    let ready_old = lock_support::run_todo(
+    let ready_old = common::run_todo(
         &home,
         &work,
         &["--json", "list", "--ready"],
@@ -284,8 +282,7 @@ fn list_archive_reads_archive_when_present_and_empty_when_absent() {
     fs::create_dir_all(&work).unwrap();
     copy_clean_fixture(&work).unwrap();
 
-    let absent =
-        lock_support::run_todo(&home, &work, &["--json", "list", "--archive"], &[]).unwrap();
+    let absent = common::run_todo(&home, &work, &["--json", "list", "--archive"], &[]).unwrap();
     assert!(absent.status.success());
     let absent_json: serde_json::Value = serde_json::from_slice(&absent.stdout).unwrap();
     assert_eq!(absent_json["data"]["archive"], true);
@@ -299,8 +296,7 @@ fn list_archive_reads_archive_when_present_and_empty_when_absent() {
     )
     .unwrap();
 
-    let present =
-        lock_support::run_todo(&home, &work, &["--json", "list", "--archive"], &[]).unwrap();
+    let present = common::run_todo(&home, &work, &["--json", "list", "--archive"], &[]).unwrap();
     assert!(present.status.success());
     let present_json: serde_json::Value = serde_json::from_slice(&present.stdout).unwrap();
     assert_eq!(present_json["data"]["archive"], true);
@@ -325,7 +321,7 @@ fn list_shortens_titles_unless_wide_and_warns_on_unsafe_files() {
     )
     .unwrap();
 
-    let narrow = lock_support::run_todo(&home, &work, &["list"], &[("COLUMNS", "50")]).unwrap();
+    let narrow = common::run_todo(&home, &work, &["list"], &[("COLUMNS", "50")]).unwrap();
     assert!(narrow.status.success());
     let narrow_out = String::from_utf8_lossy(&narrow.stdout);
     let narrow_err = String::from_utf8_lossy(&narrow.stderr);
@@ -334,8 +330,7 @@ fn list_shortens_titles_unless_wide_and_warns_on_unsafe_files() {
     assert!(first_line.chars().count() <= 50, "line: {first_line}");
     assert!(first_line.ends_with('…'), "line: {first_line}");
 
-    let wide =
-        lock_support::run_todo(&home, &work, &["list", "--wide"], &[("COLUMNS", "50")]).unwrap();
+    let wide = common::run_todo(&home, &work, &["list", "--wide"], &[("COLUMNS", "50")]).unwrap();
     assert!(wide.status.success());
     let wide_out = String::from_utf8_lossy(&wide.stdout);
     assert!(wide_out.contains("when terminal width is narrow"));
@@ -351,7 +346,7 @@ fn list_json_matches_snapshot() {
     fs::create_dir_all(&work).unwrap();
     copy_clean_fixture(&work).unwrap();
 
-    let out = lock_support::run_todo(
+    let out = common::run_todo(
         &home,
         &work,
         &["--json", "list"],

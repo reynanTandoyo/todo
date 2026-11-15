@@ -1,6 +1,6 @@
 //! CLI integration tests for `todo done` (T-024; R-WRITE-4, NFR-5, TEST-4).
 
-mod lock_support;
+mod common;
 
 use std::fs;
 use std::path::Path;
@@ -77,7 +77,7 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
     let now = "2026-11-15T14:30:00+01:00";
 
     // 1. Open task -> done with --note; prints accept line.
-    let out1 = lock_support::run_todo(
+    let out1 = common::run_todo(
         &home,
         &work,
         &["done", "T-001", "--agent", "bob", "--note", "implemented"],
@@ -107,7 +107,7 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
 
     // 2. Claimed by alice: bob without --force is refused (NOT_OWNER, exit 1), file byte-identical.
     let before_refusal = fs::read(&todo_file).unwrap();
-    let out_not_owner = lock_support::run_todo(
+    let out_not_owner = common::run_todo(
         &home,
         &work,
         &["--json", "done", "T-002", "--agent", "bob"],
@@ -120,7 +120,7 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
     assert_eq!(fs::read(&todo_file).unwrap(), before_refusal);
 
     // 3. Claimed by alice: alice completes it without --note -> `done`, claimed removed.
-    let out2 = lock_support::run_todo(
+    let out2 = common::run_todo(
         &home,
         &work,
         &["done", "2", "--agent", "alice"],
@@ -143,7 +143,7 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
 
     // 4. Blocked task: refused without --force (BAD_TRANSITION), allowed with --force + forced note.
     let before_blocked = fs::read(&todo_file).unwrap();
-    let out_blocked = lock_support::run_todo(
+    let out_blocked = common::run_todo(
         &home,
         &work,
         &["--json", "done", "T-003", "--agent", "alice"],
@@ -155,7 +155,7 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
     assert_eq!(j_bl["error"]["code"], "BAD_TRANSITION");
     assert_eq!(fs::read(&todo_file).unwrap(), before_blocked);
 
-    let out_force = lock_support::run_todo(
+    let out_force = common::run_todo(
         &home,
         &work,
         &["--json", "done", "T-003", "--agent", "bob", "--force"],
@@ -173,7 +173,7 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
 
     // 5. Already done -> BAD_TRANSITION even with --force, file byte-identical.
     let before_done = fs::read(&todo_file).unwrap();
-    let out_done = lock_support::run_todo(
+    let out_done = common::run_todo(
         &home,
         &work,
         &["--json", "done", "T-004", "--agent", "alice", "--force"],
@@ -204,7 +204,7 @@ fn done_commit_resolves_head_rejects_unknown_and_accepts_when_git_missing() {
 
     // Unknown commit is refused when git is available, leaving file byte-identical.
     let before_bad = fs::read(&todo_file).unwrap();
-    let bad_commit = lock_support::run_todo(
+    let bad_commit = common::run_todo(
         &home,
         &work,
         &[
@@ -225,7 +225,7 @@ fn done_commit_resolves_head_rejects_unknown_and_accepts_when_git_missing() {
     assert_eq!(fs::read(&todo_file).unwrap(), before_bad);
 
     // HEAD is resolved to the current commit hash.
-    let good_head = lock_support::run_todo(
+    let good_head = common::run_todo(
         &home,
         &work,
         &[
@@ -246,7 +246,7 @@ fn done_commit_resolves_head_rejects_unknown_and_accepts_when_git_missing() {
     );
 
     // When git is not on PATH, an unchecked commit hash is accepted.
-    let without_git = lock_support::run_todo(
+    let without_git = common::run_todo(
         &home,
         &work,
         &["done", "T-002", "--agent", "alice", "--commit", "cafebabe"],
@@ -293,7 +293,7 @@ fn done_lists_tasks_that_became_ready() {
     .unwrap();
 
     let now = "2026-11-15T10:00:00+01:00";
-    let res = lock_support::run_todo(
+    let res = common::run_todo(
         &home,
         &work,
         &["done", "T-001", "--agent", "alice"],
@@ -308,7 +308,7 @@ fn done_lists_tasks_that_became_ready() {
     );
     assert!(!stdout.contains("T-004"), "{stdout}");
 
-    let res2 = lock_support::run_todo(
+    let res2 = common::run_todo(
         &home,
         &work,
         &["--json", "done", "T-002", "--agent", "alice"],

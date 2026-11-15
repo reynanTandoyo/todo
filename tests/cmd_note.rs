@@ -1,6 +1,6 @@
 //! CLI integration tests for `todo note` (T-026; R-WRITE-7, R-IO-6, TEST-4).
 
-mod lock_support;
+mod common;
 
 use std::fs;
 
@@ -46,7 +46,7 @@ fn note_appends_after_last_line_on_any_status_by_any_agent() {
     let now = "2026-11-16T00:30:00+01:00";
 
     // Positional text on claimed task by another agent (bob) without --force.
-    let n1 = lock_support::run_todo(
+    let n1 = common::run_todo(
         &home,
         &work,
         &["note", "T-002", "saw edge case", "--agent", "bob"],
@@ -66,7 +66,7 @@ fn note_appends_after_last_line_on_any_status_by_any_agent() {
         ("T-003", "post-release check"),
         ("T-004", "confirmed duplicate"),
     ] {
-        let res = lock_support::run_todo(
+        let res = common::run_todo(
             &home,
             &work,
             &["--json", "note", id, "--text", msg, "--agent", "reviewer"],
@@ -103,9 +103,9 @@ fn note_appends_after_last_line_on_any_status_by_any_agent() {
     // Empty / missing note text is refused with exit 2 and leaves file untouched.
     let before_err = fs::read(&todo_file).unwrap();
     let missing =
-        lock_support::run_todo(&home, &work, &["note", "T-001", "--agent", "bob"], &[]).unwrap();
+        common::run_todo(&home, &work, &["note", "T-001", "--agent", "bob"], &[]).unwrap();
     assert_eq!(missing.status.code(), Some(2));
-    let empty = lock_support::run_todo(
+    let empty = common::run_todo(
         &home,
         &work,
         &["note", "T-001", "   ", "--agent", "bob"],

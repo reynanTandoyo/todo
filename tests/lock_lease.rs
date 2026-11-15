@@ -1,6 +1,6 @@
 //! Tests for manual leases, lock/unlock/status CLI commands, and git-free worktree execution (T-015, T-011; R-LOCK-5, R-LOCK-6, TEST-5, TEST-6, TEST-7).
 
-mod lock_support;
+mod common;
 
 use std::path::Path;
 use std::process::Command;
@@ -48,7 +48,7 @@ fn status_works_before_any_state_exists_without_creating_dot_todo() {
     let tmp = TempDir::new().unwrap();
     let (home, work, _todo_file) = setup_proj(&tmp).unwrap();
 
-    let out = lock_support::run_todo(&home, &work, &["--json", "status"], &[]).unwrap();
+    let out = common::run_todo(&home, &work, &["--json", "status"], &[]).unwrap();
     assert!(out.status.success());
     let parsed: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(parsed["schema"], "todo.status.v1");
@@ -57,7 +57,7 @@ fn status_works_before_any_state_exists_without_creating_dot_todo() {
     assert!(parsed["data"]["lease"].is_null());
     assert!(!work.join(".todo").exists());
 
-    let text_out = lock_support::run_todo(&home, &work, &["status"], &[]).unwrap();
+    let text_out = common::run_todo(&home, &work, &["status"], &[]).unwrap();
     assert!(text_out.status.success());
     let stdout = String::from_utf8_lossy(&text_out.stdout);
     assert!(stdout.contains("Write lock: free"));
@@ -69,12 +69,12 @@ fn lock_requires_agent_and_valid_minutes() {
     let tmp = TempDir::new().unwrap();
     let (home, work, _todo_file) = setup_proj(&tmp).unwrap();
 
-    let no_agent = lock_support::run_todo(&home, &work, &["--json", "lock"], &[]).unwrap();
+    let no_agent = common::run_todo(&home, &work, &["--json", "lock"], &[]).unwrap();
     assert_eq!(no_agent.status.code(), Some(2));
     let parsed: serde_json::Value = serde_json::from_slice(&no_agent.stdout).unwrap();
     assert_eq!(parsed["error"]["code"], "NO_AGENT");
 
-    let zero_min = lock_support::run_todo(
+    let zero_min = common::run_todo(
         &home,
         &work,
         &["--json", "lock", "--agent", "alice", "--minutes", "0"],
@@ -85,7 +85,7 @@ fn lock_requires_agent_and_valid_minutes() {
     let parsed: serde_json::Value = serde_json::from_slice(&zero_min.stdout).unwrap();
     assert_eq!(parsed["error"]["code"], "BAD_VALUE");
 
-    let too_long = lock_support::run_todo(
+    let too_long = common::run_todo(
         &home,
         &work,
         &["--json", "lock", "--agent", "alice", "--minutes", "61"],
@@ -105,7 +105,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     let t0 = "2026-11-15T14:00:00+01:00";
 
     // Acquire 10-minute default lease as alice at t0.
-    let lock_out = lock_support::run_todo(
+    let lock_out = common::run_todo(
         &home,
         &work,
         &["--json", "lock", "--agent", "alice"],
@@ -120,7 +120,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     let expires_at = lock_json["data"]["expires_at"].as_str().unwrap().to_owned();
 
     // `todo status` shows the active lease (both JSON and text).
-    let status_out = lock_support::run_todo(
+    let status_out = common::run_todo(
         &home,
         &work,
         &["--json", "status"],
@@ -132,7 +132,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     assert_eq!(status_json["data"]["lease"]["agent"], "alice");
     assert_eq!(status_json["data"]["lease"]["remaining_seconds"], 480);
 
-    let status_text = lock_support::run_todo(
+    let status_text = common::run_todo(
         &home,
         &work,
         &["status"],
@@ -144,7 +144,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     assert!(st.contains("Lease: held by alice"), "status:\n{st}");
 
     // Holder (alice, case-insensitive) can write normally.
-    let holder_write = lock_support::run_todo(
+    let holder_write = common::run_todo(
         &home,
         &work,
         &["__test-append", "--agent", "ALICE", "--text", "by-alice"],
@@ -159,7 +159,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     );
 
     // Another agent (bob) waits and exits 3 with LEASE_HELD naming alice and the expiry time.
-    let bob_write = lock_support::run_todo(
+    let bob_write = common::run_todo(
         &home,
         &work,
         &[
@@ -194,7 +194,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     );
 
     // After expiry (t0 + 11 minutes), status shows no lease and bob can write.
-    let expired_status = lock_support::run_todo(
+    let expired_status = common::run_todo(
         &home,
         &work,
         &["--json", "status"],
@@ -204,7 +204,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
     let exp_json: serde_json::Value = serde_json::from_slice(&expired_status.stdout).unwrap();
     assert!(exp_json["data"]["lease"].is_null());
 
-    let bob_after_expiry = lock_support::run_todo(
+    let bob_after_expiry = common::run_todo(
         &home,
         &work,
         &[
@@ -232,7 +232,7 @@ fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
     let (home, work, _todo_file) = setup_proj(&tmp).unwrap();
     let t0 = "2026-11-15T14:00:00+01:00";
 
-    let lock_out = lock_support::run_todo(
+    let lock_out = common::run_todo(
         &home,
         &work,
         &["lock", "--agent", "alice", "--minutes", "30"],
@@ -242,7 +242,7 @@ fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
     assert!(lock_out.status.success());
 
     // bob without --force is refused (exit 1, NOT_OWNER).
-    let deny = lock_support::run_todo(
+    let deny = common::run_todo(
         &home,
         &work,
         &["--json", "unlock", "--agent", "bob"],
@@ -255,7 +255,7 @@ fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
     assert_eq!(deny_json["error"]["owner"], "alice");
 
     // bob with --force ends alice's lease and names alice.
-    let forced = lock_support::run_todo(
+    let forced = common::run_todo(
         &home,
         &work,
         &["--json", "unlock", "--agent", "bob", "--force"],
@@ -271,7 +271,7 @@ fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
 
     // Same in text mode: verify message names previous holder.
     assert!(
-        lock_support::run_todo(
+        common::run_todo(
             &home,
             &work,
             &["lock", "--agent", "carol"],
@@ -281,7 +281,7 @@ fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
         .status
         .success()
     );
-    let forced_text = lock_support::run_todo(
+    let forced_text = common::run_todo(
         &home,
         &work,
         &["unlock", "--agent", "bob", "--force"],
@@ -293,7 +293,7 @@ fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
 
     // Owner unlocking own lease works without --force.
     assert!(
-        lock_support::run_todo(
+        common::run_todo(
             &home,
             &work,
             &["lock", "--agent", "dave"],
@@ -303,7 +303,7 @@ fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
         .status
         .success()
     );
-    let own_unlock = lock_support::run_todo(
+    let own_unlock = common::run_todo(
         &home,
         &work,
         &["unlock", "--agent", "dave"],
@@ -322,7 +322,7 @@ fn status_shows_active_write_lock_holder_without_waiting() {
     let ready = tmp.path().join("status.ready");
     let ready_str = ready.to_string_lossy().into_owned();
 
-    let mut holder = lock_support::spawn_todo(
+    let mut holder = common::spawn_todo(
         &home,
         &work,
         &[
@@ -341,10 +341,10 @@ fn status_shows_active_write_lock_holder_without_waiting() {
     .unwrap();
     let holder_pid = holder.id();
 
-    lock_support::wait_for_file(&ready, Duration::from_secs(5)).unwrap();
+    common::wait_for_file(&ready, Duration::from_secs(5)).unwrap();
 
     let start = std::time::Instant::now();
-    let status_out = lock_support::run_todo(&home, &work, &["--json", "status"], &[]).unwrap();
+    let status_out = common::run_todo(&home, &work, &["--json", "status"], &[]).unwrap();
     let elapsed = start.elapsed();
 
     assert!(status_out.status.success());
@@ -369,7 +369,7 @@ fn cli_changed_during_write_exits_3_and_leaves_no_tmp() {
     let ready = tmp.path().join("before-rename.ready");
     let ready_str = ready.to_string_lossy().into_owned();
 
-    let writer = lock_support::spawn_todo(
+    let writer = common::spawn_todo(
         &home,
         &work,
         &[
@@ -387,7 +387,7 @@ fn cli_changed_during_write_exits_3_and_leaves_no_tmp() {
     )
     .unwrap();
 
-    lock_support::wait_for_file(&ready, Duration::from_secs(5)).unwrap();
+    common::wait_for_file(&ready, Duration::from_secs(5)).unwrap();
 
     // Modify TODO.md externally right before rename.
     let external = "<!-- TEST FIXTURE: invented data, not a real task list -->\n# External\n";
@@ -432,8 +432,7 @@ fn linked_worktree_status_works_with_git_removed_from_path() {
     .unwrap();
 
     // Run `todo status --json` with PATH cleared so git cannot be found.
-    let out =
-        lock_support::run_todo(&home, &wt_dir, &["--json", "status"], &[("PATH", "")]).unwrap();
+    let out = common::run_todo(&home, &wt_dir, &["--json", "status"], &[("PATH", "")]).unwrap();
     assert!(
         out.status.success(),
         "status failed without git on PATH: {}",

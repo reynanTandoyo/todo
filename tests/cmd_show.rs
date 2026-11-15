@@ -1,6 +1,6 @@
 //! Integration tests for `todo show` (T-021; R-READ-2, R-DEP-2).
 
-mod lock_support;
+mod common;
 
 use std::fs;
 use std::path::Path;
@@ -27,7 +27,7 @@ fn show_text_output_equals_task_lines_in_file_and_accepts_flexible_ids() {
     let expected = format!("{}\n", file_lines[8..24].join("\n"));
 
     for query in ["T-001", "t1", "1", "T-01"] {
-        let out = lock_support::run_todo(&home, &work, &["show", query], &[]).unwrap();
+        let out = common::run_todo(&home, &work, &["show", query], &[]).unwrap();
         assert!(
             out.status.success(),
             "show {query} failed: {}",
@@ -49,7 +49,7 @@ fn show_json_includes_unknown_fields_notes_lines_dependencies_and_dependents() {
     copy_clean_fixture(&work).unwrap();
 
     // T-001 has unknown field `custom_tag`, 2 notes, lines 9..24, and T-002 depends on it.
-    let out1 = lock_support::run_todo(
+    let out1 = common::run_todo(
         &home,
         &work,
         &["--json", "show", "T-001"],
@@ -76,7 +76,7 @@ fn show_json_includes_unknown_fields_notes_lines_dependencies_and_dependents() {
     assert_eq!(j1["data"]["dependents"][0]["status"], "open");
 
     // T-002 depends on T-001 (which is claimed -> not satisfied).
-    let out2 = lock_support::run_todo(
+    let out2 = common::run_todo(
         &home,
         &work,
         &["--json", "show", "T-002"],
@@ -113,16 +113,14 @@ fn show_finds_archived_tasks_and_archived_dependencies() {
     )
     .unwrap();
 
-    let arch_show =
-        lock_support::run_todo(&home, &work, &["--json", "show", "T-001"], &[]).unwrap();
+    let arch_show = common::run_todo(&home, &work, &["--json", "show", "T-001"], &[]).unwrap();
     assert!(arch_show.status.success());
     let aj: serde_json::Value = serde_json::from_slice(&arch_show.stdout).unwrap();
     assert_eq!(aj["data"]["archived"], true);
     assert_eq!(aj["data"]["status"], "done");
     assert_eq!(aj["data"]["dependents"][0]["id"], "T-002");
 
-    let active_show =
-        lock_support::run_todo(&home, &work, &["--json", "show", "T-002"], &[]).unwrap();
+    let active_show = common::run_todo(&home, &work, &["--json", "show", "T-002"], &[]).unwrap();
     assert!(active_show.status.success());
     let tj: serde_json::Value = serde_json::from_slice(&active_show.stdout).unwrap();
     assert_eq!(tj["data"]["dependencies"][0]["id"], "T-001");
@@ -143,7 +141,7 @@ fn show_missing_task_returns_not_found_and_unsafe_file_still_warns() {
     fs::create_dir_all(&work).unwrap();
     copy_clean_fixture(&work).unwrap();
 
-    let missing = lock_support::run_todo(&home, &work, &["--json", "show", "T-999"], &[]).unwrap();
+    let missing = common::run_todo(&home, &work, &["--json", "show", "T-999"], &[]).unwrap();
     assert_eq!(missing.status.code(), Some(1));
     let mj: serde_json::Value = serde_json::from_slice(&missing.stdout).unwrap();
     assert_eq!(mj["error"]["code"], "NOT_FOUND");
@@ -156,7 +154,7 @@ fn show_missing_task_returns_not_found_and_unsafe_file_still_warns() {
          ### T-001 · Readable despite marker\n- status: open\n\n<<<<<<< HEAD\n",
     )
     .unwrap();
-    let unsafe_show = lock_support::run_todo(&home, &work, &["show", "T-001"], &[]).unwrap();
+    let unsafe_show = common::run_todo(&home, &work, &["show", "T-001"], &[]).unwrap();
     assert!(unsafe_show.status.success());
     assert!(String::from_utf8_lossy(&unsafe_show.stdout).contains("Readable despite marker"));
     assert!(String::from_utf8_lossy(&unsafe_show.stderr).contains("warning: TODO.md:"));

@@ -1,6 +1,6 @@
 //! CLI integration tests for `todo next` including `--claim` (T-023; R-READ-3, R-DEP-1, TEST-5).
 
-mod lock_support;
+mod common;
 
 use std::collections::HashSet;
 use std::fs;
@@ -80,8 +80,8 @@ fn next_respects_priority_dependencies_questions_stale_and_filters() {
     let now = "2026-11-15T14:00:00+01:00";
 
     // Unfiltered: stale P0 T-008 wins over ready P1s, never T-002/T-003/T-004/T-005.
-    let top = lock_support::run_todo(&home, &work, &["--json", "next"], &[("TODO_TEST_NOW", now)])
-        .unwrap();
+    let top =
+        common::run_todo(&home, &work, &["--json", "next"], &[("TODO_TEST_NOW", now)]).unwrap();
     assert!(top.status.success());
     let j: serde_json::Value = serde_json::from_slice(&top.stdout).unwrap();
     assert_eq!(j["data"]["task"]["id"], "T-008");
@@ -89,7 +89,7 @@ fn next_respects_priority_dependencies_questions_stale_and_filters() {
     assert_eq!(j["data"]["already_claimed"], false);
 
     // Filter `--area api`: skips T-008 and T-007, picks T-006.
-    let api = lock_support::run_todo(
+    let api = common::run_todo(
         &home,
         &work,
         &["--json", "next", "--area", "api", "--type", "bug"],
@@ -100,7 +100,7 @@ fn next_respects_priority_dependencies_questions_stale_and_filters() {
     assert_eq!(j_api["data"]["task"]["id"], "T-006");
 
     // Filter `--section Frontend` checks archive deps too -> picks T-007.
-    let fe = lock_support::run_todo(
+    let fe = common::run_todo(
         &home,
         &work,
         &["--json", "next", "--section", "frontend"],
@@ -111,7 +111,7 @@ fn next_respects_priority_dependencies_questions_stale_and_filters() {
     assert_eq!(j_fe["data"]["task"]["id"], "T-007");
 
     // Filter `--where flavor=hot`: picks T-006.
-    let wh = lock_support::run_todo(
+    let wh = common::run_todo(
         &home,
         &work,
         &["--json", "next", "--where", "flavor=hot"],
@@ -149,7 +149,7 @@ fn next_returns_own_claim_first_unless_new_and_claims_atomically() {
     let now = "2026-11-15T14:00:00+01:00";
 
     // Read-only `next --agent alice` returns alice's own T-003 even though P0 T-001 is open.
-    let own = lock_support::run_todo(
+    let own = common::run_todo(
         &home,
         &work,
         &["--json", "next", "--agent", "alice"],
@@ -162,7 +162,7 @@ fn next_returns_own_claim_first_unless_new_and_claims_atomically() {
     assert_eq!(j_own["data"]["claimed"], false);
 
     // Text output shows task summary and already claimed note.
-    let own_txt = lock_support::run_todo(
+    let own_txt = common::run_todo(
         &home,
         &work,
         &["next", "--agent", "alice"],
@@ -174,7 +174,7 @@ fn next_returns_own_claim_first_unless_new_and_claims_atomically() {
     assert!(txt.contains("already claimed by you"), "txt: {txt}");
 
     // `next --claim` without agent fails with exit 2 (NO_AGENT) and leaves file untouched.
-    let no_agent = lock_support::run_todo(
+    let no_agent = common::run_todo(
         &home,
         &work,
         &["--json", "next", "--claim"],
@@ -185,7 +185,7 @@ fn next_returns_own_claim_first_unless_new_and_claims_atomically() {
     assert_eq!(fs::read_to_string(&todo_file).unwrap(), body);
 
     // `next --claim --new --agent alice` skips T-003 and claims highest-priority P0 T-001.
-    let claim_new = lock_support::run_todo(
+    let claim_new = common::run_todo(
         &home,
         &work,
         &["--json", "next", "--claim", "--new", "--agent", "alice"],
@@ -209,7 +209,7 @@ fn next_returns_own_claim_first_unless_new_and_claims_atomically() {
     assert_eq!(after1.task_by_id(TaskId(4)).unwrap().status, Status::Open);
 
     // Filter matching nothing returns exit 0 with task: null.
-    let none = lock_support::run_todo(
+    let none = common::run_todo(
         &home,
         &work,
         &["--json", "next", "--claim", "--area", "nonexistent"],
@@ -253,7 +253,7 @@ fn ten_parallel_next_claim_get_ten_different_tasks() {
         })
         .collect();
 
-    let outputs = lock_support::run_parallel_todos(&home, &work, &invocations).unwrap();
+    let outputs = common::run_parallel_todos(&home, &work, &invocations).unwrap();
     let mut picked_ids = HashSet::new();
     let mut picked_owners = HashSet::new();
 

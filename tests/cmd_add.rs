@@ -1,6 +1,6 @@
 //! CLI integration tests for `todo add` (T-028; R-WRITE-1, R-ID-2, TEST-4, TEST-5).
 
-mod lock_support;
+mod common;
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -54,7 +54,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
 
     // 1. Unknown section -> UNKNOWN_SECTION (exit 1) listing available sections.
     let before = fs::read(&todo_file).unwrap();
-    let unk = lock_support::run_todo(
+    let unk = common::run_todo(
         &home,
         &work,
         &[
@@ -81,7 +81,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
     assert!(msg_unk.contains("3. Next Ideas"), "msg: {msg_unk}");
 
     // 2. Ambiguous section ("Next") -> AMBIGUOUS_SECTION (exit 1) listing matches & sections.
-    let amb = lock_support::run_todo(
+    let amb = common::run_todo(
         &home,
         &work,
         &[
@@ -107,7 +107,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
     assert!(msg_amb.contains("3. Next Ideas"), "msg: {msg_amb}");
 
     // 3. Omitting --section when multiple sections exist -> refused.
-    let no_sec = lock_support::run_todo(
+    let no_sec = common::run_todo(
         &home,
         &work,
         &[
@@ -126,7 +126,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
     assert_eq!(no_sec.status.code(), Some(1));
 
     // 4. Duplicate title of open task -> DUPLICATE_TITLE (exit 1).
-    let dup = lock_support::run_todo(
+    let dup = common::run_todo(
         &home,
         &work,
         &[
@@ -149,7 +149,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
     assert_eq!(j_dup["error"]["code"], "DUPLICATE_TITLE");
 
     // 5. Missing required priority -> MISSING_FIELD; invalid priority -> BAD_VALUE.
-    let miss_p = lock_support::run_todo(
+    let miss_p = common::run_todo(
         &home,
         &work,
         &[
@@ -169,7 +169,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
     let j_mp: serde_json::Value = serde_json::from_slice(&miss_p.stdout).unwrap();
     assert_eq!(j_mp["error"]["code"], "MISSING_FIELD");
 
-    let bad_p = lock_support::run_todo(
+    let bad_p = common::run_todo(
         &home,
         &work,
         &[
@@ -195,7 +195,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
     assert_eq!(fs::read(&todo_file).unwrap(), before);
 
     // 6. Successful add (with title matching a DONE task, allowed; partial section "Release"; --field).
-    let ok1 = lock_support::run_todo(
+    let ok1 = common::run_todo(
         &home,
         &work,
         &[
@@ -262,7 +262,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
         + "\n## 3. Next Ideas\n\n";
     fs::write(&todo_file, without_t6).unwrap();
 
-    let ok2 = lock_support::run_todo(
+    let ok2 = common::run_todo(
         &home,
         &work,
         &[
@@ -309,7 +309,7 @@ fn twenty_parallel_adds_lose_nothing_and_get_distinct_ids() {
             barrier.wait();
             let title = format!("Parallel task {i:02}");
             let agent = format!("agent-{i:02}");
-            let out = lock_support::run_todo(
+            let out = common::run_todo(
                 &home,
                 &work,
                 &[

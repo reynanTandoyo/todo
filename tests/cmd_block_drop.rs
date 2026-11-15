@@ -1,6 +1,6 @@
 //! CLI integration tests for `todo block`, `todo unblock`, and `todo drop` (T-025; R-WRITE-5, R-WRITE-6, TEST-4).
 
-mod lock_support;
+mod common;
 
 use std::fs;
 
@@ -51,9 +51,9 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     // Missing --note on block and drop -> exit 2 (Usage), file untouched.
     let before = fs::read(&todo_file).unwrap();
     let missing_block_note =
-        lock_support::run_todo(&home, &work, &["block", "T-001", "--agent", "bob"], &[]).unwrap();
+        common::run_todo(&home, &work, &["block", "T-001", "--agent", "bob"], &[]).unwrap();
     assert_eq!(missing_block_note.status.code(), Some(2));
-    let empty_drop_note = lock_support::run_todo(
+    let empty_drop_note = common::run_todo(
         &home,
         &work,
         &["drop", "T-001", "--agent", "bob", "--note", "   "],
@@ -64,7 +64,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     assert_eq!(fs::read(&todo_file).unwrap(), before);
 
     // Block open task (T-001) -> blocked (no owner) + note; then unblock -> open.
-    let b1 = lock_support::run_todo(
+    let b1 = common::run_todo(
         &home,
         &work,
         &["block", "T-001", "--agent", "bob", "--note", "waiting"],
@@ -82,7 +82,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
 
     // Block an already blocked task -> BAD_TRANSITION.
     let before_reblock = fs::read(&todo_file).unwrap();
-    let reblock = lock_support::run_todo(
+    let reblock = common::run_todo(
         &home,
         &work,
         &["--json", "block", "T-001", "--agent", "bob", "--note", "x"],
@@ -95,7 +95,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     assert_eq!(fs::read(&todo_file).unwrap(), before_reblock);
 
     // Unblock unowned T-001 -> open.
-    let u1 = lock_support::run_todo(
+    let u1 = common::run_todo(
         &home,
         &work,
         &["unblock", "T-001", "--agent", "bob"],
@@ -114,7 +114,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
 
     // Unblock open task -> BAD_TRANSITION.
     let before_u_open = fs::read(&todo_file).unwrap();
-    let u_open = lock_support::run_todo(
+    let u_open = common::run_todo(
         &home,
         &work,
         &["--json", "unblock", "T-001", "--agent", "bob"],
@@ -125,7 +125,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     assert_eq!(fs::read(&todo_file).unwrap(), before_u_open);
 
     // Claimed by alice (T-002): bob cannot block without --force (NOT_OWNER).
-    let block_other = lock_support::run_todo(
+    let block_other = common::run_todo(
         &home,
         &work,
         &[
@@ -139,7 +139,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     assert_eq!(j_bo["error"]["code"], "NOT_OWNER");
 
     // Alice blocks T-002 (keeps owner & claimed), then unblocks -> claimed with refreshed time!
-    let b2 = lock_support::run_todo(
+    let b2 = common::run_todo(
         &home,
         &work,
         &["block", "T-002", "--agent", "alice", "--note", "need info"],
@@ -147,7 +147,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     )
     .unwrap();
     assert!(b2.status.success());
-    let u2 = lock_support::run_todo(
+    let u2 = common::run_todo(
         &home,
         &work,
         &[
@@ -164,7 +164,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     assert_eq!(j_u2["data"]["claimed"], "2026-11-15T15:45+01:00");
 
     // Unblock claimed task -> BAD_TRANSITION.
-    let u_claimed = lock_support::run_todo(
+    let u_claimed = common::run_todo(
         &home,
         &work,
         &["--json", "unblock", "T-002", "--agent", "alice"],
@@ -174,7 +174,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     assert_eq!(u_claimed.status.code(), Some(1));
 
     // Drop claimed T-002 by bob without --force -> NOT_OWNER; with --force -> dropped, claimed removed.
-    let drop_no = lock_support::run_todo(
+    let drop_no = common::run_todo(
         &home,
         &work,
         &[
@@ -185,7 +185,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     .unwrap();
     assert_eq!(drop_no.status.code(), Some(1));
 
-    let drop_force = lock_support::run_todo(
+    let drop_force = common::run_todo(
         &home,
         &work,
         &[
@@ -202,7 +202,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     assert!(after_drop2.contains("- note (2026-11-15, bob): dropped \u{2014} obsolete\n"));
 
     // Drop open T-003 -> dropped.
-    let drop_open = lock_support::run_todo(
+    let drop_open = common::run_todo(
         &home,
         &work,
         &["drop", "T-003", "--agent", "bob", "--note", "wontfix"],
@@ -219,8 +219,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
             vec!["--json", "unblock", id, "--agent", "alice"],
             vec!["--json", "drop", id, "--agent", "alice", "--note", "x"],
         ] {
-            let res =
-                lock_support::run_todo(&home, &work, &args, &[("TODO_TEST_NOW", t2)]).unwrap();
+            let res = common::run_todo(&home, &work, &args, &[("TODO_TEST_NOW", t2)]).unwrap();
             assert_eq!(res.status.code(), Some(1), "args: {args:?}");
             let j: serde_json::Value = serde_json::from_slice(&res.stdout).unwrap();
             assert_eq!(j["error"]["code"], "BAD_TRANSITION");
@@ -253,7 +252,7 @@ fn drop_lists_tasks_that_became_ready() {
     .unwrap();
 
     let now = "2026-11-15T10:00:00+01:00";
-    let res = lock_support::run_todo(
+    let res = common::run_todo(
         &home,
         &work,
         &["drop", "T-001", "--agent", "alice", "--note", "unneeded"],

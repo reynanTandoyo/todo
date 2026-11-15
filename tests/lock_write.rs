@@ -1,6 +1,6 @@
 //! Tests for the write lock (T-013; R-LOCK-1..5, TEST-5).
 
-mod lock_support;
+mod common;
 
 use std::time::Duration;
 
@@ -132,7 +132,7 @@ fn killed_holder_delays_next_writer_by_less_than_2_seconds() {
     let ready = tmp.path().join("holder.ready");
     let ready_str = ready.to_string_lossy().into_owned();
 
-    let mut holder = lock_support::spawn_todo(
+    let mut holder = common::spawn_todo(
         &home,
         &work,
         &[
@@ -150,14 +150,14 @@ fn killed_holder_delays_next_writer_by_less_than_2_seconds() {
     )
     .unwrap();
 
-    lock_support::wait_for_file(&ready, Duration::from_secs(5)).unwrap();
+    common::wait_for_file(&ready, Duration::from_secs(5)).unwrap();
 
     // Kill the holder abruptly while it holds write.lock.
     holder.kill().unwrap();
     let _ = holder.wait();
 
     let start = std::time::Instant::now();
-    let out = lock_support::run_todo(
+    let out = common::run_todo(
         &home,
         &work,
         &[
@@ -201,7 +201,7 @@ fn held_lock_causes_exit_3_naming_holder_without_writing_and_reads_do_not_wait()
     let ready = tmp.path().join("held.ready");
     let ready_str = ready.to_string_lossy().into_owned();
 
-    let mut holder = lock_support::spawn_todo(
+    let mut holder = common::spawn_todo(
         &home,
         &work,
         &[
@@ -220,7 +220,7 @@ fn held_lock_causes_exit_3_naming_holder_without_writing_and_reads_do_not_wait()
     .unwrap();
     let holder_pid = holder.id();
 
-    lock_support::wait_for_file(&ready, Duration::from_secs(5)).unwrap();
+    common::wait_for_file(&ready, Duration::from_secs(5)).unwrap();
 
     // Reads must never wait for the write lock.
     let read_start = std::time::Instant::now();
@@ -229,7 +229,7 @@ fn held_lock_causes_exit_3_naming_holder_without_writing_and_reads_do_not_wait()
     assert!(read_start.elapsed() < Duration::from_millis(500));
 
     // Competing write exits 3 (BUSY) naming the holder and leaves TODO.md unchanged.
-    let waiter_json = lock_support::run_todo(
+    let waiter_json = common::run_todo(
         &home,
         &work,
         &[
@@ -253,7 +253,7 @@ fn held_lock_causes_exit_3_naming_holder_without_writing_and_reads_do_not_wait()
     assert_eq!(parsed["error"]["pid"], holder_pid);
     assert!(parsed["error"]["started_at"].as_str().is_some());
 
-    let waiter_text = lock_support::run_todo(
+    let waiter_text = common::run_todo(
         &home,
         &work,
         &[
@@ -306,7 +306,7 @@ fn parallel_writes_serialize_without_losing_updates() {
         })
         .collect();
 
-    let outputs = lock_support::run_parallel_todos(&home, &work, &invocations).unwrap();
+    let outputs = common::run_parallel_todos(&home, &work, &invocations).unwrap();
     for (i, out) in outputs.iter().enumerate() {
         assert!(
             out.status.success(),
