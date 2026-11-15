@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            asset_name: todo.exe
+            bin_path: target/release/todo.exe
+          - os: ubuntu-latest
+            asset_name: todo-linux-x86_64
+            bin_path: target/release/todo
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify tag matches Cargo.toml version
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg_version=$(awk -F'"' '/^version = / { print $2; exit }' Cargo.toml)
+          expected_tag="v${pkg_version}"
+          actual_tag="${GITHUB_REF_NAME}"
+          echo "Cargo.toml version: ${pkg_version} (expected tag: ${expected_tag})"
+          echo "Git tag: ${actual_tag}"
+          if [ "${actual_tag}" != "${expected_tag}" ]; then
+            echo "::error::Tag ${actual_tag} does not match Cargo.toml version ${pkg_version} (expected ${expected_tag})"
+            exit 1
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --all-features
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Prepare release asset and SHA-256 checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp "${{ matrix.bin_path }}" "dist/${{ matrix.asset_name }}"
+          (
+            cd dist
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum "${{ matrix.asset_name }}" > "${{ matrix.asset_name }}.sha256"
+            else
+              shasum -a 256 "${{ matrix.asset_name }}" > "${{ matrix.asset_name }}.sha256"
+            fi
+          )
+          cat "dist/${{ matrix.asset_name }}.sha256"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.asset_name }}
+          path: dist/*
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -la artifacts && cat artifacts/*.sha256
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: artifacts/*
