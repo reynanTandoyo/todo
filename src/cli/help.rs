@@ -12,8 +12,8 @@ pub const META: CommandMeta = CommandMeta {
     name: "help",
     summary: "Show overview or detailed help for a command",
     kind: CommandKind::Meta,
-    details: "Without a topic, lists all available commands. With a command name, shows its description and usage examples.",
-    examples: &["todo help", "todo help help"],
+    details: "Without a topic, lists all available commands. With a command name, shows its description and usage examples. Use `todo help agents` to print the agent rules.",
+    examples: &["todo help", "todo help help", "todo help agents"],
 };
 
 /// Arguments for `todo help`.
@@ -45,6 +45,12 @@ struct HelpCommandJson {
     examples: &'static [&'static str],
 }
 
+#[derive(Serialize)]
+struct HelpAgentsJson {
+    topic: &'static str,
+    rules: &'static str,
+}
+
 const fn kind_label(kind: CommandKind) -> &'static str {
     match kind {
         CommandKind::Read => "read",
@@ -57,6 +63,20 @@ const fn kind_label(kind: CommandKind) -> &'static str {
 pub fn run(args: Args, _ctx: &Context, out: &mut Output) -> Result<()> {
     match args.topic.as_deref() {
         None => print_overview(out, "help"),
+        Some(topic) if topic.eq_ignore_ascii_case("agents") => {
+            if out.is_json() {
+                out.emit_json_ok(
+                    "help",
+                    &HelpAgentsJson {
+                        topic: "agents",
+                        rules: crate::agents::RULES_TEXT,
+                    },
+                );
+            } else {
+                out.write_str(crate::agents::RULES_TEXT);
+            }
+            Ok(())
+        }
         Some(topic) => {
             if let Some(meta) = COMMANDS.iter().find(|c| c.name.eq_ignore_ascii_case(topic)) {
                 print_command_help(meta, out);

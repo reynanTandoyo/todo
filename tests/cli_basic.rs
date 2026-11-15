@@ -147,3 +147,25 @@ fn closed_pipe_exits_zero() {
     let status = child.wait().unwrap();
     assert_eq!(status.code(), Some(0));
 }
+
+#[test]
+fn help_agents_prints_builtin_rules_text() {
+    let home = TempDir::new().unwrap();
+    let out = todo_cmd(&home).args(["help", "agents"]).output().unwrap();
+    assert!(out.status.success());
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        todo::agents::RULES_TEXT
+    );
+
+    let json_out = todo_cmd(&home)
+        .args(["--json", "help", "agents"])
+        .output()
+        .unwrap();
+    assert!(json_out.status.success());
+    let parsed: serde_json::Value = serde_json::from_slice(&json_out.stdout).unwrap();
+    assert_eq!(parsed["schema"], "todo.help.v1");
+    assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["data"]["topic"], "agents");
+    assert_eq!(parsed["data"]["rules"], todo::agents::RULES_TEXT);
+}
