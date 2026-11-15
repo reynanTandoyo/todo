@@ -12,12 +12,14 @@
 //! (`R-CLAIM-5`) before `run` is called.
 
 use std::ffi::OsString;
+use std::io::Write as _;
 use std::path::PathBuf;
 
 use clap::{Args as ClapArgs, Parser, Subcommand, error::ErrorKind};
 use serde::Serialize;
 
 use crate::error::{ErrorCode, ExitCode, Result, TodoError};
+use crate::find::{ExplicitSource, FindOptions, FoundTodo, WorktreeMode, find_todo};
 use crate::output::Output;
 
 /// Whether a command reads `TODO.md`, writes `TODO.md`, or is meta/help.
@@ -79,6 +81,8 @@ pub struct GlobalOpts {
 pub struct Context {
     /// Explicit path to `TODO.md` from `--file` or `TODO_FILE`, if any.
     pub file: Option<PathBuf>,
+    /// Which source provided `file` (`--file` vs `TODO_FILE`), if any.
+    pub file_source: Option<ExplicitSource>,
     /// Whether `--json` output mode is active.
     pub json: bool,
     /// Validated agent name from `--agent` or `TODO_AGENT`, if any.
@@ -96,10 +100,13 @@ pub struct Context {
 impl Context {
     /// Resolves [`Context`] using R-CFG-3 precedence: CLI flags, then environment variables, then defaults.
     pub fn from_global(opts: &GlobalOpts) -> Result<Self> {
-        let file = opts
-            .file
-            .clone()
-            .or_else(|| non_empty_env("TODO_FILE").map(PathBuf::from));
+        let (file, file_source) = match &opts.file {
+            Some(p) => (Some(p.clone()), Some(ExplicitSource::Flag)),
+            None => match non_empty_env("TODO_FILE") {
+                Some(raw) => (Some(PathBuf::from(raw)), Some(ExplicitSource::Env)),
+                None => (None, None),
+            },
+        };
 
         let agent = match &opts.agent {
             Some(raw) => Some(validate_agent_name(raw)?.to_owned()),
@@ -113,6 +120,7 @@ impl Context {
 
         Ok(Self {
             file,
+            file_source,
             json: opts.json,
             agent,
             dry_run: opts.dry_run,
@@ -130,6 +138,34 @@ impl Context {
                 "missing agent name: pass --agent <name> or set TODO_AGENT",
             )
         })
+    }
+
+    /// Locates `TODO.md` using the resolved context and emits any discovery warnings/notices.
+    pub fn find_todo(&self, out: &mut Output) -> Result<FoundTodo> {
+        self.find_todo_with_mode(WorktreeMode::Shared, out)
+    }
+
+    /// Locates `TODO.md` with an explicit [`WorktreeMode`] and emits any discovery warnings/notices.
+    pub fn find_todo_with_mode(
+        &self,
+        worktree: WorktreeMode,
+        out: &mut Output,
+    ) -> Result<FoundTodo> {
+        let found = find_todo(&FindOptions {
+            explicit_file: self.file.as_deref(),
+            explicit_source: self.file_source,
+            start_dir: None,
+            worktree,
+        })?;
+        for w in &found.warnings {
+            out.warn(w);
+        }
+        if !out.is_json()
+            && let Some(ref notice) = found.notice
+        {
+            let _ = writeln!(std::io::stderr(), "{notice}");
+        }
+        Ok(found)
     }
 }
 
@@ -160,6 +196,9 @@ pub fn validate_agent_name(name: &str) -> Result<&str> {
     Ok(name)
 }
 
+#[cfg(feature = "test-hooks")]
+pub mod test_append;
+
 macro_rules! register_commands {
     ($($variant:ident => $module:ident),* $(,)?) => {
         $(pub mod $module;)*
@@ -174,6 +213,9 @@ macro_rules! register_commands {
                 #[command(about = $module::META.summary)]
                 $variant($module::Args),
             )*
+            #[cfg(feature = "test-hooks")]
+            #[command(name = "__test-append", hide = true)]
+            TestAppend(test_append::Args),
         }
 
         impl Command {
@@ -182,6 +224,8 @@ macro_rules! register_commands {
             pub const fn meta(&self) -> &'static CommandMeta {
                 match self {
                     $(Self::$variant(_) => &$module::META,)*
+                    #[cfg(feature = "test-hooks")]
+                    Self::TestAppend(_) => &test_append::META,
                 }
             }
 
@@ -192,6 +236,8 @@ macro_rules! register_commands {
                 }
                 match self {
                     $(Self::$variant(args) => $module::run(args, ctx, out),)*
+                    #[cfg(feature = "test-hooks")]
+                    Self::TestAppend(args) => test_append::run(args, ctx, out),
                 }
             }
         }
