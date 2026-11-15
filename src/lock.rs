@@ -1,10 +1,12 @@
 //! The write lock and the manual lease (T-013, T-015; R-LOCK-1..8).
 
 use std::fs::{File, OpenOptions, TryLockError};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use chrono::{DateTime, FixedOffset, Local, Utc};
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::atomic::{self, FileSnapshot, random_u64};
@@ -272,4 +274,227 @@ pub(crate) fn lease_held_error(lease: &Lease) -> TodoError {
     .with_owner(lease.agent.clone())
     .with_detail("started_at", Value::String(lease.started_at.clone()))
     .with_detail("expires_at", Value::String(lease.expires_at.clone()))
+}
+
+/// Active manual lease information returned by [`query_status`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LeaseStatus {
+    /// Agent holding the lease.
+    pub agent: String,
+    /// RFC 3339 timestamp when the lease started.
+    pub started_at: String,
+    /// RFC 3339 timestamp when the lease expires.
+    pub expires_at: String,
+    /// Whole seconds remaining until expiry (at least `0`).
+    pub remaining_seconds: i64,
+}
+
+/// Snapshot of the write lock and manual lease returned by [`query_status`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LockStatus {
+    /// Whether `write.lock` is currently locked by an OS process.
+    pub write_lock_held: bool,
+    /// Holder metadata from `holder.json` if `write_lock_held` is `true`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub holder: Option<LockHolder>,
+    /// Active (non-expired) manual lease, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lease: Option<LeaseStatus>,
+}
+
+/// Outcome of [`release_lease`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnlockOutcome {
+    /// Ended the caller's own active lease.
+    Unlocked { agent: String },
+    /// Ended another agent's active lease via `--force`.
+    Forced { previous_holder: String },
+    /// No active lease existed (or an expired lease was cleared).
+    NotActive,
+}
+
+/// Acquires or refreshes a manual editing lease for `agent` (`todo lock`, R-LOCK-6).
+///
+/// Waits up to `cfg.effective_wait()` if another agent holds the write lock or a live lease.
+pub fn acquire_lease(
+    state: &StateDir,
+    agent: &str,
+    minutes: Option<u64>,
+    cfg: &LockConfig,
+) -> Result<Lease> {
+    let mins = minutes.unwrap_or(cfg.lease_minutes);
+    if mins == 0 || mins > cfg.lease_max_minutes {
+        return Err(TodoError::new(
+            ErrorCode::BadValue,
+            format!(
+                "lease duration must be between 1 and {} minutes (got {mins})",
+                cfg.lease_max_minutes
+            ),
+        ));
+    }
+
+    let wait_timeout = cfg.effective_wait();
+    let deadline = Instant::now() + wait_timeout;
+
+    let guard = loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        let guard = WriteLockGuard::acquire(state, agent, "lock", remaining)?;
+
+        if let Some(existing) = state.read_lease()?
+            && is_lease_live(&existing, current_time())
+            && !existing.agent.eq_ignore_ascii_case(agent)
+        {
+            drop(guard);
+            let now_inst = Instant::now();
+            if now_inst >= deadline {
+                return Err(lease_held_error(&existing));
+            }
+            let remaining = deadline.saturating_duration_since(now_inst);
+            let jitter = random_retry_delay().min(remaining);
+            if !jitter.is_zero() {
+                std::thread::sleep(jitter);
+            }
+            continue;
+        }
+        break guard;
+    };
+
+    let now = current_time();
+    let duration = lease_duration(mins);
+    let expires = now + duration;
+    let lease = Lease {
+        agent: agent.to_owned(),
+        started_at: now.to_rfc3339(),
+        expires_at: expires.to_rfc3339(),
+    };
+    state.write_lease(&lease)?;
+    drop(guard);
+    Ok(lease)
+}
+
+fn lease_duration(minutes: u64) -> chrono::Duration {
+    #[cfg(feature = "test-hooks")]
+    {
+        if let Ok(secs_str) = std::env::var("TODO_TEST_LEASE_SECONDS")
+            && let Ok(secs) = secs_str.parse::<i64>()
+            && secs > 0
+        {
+            return chrono::Duration::seconds(secs);
+        }
+    }
+    let mins_i64 = i64::try_from(minutes).unwrap_or(60);
+    chrono::Duration::minutes(mins_i64)
+}
+
+/// Ends an active manual editing lease (`todo unlock`, R-LOCK-6).
+///
+/// An expired lease counts as already ended. Ending another agent's live lease requires
+/// `force == true`; otherwise returns `NOT_OWNER` (exit 1).
+pub fn release_lease(
+    state: &StateDir,
+    agent: &str,
+    force: bool,
+    cfg: &LockConfig,
+) -> Result<UnlockOutcome> {
+    let guard = WriteLockGuard::acquire(state, agent, "unlock", cfg.effective_wait())?;
+
+    let outcome = match state.read_lease()? {
+        None => UnlockOutcome::NotActive,
+        Some(lease) if !is_lease_live(&lease, current_time()) => {
+            state.remove_lease()?;
+            UnlockOutcome::NotActive
+        }
+        Some(lease) if lease.agent.eq_ignore_ascii_case(agent) => {
+            state.remove_lease()?;
+            UnlockOutcome::Unlocked { agent: lease.agent }
+        }
+        Some(lease) => {
+            if force {
+                state.remove_lease()?;
+                UnlockOutcome::Forced {
+                    previous_holder: lease.agent,
+                }
+            } else {
+                drop(guard);
+                return Err(TodoError::new(
+                    ErrorCode::NotOwner,
+                    format!(
+                        "lease is held by {} until {}; pass --force to end it",
+                        lease.agent, lease.expires_at
+                    ),
+                )
+                .with_owner(lease.agent)
+                .with_detail("expires_at", Value::String(lease.expires_at)));
+            }
+        }
+    };
+
+    drop(guard);
+    Ok(outcome)
+}
+
+/// Reads the current write-lock and lease status without blocking or creating state files (R-LOCK-5, R-LOCK-6).
+pub fn query_status(state: &StateDir) -> Result<LockStatus> {
+    if !fs_path(state.path()).exists() {
+        return Ok(LockStatus {
+            write_lock_held: false,
+            holder: None,
+            lease: None,
+        });
+    }
+
+    let write_lock_held = is_write_lock_held(state).unwrap_or(false);
+    let holder = if write_lock_held {
+        state.read_holder().ok().flatten()
+    } else {
+        None
+    };
+
+    let now = current_time();
+    let lease = match state.read_lease()? {
+        Some(l) if is_lease_live(&l, now) => {
+            let remaining_seconds = DateTime::parse_from_rfc3339(&l.expires_at)
+                .map(|exp| {
+                    exp.with_timezone(&Utc)
+                        .signed_duration_since(now.with_timezone(&Utc))
+                        .num_seconds()
+                        .max(0)
+                })
+                .unwrap_or(0);
+            Some(LeaseStatus {
+                agent: l.agent,
+                started_at: l.started_at,
+                expires_at: l.expires_at,
+                remaining_seconds,
+            })
+        }
+        _ => None,
+    };
+
+    Ok(LockStatus {
+        write_lock_held,
+        holder,
+        lease,
+    })
+}
+
+fn is_write_lock_held(state: &StateDir) -> io::Result<bool> {
+    let lock_path = state.write_lock_path();
+    let file = match OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(fs_path(&lock_path).as_ref())
+    {
+        Ok(f) => f,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(e),
+    };
+    match file.try_lock() {
+        Ok(()) => {
+            let _ = file.unlock();
+            Ok(false)
+        }
+        Err(TryLockError::WouldBlock) => Ok(true),
+        Err(TryLockError::Error(e)) => Err(e),
+    }
 }

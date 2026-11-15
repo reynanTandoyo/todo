@@ -9,6 +9,21 @@ expression: ok_json
         "kind": "meta",
         "name": "help",
         "summary": "Show overview or detailed help for a command"
+      },
+      {
+        "kind": "write",
+        "name": "lock",
+        "summary": "Take a manual editing lease on TODO.md"
+      },
+      {
+        "kind": "read",
+        "name": "status",
+        "summary": "Show write lock and manual lease status"
+      },
+      {
+        "kind": "write",
+        "name": "unlock",
+        "summary": "End a manual editing lease on TODO.md"
       }
     ],
     "version": "0.1.0"

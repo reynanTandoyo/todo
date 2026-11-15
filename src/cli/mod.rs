@@ -247,6 +247,9 @@ macro_rules! register_commands {
 // One-line command registration: add `Variant => module,` here.
 register_commands! {
     Help => help,
+    Lock => lock,
+    Status => status,
+    Unlock => unlock,
 }
 
 /// Top-level `todo` CLI parser.
