@@ -513,7 +513,12 @@ where
                     ExitCode::Ok
                 }
                 _ => {
-                    let todo_err = TodoError::new(ErrorCode::Usage, err.to_string().trim());
+                    // clap's message starts with its own "error: "; the output layer adds
+                    // one too, so strip clap's to avoid "error: error: ...".
+                    let text = err.to_string();
+                    let text = text.trim();
+                    let message = text.strip_prefix("error: ").unwrap_or(text);
+                    let todo_err = TodoError::new(ErrorCode::Usage, message);
                     out.emit_error("cli", &todo_err);
                     ExitCode::Usage
                 }

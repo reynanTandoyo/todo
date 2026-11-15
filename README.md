@@ -180,6 +180,10 @@ for defaults.
 - **Windows SmartScreen:** A self-built `todo.exe` is unsigned, so Windows SmartScreen may show a
   warning the first time you run it from another location; building from source locally with
   `cargo build --release` avoids downloading an untrusted binary.
+- **Capturing output in Windows PowerShell 5.1:** `todo` writes UTF-8. Printed straight to the
+  console it always shows correctly, but when a script captures it (`$tasks = todo list`),
+  Windows PowerShell 5.1 decodes it with the console's code page, which can garble `·` and `—`
+  on PCs not set to UTF-8. Run `[Console]::OutputEncoding = [Text.Encoding]::UTF8` first.
 
 ## Documents
 
