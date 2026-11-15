@@ -1,13 +1,11 @@
+mod common;
+
 use std::fs;
-use std::path::Path;
-use std::process::Command;
 
 use serde_json::Value;
 use tempfile::TempDir;
 
-fn todo_bin() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_todo"))
-}
+use common::{todo_bin, write_todo};
 
 const SAMPLE_TODO: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
@@ -22,14 +20,10 @@ const SAMPLE_TODO: &str = "\
 - priority: P1
 ";
 
-fn write_sample(dir: &Path) {
-    fs::write(dir.join("TODO.md"), SAMPLE_TODO).expect("write TODO.md");
-}
-
 #[test]
 fn hand_edit_between_commands_is_saved_and_reported_once() {
     let dir = TempDir::new().expect("tempdir");
-    write_sample(dir.path());
+    write_todo(dir.path(), SAMPLE_TODO);
 
     // Initial write via todo so last-write.json is recorded.
     let add = todo_bin()
@@ -105,7 +99,7 @@ fn hand_edit_between_commands_is_saved_and_reported_once() {
 #[test]
 fn edits_during_lease_are_recorded_without_warning() {
     let dir = TempDir::new().expect("tempdir");
-    write_sample(dir.path());
+    write_todo(dir.path(), SAMPLE_TODO);
 
     // Initial write.
     let add = todo_bin()

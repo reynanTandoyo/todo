@@ -8,18 +8,7 @@ use std::process::Command;
 
 use tempfile::TempDir;
 
-fn setup_proj(
-    tmp: &TempDir,
-    body: &str,
-) -> std::io::Result<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home)?;
-    fs::create_dir_all(&work)?;
-    let todo_file = work.join("TODO.md");
-    fs::write(&todo_file, body)?;
-    Ok((home, work, todo_file))
-}
+use common::setup_proj;
 
 fn init_git_repo_with_commit(dir: &Path) -> String {
     let run_git = |args: &[&str]| {
@@ -73,7 +62,7 @@ fn done_transitions_ownership_notes_and_accept_reminder() {
 ### T-004 · Already done\n\
 - status: done\n\
 - owner: alice\n";
-    let (home, work, todo_file) = setup_proj(&tmp, initial).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, initial);
     let now = "2026-11-15T14:30:00+01:00";
 
     // 1. Open task -> done with --note; prints accept line.
@@ -198,7 +187,7 @@ fn done_commit_resolves_head_rejects_unknown_and_accepts_when_git_missing() {
 ### T-002 · Second task\n\
 - status: open\n\
 - owner: —\n";
-    let (home, work, todo_file) = setup_proj(&tmp, initial).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, initial);
     let head_short = init_git_repo_with_commit(&work);
     let now = "2026-11-15T14:30:00+01:00";
 

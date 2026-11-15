@@ -1,17 +1,11 @@
+mod common;
+
 use std::fs;
-use std::path::Path;
-use std::process::Command;
 
 use serde_json::Value;
 use tempfile::TempDir;
 
-fn todo_bin() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_todo"))
-}
-
-fn write_fixture(dir: &Path, content: &str) {
-    fs::write(dir.join("TODO.md"), content).expect("write TODO.md");
-}
+use common::{todo_bin, write_todo};
 
 const SAMPLE_TODO: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
@@ -29,7 +23,7 @@ const SAMPLE_TODO: &str = "\
 #[test]
 fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
     let dir = TempDir::new().expect("tempdir");
-    write_fixture(dir.path(), SAMPLE_TODO);
+    write_todo(dir.path(), SAMPLE_TODO);
     fs::write(dir.path().join("todo.toml"), "snapshots_keep = 3\n").expect("write todo.toml");
 
     // 4 writes -> snapshots 1, 2, 3, 4 created, only 2, 3, 4 kept.

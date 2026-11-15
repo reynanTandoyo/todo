@@ -6,18 +6,7 @@ use std::fs;
 
 use tempfile::TempDir;
 
-fn setup_proj(
-    tmp: &TempDir,
-    body: &str,
-) -> std::io::Result<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home)?;
-    fs::create_dir_all(&work)?;
-    let todo_file = work.join("TODO.md");
-    fs::write(&todo_file, body)?;
-    Ok((home, work, todo_file))
-}
+use common::setup_proj;
 
 #[test]
 fn note_appends_after_last_line_on_any_status_by_any_agent() {
@@ -41,7 +30,7 @@ fn note_appends_after_last_line_on_any_status_by_any_agent() {
 ### T-004 · Dropped task\n\
 - status: dropped\n\
 - owner: —\n";
-    let (home, work, todo_file) = setup_proj(&tmp, initial).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, initial);
     // 23:30 UTC is 2026-11-16 in +01:00, verifying local date (R-IO-6).
     let now = "2026-11-16T00:30:00+01:00";
 

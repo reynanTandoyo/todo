@@ -4,20 +4,11 @@ mod common;
 
 use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
 
 use tempfile::TempDir;
-use todo::doc::{Document, Status, TaskId};
 
-fn setup_proj(tmp: &TempDir, body: &str) -> std::io::Result<(PathBuf, PathBuf, PathBuf)> {
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home)?;
-    fs::create_dir_all(&work)?;
-    let todo_file = work.join("TODO.md");
-    fs::write(&todo_file, body)?;
-    Ok((home, work, todo_file))
-}
+use common::setup_proj;
+use todo::doc::{Document, Status, TaskId};
 
 #[cfg(feature = "test-hooks")]
 #[test]
@@ -75,7 +66,7 @@ fn next_respects_priority_dependencies_questions_stale_and_filters() {
 - status: done\n\
 - owner: alice\n";
 
-    let (home, work, _) = setup_proj(&tmp, body).unwrap();
+    let (home, work, _) = setup_proj(&tmp, body);
     fs::write(work.join("TODO-archive.md"), archive).unwrap();
     let now = "2026-11-15T14:00:00+01:00";
 
@@ -145,7 +136,7 @@ fn next_returns_own_claim_first_unless_new_and_claims_atomically() {
 ### T-004 · Unprioritized ready\n\
 - status: open\n";
 
-    let (home, work, todo_file) = setup_proj(&tmp, body).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, body);
     let now = "2026-11-15T14:00:00+01:00";
 
     // Read-only `next --agent alice` returns alice's own T-003 even though P0 T-001 is open.
@@ -239,7 +230,7 @@ fn ten_parallel_next_claim_get_ten_different_tasks() {
             "### T-{i:03} · Parallel work item {i}\n- status: open\n- owner: —\n- priority: {prio}\n\n"
         ));
     }
-    let (home, work, todo_file) = setup_proj(&tmp, &body).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, &body);
 
     let invocations: Vec<Vec<String>> = (0..10)
         .map(|i| {

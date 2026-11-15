@@ -9,20 +9,11 @@ use std::time::Duration;
 
 use tempfile::TempDir;
 
-fn setup_proj(
-    tmp: &TempDir,
-) -> std::io::Result<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    std::fs::create_dir_all(&home)?;
-    std::fs::create_dir_all(&work)?;
-    let todo_file = work.join("TODO.md");
-    std::fs::write(
-        &todo_file,
-        "<!-- TEST FIXTURE: invented data, not a real task list -->\n# Lease tests\n",
-    )?;
-    Ok((home, work, todo_file))
-}
+use common::setup_proj;
+
+const LEASE_BODY: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->
+# Lease tests
+";
 
 fn run_git(dir: &Path, args: &[&str]) -> std::io::Result<()> {
     let out = Command::new("git")
@@ -46,7 +37,7 @@ fn run_git(dir: &Path, args: &[&str]) -> std::io::Result<()> {
 #[test]
 fn status_works_before_any_state_exists_without_creating_dot_todo() {
     let tmp = TempDir::new().unwrap();
-    let (home, work, _todo_file) = setup_proj(&tmp).unwrap();
+    let (home, work, _todo_file) = setup_proj(&tmp, LEASE_BODY);
 
     let out = common::run_todo(&home, &work, &["--json", "status"], &[]).unwrap();
     assert!(out.status.success());
@@ -67,7 +58,7 @@ fn status_works_before_any_state_exists_without_creating_dot_todo() {
 #[test]
 fn lock_requires_agent_and_valid_minutes() {
     let tmp = TempDir::new().unwrap();
-    let (home, work, _todo_file) = setup_proj(&tmp).unwrap();
+    let (home, work, _todo_file) = setup_proj(&tmp, LEASE_BODY);
 
     let no_agent = common::run_todo(&home, &work, &["--json", "lock"], &[]).unwrap();
     assert_eq!(no_agent.status.code(), Some(2));
@@ -101,7 +92,7 @@ fn lock_requires_agent_and_valid_minutes() {
 #[test]
 fn lease_blocks_other_agents_allows_holder_and_expires() {
     let tmp = TempDir::new().unwrap();
-    let (home, work, todo_file) = setup_proj(&tmp).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, LEASE_BODY);
     let t0 = "2026-11-15T14:00:00+01:00";
 
     // Acquire 10-minute default lease as alice at t0.
@@ -229,7 +220,7 @@ fn lease_blocks_other_agents_allows_holder_and_expires() {
 #[test]
 fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
     let tmp = TempDir::new().unwrap();
-    let (home, work, _todo_file) = setup_proj(&tmp).unwrap();
+    let (home, work, _todo_file) = setup_proj(&tmp, LEASE_BODY);
     let t0 = "2026-11-15T14:00:00+01:00";
 
     let lock_out = common::run_todo(
@@ -318,7 +309,7 @@ fn unlock_requires_force_for_other_agent_and_names_previous_holder() {
 #[test]
 fn status_shows_active_write_lock_holder_without_waiting() {
     let tmp = TempDir::new().unwrap();
-    let (home, work, _todo_file) = setup_proj(&tmp).unwrap();
+    let (home, work, _todo_file) = setup_proj(&tmp, LEASE_BODY);
     let ready = tmp.path().join("status.ready");
     let ready_str = ready.to_string_lossy().into_owned();
 
@@ -365,7 +356,7 @@ fn status_shows_active_write_lock_holder_without_waiting() {
 #[test]
 fn cli_changed_during_write_exits_3_and_leaves_no_tmp() {
     let tmp = TempDir::new().unwrap();
-    let (home, work, todo_file) = setup_proj(&tmp).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, LEASE_BODY);
     let ready = tmp.path().join("before-rename.ready");
     let ready_str = ready.to_string_lossy().into_owned();
 

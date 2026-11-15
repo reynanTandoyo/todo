@@ -5,20 +5,9 @@ mod common;
 use std::fs;
 
 use tempfile::TempDir;
-use todo::doc::{Document, Status, TaskId};
 
-fn setup_proj(
-    tmp: &TempDir,
-    body: &str,
-) -> std::io::Result<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home)?;
-    fs::create_dir_all(&work)?;
-    let todo_file = work.join("TODO.md");
-    fs::write(&todo_file, body)?;
-    Ok((home, work, todo_file))
-}
+use common::setup_proj;
+use todo::doc::{Document, Status, TaskId};
 
 #[cfg(feature = "test-hooks")]
 #[test]
@@ -34,7 +23,7 @@ fn claim_open_refresh_stale_takeover_and_force_cases() {
 ### T-002 · Stale without timestamp\n\
 - status: claimed\n\
 - owner: ghost-bot\n";
-    let (home, work, todo_file) = setup_proj(&tmp, initial).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, initial);
 
     // Missing agent -> NO_AGENT exit 2 and file untouched.
     let no_agent = common::run_todo(&home, &work, &["--json", "claim", "T-001"], &[]).unwrap();
@@ -153,7 +142,7 @@ fn claim_and_release_transition_table_and_refusals() {
 ### T-003 · Blocked owned\n- status: blocked\n- owner: alice\n- claimed: 2026-11-15T14:00+01:00\n\n\
 ### T-004 · Done\n- status: done\n- owner: alice\n\n\
 ### T-005 · Dropped\n- status: dropped\n- owner: —\n";
-    let (home, work, todo_file) = setup_proj(&tmp, initial).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, initial);
     let now = "2026-11-15T15:00:00+01:00";
 
     // Refused transitions must leave TODO.md byte-identical.
@@ -265,7 +254,7 @@ fn claim_refuses_unsafe_files_and_duplicate_archive_ids_without_writing() {
     let unsafe_body = "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
 ### T-001 · Repeated field\n- status: open\n- priority: P1\n- priority: P2\n\n\
 ### T-002 · Clean task\n- status: open\n";
-    let (home, work, todo_file) = setup_proj(&tmp, unsafe_body).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, unsafe_body);
 
     // Task with repeated field is refused with UNSAFE_FILE (exit 4).
     let bad = common::run_todo(
@@ -308,7 +297,7 @@ fn twenty_parallel_claims_of_one_task_have_exactly_one_winner() {
 - status: open\n\
 - owner: —\n\
 - priority: P0\n";
-    let (home, work, todo_file) = setup_proj(&tmp, body).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, body);
 
     let invocations: Vec<Vec<String>> = (0..20)
         .map(|i| {

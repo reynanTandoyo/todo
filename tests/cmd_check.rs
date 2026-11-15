@@ -1,13 +1,12 @@
+mod common;
+
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use serde_json::Value;
 use tempfile::TempDir;
 
-fn todo_bin() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_todo"))
-}
+use common::todo_bin;
 
 fn run_check(dir: &Path) -> (i32, String, Value) {
     let text_out = todo_bin()

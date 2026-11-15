@@ -6,18 +6,7 @@ use std::fs;
 
 use tempfile::TempDir;
 
-fn setup_proj(
-    tmp: &TempDir,
-    body: &str,
-) -> std::io::Result<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home)?;
-    fs::create_dir_all(&work)?;
-    let todo_file = work.join("TODO.md");
-    fs::write(&todo_file, body)?;
-    Ok((home, work, todo_file))
-}
+use common::setup_proj;
 
 #[test]
 fn set_edits_all_options_combined_priority_field_and_unset() {
@@ -36,7 +25,7 @@ fn set_edits_all_options_combined_priority_field_and_unset() {
 - owner: alice\n\
 - claimed: 2026-11-15T10:00+01:00\n\
 - priority: P2\n";
-    let (home, work, todo_file) = setup_proj(&tmp, initial).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, initial);
     let now = "2026-11-15T14:00:00+01:00";
 
     // Update combined priority line in place (--priority + --area, keeping --type), plus all other options.
@@ -173,7 +162,7 @@ fn set_refuses_status_owner_claimed_and_invalid_args() {
 - status: open\n\
 - owner: —\n\
 - priority: P1\n";
-    let (home, work, todo_file) = setup_proj(&tmp, initial).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, initial);
     let before = fs::read(&todo_file).unwrap();
 
     for key in ["status", "owner", "claimed", "STATUS", "Owner"] {

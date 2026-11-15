@@ -1,12 +1,11 @@
+mod common;
+
 use std::fs;
-use std::process::Command;
 
 use serde_json::Value;
 use tempfile::TempDir;
 
-fn todo_bin() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_todo"))
-}
+use common::todo_bin;
 
 #[test]
 fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_outdated() {

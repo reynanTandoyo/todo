@@ -6,18 +6,7 @@ use std::fs;
 
 use tempfile::TempDir;
 
-fn setup_proj(
-    tmp: &TempDir,
-    body: &str,
-) -> std::io::Result<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home)?;
-    fs::create_dir_all(&work)?;
-    let todo_file = work.join("TODO.md");
-    fs::write(&todo_file, body)?;
-    Ok((home, work, todo_file))
-}
+use common::setup_proj;
 
 #[test]
 fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
@@ -44,7 +33,7 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
 ### T-005 · Dropped task\n\
 - status: dropped\n\
 - owner: —\n";
-    let (home, work, todo_file) = setup_proj(&tmp, initial).unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, initial);
     let t1 = "2026-11-15T12:00:00+01:00";
     let t2 = "2026-11-15T15:45:00+01:00";
 

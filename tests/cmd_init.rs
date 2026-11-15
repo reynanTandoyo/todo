@@ -1,12 +1,11 @@
+mod common;
+
 use std::fs;
-use std::process::Command;
 
 use serde_json::Value;
 use tempfile::TempDir;
 
-fn todo_bin() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_todo"))
-}
+use common::todo_bin;
 
 #[test]
 fn init_creates_valid_todo_that_passes_check_and_refuses_overwrite() {
