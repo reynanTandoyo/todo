@@ -1,0 +1,230 @@
+//! CLI integration tests for `todo block`, `todo unblock`, and `todo drop` (T-025; R-WRITE-5, R-WRITE-6, TEST-4).
+
+mod lock_support;
+
+use std::fs;
+
+use tempfile::TempDir;
+
+fn setup_proj(
+    tmp: &TempDir,
+    body: &str,
+) -> std::io::Result<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
+    let home = tmp.path().join("home");
+    let work = tmp.path().join("work");
+    fs::create_dir_all(&home)?;
+    fs::create_dir_all(&work)?;
+    let todo_file = work.join("TODO.md");
+    fs::write(&todo_file, body)?;
+    Ok((home, work, todo_file))
+}
+
+#[test]
+fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
+    let tmp = TempDir::new().unwrap();
+    let initial = "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
+## Now\n\n\
+### T-001 · Open task\n\
+- status: open\n\
+- owner: —\n\
+\n\
+### T-002 · Claimed by alice\n\
+- status: claimed\n\
+- owner: alice\n\
+- claimed: 2026-11-15T10:00+01:00\n\
+\n\
+### T-003 · Open to drop\n\
+- status: open\n\
+- owner: —\n\
+\n\
+### T-004 · Done task\n\
+- status: done\n\
+- owner: alice\n\
+\n\
+### T-005 · Dropped task\n\
+- status: dropped\n\
+- owner: —\n";
+    let (home, work, todo_file) = setup_proj(&tmp, initial).unwrap();
+    let t1 = "2026-11-15T12:00:00+01:00";
+    let t2 = "2026-11-15T15:45:00+01:00";
+
+    // Missing --note on block and drop -> exit 2 (Usage), file untouched.
+    let before = fs::read(&todo_file).unwrap();
+    let missing_block_note =
+        lock_support::run_todo(&home, &work, &["block", "T-001", "--agent", "bob"], &[]).unwrap();
+    assert_eq!(missing_block_note.status.code(), Some(2));
+    let empty_drop_note = lock_support::run_todo(
+        &home,
+        &work,
+        &["drop", "T-001", "--agent", "bob", "--note", "   "],
+        &[],
+    )
+    .unwrap();
+    assert_eq!(empty_drop_note.status.code(), Some(2));
+    assert_eq!(fs::read(&todo_file).unwrap(), before);
+
+    // Block open task (T-001) -> blocked (no owner) + note; then unblock -> open.
+    let b1 = lock_support::run_todo(
+        &home,
+        &work,
+        &["block", "T-001", "--agent", "bob", "--note", "waiting"],
+        &[("TODO_TEST_NOW", t1)],
+    )
+    .unwrap();
+    assert!(b1.status.success());
+    let after_b1 = fs::read_to_string(&todo_file).unwrap();
+    assert!(after_b1.contains(
+        "### T-001 · Open task\n\
+- status: blocked\n\
+- owner: —\n\
+- note (2026-11-15, bob): blocked \u{2014} waiting\n"
+    ));
+
+    // Block an already blocked task -> BAD_TRANSITION.
+    let before_reblock = fs::read(&todo_file).unwrap();
+    let reblock = lock_support::run_todo(
+        &home,
+        &work,
+        &["--json", "block", "T-001", "--agent", "bob", "--note", "x"],
+        &[("TODO_TEST_NOW", t1)],
+    )
+    .unwrap();
+    assert_eq!(reblock.status.code(), Some(1));
+    let j_rb: serde_json::Value = serde_json::from_slice(&reblock.stdout).unwrap();
+    assert_eq!(j_rb["error"]["code"], "BAD_TRANSITION");
+    assert_eq!(fs::read(&todo_file).unwrap(), before_reblock);
+
+    // Unblock unowned T-001 -> open.
+    let u1 = lock_support::run_todo(
+        &home,
+        &work,
+        &["unblock", "T-001", "--agent", "bob"],
+        &[("TODO_TEST_NOW", t2)],
+    )
+    .unwrap();
+    assert!(u1.status.success());
+    let after_u1 = fs::read_to_string(&todo_file).unwrap();
+    assert!(after_u1.contains(
+        "### T-001 · Open task\n\
+- status: open\n\
+- owner: —\n\
+- note (2026-11-15, bob): blocked \u{2014} waiting\n\
+- note (2026-11-15, bob): unblocked\n"
+    ));
+
+    // Unblock open task -> BAD_TRANSITION.
+    let before_u_open = fs::read(&todo_file).unwrap();
+    let u_open = lock_support::run_todo(
+        &home,
+        &work,
+        &["--json", "unblock", "T-001", "--agent", "bob"],
+        &[("TODO_TEST_NOW", t2)],
+    )
+    .unwrap();
+    assert_eq!(u_open.status.code(), Some(1));
+    assert_eq!(fs::read(&todo_file).unwrap(), before_u_open);
+
+    // Claimed by alice (T-002): bob cannot block without --force (NOT_OWNER).
+    let block_other = lock_support::run_todo(
+        &home,
+        &work,
+        &[
+            "--json", "block", "T-002", "--agent", "bob", "--note", "halt",
+        ],
+        &[("TODO_TEST_NOW", t1)],
+    )
+    .unwrap();
+    assert_eq!(block_other.status.code(), Some(1));
+    let j_bo: serde_json::Value = serde_json::from_slice(&block_other.stdout).unwrap();
+    assert_eq!(j_bo["error"]["code"], "NOT_OWNER");
+
+    // Alice blocks T-002 (keeps owner & claimed), then unblocks -> claimed with refreshed time!
+    let b2 = lock_support::run_todo(
+        &home,
+        &work,
+        &["block", "T-002", "--agent", "alice", "--note", "need info"],
+        &[("TODO_TEST_NOW", t1)],
+    )
+    .unwrap();
+    assert!(b2.status.success());
+    let u2 = lock_support::run_todo(
+        &home,
+        &work,
+        &[
+            "--json", "unblock", "T-002", "--agent", "alice", "--note", "got info",
+        ],
+        &[("TODO_TEST_NOW", t2)],
+    )
+    .unwrap();
+    assert!(u2.status.success());
+    let j_u2: serde_json::Value = serde_json::from_slice(&u2.stdout).unwrap();
+    assert_eq!(j_u2["schema"], "todo.unblock.v1");
+    assert_eq!(j_u2["data"]["status"], "claimed");
+    assert_eq!(j_u2["data"]["owner"], "alice");
+    assert_eq!(j_u2["data"]["claimed"], "2026-11-15T15:45+01:00");
+
+    // Unblock claimed task -> BAD_TRANSITION.
+    let u_claimed = lock_support::run_todo(
+        &home,
+        &work,
+        &["--json", "unblock", "T-002", "--agent", "alice"],
+        &[("TODO_TEST_NOW", t2)],
+    )
+    .unwrap();
+    assert_eq!(u_claimed.status.code(), Some(1));
+
+    // Drop claimed T-002 by bob without --force -> NOT_OWNER; with --force -> dropped, claimed removed.
+    let drop_no = lock_support::run_todo(
+        &home,
+        &work,
+        &[
+            "--json", "drop", "T-002", "--agent", "bob", "--note", "obsolete",
+        ],
+        &[("TODO_TEST_NOW", t2)],
+    )
+    .unwrap();
+    assert_eq!(drop_no.status.code(), Some(1));
+
+    let drop_force = lock_support::run_todo(
+        &home,
+        &work,
+        &[
+            "drop", "T-002", "--agent", "bob", "--force", "--note", "obsolete",
+        ],
+        &[("TODO_TEST_NOW", t2)],
+    )
+    .unwrap();
+    assert!(drop_force.status.success());
+    let after_drop2 = fs::read_to_string(&todo_file).unwrap();
+    assert!(after_drop2.contains("- status: dropped\n- owner: alice\n- note (2026-11-15, alice):"));
+    assert!(!after_drop2.contains("2026-11-15T15:45+01:00"));
+    assert!(after_drop2.contains("- note (2026-11-15, bob): forced drop (owner was alice)\n"));
+    assert!(after_drop2.contains("- note (2026-11-15, bob): dropped \u{2014} obsolete\n"));
+
+    // Drop open T-003 -> dropped.
+    let drop_open = lock_support::run_todo(
+        &home,
+        &work,
+        &["drop", "T-003", "--agent", "bob", "--note", "wontfix"],
+        &[("TODO_TEST_NOW", t2)],
+    )
+    .unwrap();
+    assert!(drop_open.status.success());
+
+    // Block, unblock, drop on done (T-004) and dropped (T-005) -> BAD_TRANSITION, byte-identical.
+    let before_terminal = fs::read(&todo_file).unwrap();
+    for id in ["T-004", "T-005"] {
+        for args in [
+            vec!["--json", "block", id, "--agent", "alice", "--note", "x"],
+            vec!["--json", "unblock", id, "--agent", "alice"],
+            vec!["--json", "drop", id, "--agent", "alice", "--note", "x"],
+        ] {
+            let res =
+                lock_support::run_todo(&home, &work, &args, &[("TODO_TEST_NOW", t2)]).unwrap();
+            assert_eq!(res.status.code(), Some(1), "args: {args:?}");
+            let j: serde_json::Value = serde_json::from_slice(&res.stdout).unwrap();
+            assert_eq!(j["error"]["code"], "BAD_TRANSITION");
+        }
+    }
+    assert_eq!(fs::read(&todo_file).unwrap(), before_terminal);
+}
