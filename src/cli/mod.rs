@@ -249,6 +249,7 @@ register_commands! {
     Help => help,
     List => list,
     Lock => lock,
+    Show => show,
     Status => status,
     Unlock => unlock,
 }

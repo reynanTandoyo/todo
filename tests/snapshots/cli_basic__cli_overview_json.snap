@@ -22,6 +22,11 @@ expression: ok_json
       },
       {
         "kind": "read",
+        "name": "show",
+        "summary": "Show full details of a task"
+      },
+      {
+        "kind": "read",
         "name": "status",
         "summary": "Show write lock and manual lease status"
       },
