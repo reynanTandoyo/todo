@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use crate::error::{ErrorCode, Result, TodoError};
 
@@ -171,7 +171,7 @@ fn absolute_clean(path: &Path, base: &Path) -> Result<PathBuf> {
             format!("could not resolve path {}: {e}", joined.display()),
         )
     })?;
-    Ok(strip_verbatim_prefix(&abs))
+    Ok(normalize_lexically(&strip_verbatim_prefix(&abs)))
 }
 
 fn resolve_relative_path(base_dir: &Path, raw: &str) -> PathBuf {
@@ -182,9 +182,39 @@ fn resolve_relative_path(base_dir: &Path, raw: &str) -> PathBuf {
         base_dir.join(p)
     };
     match std::path::absolute(&joined) {
-        Ok(abs) => strip_verbatim_prefix(&abs),
-        Err(_) => joined,
+        Ok(abs) => normalize_lexically(&strip_verbatim_prefix(&abs)),
+        Err(_) => normalize_lexically(&joined),
     }
+}
+
+/// Removes `.` and `..` components without touching the file system.
+///
+/// `std::path::absolute` resolves `..` on Windows but deliberately keeps it on Unix, so a
+/// worktree's `commondir` of `../..` stayed `…/.git/worktrees/<name>/../..` on Linux and the
+/// main checkout was never found (R-FIND-5). Normalizing the text on every platform gives the
+/// Windows behaviour everywhere, without resolving symlinks or 8.3 short names.
+fn normalize_lexically(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                let at_root = matches!(
+                    out.components().next_back(),
+                    None | Some(Component::RootDir | Component::Prefix(_) | Component::ParentDir)
+                );
+                if at_root {
+                    if !path.has_root() {
+                        out.push(Component::ParentDir.as_os_str());
+                    }
+                } else {
+                    out.pop();
+                }
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
 }
 
 fn no_file_error(searched_from: &Path) -> TodoError {
@@ -676,4 +706,42 @@ pub fn synced_folder_warning(path: &Path) -> Option<String> {
         "{} is inside a {service} folder; synced folders are not safe for parallel agents",
         path.display()
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_lexically;
+    use std::path::Path;
+
+    #[cfg(unix)]
+    #[test]
+    fn worktree_commondir_dotdots_resolve_on_unix() {
+        let raw = Path::new("/tmp/x/main-repo/.git/worktrees/wt-feature/../..");
+        assert_eq!(normalize_lexically(raw), Path::new("/tmp/x/main-repo/.git"));
+        assert_eq!(
+            normalize_lexically(Path::new("/a/./b/../c")),
+            Path::new("/a/c")
+        );
+        assert_eq!(normalize_lexically(Path::new("/..")), Path::new("/"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn worktree_commondir_dotdots_resolve_on_windows() {
+        let raw = Path::new(r"C:\x\main-repo\.git\worktrees\wt-feature\..\..");
+        assert_eq!(normalize_lexically(raw), Path::new(r"C:\x\main-repo\.git"));
+        assert_eq!(
+            normalize_lexically(Path::new(r"C:\a\.\b\..\c")),
+            Path::new(r"C:\a\c")
+        );
+        assert_eq!(normalize_lexically(Path::new(r"C:\..")), Path::new(r"C:\"));
+    }
+
+    #[test]
+    fn relative_paths_keep_leading_dotdots() {
+        assert_eq!(
+            normalize_lexically(Path::new("../a/./b/..")),
+            Path::new("../a")
+        );
+    }
 }

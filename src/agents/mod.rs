@@ -52,8 +52,7 @@ pub fn check_managed_block_in_text(text: &str) -> ManagedBlockStatus {
     };
 
     let existing_body = lines[b + 1..e].join("\n");
-    let canonical_body = RULES_TEXT.trim();
-    if existing_body.trim() == canonical_body {
+    if existing_body.trim() == rules_text_lf() {
         ManagedBlockStatus::Current {
             begin_line: b + 1,
             end_line: e + 1,
@@ -85,8 +84,15 @@ pub fn render_managed_block(eol: &str) -> String {
 pub fn render_claude_skill() -> String {
     format!(
         "---\nname: todo\ndescription: Share a TODO.md task list safely across agents and people using the `todo` CLI.\n---\n\n{}\n",
-        RULES_TEXT.trim()
+        rules_text_lf()
     )
+}
+
+/// [`RULES_TEXT`] trimmed, with LF line endings. The text is embedded from `rules.md` at build
+/// time, so a checkout with CRLF endings (git `autocrlf` on Windows) would otherwise make a
+/// freshly installed block compare as outdated.
+fn rules_text_lf() -> String {
+    RULES_TEXT.trim().lines().collect::<Vec<_>>().join("\n")
 }
 
 /// Inserts or updates the managed agent-rules block in `existing_bytes` (`None` for a new file),
