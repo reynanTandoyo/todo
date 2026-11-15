@@ -5,7 +5,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{parse_json, read_todo, stderr_text, stdout_text, todo_bin, write_todo};
+use common::{parse_json, read_todo, run_in, stderr_text, stdout_text, write_todo};
 
 const SAMPLE_TODO: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
@@ -28,9 +28,9 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
 
     // 4 writes -> snapshots 1, 2, 3, 4 created, only 2, 3, 4 kept.
     for i in 1..=4 {
-        let out = todo_bin()
-            .current_dir(dir.path())
-            .args([
+        let out = run_in(
+            dir.path(),
+            &[
                 "add",
                 "--title",
                 &format!("Task number {i}"),
@@ -38,9 +38,8 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
                 "P2",
                 "--agent",
                 "agent-1",
-            ])
-            .output()
-            .expect("run add");
+            ],
+        );
         assert!(
             out.status.success(),
             "add {i} failed: {}",
@@ -48,11 +47,7 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
         );
     }
 
-    let hist_out = todo_bin()
-        .current_dir(dir.path())
-        .args(["history", "--json"])
-        .output()
-        .expect("run history");
+    let hist_out = run_in(dir.path(), &["history", "--json"]);
     assert!(hist_out.status.success());
     let hist_json: Value = parse_json(&hist_out.stdout);
     assert_eq!(hist_json["ok"], true);
@@ -74,22 +69,14 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
     assert!(dir.path().join(".todo/history/000002.md").exists());
 
     // Diff snapshot 2 against current.
-    let diff_out = todo_bin()
-        .current_dir(dir.path())
-        .args(["diff", "2"])
-        .output()
-        .expect("run diff 2");
+    let diff_out = run_in(dir.path(), &["diff", "2"]);
     assert!(diff_out.status.success());
     let diff_text = stdout_text(&diff_out);
     assert!(diff_text.contains("Task number 3"));
     assert!(diff_text.contains("Task number 4"));
 
     // Diff snapshot 2 against 3.
-    let diff_2_3 = todo_bin()
-        .current_dir(dir.path())
-        .args(["diff", "2", "3", "--json"])
-        .output()
-        .expect("run diff 2 3");
+    let diff_2_3 = run_in(dir.path(), &["diff", "2", "3", "--json"]);
     assert!(diff_2_3.status.success());
     let diff_json: Value = parse_json(&diff_2_3.stdout);
     assert_eq!(diff_json["data"]["from"], 2);
@@ -98,22 +85,14 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
 
     // Restore without --yes previews only and does not modify TODO.md.
     let before_preview = read_todo(dir.path());
-    let preview_out = todo_bin()
-        .current_dir(dir.path())
-        .args(["restore", "2", "--agent", "agent-1"])
-        .output()
-        .expect("run restore preview");
+    let preview_out = run_in(dir.path(), &["restore", "2", "--agent", "agent-1"]);
     assert!(preview_out.status.success());
     let preview_stdout = stdout_text(&preview_out);
     assert!(preview_stdout.contains("pass --yes"));
     assert_eq!(read_todo(dir.path()), before_preview);
 
     // Restore with --yes applies snapshot 2 and records snapshot 5 (pre-restore) so it can be undone.
-    let restore_out = todo_bin()
-        .current_dir(dir.path())
-        .args(["restore", "2", "--yes", "--agent", "agent-1"])
-        .output()
-        .expect("run restore --yes");
+    let restore_out = run_in(dir.path(), &["restore", "2", "--yes", "--agent", "agent-1"]);
     assert!(
         restore_out.status.success(),
         "restore failed: {}",
@@ -124,11 +103,7 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
     assert!(!after_restore.contains("Task number 4"));
 
     // Undo the restore by restoring snapshot 5!
-    let hist_after = todo_bin()
-        .current_dir(dir.path())
-        .args(["history", "--json"])
-        .output()
-        .expect("run history after restore");
+    let hist_after = run_in(dir.path(), &["history", "--json"]);
     let hist_after_json: Value = parse_json(&hist_after.stdout);
     let latest_num = hist_after_json["data"]["snapshots"]
         .as_array()
@@ -139,11 +114,7 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
         .expect("num");
     assert_eq!(latest_num, 5);
 
-    let undo_out = todo_bin()
-        .current_dir(dir.path())
-        .args(["restore", "5", "--yes", "--agent", "agent-1"])
-        .output()
-        .expect("undo restore");
+    let undo_out = run_in(dir.path(), &["restore", "5", "--yes", "--agent", "agent-1"]);
     assert!(undo_out.status.success());
     let after_undo = read_todo(dir.path());
     assert_eq!(after_undo, before_preview);

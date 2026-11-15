@@ -5,17 +5,13 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{parse_json, read_todo, stderr_text, stdout_text, todo_bin};
+use common::{parse_json, read_todo, run_in, stderr_text, stdout_text};
 
 #[test]
 fn init_creates_valid_todo_that_passes_check_and_refuses_overwrite() {
     let dir = TempDir::new().expect("tempdir");
 
-    let out = todo_bin()
-        .current_dir(dir.path())
-        .args(["init", "--title", "Sample Project"])
-        .output()
-        .expect("run init");
+    let out = run_in(dir.path(), &["init", "--title", "Sample Project"]);
     assert!(out.status.success(), "init failed: {}", stderr_text(&out));
     let stdout = stdout_text(&out);
     assert!(stdout.contains("<!-- todo:begin -->"));
@@ -29,11 +25,7 @@ fn init_creates_valid_todo_that_passes_check_and_refuses_overwrite() {
     assert!(created.contains("## Tasks"));
 
     // Created file must pass `todo check`.
-    let check = todo_bin()
-        .current_dir(dir.path())
-        .args(["check"])
-        .output()
-        .expect("run check");
+    let check = run_in(dir.path(), &["check"]);
     assert!(
         check.status.success(),
         "check failed on newly initialized TODO.md: {}",
@@ -44,11 +36,7 @@ fn init_creates_valid_todo_that_passes_check_and_refuses_overwrite() {
     let sentinel = "<!-- custom content -->\n";
     fs::write(dir.path().join("TODO.md"), sentinel).expect("write sentinel");
 
-    let second = todo_bin()
-        .current_dir(dir.path())
-        .args(["init", "--json"])
-        .output()
-        .expect("run second init");
+    let second = run_in(dir.path(), &["init", "--json"]);
     assert_eq!(second.status.code(), Some(4));
     let json: Value = parse_json(&second.stdout);
     assert_eq!(json["ok"], false);

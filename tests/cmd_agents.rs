@@ -5,7 +5,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{parse_json, stderr_text, stdout_text, todo_bin};
+use common::{parse_json, run_in, stderr_text, stdout_text};
 
 #[test]
 fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_outdated() {
@@ -13,41 +13,25 @@ fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_out
     let agents_path = dir.path().join("AGENTS.md");
 
     // 1. Missing file -> agents check exits 1.
-    let missing_check = todo_bin()
-        .current_dir(dir.path())
-        .args(["agents", "check"])
-        .output()
-        .expect("run agents check on missing file");
+    let missing_check = run_in(dir.path(), &["agents", "check"]);
     assert_eq!(missing_check.status.code(), Some(1));
     assert!(stdout_text(&missing_check).contains("missing"));
 
     // 2. Existing file with CRLF and no block -> agents check exits 1.
     let prefix = "# Repo Rules\r\n\r\nKeep this exact CRLF header.\r\n";
     fs::write(&agents_path, prefix).expect("write AGENTS.md");
-    let no_block_check = todo_bin()
-        .current_dir(dir.path())
-        .args(["agents", "check"])
-        .output()
-        .expect("run agents check without block");
+    let no_block_check = run_in(dir.path(), &["agents", "check"]);
     assert_eq!(no_block_check.status.code(), Some(1));
     assert!(stdout_text(&no_block_check).contains("missing agent rules block"));
 
     // 3. Preview without --yes makes no changes.
-    let preview = todo_bin()
-        .current_dir(dir.path())
-        .args(["agents", "install"])
-        .output()
-        .expect("run agents install preview");
+    let preview = run_in(dir.path(), &["agents", "install"]);
     assert!(preview.status.success());
     assert!(stdout_text(&preview).contains("pass --yes"));
     assert_eq!(fs::read(&agents_path).expect("read"), prefix.as_bytes());
 
     // 4. Install --yes adds block while preserving prefix bytes.
-    let install = todo_bin()
-        .current_dir(dir.path())
-        .args(["agents", "install", "--yes"])
-        .output()
-        .expect("run agents install --yes");
+    let install = run_in(dir.path(), &["agents", "install", "--yes"]);
     assert!(
         install.status.success(),
         "install failed: {}",
@@ -60,11 +44,7 @@ fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_out
     );
 
     // 5. Check now passes with exit 0.
-    let ok_check = todo_bin()
-        .current_dir(dir.path())
-        .args(["agents", "check", "--json"])
-        .output()
-        .expect("run agents check ok");
+    let ok_check = run_in(dir.path(), &["agents", "check", "--json"]);
     assert!(ok_check.status.success());
     let ok_json: Value = parse_json(&ok_check.stdout);
     assert_eq!(ok_json["data"]["status"], "current");
@@ -76,11 +56,7 @@ fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_out
     let outdated = format!("{claude_prefix}Old rules.\r\n{claude_suffix}");
     fs::write(&claude_path, outdated.as_bytes()).expect("write CLAUDE.md");
 
-    let outdated_check = todo_bin()
-        .current_dir(dir.path())
-        .args(["agents", "check", "--into", "CLAUDE.md"])
-        .output()
-        .expect("run agents check outdated");
+    let outdated_check = run_in(dir.path(), &["agents", "check", "--into", "CLAUDE.md"]);
     assert_eq!(outdated_check.status.code(), Some(1));
     let outdated_stdout = stdout_text(&outdated_check);
     assert!(
@@ -89,11 +65,10 @@ fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_out
     );
 
     // 7. Install --into CLAUDE.md --yes replaces only between markers, keeping prefix & suffix byte-for-byte.
-    let update = todo_bin()
-        .current_dir(dir.path())
-        .args(["agents", "install", "--into", "CLAUDE.md", "--yes"])
-        .output()
-        .expect("run agents install --into CLAUDE.md --yes");
+    let update = run_in(
+        dir.path(),
+        &["agents", "install", "--into", "CLAUDE.md", "--yes"],
+    );
     assert!(update.status.success());
     let updated_bytes = fs::read(&claude_path).expect("read CLAUDE.md");
     assert!(
@@ -105,10 +80,6 @@ fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_out
         "suffix bytes after <!-- todo:end --> changed!"
     );
 
-    let recheck = todo_bin()
-        .current_dir(dir.path())
-        .args(["agents", "check", "--into", "CLAUDE.md"])
-        .output()
-        .expect("recheck CLAUDE.md");
+    let recheck = run_in(dir.path(), &["agents", "check", "--into", "CLAUDE.md"]);
     assert!(recheck.status.success());
 }

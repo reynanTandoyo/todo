@@ -5,7 +5,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{parse_json, read_text, todo_bin, write_todo};
+use common::{parse_json, read_text, run_in, write_todo};
 
 const SAMPLE_TODO: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
@@ -26,9 +26,9 @@ fn hand_edit_between_commands_is_saved_and_reported_once() {
     write_todo(dir.path(), SAMPLE_TODO);
 
     // Initial write via todo so last-write.json is recorded.
-    let add = todo_bin()
-        .current_dir(dir.path())
-        .args([
+    let add = run_in(
+        dir.path(),
+        &[
             "add",
             "--title",
             "Second task",
@@ -36,9 +36,8 @@ fn hand_edit_between_commands_is_saved_and_reported_once() {
             "P2",
             "--agent",
             "agent-1",
-        ])
-        .output()
-        .expect("run add");
+        ],
+    );
     assert!(add.status.success());
 
     // Simulate a hand edit outside the tool.
@@ -48,11 +47,7 @@ fn hand_edit_between_commands_is_saved_and_reported_once() {
     fs::write(&path, text).expect("write hand edit");
 
     // Next command (read) detects it once, warns once, and saves an outside-edit snapshot.
-    let list1 = todo_bin()
-        .current_dir(dir.path())
-        .args(["list", "--json"])
-        .output()
-        .expect("run list 1");
+    let list1 = run_in(dir.path(), &["list", "--json"]);
     assert!(list1.status.success());
     let list1_json: Value = parse_json(&list1.stdout);
     let warnings1 = list1_json["warnings"].as_array().expect("warnings array");
@@ -69,11 +64,7 @@ fn hand_edit_between_commands_is_saved_and_reported_once() {
     );
 
     // Second read command must NOT warn again.
-    let list2 = todo_bin()
-        .current_dir(dir.path())
-        .args(["list", "--json"])
-        .output()
-        .expect("run list 2");
+    let list2 = run_in(dir.path(), &["list", "--json"]);
     assert!(list2.status.success());
     let list2_json: Value = parse_json(&list2.stdout);
     let warnings2 = list2_json["warnings"].as_array().expect("warnings array");
@@ -83,11 +74,7 @@ fn hand_edit_between_commands_is_saved_and_reported_once() {
     );
 
     // History contains the outside-edit snapshot.
-    let hist = todo_bin()
-        .current_dir(dir.path())
-        .args(["history", "--json"])
-        .output()
-        .expect("run history");
+    let hist = run_in(dir.path(), &["history", "--json"]);
     assert!(hist.status.success());
     let hist_json: Value = parse_json(&hist.stdout);
     let snaps = hist_json["data"]["snapshots"].as_array().expect("snaps");
@@ -102,9 +89,9 @@ fn edits_during_lease_are_recorded_without_warning() {
     write_todo(dir.path(), SAMPLE_TODO);
 
     // Initial write.
-    let add = todo_bin()
-        .current_dir(dir.path())
-        .args([
+    let add = run_in(
+        dir.path(),
+        &[
             "add",
             "--title",
             "Second task",
@@ -112,17 +99,12 @@ fn edits_during_lease_are_recorded_without_warning() {
             "P2",
             "--agent",
             "agent-1",
-        ])
-        .output()
-        .expect("run add");
+        ],
+    );
     assert!(add.status.success());
 
     // Acquire lease.
-    let lock = todo_bin()
-        .current_dir(dir.path())
-        .args(["lock", "--agent", "human"])
-        .output()
-        .expect("run lock");
+    let lock = run_in(dir.path(), &["lock", "--agent", "human"]);
     assert!(lock.status.success());
 
     // Edit by hand while lease is live.
@@ -132,11 +114,7 @@ fn edits_during_lease_are_recorded_without_warning() {
     fs::write(&path, text).expect("write lease edit");
 
     // Read during live lease emits no outside-edit warning.
-    let list_during = todo_bin()
-        .current_dir(dir.path())
-        .args(["list", "--json"])
-        .output()
-        .expect("run list during lease");
+    let list_during = run_in(dir.path(), &["list", "--json"]);
     assert!(list_during.status.success());
     let list_during_json: Value = parse_json(&list_during.stdout);
     assert!(
@@ -147,11 +125,7 @@ fn edits_during_lease_are_recorded_without_warning() {
     );
 
     // Unlock records the lease edit snapshot without a warning.
-    let unlock = todo_bin()
-        .current_dir(dir.path())
-        .args(["unlock", "--agent", "human", "--json"])
-        .output()
-        .expect("run unlock");
+    let unlock = run_in(dir.path(), &["unlock", "--agent", "human", "--json"]);
     assert!(unlock.status.success());
     let unlock_json: Value = parse_json(&unlock.stdout);
     assert!(
@@ -162,11 +136,7 @@ fn edits_during_lease_are_recorded_without_warning() {
     );
 
     // Subsequent list emits no warning either.
-    let list_after = todo_bin()
-        .current_dir(dir.path())
-        .args(["list", "--json"])
-        .output()
-        .expect("run list after unlock");
+    let list_after = run_in(dir.path(), &["list", "--json"]);
     assert!(list_after.status.success());
     let list_after_json: Value = parse_json(&list_after.stdout);
     assert!(
@@ -177,11 +147,7 @@ fn edits_during_lease_are_recorded_without_warning() {
     );
 
     // History has the lease edit snapshot.
-    let hist = todo_bin()
-        .current_dir(dir.path())
-        .args(["history", "--json"])
-        .output()
-        .expect("run history");
+    let hist = run_in(dir.path(), &["history", "--json"]);
     let hist_json: Value = parse_json(&hist.stdout);
     let snaps = hist_json["data"]["snapshots"].as_array().expect("snaps");
     assert_eq!(snaps.len(), 2);

@@ -5,7 +5,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{parse_json, read_text, stderr_text, stdout_text, todo_bin};
+use common::{parse_json, read_text, run_in, stderr_text, stdout_text, todo_bin};
 
 const ARCHIVE_FIXTURE: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
@@ -52,11 +52,7 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
     fs::write(dir.path().join("TODO.md"), ARCHIVE_FIXTURE).expect("write TODO.md");
 
     // Preview without --yes makes no changes.
-    let preview = todo_bin()
-        .current_dir(dir.path())
-        .args(["archive", "--agent", "coordinator"])
-        .output()
-        .expect("run archive preview");
+    let preview = run_in(dir.path(), &["archive", "--agent", "coordinator"]);
     assert!(preview.status.success());
     assert!(stdout_text(&preview).contains("pass --yes"));
     assert!(!dir.path().join("TODO-archive.md").exists());
@@ -93,19 +89,11 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
     assert!(!archive_text.contains("T-002"));
 
     // show still finds T-001 in archive.
-    let show = todo_bin()
-        .current_dir(dir.path())
-        .args(["show", "T-001", "--json"])
-        .output()
-        .expect("run show T-001");
+    let show = run_in(dir.path(), &["show", "T-001", "--json"]);
     assert!(show.status.success());
 
     // list --archive includes archived tasks.
-    let list_arch = todo_bin()
-        .current_dir(dir.path())
-        .args(["list", "--archive", "--json"])
-        .output()
-        .expect("run list --archive");
+    let list_arch = run_in(dir.path(), &["list", "--archive", "--json"]);
     assert!(list_arch.status.success());
     let list_json: Value = parse_json(&list_arch.stdout);
     let tasks = list_json["data"]["tasks"].as_array().expect("tasks");
@@ -113,11 +101,7 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
     assert!(tasks.iter().any(|t| t["id"] == "T-004"));
 
     // Dependency check: T-003 depends on T-001 (which is done in archive), so T-003 is ready and `check` is clean!
-    let check = todo_bin()
-        .current_dir(dir.path())
-        .args(["check"])
-        .output()
-        .expect("run check");
+    let check = run_in(dir.path(), &["check"]);
     assert!(
         check.status.success(),
         "check failed: {}",
@@ -125,19 +109,15 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
     );
 
     // Archive remaining done task T-002 (into existing Backend section in TODO-archive.md).
-    let arch_rest = todo_bin()
-        .current_dir(dir.path())
-        .args(["archive", "--yes", "--agent", "coordinator"])
-        .output()
-        .expect("run archive rest");
+    let arch_rest = run_in(dir.path(), &["archive", "--yes", "--agent", "coordinator"]);
     assert!(arch_rest.status.success());
     let archive_text2 = read_text(&dir.path().join("TODO-archive.md"));
     assert!(archive_text2.contains("### T-002 · Recent done backend task"));
 
     // Adding a new task must pick T-006, never reusing archived IDs.
-    let add = todo_bin()
-        .current_dir(dir.path())
-        .args([
+    let add = run_in(
+        dir.path(),
+        &[
             "add",
             "--title",
             "After archive",
@@ -148,9 +128,8 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
             "--agent",
             "alice",
             "--json",
-        ])
-        .output()
-        .expect("run add");
+        ],
+    );
     assert!(add.status.success());
     let add_json: Value = parse_json(&add.stdout);
     assert_eq!(add_json["data"]["id"], "T-006");

@@ -6,19 +6,11 @@ use std::path::Path;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{parse_json, read_todo, stdout_text, todo_bin};
+use common::{parse_json, read_todo, run_in, stdout_text};
 
 fn run_check(dir: &Path) -> (i32, String, Value) {
-    let text_out = todo_bin()
-        .current_dir(dir)
-        .args(["check"])
-        .output()
-        .expect("run check");
-    let json_out = todo_bin()
-        .current_dir(dir)
-        .args(["check", "--json"])
-        .output()
-        .expect("run check --json");
+    let text_out = run_in(dir, &["check"]);
+    let json_out = run_in(dir, &["check", "--json"]);
     let code = text_out.status.code().unwrap_or(-1);
     let stdout = stdout_text(&text_out);
     let json: Value = parse_json(&json_out.stdout);
@@ -252,11 +244,7 @@ Stale rules.
     )
     .expect("write TODO.md");
 
-    let out = todo_bin()
-        .current_dir(dir.path())
-        .args(["check", "--fix", "--agent", "alice"])
-        .output()
-        .expect("run check --fix");
+    let out = run_in(dir.path(), &["check", "--fix", "--agent", "alice"]);
     assert_eq!(out.status.code(), Some(1));
     let stdout = String::from_utf8(out.stdout).expect("utf8");
     assert!(

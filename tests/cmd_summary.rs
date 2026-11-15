@@ -5,7 +5,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{parse_json, stderr_text, stdout_text, todo_bin};
+use common::{parse_json, run_in, stderr_text, stdout_text, todo_bin};
 
 #[test]
 fn summary_json_matches_snapshot() {
@@ -103,11 +103,7 @@ fn summary_on_5000_tasks_is_at_most_40_lines() {
     }
     fs::write(dir.path().join("TODO.md"), content).expect("write 5000-task TODO.md");
 
-    let out = todo_bin()
-        .current_dir(dir.path())
-        .args(["summary"])
-        .output()
-        .expect("run summary");
+    let out = run_in(dir.path(), &["summary"]);
     assert!(out.status.success());
     let stdout = stdout_text(&out);
     let line_count = stdout.lines().count();
