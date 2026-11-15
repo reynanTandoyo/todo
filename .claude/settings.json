@@ -12,6 +12,17 @@
         "matcher": "Edit|Write|MultiEdit"
       }
     ],
+    "SessionEnd": [
+      {
+        "_managed_by": "todo",
+        "hooks": [
+          {
+            "command": "todo session-end",
+            "type": "command"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "_managed_by": "todo",
