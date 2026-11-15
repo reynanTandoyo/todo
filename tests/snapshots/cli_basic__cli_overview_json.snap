@@ -1,0 +1,19 @@
+---
+source: tests/cli_basic.rs
+expression: ok_json
+---
+{
+  "data": {
+    "commands": [
+      {
+        "kind": "meta",
+        "name": "help",
+        "summary": "Show overview or detailed help for a command"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  "ok": true,
+  "schema": "todo.overview.v1",
+  "warnings": []
+}

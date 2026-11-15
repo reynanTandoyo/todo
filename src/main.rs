@@ -1,8 +1,5 @@
-//! `todo`: concurrency-safe editor for TODO.md task files.
-//!
-//! Scaffold only. Commands are implemented once the file-format decision is made.
+//! `todo`: concurrency-safe editor for `TODO.md` task files.
 
-fn main() {
-    eprintln!("todo: not implemented yet");
-    std::process::exit(1);
+fn main() -> std::process::ExitCode {
+    todo::cli::run_cli().into()
 }

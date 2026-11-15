@@ -180,7 +180,7 @@ pub struct TodoError {
     /// Process exit code.
     pub exit_code: ExitCode,
     /// Optional structured details serialized into the JSON `error` object.
-    pub details: ErrorDetails,
+    pub details: Box<ErrorDetails>,
 }
 
 impl TodoError {
@@ -191,7 +191,7 @@ impl TodoError {
             code,
             message: message.into(),
             exit_code: code.default_exit_code(),
-            details: ErrorDetails::default(),
+            details: Box::new(ErrorDetails::default()),
         }
     }
 

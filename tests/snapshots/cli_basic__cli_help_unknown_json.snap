@@ -1,0 +1,13 @@
+---
+source: tests/cli_basic.rs
+expression: err_json
+---
+{
+  "error": {
+    "code": "USAGE",
+    "message": "unknown help topic: nonexistent"
+  },
+  "ok": false,
+  "schema": "todo.help.v1",
+  "warnings": []
+}
