@@ -386,6 +386,7 @@ register_commands! {
     Release => release,
     Reopen => reopen,
     Restore => restore,
+    Search => search,
     Set => set,
     Show => show,
     Status => status,
