@@ -112,6 +112,34 @@ Task arguments also match unique case-insensitive title substrings (excluding `d
 tasks). Text options accept `-` (standard input) or `@path` (a UTF-8 file) so quotes, backticks,
 and `$` pass cleanly through PowerShell.
 
+### Importing a checkbox list
+
+`todo import --from checkbox` turns a Markdown checkbox list (`- [ ]`, `- [~]`, `- [!]`, `- [x]`
+lines under `##` sections) into a `TODO.md`. Without `--yes` it only prints the converted text, or a
+diff when the target exists. With `--yes` it writes the result and first saves an existing target as
+`<name>.pre-import`. All other lines stay byte for byte.
+
+```powershell
+todo import --from checkbox "C:\My Notes\plan.md"                       # preview
+todo import --from checkbox "C:\My Notes\plan.md" --out TODO.md --yes   # write a new TODO.md
+todo import --from checkbox TODO.md --yes                                # convert in place
+```
+
+| In the list | In `TODO.md` |
+|---|---|
+| `- [ ]`, `- [~]`, `- [!]`, `- [x]` | status `open`, `claimed`, `blocked`, `done` |
+| `**Title** — rest` or `Title — rest` | title `Title`, field `description: rest` |
+| `(added: agent, 2026-11-01)` | note `added` |
+| `(claimed: agent, 2026-11-01)` | owner `agent`, claim time = time of the import (an old claim would be stale), the old date in a note |
+| `(done: agent, 2026-11-05, abc1234)` | note `done` and `commit: abc1234` |
+| `  - 2026-11-05 agent: text` | note by `agent` on that date |
+| sections named like "Needs user decision" or "Questions" | `type: question` (so `todo next` skips them) |
+
+Checkboxes in the preamble, in code fences or indented stay text. IDs are `T-001`, `T-002`, … in
+file order. The command checks the result like `todo check`, compares the task count with the number
+of converted lines and reports both. It does not take the write lock; use it on lists that agents
+are not using yet.
+
 ### Manual edit leases, editor integration, and Claude Code
 
 ```powershell

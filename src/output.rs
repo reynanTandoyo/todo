@@ -204,6 +204,15 @@ impl Output {
         }
     }
 
+    /// Writes a plain status line to stderr in text mode (nothing in `--json` mode).
+    ///
+    /// For commands whose standard output is data that may be piped, such as `todo import`.
+    pub fn info(&mut self, message: &str) {
+        if !self.json {
+            self.write_stderr_line(message);
+        }
+    }
+
     /// Writes plain text to stdout (no trailing newline added).
     ///
     /// Ignored in `--json` mode or if stdout already hit `BrokenPipe`.

@@ -498,6 +498,7 @@ register_commands! {
     Help => help,
     History => history,
     Hooks => hooks,
+    Import => import,
     Init => init,
     List => list,
     Lock => lock,

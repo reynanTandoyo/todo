@@ -358,6 +358,35 @@ Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `T
 }
 ```
 
+### `todo import --json` (`todo.import.v1`)
+
+```json
+{
+  "schema": "todo.import.v1",
+  "ok": true,
+  "data": {
+    "source": "notes.md",
+    "target": "TODO.md",
+    "written": false,
+    "backup": null,
+    "checkbox_lines": 7,
+    "tasks": 7,
+    "problems": 0,
+    "converted": [
+      { "id": "T-001", "title": "Add export", "status": "open", "source_line": 11 }
+    ],
+    "text": "<!-- todo-format: 1 -->\n..."
+  },
+  "warnings": []
+}
+```
+
+`written` is `true` with `--yes` (and no `--dry-run`); then `backup` is the path of the
+`<name>.pre-import` copy when the target already existed, otherwise `null`. Without `--yes`, `text`
+holds the converted file when the target does not exist, and `diff` (unified diff) when it does;
+neither is present after a write. `checkbox_lines` and `tasks` are always equal; a result that fails
+the `todo check` rules or the count is an error (`BAD_VALUE`, exit 1, `details.problems`).
+
 ### `todo agents install --json` and `todo agents check --json` (`todo.agents.v1`)
 
 - `install`: `{"file":"AGENTS.md","applied":true,"changed":true,"created":false}`

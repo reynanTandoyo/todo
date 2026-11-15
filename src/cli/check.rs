@@ -217,7 +217,8 @@ pub(crate) fn collect_problems(
     Ok((label, problems))
 }
 
-fn check_tasks(
+/// Per-task semantic checks (claims, owners, blocked reasons, configured values).
+pub(crate) fn check_tasks(
     doc: &Document,
     _archive: Option<&Document>,
     cfg: &OpsConfig,
@@ -306,7 +307,8 @@ fn check_tasks(
     }
 }
 
-fn check_dependencies(
+/// Dependency checks: missing IDs, dropped dependencies, cycles (`R-DEP-3`).
+pub(crate) fn check_dependencies(
     doc: &Document,
     archive: Option<&Document>,
     label: &str,

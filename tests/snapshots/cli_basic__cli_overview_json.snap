@@ -92,6 +92,11 @@ expression: ok_json
       },
       {
         "kind": "meta",
+        "name": "import",
+        "summary": "Convert a Markdown checkbox list into a TODO.md"
+      },
+      {
+        "kind": "meta",
         "name": "init",
         "summary": "Create a new TODO.md with format line, agent rules, and ## Tasks"
       },

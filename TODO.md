@@ -662,8 +662,9 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - reqs: I-11
 
 ### T-081 · Import from other task-list formats
-- status: open
-- owner: —
+- status: claimed
+- owner: r4-sonnet
+- claimed: 2026-11-16T00:11+01:00
 - priority: P2 · type: idea · area: cli
 - accept: Checkbox list converts to format 1 per R-IMP-1: markers, title/description, suffixes, notes, question sections; non-task lines byte for byte; todo check passes; counts reported; preview without --yes; .pre-import backup
 - reqs: R-IMP-1

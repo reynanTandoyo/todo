@@ -10,6 +10,7 @@ pub mod doc;
 pub mod error;
 pub mod find;
 pub mod history;
+pub mod import;
 pub mod lock;
 pub mod ops;
 pub mod output;

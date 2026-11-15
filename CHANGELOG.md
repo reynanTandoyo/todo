@@ -2,6 +2,11 @@
 
 All notable changes to `todo` are documented in this file.
 
+## [0.4.0] - 2026-11-16
+
+### Added
+- `todo import --from checkbox <source> [--out <path>] [--yes]`: convert a Markdown checkbox task list into format version 1 with a preview, a `<name>.pre-import` backup, and a `todo check` plus task-count proof of the result (`R-IMP-1`).
+
 ## [0.3.0] - 2026-11-15
 
 ### Added
