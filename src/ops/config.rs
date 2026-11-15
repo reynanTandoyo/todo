@@ -22,6 +22,10 @@ pub struct OpsConfig {
     pub id_config: IdConfig,
     /// Ordered priority names from most urgent to least urgent (`R-CFG-2`).
     pub priorities: Vec<String>,
+    /// Default section name for `todo add` when `--section` is omitted (`R-WRITE-1`).
+    pub default_section: Option<String>,
+    /// Fields required by `todo add` (`R-WRITE-1`, default `["priority"]`).
+    pub required_fields: Vec<String>,
     /// File name of the archive file next to `TODO.md` (`format.md` §14).
     pub archive_file: String,
     /// Number of hours before a claim becomes stale (`R-CLAIM-4`).
@@ -40,6 +44,8 @@ impl Default for OpsConfig {
                 "P2".to_string(),
                 "P3".to_string(),
             ],
+            default_section: None,
+            required_fields: vec!["priority".to_string()],
             archive_file: DEFAULT_ARCHIVE_FILE.to_string(),
             claim_ttl_hours: DEFAULT_CLAIM_TTL_HOURS,
             lock: LockConfig::default(),

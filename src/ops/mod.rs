@@ -42,7 +42,8 @@ pub use config::{DEFAULT_ARCHIVE_FILE, DEFAULT_CLAIM_TTL_HOURS, OpsConfig};
 pub use edits::TaskEditBuilder;
 pub use pipeline::{
     DocWritePlan, WriteDocResult, WriteTaskResult, build_claim_edits, build_release_edits,
-    check_task_writable, edit_doc_and_write, edit_task_and_write, parse_doc_for_write,
+    check_task_writable, edit_doc_and_write, edit_doc_with_state_and_write, edit_task_and_write,
+    parse_doc_for_write,
 };
 pub use query::{
     ListFilter, NextFilter, SelectedNext, StatusFilter, WhereClause, filter_tasks,

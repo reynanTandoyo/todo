@@ -122,6 +122,34 @@ where
         DateTime<FixedOffset>,
     ) -> Result<DocWritePlan<T>>,
 {
+    edit_doc_with_state_and_write(
+        ctx,
+        cfg,
+        command,
+        out,
+        |doc, archive, _state, label, agent, now| op(doc, archive, label, agent, now),
+    )
+}
+
+/// Same as [`edit_doc_and_write`], but also provides `&StateDir` inside the lock so commands like
+/// `add` can read and update `ids.json` atomically under the write lock (`R-ID-2`).
+pub fn edit_doc_with_state_and_write<T, F>(
+    ctx: &Context,
+    cfg: &OpsConfig,
+    command: &str,
+    out: &mut Output,
+    mut op: F,
+) -> Result<WriteDocResult<T>>
+where
+    F: FnMut(
+        &Document,
+        Option<&Document>,
+        &StateDir,
+        &str,
+        &str,
+        DateTime<FixedOffset>,
+    ) -> Result<DocWritePlan<T>>,
+{
     let agent = ctx.require_agent()?.to_owned();
     let found = ctx.find_todo(out)?;
     let state = StateDir::from_found(&found)?;
@@ -139,7 +167,7 @@ where
             let archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
             let now = current_time();
 
-            match op(&doc, archive.as_ref(), &label, &agent, now)? {
+            match op(&doc, archive.as_ref(), &state, &label, &agent, now)? {
                 DocWritePlan::Unchanged(val) => Ok(WriteOutcome::Unchanged((false, val))),
                 DocWritePlan::Edits {
                     edits,
