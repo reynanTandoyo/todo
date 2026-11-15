@@ -2,13 +2,9 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::Status;
+use crate::cli::{CommandKind, CommandMeta, Context, run_task_op};
 use crate::error::Result;
-use crate::ops::{
-    OpsConfig, OwnershipDecision, StatusCommand, TaskEditBuilder, edit_task_and_write,
-    forced_note_text, validate_transition,
-};
+use crate::ops::TaskOp;
 use crate::output::Output;
 
 /// Metadata for the `unblock` command.
@@ -37,45 +33,8 @@ pub struct Args {
 
 /// Runs `todo unblock <task>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let cfg = ctx.load_config()?;
-    let res = edit_task_and_write(
-        ctx,
-        &cfg,
-        META.name,
-        &args.task,
-        out,
-        |doc, task, _archive, agent, now| {
-            let id_str = cfg.id_config.format_id(task.id);
-            let (next_status, ownership) =
-                validate_transition(task, StatusCommand::Unblock, agent, ctx.force, &id_str)?;
-
-            let mut builder = TaskEditBuilder::new(doc, task);
-            builder.set_status(next_status);
-            if next_status == Status::Claimed {
-                builder.set_claimed(&OpsConfig::format_claimed_timestamp(now));
-            } else {
-                builder.remove_claimed();
-            }
-
-            let date = OpsConfig::format_note_date(now);
-            if let OwnershipDecision::Forced { previous_owner } = ownership {
-                builder.add_note(&date, agent, &forced_note_text("unblock", &previous_owner));
-            }
-            let note_text = match args.note.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-                Some(text) => format!("unblocked \u{2014} {text}"),
-                None => "unblocked".to_string(),
-            };
-            builder.add_note(&date, agent, &note_text);
-
-            let (edits, _) = builder.build();
-            Ok((edits, ()))
-        },
-    )?;
-
-    if out.is_json() {
-        out.emit_json_ok(META.name, &res.task);
-    } else {
-        out.write_line(&format!("{}: unblock ok", res.task_id));
-    }
-    Ok(())
+    let op = TaskOp::Unblock {
+        note: args.note.as_deref(),
+    };
+    run_task_op(ctx, out, META.name, &args.task, &op)
 }

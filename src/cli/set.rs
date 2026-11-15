@@ -2,12 +2,11 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context, resolve_opt_text_arg, resolve_text_arg};
-use crate::error::{ErrorCode, Result, TodoError};
-use crate::ops::{
-    OpsConfig, OwnershipDecision, TaskCommand, TaskEditBuilder, check_ownership,
-    edit_task_and_write, forced_note_text,
+use crate::cli::{
+    CommandKind, CommandMeta, Context, resolve_opt_text_arg, resolve_text_arg, run_task_op,
 };
+use crate::error::{ErrorCode, Result, TodoError};
+use crate::ops::{SetChange, TaskOp};
 use crate::output::Output;
 
 /// Metadata for the `set` command.
@@ -113,73 +112,42 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         ));
     }
 
-    let cfg = ctx.load_config()?;
-    let res = edit_task_and_write(
+    // Same order as before: named options, then `--field` pairs, then `--unset`.
+    let mut changes: Vec<SetChange<'_>> = Vec::new();
+    if let Some(ref title) = resolved_title {
+        changes.push(SetChange::Title(title));
+    }
+    let named = [
+        ("priority", args.priority.as_ref()),
+        ("type", args.task_type.as_ref()),
+        ("area", args.area.as_ref()),
+        ("depends", args.depends.as_ref()),
+        ("files", resolved_files.as_ref()),
+        ("problem", resolved_problem.as_ref()),
+        ("fix", resolved_fix.as_ref()),
+        ("accept", resolved_accept.as_ref()),
+    ];
+    for (key, value) in named {
+        if let Some(value) = value {
+            changes.push(SetChange::Field(key, value));
+        }
+    }
+    for (key, value) in &parsed_fields {
+        changes.push(if key == "title" {
+            SetChange::Title(value)
+        } else {
+            SetChange::Field(key, value)
+        });
+    }
+    changes.extend(parsed_unsets.iter().map(|k| SetChange::Unset(k)));
+
+    run_task_op(
         ctx,
-        &cfg,
+        out,
         META.name,
         &args.task,
-        out,
-        |doc, task, _archive, agent, now| {
-            let id_str = cfg.id_config.format_id(task.id);
-            let ownership = check_ownership(task, TaskCommand::Set, agent, ctx.force, &id_str)?;
-
-            let mut builder = TaskEditBuilder::new(doc, task);
-
-            if let Some(ref title) = resolved_title {
-                builder.set_title(title);
-            }
-            if let Some(ref priority) = args.priority {
-                builder.set_field("priority", priority);
-            }
-            if let Some(ref task_type) = args.task_type {
-                builder.set_field("type", task_type);
-            }
-            if let Some(ref area) = args.area {
-                builder.set_field("area", area);
-            }
-            if let Some(ref depends) = args.depends {
-                builder.set_field("depends", depends);
-            }
-            if let Some(ref files) = resolved_files {
-                builder.set_field("files", files);
-            }
-            if let Some(ref problem) = resolved_problem {
-                builder.set_field("problem", problem);
-            }
-            if let Some(ref fix) = resolved_fix {
-                builder.set_field("fix", fix);
-            }
-            if let Some(ref accept) = resolved_accept {
-                builder.set_field("accept", accept);
-            }
-            for (key, value) in &parsed_fields {
-                if key == "title" {
-                    builder.set_title(value);
-                } else {
-                    builder.set_field(key, value);
-                }
-            }
-            for key in &parsed_unsets {
-                builder.unset_field(key);
-            }
-
-            if let OwnershipDecision::Forced { previous_owner } = ownership {
-                let date = OpsConfig::format_note_date(now);
-                builder.add_note(&date, agent, &forced_note_text("set", &previous_owner));
-            }
-
-            let (edits, _) = builder.build();
-            Ok((edits, ()))
-        },
-    )?;
-
-    if out.is_json() {
-        out.emit_json_ok(META.name, &res.task);
-    } else {
-        out.write_line(&format!("{}: set ok", res.task_id));
-    }
-    Ok(())
+        &TaskOp::Set { changes: &changes },
+    )
 }
 
 fn parse_field_pairs(raw: &[String]) -> Result<Vec<(String, String)>> {

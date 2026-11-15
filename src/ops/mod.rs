@@ -37,6 +37,7 @@ pub mod pipeline;
 pub mod query;
 pub mod read;
 pub mod rules;
+pub mod task_ops;
 
 pub use config::{
     CONFIG_FILENAME, DEFAULT_ARCHIVE_FILE, DEFAULT_CLAIM_TTL_HOURS, DEFAULT_QUESTION_SECTION,
@@ -66,3 +67,4 @@ pub use rules::{
     bad_transition_error, check_ownership, forced_note_text, plan_claim, plan_release,
     validate_transition,
 };
+pub use task_ops::{OpEnv, SetChange, TaskOp};

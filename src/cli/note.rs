@@ -2,11 +2,11 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context, resolve_text_arg};
-use crate::error::{ErrorCode, Result, TodoError};
-use crate::ops::{
-    OpsConfig, TaskCommand, TaskEditBuilder, check_ownership, edit_task_with_found_and_write,
+use crate::cli::{
+    CommandKind, CommandMeta, Context, edit_one_task, report_task_ok, resolve_text_arg,
 };
+use crate::error::{ErrorCode, Result, TodoError};
+use crate::ops::TaskOp;
 use crate::output::Output;
 
 /// Metadata for the `note` command.
@@ -52,29 +52,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     }
 
     let (found, cfg) = ctx.load_config_with_found()?;
-    let res = edit_task_with_found_and_write(
-        ctx,
-        found,
-        &cfg,
-        META.name,
-        &args.task,
-        out,
-        |doc, task, _archive, agent, now| {
-            let id_str = cfg.id_config.format_id(task.id);
-            let _ = check_ownership(task, TaskCommand::Note, agent, ctx.force, &id_str)?;
-
-            let mut builder = TaskEditBuilder::new(doc, task);
-            let date = OpsConfig::format_note_date(now);
-            builder.add_note(&date, agent, note_text);
-            let (edits, _) = builder.build();
-            Ok((edits, ()))
-        },
-    )?;
-
-    if out.is_json() {
-        out.emit_json_ok(META.name, &res.task);
-    } else {
-        out.write_line(&format!("{}: note ok", res.task_id));
-    }
+    let op = TaskOp::Note { text: note_text };
+    let res = edit_one_task(ctx, out, META.name, &args.task, &op, &cfg, Some(found))?;
+    report_task_ok(out, META.name, &res);
     Ok(())
 }

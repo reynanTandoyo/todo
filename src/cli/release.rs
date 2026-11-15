@@ -5,12 +5,12 @@ use std::collections::BTreeSet;
 use clap::Args as ClapArgs;
 use serde::Serialize;
 
-use crate::cli::{CommandKind, CommandMeta, Context, validate_agent_name};
+use crate::cli::{CommandKind, CommandMeta, Context, run_task_op, validate_agent_name};
 use crate::doc::{Status, TaskChangeIntent, agent_names_equal};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
-    DocWritePlan, OpsConfig, TaskEditBuilder, TaskJson, build_release_edits, build_task_json,
-    check_task_writable, edit_doc_and_write, edit_task_and_write, forced_note_text, plan_release,
+    DocWritePlan, OpsConfig, TaskEditBuilder, TaskJson, TaskOp, build_task_json,
+    check_task_writable, edit_doc_and_write, forced_note_text,
 };
 use crate::output::Output;
 
@@ -89,26 +89,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         ));
     };
 
-    let cfg = ctx.load_config()?;
-    let res = edit_task_and_write(
-        ctx,
-        &cfg,
-        META.name,
-        &task_arg,
-        out,
-        |doc, task, _archive, agent, now| {
-            let plan = plan_release(task, agent, ctx.force, &cfg)?;
-            let (edits, _) = build_release_edits(doc, task, &plan, agent, now);
-            Ok((edits, ()))
-        },
-    )?;
-
-    if out.is_json() {
-        out.emit_json_ok(META.name, &res.task);
-    } else {
-        out.write_line(&format!("{}: release ok", res.task_id));
-    }
-    Ok(())
+    run_task_op(ctx, out, META.name, &task_arg, &TaskOp::Release)
 }
 
 fn run_bulk_stale(ctx: &Context, out: &mut Output) -> Result<()> {

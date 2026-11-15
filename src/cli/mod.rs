@@ -18,12 +18,16 @@ use std::path::{Path, PathBuf};
 use clap::{Args as ClapArgs, Parser, Subcommand, error::ErrorKind};
 use serde::Serialize;
 
+use crate::doc::{Document, Task};
 use crate::error::{ErrorCode, ExitCode, Result, TodoError};
 use crate::find::{
     ExplicitSource, FindOptions, FoundBy, FoundTodo, WorktreeMode, find_local_worktree_toml,
     find_todo,
 };
-use crate::ops::OpsConfig;
+use crate::ops::edit_task_with_found_and_write;
+use crate::ops::{
+    NewlyReadyTask, OpEnv, OpsConfig, TaskJson, TaskOp, WriteTaskResult, edit_task_and_write,
+};
 use crate::output::Output;
 
 /// Whether a command reads `TODO.md`, writes `TODO.md`, or is meta/help.
@@ -319,6 +323,90 @@ pub fn validate_agent_name(name: &str) -> Result<&str> {
         ));
     }
     Ok(name)
+}
+
+/// Edits one task with a shared [`TaskOp`] and runs the write pipeline.
+///
+/// `found` is a [`FoundTodo`] already located together with `cfg` (see
+/// [`Context::load_config_with_found`]); with `None` the pipeline locates the file itself.
+pub(crate) fn edit_one_task(
+    ctx: &Context,
+    out: &mut Output,
+    name: &str,
+    task: &str,
+    op: &TaskOp<'_>,
+    cfg: &OpsConfig,
+    found: Option<FoundTodo>,
+) -> Result<WriteTaskResult<()>> {
+    let edit = |doc: &Document, t: &Task, _archive: Option<&Document>, agent: &str, now| {
+        let env = OpEnv {
+            cfg,
+            agent,
+            force: ctx.force,
+            now,
+        };
+        Ok((op.build_edits(doc, t, &env)?, ()))
+    };
+    match found {
+        Some(found) => edit_task_with_found_and_write(ctx, found, cfg, name, task, out, edit),
+        None => edit_task_and_write(ctx, cfg, name, task, out, edit),
+    }
+}
+
+/// The whole body of a simple task command: load settings, run `op` on `task`, print the result.
+pub(crate) fn run_task_op(
+    ctx: &Context,
+    out: &mut Output,
+    name: &str,
+    task: &str,
+    op: &TaskOp<'_>,
+) -> Result<()> {
+    let cfg = ctx.load_config()?;
+    let res = edit_one_task(ctx, out, name, task, op, &cfg, None)?;
+    report_task_ok(out, name, &res);
+    Ok(())
+}
+
+/// Prints the result of a task edit: the task as JSON, or `<id>: <name> ok`.
+pub(crate) fn report_task_ok(out: &mut Output, name: &str, res: &WriteTaskResult<()>) {
+    if out.is_json() {
+        out.emit_json_ok(name, &res.task);
+    } else {
+        out.write_line(&format!("{}: {name} ok", res.task_id));
+    }
+}
+
+#[derive(Serialize)]
+struct TaskReadyJson<'a> {
+    #[serde(flatten)]
+    task: &'a TaskJson,
+    #[serde(skip_serializing_if = "<[NewlyReadyTask]>::is_empty")]
+    newly_ready: &'a [NewlyReadyTask],
+}
+
+/// Like [`report_task_ok`], also listing tasks that became ready (`done`, `drop`).
+/// With `show_accept` the text output includes the task's `accept` line.
+pub(crate) fn report_task_with_ready(
+    out: &mut Output,
+    name: &str,
+    res: &WriteTaskResult<()>,
+    show_accept: bool,
+) {
+    if out.is_json() {
+        let json = TaskReadyJson {
+            task: &res.task,
+            newly_ready: &res.newly_ready,
+        };
+        out.emit_json_ok(name, &json);
+        return;
+    }
+    out.write_line(&format!("{}: {name} ok", res.task_id));
+    if show_accept && let Some(ref accept) = res.task.accept {
+        out.write_line(&format!("accept: {accept}"));
+    }
+    for ready in &res.newly_ready {
+        out.write_line(&format!("now ready: {} {}", ready.id, ready.title));
+    }
 }
 
 #[cfg(feature = "test-hooks")]

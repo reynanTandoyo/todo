@@ -2,9 +2,9 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, run_task_op};
 use crate::error::Result;
-use crate::ops::{build_claim_edits, edit_task_and_write, plan_claim};
+use crate::ops::TaskOp;
 use crate::output::Output;
 
 /// Metadata for the `claim` command.
@@ -30,24 +30,5 @@ pub struct Args {
 
 /// Runs `todo claim <task>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let cfg = ctx.load_config()?;
-    let res = edit_task_and_write(
-        ctx,
-        &cfg,
-        META.name,
-        &args.task,
-        out,
-        |doc, task, _archive, agent, now| {
-            let plan = plan_claim(task, agent, ctx.force, now, &cfg)?;
-            let (edits, _) = build_claim_edits(doc, task, &plan, now);
-            Ok((edits, ()))
-        },
-    )?;
-
-    if out.is_json() {
-        out.emit_json_ok(META.name, &res.task);
-    } else {
-        out.write_line(&format!("{}: claim ok", res.task_id));
-    }
-    Ok(())
+    run_task_op(ctx, out, META.name, &args.task, &TaskOp::Claim)
 }

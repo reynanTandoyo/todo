@@ -5,15 +5,12 @@ use std::path::Path;
 use std::process::Command as ProcessCommand;
 
 use clap::Args as ClapArgs;
-use serde::Serialize;
 
-use crate::cli::{CommandKind, CommandMeta, Context, resolve_opt_text_arg};
-use crate::doc::Status;
-use crate::error::{ErrorCode, Result, TodoError};
-use crate::ops::{
-    NewlyReadyTask, OpsConfig, OwnershipDecision, StatusCommand, TaskEditBuilder, TaskJson,
-    edit_task_with_found_and_write, forced_note_text, validate_transition,
+use crate::cli::{
+    CommandKind, CommandMeta, Context, edit_one_task, report_task_with_ready, resolve_opt_text_arg,
 };
+use crate::error::{ErrorCode, Result, TodoError};
+use crate::ops::TaskOp;
 use crate::output::Output;
 
 /// Metadata for the `done` command.
@@ -45,14 +42,6 @@ pub struct Args {
     pub commit: Option<String>,
 }
 
-#[derive(Serialize)]
-struct DoneJson<'a> {
-    #[serde(flatten)]
-    task: &'a TaskJson,
-    #[serde(skip_serializing_if = "<[NewlyReadyTask]>::is_empty")]
-    newly_ready: &'a [NewlyReadyTask],
-}
-
 /// Runs `todo done <task>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     // Resolve/verify `--commit` before taking the write lock (R-WRITE-4, NFR-5).
@@ -68,58 +57,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     let resolved_note = resolve_opt_text_arg(args.note.as_deref())?;
     let (found, cfg) = ctx.load_config_with_found()?;
-    let res = edit_task_with_found_and_write(
-        ctx,
-        found,
-        &cfg,
-        META.name,
-        &args.task,
-        out,
-        |doc, task, _archive, agent, now| {
-            let id_str = cfg.id_config.format_id(task.id);
-            let (_, ownership) =
-                validate_transition(task, StatusCommand::Done, agent, ctx.force, &id_str)?;
-
-            let mut builder = TaskEditBuilder::new(doc, task);
-            builder.set_status(Status::Done);
-            builder.set_owner(Some(agent));
-            builder.remove_claimed();
-            if let Some(ref commit_hash) = resolved_commit {
-                builder.set_field("commit", commit_hash);
-            }
-
-            let date = OpsConfig::format_note_date(now);
-            if let OwnershipDecision::Forced { previous_owner } = ownership {
-                builder.add_note(&date, agent, &forced_note_text("done", &previous_owner));
-            }
-            let note_text = match resolved_note.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-                Some(text) => format!("done \u{2014} {text}"),
-                None => "done".to_string(),
-            };
-            builder.add_note(&date, agent, &note_text);
-
-            let (edits, _) = builder.build();
-            Ok((edits, ()))
-        },
-    )?;
-
-    if out.is_json() {
-        out.emit_json_ok(
-            META.name,
-            &DoneJson {
-                task: &res.task,
-                newly_ready: &res.newly_ready,
-            },
-        );
-    } else {
-        out.write_line(&format!("{}: done ok", res.task_id));
-        if let Some(ref accept) = res.task.accept {
-            out.write_line(&format!("accept: {accept}"));
-        }
-        for ready in &res.newly_ready {
-            out.write_line(&format!("now ready: {} {}", ready.id, ready.title));
-        }
-    }
+    let op = TaskOp::Done {
+        note: resolved_note.as_deref(),
+        commit: resolved_commit.as_deref(),
+    };
+    let res = edit_one_task(ctx, out, META.name, &args.task, &op, &cfg, Some(found))?;
+    report_task_with_ready(out, META.name, &res, true);
     Ok(())
 }
 

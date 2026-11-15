@@ -2,13 +2,10 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context, resolve_text_arg};
-use crate::doc::{Status, sanitize_trimmed_value};
+use crate::cli::{CommandKind, CommandMeta, Context, resolve_text_arg, run_task_op};
+use crate::doc::sanitize_trimmed_value;
 use crate::error::{ErrorCode, Result, TodoError};
-use crate::ops::{
-    OpsConfig, OwnershipDecision, StatusCommand, TaskEditBuilder, edit_task_and_write,
-    forced_note_text, validate_transition,
-};
+use crate::ops::TaskOp;
 use crate::output::Output;
 
 /// Metadata for the `answer` command.
@@ -44,38 +41,9 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             "answer text cannot be empty",
         ));
     }
-
-    let cfg = ctx.load_config()?;
-    let res = edit_task_and_write(
-        ctx,
-        &cfg,
-        META.name,
-        &args.task,
-        out,
-        |doc, task, _archive, agent, now| {
-            let id_str = cfg.id_config.format_id(task.id);
-            let (_, ownership) =
-                validate_transition(task, StatusCommand::Done, agent, ctx.force, &id_str)?;
-
-            let mut builder = TaskEditBuilder::new(doc, task);
-            builder.set_status(Status::Done);
-            builder.remove_claimed();
-
-            let date = OpsConfig::format_note_date(now);
-            if let OwnershipDecision::Forced { previous_owner } = ownership {
-                builder.add_note(&date, agent, &forced_note_text("answer", &previous_owner));
-            }
-            builder.add_note(&date, agent, &format!("answered \u{2014} {answer_text}"));
-
-            let (edits, _) = builder.build();
-            Ok((edits, ()))
-        },
-    )?;
-
-    if out.is_json() {
-        out.emit_json_ok(META.name, &res.task);
-    } else {
-        out.write_line(&format!("{}: answer ok", res.task_id));
-    }
-    Ok(())
+    let op = TaskOp::Answer {
+        verb: "answered",
+        text: &answer_text,
+    };
+    run_task_op(ctx, out, META.name, &args.task, &op)
 }
