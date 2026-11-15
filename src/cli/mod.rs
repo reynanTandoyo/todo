@@ -326,6 +326,7 @@ register_commands! {
     Status => status,
     Unblock => unblock,
     Unlock => unlock,
+    Where => where_cmd,
 }
 
 /// Top-level `todo` CLI parser.

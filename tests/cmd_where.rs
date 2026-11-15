@@ -1,0 +1,108 @@
+//! Tests for `todo where` (T-016; R-FIND-7).
+
+use std::fs;
+use std::path::Path;
+use std::process::Command;
+
+use assert_cmd::cargo::cargo_bin_cmd;
+use serde_json::Value;
+use tempfile::TempDir;
+
+fn run_git(dir: &Path, args: &[&str]) {
+    let out = Command::new("git")
+        .current_dir(dir)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "git {:?} failed: {}",
+        args,
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn where_prints_all_r_find_7_items_in_text_and_json() {
+    let dir = TempDir::new().unwrap();
+    run_git(dir.path(), &["init", "-q"]);
+    fs::write(
+        dir.path().join("TODO.md"),
+        "<!-- todo-format: 1 -->\n\n## Tasks\n\n\
+         ### T-001 · Open task\n- status: open\n- owner: —\n- priority: P1\n\n\
+         ### T-002 · Claimed task\n- status: claimed\n- owner: alice\n- priority: P1\n\n\
+         ### T-003 · Blocked task\n- status: blocked\n- owner: —\n- priority: P2\n\n\
+         ### T-004 · Done task\n- status: done\n- owner: alice\n- priority: P2\n\n\
+         ### T-005 · Dropped task\n- status: dropped\n- owner: —\n- priority: P3\n",
+    )
+    .unwrap();
+
+    // Acquire a manual lease so lease status is also populated.
+    let lock_out = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["--agent", "alice", "lock", "--minutes", "5"])
+        .output()
+        .unwrap();
+    assert_eq!(lock_out.status.code(), Some(0));
+
+    // Text mode
+    let text_out = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["where"])
+        .output()
+        .unwrap();
+    assert_eq!(text_out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&text_out.stdout);
+    assert!(stdout.contains("File:"), "stdout: {stdout}");
+    assert!(stdout.contains("found by: walk"), "stdout: {stdout}");
+    assert!(stdout.contains("Repo root:"), "stdout: {stdout}");
+    assert!(stdout.contains("State dir:"), "stdout: {stdout}");
+    assert!(stdout.contains("Write lock: free"), "stdout: {stdout}");
+    assert!(stdout.contains("Lease: held by alice"), "stdout: {stdout}");
+    assert!(stdout.contains("Format version: 1"), "stdout: {stdout}");
+    assert!(
+        stdout.contains("Tasks: 5 total (open: 1, claimed: 1, blocked: 1, done: 1, dropped: 1)"),
+        "stdout: {stdout}"
+    );
+
+    // JSON mode
+    let json_out = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["--json", "where"])
+        .output()
+        .unwrap();
+    assert_eq!(json_out.status.code(), Some(0));
+    let json: Value = serde_json::from_slice(&json_out.stdout).unwrap();
+    assert_eq!(json["ok"], true);
+    assert_eq!(json["data"]["found_by"], "walk");
+    assert!(json["data"]["file"].as_str().unwrap().ends_with("TODO.md"));
+    assert!(json["data"]["repo_root"].is_string());
+    assert!(json["data"]["state_dir"].is_string());
+    assert_eq!(json["data"]["write_lock"]["held"], false);
+    assert_eq!(json["data"]["lease"]["agent"], "alice");
+    assert_eq!(json["data"]["format_version"], 1);
+    assert_eq!(json["data"]["counts"]["open"], 1);
+    assert_eq!(json["data"]["counts"]["claimed"], 1);
+    assert_eq!(json["data"]["counts"]["blocked"], 1);
+    assert_eq!(json["data"]["counts"]["done"], 1);
+    assert_eq!(json["data"]["counts"]["dropped"], 1);
+    assert_eq!(json["data"]["counts"]["total"], 5);
+}
+
+#[test]
+fn where_works_outside_git_repo() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("TODO.md"), "## Tasks\n").unwrap();
+
+    let json_out = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["--json", "where"])
+        .output()
+        .unwrap();
+    assert_eq!(json_out.status.code(), Some(0));
+    let json: Value = serde_json::from_slice(&json_out.stdout).unwrap();
+    assert_eq!(json["data"]["found_by"], "walk");
+    assert!(json["data"]["repo_root"].is_null());
+    assert!(json["data"]["format_version"].is_null());
+    assert_eq!(json["data"]["counts"]["total"], 0);
+}
