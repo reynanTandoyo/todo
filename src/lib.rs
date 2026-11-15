@@ -9,6 +9,7 @@ pub mod cli;
 pub mod doc;
 pub mod error;
 pub mod find;
+pub mod history;
 pub mod lock;
 pub mod ops;
 pub mod output;

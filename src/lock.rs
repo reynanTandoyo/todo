@@ -26,6 +26,8 @@ pub struct LockConfig {
     pub lease_minutes: u64,
     /// Maximum allowed manual lease duration in minutes (`lease_max_minutes`, default 60).
     pub lease_max_minutes: u64,
+    /// Number of snapshots to keep in `history/` (`snapshots_keep`, default 200).
+    pub snapshots_keep: u64,
 }
 
 impl Default for LockConfig {
@@ -34,6 +36,7 @@ impl Default for LockConfig {
             lock_wait_seconds: 30,
             lease_minutes: 10,
             lease_max_minutes: 60,
+            snapshots_keep: 200,
         }
     }
 }
@@ -224,6 +227,15 @@ where
             Ok(val)
         }
         WriteOutcome::Changed { new_bytes, value } => {
+            crate::history::record_snapshot(
+                state,
+                &read.bytes,
+                &read.snapshot.sha256_hex(),
+                agent,
+                command,
+                false,
+                cfg.snapshots_keep,
+            )?;
             atomic::atomic_replace(todo_path, &read.snapshot, &new_bytes)?;
             let post_mtime = std::fs::metadata(fs_path(todo_path).as_ref())
                 .ok()

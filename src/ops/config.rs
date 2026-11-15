@@ -269,7 +269,9 @@ impl OpsConfig {
                     lease_max_line = Some(line);
                 }
                 "snapshots_keep" => {
-                    cfg.snapshots_keep = expect_u64(&key, val, line, 0)?;
+                    let keep = expect_u64(&key, val, line, 0)?;
+                    cfg.snapshots_keep = keep;
+                    cfg.lock.snapshots_keep = keep;
                 }
                 "worktree" => {
                     let s = expect_string(&key, val, line)?;

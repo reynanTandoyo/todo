@@ -31,6 +31,11 @@ expression: ok_json
         "summary": "Claim a task for an agent"
       },
       {
+        "kind": "read",
+        "name": "diff",
+        "summary": "Show changes between snapshots or against the current TODO.md"
+      },
+      {
         "kind": "write",
         "name": "done",
         "summary": "Mark a task done"
@@ -44,6 +49,11 @@ expression: ok_json
         "kind": "meta",
         "name": "help",
         "summary": "Show overview or detailed help for a command"
+      },
+      {
+        "kind": "read",
+        "name": "history",
+        "summary": "List saved snapshots of TODO.md"
       },
       {
         "kind": "read",
@@ -79,6 +89,11 @@ expression: ok_json
         "kind": "write",
         "name": "reopen",
         "summary": "Put a done or dropped task back to open"
+      },
+      {
+        "kind": "write",
+        "name": "restore",
+        "summary": "Restore TODO.md from a saved snapshot"
       },
       {
         "kind": "write",
