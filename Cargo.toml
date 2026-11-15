@@ -1,0 +1,18 @@
+[package]
+name = "todo"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Concurrency-safe command-line editor for TODO.md task files"
+publish = false
+
+[[bin]]
+name = "todo"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

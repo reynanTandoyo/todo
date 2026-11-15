@@ -1,0 +1,2 @@
+# Test fixtures must keep their exact line endings; tests check byte-for-byte output.
+tests/fixtures/** -text
