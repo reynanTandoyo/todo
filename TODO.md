@@ -62,21 +62,25 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 21 tests pass
 
 ### T-006 · Non-ASCII text in Windows consoles
-- status: open
-- owner: —
+- status: done
+- owner: coordinator
 - priority: P0 · type: test · area: cli
 - reqs: R-OUT-6
 - depends: T-005
 - accept: `·`, `—` and Japanese text checked by hand in PowerShell 5, PowerShell 7, cmd and Windows Terminal, with the result recorded in a note; piped output is UTF-8 (automated test)
+- commit: 8029ac3
 - note (2026-11-15, coordinator): automated part done in 8029ac3 (test: piped output is UTF-8); still open: a person runs scripts/console-check.ps1 in PowerShell 5, PowerShell 7, cmd and Windows Terminal and records the result here
+- note (2026-11-15, coordinator): done — the owner ran scripts/console-check.ps1 in PowerShell: '·', '—' and Japanese text render correctly in todo list and todo show; other shells not repeated because direct console output goes through the Windows console API whatever the shell
 
 ### T-007 · Settings file todo.toml
-- status: open
-- owner: —
+- status: done
+- owner: w5-hydrogen
 - priority: P1 · type: feature · area: config
 - reqs: R-CFG-2
 - depends: T-005, T-011
 - accept: every key in requirements §5.14 has a test, including `worktree = "local"`; an unknown key or a bad value gives `todo.toml:<line>: message`
+- commit: d893d29
+- note (2026-11-15, w5-hydrogen): done — verified by coordinator: fmt, clippy and 128 tests pass; where, title matching, --dry-run and ask tried on a copy
 
 ## 2. Safety: finding, locking, writing
 
@@ -141,12 +145,14 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 79 tests pass
 
 ### T-016 · todo where
-- status: open
-- owner: —
+- status: done
+- owner: w5-hydrogen
 - priority: P1 · type: feature · area: find
 - reqs: R-FIND-7
 - depends: T-012, T-015
 - accept: every item listed in R-FIND-7 appears, in text and JSON
+- commit: b429716
+- note (2026-11-15, w5-hydrogen): done — verified by coordinator: fmt, clippy and 128 tests pass; where, title matching, --dry-run and ask tried on a copy
 
 ## 3. Task commands
 
@@ -241,60 +247,74 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, w4b-hydrogen): done — verified by coordinator: fmt, clippy and 110 tests pass
 
 ### T-029 · Match tasks by title
-- status: open
-- owner: —
+- status: done
+- owner: w5-hydrogen
 - priority: P1 · type: feature · area: cli
 - reqs: R-ID-4
 - depends: T-022
 - accept: a unique match works; several or no matches are refused with the candidates; done and dropped tasks are never matched
+- commit: 11a40ca
+- note (2026-11-15, w5-hydrogen): done — verified by coordinator: fmt, clippy and 128 tests pass; where, title matching, --dry-run and ask tried on a copy
 
 ### T-030 · reopen and move
-- status: open
-- owner: —
+- status: done
+- owner: w5-hydrogen
 - priority: P1 · type: feature · area: cli
 - reqs: R-WRITE-10
 - depends: T-028
 - accept: reopen needs a reason and clears owner and claim time; move keeps every line of the task and leaves the rest of the file unchanged
+- commit: 185fdab
+- note (2026-11-15, w5-hydrogen): done — verified by coordinator: fmt, clippy and 128 tests pass; where, title matching, --dry-run and ask tried on a copy
 
 ### T-031 · ask and answer
-- status: open
-- owner: —
+- status: done
+- owner: w5-hydrogen
 - priority: P1 · type: feature · area: cli
 - reqs: R-WRITE-11
 - depends: T-028
 - accept: the questions section is added when missing; next never returns a question; answer adds the answer note and marks the question done
+- commit: abd5368
+- note (2026-11-15, w5-hydrogen): done — verified by coordinator: fmt, clippy and 128 tests pass; where, title matching, --dry-run and ask tried on a copy
 
 ### T-032 · Text from standard input or a file
-- status: open
-- owner: —
+- status: done
+- owner: w5-hydrogen
 - priority: P1 · type: feature · area: cli
 - reqs: R-WRITE-12
 - depends: T-005
 - accept: text with quotes, backticks and `$` arrives unchanged from PowerShell through `-` and `@path`
+- commit: 0d297c2
+- note (2026-11-15, w5-hydrogen): done — verified by coordinator: fmt, clippy and 128 tests pass; where, title matching, --dry-run and ask tried on a copy
 
 ### T-033 · release --stale and --all
-- status: open
-- owner: —
+- status: done
+- owner: w5-hydrogen
 - priority: P1 · type: feature · area: cli
 - reqs: R-CLAIM-6
 - depends: T-022
 - accept: only stale claims are released by --stale; --all releases one agent's claims in one locked step; another agent needs --force
+- commit: 5f89686
+- note (2026-11-15, w5-hydrogen): done — verified by coordinator: fmt, clippy and 128 tests pass; where, title matching, --dry-run and ask tried on a copy
 
 ### T-034 · add --from: several tasks in one step
-- status: open
-- owner: —
+- status: done
+- owner: w5-hydrogen
 - priority: P1 · type: feature · area: cli
 - reqs: R-WRITE-13
 - depends: T-028
 - accept: 30 tasks are added in one locked step; `@ref` dependencies resolve to the new IDs; one bad entry rejects the whole batch
+- commit: 94e2aa2
+- note (2026-11-15, w5-hydrogen): done — verified by coordinator: fmt, clippy and 128 tests pass; where, title matching, --dry-run and ask tried on a copy
 
 ### T-035 · --dry-run and --yes
-- status: open
-- owner: —
+- status: done
+- owner: w5-hydrogen
 - priority: P1 · type: feature · area: cli
 - reqs: R-EDIT-10, R-WRITE-14
 - depends: T-028
 - accept: every write command prints a diff with --dry-run and leaves the file byte-identical; bulk commands change nothing without --yes
+- commit: f09a8e2
+- note (2026-11-15, w5-hydrogen): done — verified by coordinator: fmt, clippy and 128 tests pass; where, title matching, --dry-run and ask tried on a copy
 
 ### T-036 · apply: several operations in one step
 - status: open
