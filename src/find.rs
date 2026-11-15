@@ -1,6 +1,7 @@
 //! Finding TODO.md, including linked git worktrees (T-010, T-011; R-FIND-1..7).
 
 use std::borrow::Cow;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use crate::error::{ErrorCode, Result, TodoError};
@@ -136,6 +137,12 @@ pub(crate) fn strip_verbatim_prefix(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
+/// Canonicalizes a path using long-path support and strips any Windows verbatim prefix.
+pub(crate) fn canonicalize_clean(path: &Path) -> std::io::Result<PathBuf> {
+    let canon = std::fs::canonicalize(fs_path(path).as_ref())?;
+    Ok(strip_verbatim_prefix(&canon))
+}
+
 fn path_is_file(path: &Path) -> bool {
     std::fs::metadata(fs_path(path).as_ref()).is_ok_and(|m| m.is_file())
 }
@@ -146,6 +153,10 @@ fn path_is_dir(path: &Path) -> bool {
 
 fn path_exists(path: &Path) -> bool {
     std::fs::symlink_metadata(fs_path(path).as_ref()).is_ok()
+}
+
+fn read_to_string_safe(path: &Path) -> std::io::Result<String> {
+    std::fs::read_to_string(fs_path(path).as_ref())
 }
 
 fn absolute_clean(path: &Path, base: &Path) -> Result<PathBuf> {
@@ -161,6 +172,19 @@ fn absolute_clean(path: &Path, base: &Path) -> Result<PathBuf> {
         )
     })?;
     Ok(strip_verbatim_prefix(&abs))
+}
+
+fn resolve_relative_path(base_dir: &Path, raw: &str) -> PathBuf {
+    let p = Path::new(raw);
+    let joined = if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        base_dir.join(p)
+    };
+    match std::path::absolute(&joined) {
+        Ok(abs) => strip_verbatim_prefix(&abs),
+        Err(_) => joined,
+    }
 }
 
 fn no_file_error(searched_from: &Path) -> TodoError {
@@ -217,13 +241,7 @@ pub fn find_todo(opts: &FindOptions<'_>) -> Result<FoundTodo> {
             .and_then(find_git_root_upward)
             .map(|root| inspect_git_root(&root));
 
-        let (repo_root, git_dir, git_common_dir) = match git_ctx {
-            Some(GitContext::Normal { root, dot_git }) => {
-                (Some(root), Some(dot_git.clone()), Some(dot_git))
-            }
-            Some(GitContext::UnknownDotGit { root }) => (Some(root), None, None),
-            None => (None, None, None),
-        };
+        let (repo_root, git_dir, git_common_dir) = git_context_paths(git_ctx.as_ref());
 
         return Ok(FoundTodo {
             path: resolved,
@@ -236,36 +254,118 @@ pub fn find_todo(opts: &FindOptions<'_>) -> Result<FoundTodo> {
         });
     }
 
-    // Walk up from `cwd` to find `TODO.md`, stopping at the first `.git` repository root (R-FIND-3, R-FIND-4).
+    // Check if `cwd` is inside a git repository first so linked worktrees map to the main checkout
+    // before checking any local `TODO.md` in the worktree (R-FIND-5).
+    if let Some(git_root) = find_git_root_upward(&cwd) {
+        let git_ctx = inspect_git_root(&git_root);
+        match git_ctx {
+            GitContext::Normal {
+                ref root,
+                ref dot_git,
+            } => {
+                if let Some(found_path) = walk_up_bounded(&cwd, root) {
+                    return Ok(FoundTodo {
+                        path: found_path,
+                        found_by: FoundBy::Walk,
+                        repo_root: Some(root.clone()),
+                        git_dir: Some(dot_git.clone()),
+                        git_common_dir: Some(dot_git.clone()),
+                        notice: None,
+                        warnings: Vec::new(),
+                    });
+                }
+                return Err(no_file_error(&cwd));
+            }
+            GitContext::LinkedWorktree {
+                ref wt_root,
+                ref main_checkout,
+                ref worktree_git_dir,
+                ref common_git_dir,
+            } => {
+                if opts.worktree == WorktreeMode::Local {
+                    if let Some(found_path) = walk_up_bounded(&cwd, wt_root) {
+                        return Ok(FoundTodo {
+                            path: found_path,
+                            found_by: FoundBy::Walk,
+                            repo_root: Some(wt_root.clone()),
+                            git_dir: Some(worktree_git_dir.clone()),
+                            git_common_dir: Some(common_git_dir.clone()),
+                            notice: None,
+                            warnings: Vec::new(),
+                        });
+                    }
+                    return Err(no_file_error(&cwd));
+                }
+
+                let rel = relative_subpath(&cwd, wt_root).unwrap_or_default();
+                let mapped_start = if rel.as_os_str().is_empty() {
+                    main_checkout.clone()
+                } else {
+                    main_checkout.join(&rel)
+                };
+                if let Some(found_path) = walk_up_bounded(&mapped_start, main_checkout) {
+                    let notice = format!("linked worktree: using {}", found_path.display());
+                    return Ok(FoundTodo {
+                        path: found_path,
+                        found_by: FoundBy::WorktreeMain,
+                        repo_root: Some(main_checkout.clone()),
+                        git_dir: Some(worktree_git_dir.clone()),
+                        git_common_dir: Some(common_git_dir.clone()),
+                        notice: Some(notice),
+                        warnings: Vec::new(),
+                    });
+                }
+                return Err(no_file_error(&mapped_start));
+            }
+            GitContext::LinkedFallback {
+                ref wt_root,
+                ref worktree_git_dir,
+                ref common_git_dir,
+                ref reason,
+            } => {
+                if let Some(found_path) = walk_up_bounded(&cwd, wt_root) {
+                    let warnings = if opts.worktree == WorktreeMode::Local {
+                        Vec::new()
+                    } else {
+                        vec![format!(
+                            "could not locate main git checkout ({reason}); using worktree file {}",
+                            found_path.display()
+                        )]
+                    };
+                    let found_by = if opts.worktree == WorktreeMode::Local {
+                        FoundBy::Walk
+                    } else {
+                        FoundBy::WorktreeFallback
+                    };
+                    return Ok(FoundTodo {
+                        path: found_path,
+                        found_by,
+                        repo_root: Some(wt_root.clone()),
+                        git_dir: worktree_git_dir.clone(),
+                        git_common_dir: common_git_dir.clone(),
+                        notice: None,
+                        warnings,
+                    });
+                }
+                return Err(no_file_error(&cwd));
+            }
+        }
+    }
+
+    // Outside any git repository: walk up to the drive/filesystem root (R-FIND-3, R-FIND-4).
     let mut current = cwd.as_path();
     loop {
         let candidate = current.join(TODO_FILENAME);
-        let has_git = path_exists(&current.join(".git"));
         if path_is_file(&candidate) {
-            let git_ctx = if has_git {
-                Some(inspect_git_root(current))
-            } else {
-                find_git_root_upward(current).map(|root| inspect_git_root(&root))
-            };
-            let (repo_root, git_dir, git_common_dir) = match git_ctx {
-                Some(GitContext::Normal { root, dot_git }) => {
-                    (Some(root), Some(dot_git.clone()), Some(dot_git))
-                }
-                Some(GitContext::UnknownDotGit { root }) => (Some(root), None, None),
-                None => (None, None, None),
-            };
             return Ok(FoundTodo {
                 path: candidate,
                 found_by: FoundBy::Walk,
-                repo_root,
-                git_dir,
-                git_common_dir,
+                repo_root: None,
+                git_dir: None,
+                git_common_dir: None,
                 notice: None,
                 warnings: Vec::new(),
             });
-        }
-        if has_git {
-            return Err(no_file_error(&cwd));
         }
         match current.parent() {
             Some(parent) => current = parent,
@@ -274,9 +374,89 @@ pub fn find_todo(opts: &FindOptions<'_>) -> Result<FoundTodo> {
     }
 }
 
+fn walk_up_bounded(start: &Path, stop_at: &Path) -> Option<PathBuf> {
+    let canon_stop = canonicalize_clean(stop_at).ok();
+    let mut current = start;
+    loop {
+        let candidate = current.join(TODO_FILENAME);
+        if path_is_file(&candidate) {
+            return Some(candidate);
+        }
+        if current == stop_at {
+            return None;
+        }
+        if let Some(ref target) = canon_stop
+            && let Ok(canon_cur) = canonicalize_clean(current)
+            && &canon_cur == target
+        {
+            return None;
+        }
+        current = current.parent()?;
+    }
+}
+
+fn relative_subpath(child: &Path, root: &Path) -> Option<PathBuf> {
+    if let Ok(rel) = child.strip_prefix(root) {
+        return Some(rel.to_path_buf());
+    }
+    if let (Ok(canon_child), Ok(canon_root)) = (canonicalize_clean(child), canonicalize_clean(root))
+        && let Ok(rel) = canon_child.strip_prefix(&canon_root)
+    {
+        return Some(rel.to_path_buf());
+    }
+    None
+}
+
 enum GitContext {
-    Normal { root: PathBuf, dot_git: PathBuf },
-    UnknownDotGit { root: PathBuf },
+    Normal {
+        root: PathBuf,
+        dot_git: PathBuf,
+    },
+    LinkedWorktree {
+        wt_root: PathBuf,
+        main_checkout: PathBuf,
+        worktree_git_dir: PathBuf,
+        common_git_dir: PathBuf,
+    },
+    LinkedFallback {
+        wt_root: PathBuf,
+        worktree_git_dir: Option<PathBuf>,
+        common_git_dir: Option<PathBuf>,
+        reason: String,
+    },
+}
+
+fn git_context_paths(
+    ctx: Option<&GitContext>,
+) -> (Option<PathBuf>, Option<PathBuf>, Option<PathBuf>) {
+    match ctx {
+        Some(GitContext::Normal { root, dot_git }) => (
+            Some(root.clone()),
+            Some(dot_git.clone()),
+            Some(dot_git.clone()),
+        ),
+        Some(GitContext::LinkedWorktree {
+            wt_root,
+            worktree_git_dir,
+            common_git_dir,
+            ..
+        }) => (
+            Some(wt_root.clone()),
+            Some(worktree_git_dir.clone()),
+            Some(common_git_dir.clone()),
+        ),
+        Some(GitContext::LinkedFallback {
+            wt_root,
+            worktree_git_dir,
+            common_git_dir,
+            ..
+        }) => (
+            Some(wt_root.clone()),
+            worktree_git_dir.clone(),
+            common_git_dir.clone(),
+        ),
+        None => (None, None, None),
+    }
 }
 
 fn find_git_root_upward(start: &Path) -> Option<PathBuf> {
@@ -292,13 +472,163 @@ fn find_git_root_upward(start: &Path) -> Option<PathBuf> {
 fn inspect_git_root(root: &Path) -> GitContext {
     let dot_git = root.join(".git");
     if path_is_dir(&dot_git) {
-        GitContext::Normal {
+        return GitContext::Normal {
             root: root.to_path_buf(),
             dot_git,
+        };
+    }
+
+    let Ok(dot_git_text) = read_to_string_safe(&dot_git) else {
+        return GitContext::LinkedFallback {
+            wt_root: root.to_path_buf(),
+            worktree_git_dir: None,
+            common_git_dir: None,
+            reason: "unreadable .git file".to_owned(),
+        };
+    };
+
+    let Some(gitdir_raw) = dot_git_text
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("gitdir:").map(str::trim))
+        .filter(|s| !s.is_empty())
+    else {
+        return GitContext::LinkedFallback {
+            wt_root: root.to_path_buf(),
+            worktree_git_dir: None,
+            common_git_dir: None,
+            reason: "missing gitdir in .git file".to_owned(),
+        };
+    };
+
+    let worktree_git_dir = resolve_relative_path(root, gitdir_raw);
+    if !path_is_dir(&worktree_git_dir) {
+        return GitContext::LinkedFallback {
+            wt_root: root.to_path_buf(),
+            worktree_git_dir: Some(worktree_git_dir),
+            common_git_dir: None,
+            reason: "gitdir target does not exist".to_owned(),
+        };
+    }
+
+    let commondir_file = worktree_git_dir.join("commondir");
+    let Ok(commondir_text) = read_to_string_safe(&commondir_file) else {
+        return GitContext::LinkedFallback {
+            wt_root: root.to_path_buf(),
+            worktree_git_dir: Some(worktree_git_dir),
+            common_git_dir: None,
+            reason: "missing commondir file".to_owned(),
+        };
+    };
+
+    let Some(commondir_raw) = commondir_text
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+    else {
+        return GitContext::LinkedFallback {
+            wt_root: root.to_path_buf(),
+            worktree_git_dir: Some(worktree_git_dir),
+            common_git_dir: None,
+            reason: "empty commondir file".to_owned(),
+        };
+    };
+
+    let common_git_dir = resolve_relative_path(&worktree_git_dir, commondir_raw);
+    if !path_is_dir(&common_git_dir) {
+        return GitContext::LinkedFallback {
+            wt_root: root.to_path_buf(),
+            worktree_git_dir: Some(worktree_git_dir),
+            common_git_dir: Some(common_git_dir),
+            reason: "commondir target does not exist".to_owned(),
+        };
+    }
+
+    let core = read_core_config(&common_git_dir.join("config"));
+    if core.bare {
+        return GitContext::LinkedFallback {
+            wt_root: root.to_path_buf(),
+            worktree_git_dir: Some(worktree_git_dir),
+            common_git_dir: Some(common_git_dir),
+            reason: "bare repository".to_owned(),
+        };
+    }
+
+    if let Some(worktree_cfg) = core.worktree {
+        let main_checkout = resolve_relative_path(&common_git_dir, &worktree_cfg);
+        if path_is_dir(&main_checkout) {
+            return GitContext::LinkedWorktree {
+                wt_root: root.to_path_buf(),
+                main_checkout,
+                worktree_git_dir,
+                common_git_dir,
+            };
         }
-    } else {
-        GitContext::UnknownDotGit {
-            root: root.to_path_buf(),
+        return GitContext::LinkedFallback {
+            wt_root: root.to_path_buf(),
+            worktree_git_dir: Some(worktree_git_dir),
+            common_git_dir: Some(common_git_dir),
+            reason: "configured core.worktree does not exist".to_owned(),
+        };
+    }
+
+    if common_git_dir.file_name() == Some(OsStr::new(".git"))
+        && let Some(main_checkout) = common_git_dir.parent()
+        && path_is_dir(main_checkout)
+    {
+        return GitContext::LinkedWorktree {
+            wt_root: root.to_path_buf(),
+            main_checkout: main_checkout.to_path_buf(),
+            worktree_git_dir,
+            common_git_dir,
+        };
+    }
+
+    GitContext::LinkedFallback {
+        wt_root: root.to_path_buf(),
+        worktree_git_dir: Some(worktree_git_dir),
+        common_git_dir: Some(common_git_dir),
+        reason: "unusual repository layout".to_owned(),
+    }
+}
+
+#[derive(Default)]
+struct CoreGitConfig {
+    bare: bool,
+    worktree: Option<String>,
+}
+
+fn read_core_config(config_path: &Path) -> CoreGitConfig {
+    let mut cfg = CoreGitConfig::default();
+    let Ok(text) = read_to_string_safe(config_path) else {
+        return cfg;
+    };
+    let mut in_core = false;
+    for raw_line in text.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            in_core = line.eq_ignore_ascii_case("[core]");
+            continue;
+        }
+        if !in_core {
+            continue;
+        }
+        if let Some((key, val)) = line.split_once('=') {
+            let key = key.trim();
+            let val = val
+                .split(['#', ';'])
+                .next()
+                .unwrap_or("")
+                .trim()
+                .trim_matches('"');
+            if key.eq_ignore_ascii_case("bare") {
+                cfg.bare = val.eq_ignore_ascii_case("true");
+            } else if key.eq_ignore_ascii_case("worktree") && !val.is_empty() {
+                cfg.worktree = Some(val.to_owned());
+            }
         }
     }
+    cfg
 }
