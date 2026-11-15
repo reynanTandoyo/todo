@@ -44,9 +44,9 @@ pub use config::{
 };
 pub use edits::TaskEditBuilder;
 pub use pipeline::{
-    DocWritePlan, WriteDocResult, WriteTaskResult, build_claim_edits, build_release_edits,
-    check_task_writable, edit_doc_and_write, edit_doc_with_state_and_write, edit_task_and_write,
-    parse_doc_for_write, require_yes_or_preview,
+    DocWritePlan, NewlyReadyTask, WriteDocResult, WriteTaskResult, build_claim_edits,
+    build_release_edits, check_task_writable, edit_doc_and_write, edit_doc_with_state_and_write,
+    edit_task_and_write, parse_doc_for_write, require_yes_or_preview,
 };
 pub use query::{
     ListFilter, NextFilter, SelectedNext, StatusFilter, WhereClause, filter_tasks,

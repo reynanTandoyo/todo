@@ -5,13 +5,14 @@ use std::path::Path;
 use std::process::Command as ProcessCommand;
 
 use clap::Args as ClapArgs;
+use serde::Serialize;
 
 use crate::cli::{CommandKind, CommandMeta, Context, resolve_opt_text_arg};
 use crate::doc::Status;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
-    OpsConfig, OwnershipDecision, StatusCommand, TaskEditBuilder, edit_task_and_write,
-    forced_note_text, validate_transition,
+    NewlyReadyTask, OpsConfig, OwnershipDecision, StatusCommand, TaskEditBuilder, TaskJson,
+    edit_task_and_write, forced_note_text, validate_transition,
 };
 use crate::output::Output;
 
@@ -42,6 +43,14 @@ pub struct Args {
     /// Optional commit hash or `HEAD` to record in the `commit` field.
     #[arg(long, value_name = "HASH|HEAD")]
     pub commit: Option<String>,
+}
+
+#[derive(Serialize)]
+struct DoneJson<'a> {
+    #[serde(flatten)]
+    task: &'a TaskJson,
+    #[serde(skip_serializing_if = "<[NewlyReadyTask]>::is_empty")]
+    newly_ready: &'a [NewlyReadyTask],
 }
 
 /// Runs `todo done <task>`.
@@ -94,11 +103,20 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     )?;
 
     if out.is_json() {
-        out.emit_json_ok(META.name, &res.task);
+        out.emit_json_ok(
+            META.name,
+            &DoneJson {
+                task: &res.task,
+                newly_ready: &res.newly_ready,
+            },
+        );
     } else {
         out.write_line(&format!("{}: done ok", res.task_id));
         if let Some(ref accept) = res.task.accept {
             out.write_line(&format!("accept: {accept}"));
+        }
+        for ready in &res.newly_ready {
+            out.write_line(&format!("now ready: {} {}", ready.id, ready.title));
         }
     }
     Ok(())

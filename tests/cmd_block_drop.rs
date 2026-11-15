@@ -228,3 +228,42 @@ fn block_unblock_and_drop_require_reason_and_follow_transition_table() {
     }
     assert_eq!(fs::read(&todo_file).unwrap(), before_terminal);
 }
+
+#[test]
+fn drop_lists_tasks_that_became_ready() {
+    let dir = TempDir::new().unwrap();
+    let home = dir.path().join("home");
+    let work = dir.path().join("work");
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(&work).unwrap();
+    let todo_file = work.join("TODO.md");
+    fs::write(
+        &todo_file,
+        "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
+         <!-- todo-format: 1 -->\n\n\
+         ## Tasks\n\n\
+         ### T-001 · First\n\
+         - status: open\n\
+         - priority: P1\n\n\
+         ### T-002 · Waiting on T-001\n\
+         - status: open\n\
+         - priority: P1\n\
+         - depends: T-001\n",
+    )
+    .unwrap();
+
+    let now = "2026-11-15T10:00:00+01:00";
+    let res = lock_support::run_todo(
+        &home,
+        &work,
+        &["drop", "T-001", "--agent", "alice", "--note", "unneeded"],
+        &[("TODO_TEST_NOW", now)],
+    )
+    .unwrap();
+    assert!(res.status.success());
+    let stdout = String::from_utf8(res.stdout).unwrap();
+    assert!(
+        stdout.contains("now ready: T-002 Waiting on T-001"),
+        "{stdout}"
+    );
+}

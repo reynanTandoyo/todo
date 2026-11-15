@@ -1,18 +1,23 @@
 //! Shared write pipeline used by every mutating `todo` command (`R-LOCK-1..6`, `R-EDIT-7`, `R-EDIT-8`, `R-IO-1..5`).
 
+use std::collections::BTreeSet;
+
 use chrono::{DateTime, FixedOffset};
+use serde::Serialize;
 use similar::TextDiff;
 
 use crate::atomic::validate_utf8;
 use crate::cli::Context;
-use crate::doc::{Document, EditError, LineEdit, Problem, Task, TaskChangeIntent};
+use crate::doc::{Document, EditError, LineEdit, Problem, Task, TaskChangeIntent, TaskId};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::FoundTodo;
 use crate::lock::{WriteOutcome, current_time, locked_read_modify_write_with_warnings};
 use crate::ops::config::OpsConfig;
 use crate::ops::edits::TaskEditBuilder;
 use crate::ops::query::resolve_task_in_doc;
-use crate::ops::read::{TaskJson, build_task_json, file_label, read_optional_archive};
+use crate::ops::read::{
+    TaskJson, build_task_json, file_label, is_task_ready, read_optional_archive,
+};
 use crate::ops::rules::{ClaimPlan, ReleasePlan};
 use crate::output::Output;
 use crate::state::StateDir;
@@ -47,6 +52,18 @@ pub struct WriteDocResult<T> {
     pub value: T,
 }
 
+/// Summary of a task that became ready as a result of a write (`R-DEP-4`).
+#[derive(Debug, Clone, Serialize)]
+pub struct NewlyReadyTask {
+    /// Canonical formatted task ID.
+    pub id: String,
+    /// Task priority, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<String>,
+    /// Task title.
+    pub title: String,
+}
+
 /// Result returned by [`edit_task_and_write`].
 #[derive(Debug, Clone)]
 pub struct WriteTaskResult<T> {
@@ -56,6 +73,8 @@ pub struct WriteTaskResult<T> {
     pub task_id: String,
     /// Post-edit JSON representation of the target task (`R-WRITE`).
     pub task: TaskJson,
+    /// Tasks that became ready after this edit (`R-DEP-4`).
+    pub newly_ready: Vec<NewlyReadyTask>,
     /// `true` if `TODO.md` was modified on disk.
     pub changed: bool,
     /// Command-specific payload.
@@ -289,8 +308,15 @@ where
         let (edits, payload) = op(doc, task, archive, agent, now)?;
         if edits.is_empty() {
             let task_json = build_task_json(doc, task, archive, false, now, &label_cfg);
-            return Ok(DocWritePlan::Unchanged((task_json, payload)));
+            return Ok(DocWritePlan::Unchanged((task_json, Vec::new(), payload)));
         }
+
+        let pre_not_ready: BTreeSet<TaskId> = doc
+            .tasks
+            .iter()
+            .filter(|t| !is_task_ready(doc, t, archive, now, &label_cfg))
+            .map(|t| t.id)
+            .collect();
 
         let arch_owned = archive.cloned();
         let cfg_owned = label_cfg.clone();
@@ -314,7 +340,21 @@ where
                     now,
                     &cfg_owned,
                 );
-                Ok((task_json, payload))
+                let newly_ready = new_doc
+                    .tasks
+                    .iter()
+                    .filter(|t| {
+                        t.id != task_id
+                            && pre_not_ready.contains(&t.id)
+                            && is_task_ready(new_doc, t, arch_owned.as_ref(), now, &cfg_owned)
+                    })
+                    .map(|t| NewlyReadyTask {
+                        id: cfg_owned.id_config.format_id(t.id),
+                        priority: t.priority.clone(),
+                        title: t.title.clone(),
+                    })
+                    .collect();
+                Ok((task_json, newly_ready, payload))
             }),
         })
     })?;
@@ -323,8 +363,9 @@ where
         found: res.found,
         task_id: res.value.0.id.clone(),
         task: res.value.0,
+        newly_ready: res.value.1,
         changed: res.changed,
-        value: res.value.1,
+        value: res.value.2,
     })
 }
 

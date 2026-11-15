@@ -1,13 +1,14 @@
 //! `todo drop` command: mark a task dropped with a reason note (T-025; R-WRITE-6, R-WRITE-9).
 
 use clap::Args as ClapArgs;
+use serde::Serialize;
 
 use crate::cli::{CommandKind, CommandMeta, Context, resolve_text_arg};
 use crate::doc::Status;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
-    OpsConfig, OwnershipDecision, StatusCommand, TaskEditBuilder, edit_task_and_write,
-    forced_note_text, validate_transition,
+    NewlyReadyTask, OpsConfig, OwnershipDecision, StatusCommand, TaskEditBuilder, TaskJson,
+    edit_task_and_write, forced_note_text, validate_transition,
 };
 use crate::output::Output;
 
@@ -33,6 +34,14 @@ pub struct Args {
     /// Reason the task is dropped (required).
     #[arg(long, value_name = "TEXT")]
     pub note: String,
+}
+
+#[derive(Serialize)]
+struct DropJson<'a> {
+    #[serde(flatten)]
+    task: &'a TaskJson,
+    #[serde(skip_serializing_if = "<[NewlyReadyTask]>::is_empty")]
+    newly_ready: &'a [NewlyReadyTask],
 }
 
 /// Runs `todo drop <task> --note <reason>`.
@@ -74,9 +83,18 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     )?;
 
     if out.is_json() {
-        out.emit_json_ok(META.name, &res.task);
+        out.emit_json_ok(
+            META.name,
+            &DropJson {
+                task: &res.task,
+                newly_ready: &res.newly_ready,
+            },
+        );
     } else {
         out.write_line(&format!("{}: drop ok", res.task_id));
+        for ready in &res.newly_ready {
+            out.write_line(&format!("now ready: {} {}", ready.id, ready.title));
+        }
     }
     Ok(())
 }
