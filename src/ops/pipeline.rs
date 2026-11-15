@@ -8,7 +8,7 @@ use crate::cli::Context;
 use crate::doc::{Document, EditError, LineEdit, Problem, Task, TaskChangeIntent};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::FoundTodo;
-use crate::lock::{WriteOutcome, current_time, locked_read_modify_write};
+use crate::lock::{WriteOutcome, current_time, locked_read_modify_write_with_warnings};
 use crate::ops::config::OpsConfig;
 use crate::ops::edits::TaskEditBuilder;
 use crate::ops::query::resolve_task_in_doc;
@@ -159,12 +159,14 @@ where
     let archive_path = cfg.archive_path(&found.path);
 
     let mut dry_run_diff: Option<String> = None;
-    let (changed, value) = locked_read_modify_write(
+    let mut lock_warnings: Vec<String> = Vec::new();
+    let (changed, value) = locked_read_modify_write_with_warnings(
         &found.path,
         &state,
         &agent,
         command,
         &cfg.lock,
+        &mut lock_warnings,
         |bytes, _snap| {
             let doc = parse_doc_for_write(bytes, &label, cfg)?;
             let archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
@@ -210,6 +212,10 @@ where
             }
         },
     )?;
+
+    for warn in lock_warnings {
+        out.warn(warn);
+    }
 
     if let Some(diff) = dry_run_diff {
         if out.is_json() {

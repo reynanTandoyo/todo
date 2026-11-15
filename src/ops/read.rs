@@ -108,6 +108,14 @@ pub fn load_for_read(
 
     let label = file_label(&found.path);
     let read = read_file_with_snapshot(&found.path)?;
+    let state = crate::state::StateDir::from_found(&found)?;
+    if let crate::history::OutsideEditOutcome::Recorded {
+        warning: Some(warn),
+    } =
+        crate::history::detect_outside_edit(&found.path, &label, &state, &read.snapshot, &cfg.lock)?
+    {
+        out.warn(warn);
+    }
     let _ = validate_utf8(&read.bytes, &label)?;
     let doc =
         Document::parse_bytes_with_config(&read.bytes, cfg.id_config.clone()).map_err(|e| {

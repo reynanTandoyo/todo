@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::error::Result;
-use crate::lock::{UnlockOutcome, release_lease};
+use crate::lock::{UnlockOutcome, release_lease_with_file};
 use crate::output::Output;
 use crate::state::StateDir;
 
@@ -37,7 +37,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let state = StateDir::from_found(&found)?;
     let cfg = ops_cfg.lock;
 
-    match release_lease(&state, agent, ctx.force, &cfg)? {
+    match release_lease_with_file(&found.path, &state, agent, ctx.force, &cfg)? {
         UnlockOutcome::Unlocked { agent: holder } => {
             if out.is_json() {
                 out.emit_json_ok(

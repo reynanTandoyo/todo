@@ -188,6 +188,32 @@ pub fn locked_read_modify_write<T, F>(
     agent: &str,
     command: &str,
     cfg: &LockConfig,
+    modify: F,
+) -> Result<T>
+where
+    F: FnMut(&[u8], &FileSnapshot) -> Result<WriteOutcome<T>>,
+{
+    let mut warnings = Vec::new();
+    locked_read_modify_write_with_warnings(
+        todo_path,
+        state,
+        agent,
+        command,
+        cfg,
+        &mut warnings,
+        modify,
+    )
+}
+
+/// Like [`locked_read_modify_write`], but also collects any outside-edit warnings (`R-HIST-3`)
+/// into `warnings`.
+pub fn locked_read_modify_write_with_warnings<T, F>(
+    todo_path: &Path,
+    state: &StateDir,
+    agent: &str,
+    command: &str,
+    cfg: &LockConfig,
+    warnings: &mut Vec<String>,
     mut modify: F,
 ) -> Result<T>
 where
@@ -221,6 +247,21 @@ where
     };
 
     let read = atomic::read_file_with_snapshot(todo_path)?;
+    let label = todo_path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "TODO.md".to_string());
+    if let crate::history::OutsideEditOutcome::Recorded {
+        warning: Some(warn),
+    } = crate::history::detect_outside_edit_locked(
+        &label,
+        state,
+        &read.bytes,
+        &read.snapshot,
+        cfg.snapshots_keep,
+    )? {
+        warnings.push(warn);
+    }
     match modify(&read.bytes, &read.snapshot)? {
         WriteOutcome::Unchanged(val) => {
             drop(guard);
@@ -408,20 +449,66 @@ pub fn release_lease(
     force: bool,
     cfg: &LockConfig,
 ) -> Result<UnlockOutcome> {
+    release_lease_inner(None, state, agent, force, cfg)
+}
+
+/// Ends an active manual editing lease and records any edits made to `todo_path` during the
+/// lease as a snapshot without emitting an outside-edit warning (`R-LOCK-6`, `R-HIST-3`).
+pub fn release_lease_with_file(
+    todo_path: &Path,
+    state: &StateDir,
+    agent: &str,
+    force: bool,
+    cfg: &LockConfig,
+) -> Result<UnlockOutcome> {
+    release_lease_inner(Some(todo_path), state, agent, force, cfg)
+}
+
+fn release_lease_inner(
+    todo_path: Option<&Path>,
+    state: &StateDir,
+    agent: &str,
+    force: bool,
+    cfg: &LockConfig,
+) -> Result<UnlockOutcome> {
     let guard = WriteLockGuard::acquire(state, agent, "unlock", cfg.effective_wait())?;
 
     let outcome = match state.read_lease()? {
         None => UnlockOutcome::NotActive,
         Some(lease) if !is_lease_live(&lease, current_time()) => {
+            if let Some(path) = todo_path {
+                crate::history::record_lease_edit_if_changed(
+                    path,
+                    state,
+                    &lease.agent,
+                    cfg.snapshots_keep,
+                )?;
+            }
             state.remove_lease()?;
             UnlockOutcome::NotActive
         }
         Some(lease) if lease.agent.eq_ignore_ascii_case(agent) => {
+            if let Some(path) = todo_path {
+                crate::history::record_lease_edit_if_changed(
+                    path,
+                    state,
+                    &lease.agent,
+                    cfg.snapshots_keep,
+                )?;
+            }
             state.remove_lease()?;
             UnlockOutcome::Unlocked { agent: lease.agent }
         }
         Some(lease) => {
             if force {
+                if let Some(path) = todo_path {
+                    crate::history::record_lease_edit_if_changed(
+                        path,
+                        state,
+                        &lease.agent,
+                        cfg.snapshots_keep,
+                    )?;
+                }
                 state.remove_lease()?;
                 UnlockOutcome::Forced {
                     previous_holder: lease.agent,

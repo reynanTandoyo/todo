@@ -45,6 +45,11 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let cfg = ops_cfg.lock;
     let minutes = args.minutes.unwrap_or(cfg.lease_minutes);
     let lease = acquire_lease(&state, agent, args.minutes, &cfg)?;
+    if state.read_last_write()?.is_none()
+        && let Ok(snap) = crate::atomic::read_file_with_snapshot(&found.path)
+    {
+        let _ = state.write_last_write(&crate::state::LastWrite::from_snapshot(&snap.snapshot));
+    }
 
     if out.is_json() {
         out.emit_json_ok(

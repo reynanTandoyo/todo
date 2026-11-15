@@ -6,11 +6,11 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::atomic::atomic_write_bytes;
+use crate::atomic::{FileSnapshot, atomic_write_bytes, read_file_with_snapshot};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::fs_path;
-use crate::lock::current_time;
-use crate::state::StateDir;
+use crate::lock::{LockConfig, WriteLockGuard, current_time, is_lease_live};
+use crate::state::{LastWrite, StateDir};
 
 const fn is_false(b: &bool) -> bool {
     !*b
@@ -203,4 +203,135 @@ fn write_history_index(state: &StateDir, entries: &[SnapshotEntry]) -> Result<()
         out.push('\n');
     }
     atomic_write_bytes(&state.history_index_path(), out.as_bytes())
+}
+
+/// Result of checking `last-write.json` against the current `TODO.md` bytes (`R-HIST-3`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OutsideEditOutcome {
+    /// No outside edit was detected (or no `last-write.json` exists yet, or a live lease is active).
+    None,
+    /// An outside edit (or expired-lease edit) was recorded as a snapshot.
+    Recorded {
+        /// Warning message to display once, or `None` for edits made under a lease.
+        warning: Option<String>,
+    },
+}
+
+/// Checks for an outside edit from a read-only command, acquiring the write lock only if a hash
+/// mismatch is observed (`R-HIST-3`).
+pub fn detect_outside_edit(
+    todo_path: &Path,
+    label: &str,
+    state: &StateDir,
+    current_snap: &FileSnapshot,
+    lock_cfg: &LockConfig,
+) -> Result<OutsideEditOutcome> {
+    if !fs_path(state.path()).exists() {
+        return Ok(OutsideEditOutcome::None);
+    }
+    let Some(last) = state.read_last_write()? else {
+        return Ok(OutsideEditOutcome::None);
+    };
+    if last.sha256 == current_snap.sha256_hex() {
+        return Ok(OutsideEditOutcome::None);
+    }
+    if let Some(lease) = state.read_lease()?
+        && is_lease_live(&lease, current_time())
+    {
+        return Ok(OutsideEditOutcome::None);
+    }
+
+    let _guard = WriteLockGuard::acquire(state, "todo", "outside-edit", lock_cfg.effective_wait())?;
+    let fresh = read_file_with_snapshot(todo_path)?;
+    detect_outside_edit_locked(
+        label,
+        state,
+        &fresh.bytes,
+        &fresh.snapshot,
+        lock_cfg.snapshots_keep,
+    )
+}
+
+/// Checks for an outside edit while the caller already holds the state write lock (`R-HIST-3`).
+pub fn detect_outside_edit_locked(
+    label: &str,
+    state: &StateDir,
+    current_bytes: &[u8],
+    current_snap: &FileSnapshot,
+    snapshots_keep: u64,
+) -> Result<OutsideEditOutcome> {
+    let Some(last) = state.read_last_write()? else {
+        return Ok(OutsideEditOutcome::None);
+    };
+    let current_hash = current_snap.sha256_hex();
+    if last.sha256 == current_hash {
+        return Ok(OutsideEditOutcome::None);
+    }
+
+    if let Some(lease) = state.read_lease()? {
+        if is_lease_live(&lease, current_time()) {
+            return Ok(OutsideEditOutcome::None);
+        }
+        // Lease expired before unlock: record the hand edit without a warning and clear the expired lease.
+        let _ = record_snapshot(
+            state,
+            current_bytes,
+            &current_hash,
+            &lease.agent,
+            "lease edit",
+            false,
+            snapshots_keep,
+        )?;
+        state.remove_lease()?;
+        state.write_last_write(&LastWrite::from_snapshot(current_snap))?;
+        return Ok(OutsideEditOutcome::Recorded { warning: None });
+    }
+
+    let entry = record_snapshot(
+        state,
+        current_bytes,
+        &current_hash,
+        "outside",
+        "outside edit",
+        true,
+        snapshots_keep,
+    )?;
+    state.write_last_write(&LastWrite::from_snapshot(current_snap))?;
+    let warning = entry.map(|e| {
+        format!(
+            "{label}: edited outside the tool (saved snapshot #{:06})",
+            e.number
+        )
+    });
+    Ok(OutsideEditOutcome::Recorded { warning })
+}
+
+/// Records any hand edits made during a manual lease when `todo unlock` runs, without a warning (`R-HIST-3`, `R-LOCK-6`).
+pub fn record_lease_edit_if_changed(
+    todo_path: &Path,
+    state: &StateDir,
+    lease_agent: &str,
+    snapshots_keep: u64,
+) -> Result<()> {
+    let Some(last) = state.read_last_write()? else {
+        return Ok(());
+    };
+    let Ok(fresh) = read_file_with_snapshot(todo_path) else {
+        return Ok(());
+    };
+    let current_hash = fresh.snapshot.sha256_hex();
+    if last.sha256 == current_hash {
+        return Ok(());
+    }
+    let _ = record_snapshot(
+        state,
+        &fresh.bytes,
+        &current_hash,
+        lease_agent,
+        "lease edit",
+        false,
+        snapshots_keep,
+    )?;
+    state.write_last_write(&LastWrite::from_snapshot(&fresh.snapshot))?;
+    Ok(())
 }
