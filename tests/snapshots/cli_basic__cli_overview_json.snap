@@ -26,6 +26,11 @@ expression: ok_json
         "summary": "Mark a task blocked with a reason"
       },
       {
+        "kind": "read",
+        "name": "check",
+        "summary": "Check TODO.md for format, dependency, claim, and state problems"
+      },
+      {
         "kind": "write",
         "name": "claim",
         "summary": "Claim a task for an agent"

@@ -368,6 +368,7 @@ register_commands! {
     Answer => answer,
     Ask => ask,
     Block => block,
+    Check => check,
     Claim => claim,
     Diff => diff,
     Done => done,
