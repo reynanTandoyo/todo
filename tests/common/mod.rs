@@ -8,6 +8,7 @@
 
 use std::fs;
 use std::io;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
 use std::time::{Duration, Instant};
@@ -146,6 +147,26 @@ pub fn setup_fixture_proj(tmp: &TempDir, name: &str) -> (PathBuf, PathBuf, PathB
     copy_fixture(&work, name);
     let todo_file = work.join("TODO.md");
     (home, work, todo_file)
+}
+
+/// Runs `todo` in `dir` with `args`, feeding `stdin_data` on standard input.
+#[must_use]
+pub fn run_with_stdin(dir: &Path, args: &[&str], stdin_data: &str) -> Output {
+    let mut child = todo_bin()
+        .current_dir(dir)
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn todo");
+    child
+        .stdin
+        .as_mut()
+        .expect("todo stdin")
+        .write_all(stdin_data.as_bytes())
+        .expect("write todo stdin");
+    child.wait_with_output().expect("wait for todo")
 }
 
 /// Writes `content` to `<dir>/TODO.md` and returns the path.

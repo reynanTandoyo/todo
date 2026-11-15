@@ -1,4 +1,9 @@
 #![allow(clippy::expect_used)] // whole file is test code; helpers outside #[test] may expect()
+
+mod common;
+
+use common::fixture;
+
 use std::fs;
 
 use chrono::NaiveDate;
@@ -9,13 +14,9 @@ use todo::doc::{
     inspect_problems, is_valid_agent_name, strip_section_number, verify_task_edits,
 };
 
-fn read_fixture(name: &str) -> Vec<u8> {
-    fs::read(format!("tests/fixtures/{name}")).expect("read fixture")
-}
-
 #[test]
 fn parses_clean_basic_fixture_completely() {
-    let bytes = read_fixture("clean_basic.md");
+    let bytes = fixture("clean_basic.md");
     let doc = Document::parse_bytes(&bytes).expect("valid UTF-8");
 
     assert!(
@@ -121,7 +122,7 @@ fn parses_clean_basic_fixture_completely() {
 
 #[test]
 fn messy_fixture_ignores_fences_comments_and_warns_only_on_fake_tasks() {
-    let bytes = read_fixture("messy_crlf_bom.md");
+    let bytes = fixture("messy_crlf_bom.md");
     let doc = Document::parse_bytes(&bytes).expect("valid UTF-8");
 
     assert!(!doc.blocks_all_writes());
@@ -154,7 +155,7 @@ fn messy_fixture_ignores_fences_comments_and_warns_only_on_fake_tasks() {
 
 #[test]
 fn mixed_fixture_handles_omitted_format_lenient_ids_separators_and_presection_task() {
-    let bytes = read_fixture("no_final_newline_mixed.md");
+    let bytes = fixture("no_final_newline_mixed.md");
     let doc = Document::parse_bytes(&bytes).expect("valid UTF-8");
 
     assert!(
@@ -194,7 +195,7 @@ fn mixed_fixture_handles_omitted_format_lenient_ids_separators_and_presection_ta
 
 #[test]
 fn detects_managed_block() {
-    let bytes = read_fixture("managed_block.md");
+    let bytes = fixture("managed_block.md");
     let doc = Document::parse_bytes(&bytes).expect("valid UTF-8");
     assert!(doc.problems.is_empty());
     let block = doc.managed_block.expect("managed block");
@@ -205,7 +206,7 @@ fn detects_managed_block() {
 #[test]
 fn reports_all_file_level_refusals_from_format_section_13() {
     // 1. Invalid UTF-8
-    let bad_utf8 = read_fixture("bad_utf8.md");
+    let bad_utf8 = fixture("bad_utf8.md");
     let utf8_probs = inspect_problems(&bad_utf8, IdConfig::default());
     assert_eq!(utf8_probs.len(), 1);
     assert!(utf8_probs[0].blocks_all_writes());
@@ -220,7 +221,7 @@ fn reports_all_file_level_refusals_from_format_section_13() {
     );
 
     // 2. Version 2 format line
-    let v2 = read_fixture("bad_version_2.md");
+    let v2 = fixture("bad_version_2.md");
     let v2_doc = Document::parse_bytes(&v2).expect("valid UTF-8");
     assert!(v2_doc.blocks_all_writes());
     assert_eq!(v2_doc.declared_format_version, Some(2));
@@ -236,7 +237,7 @@ fn reports_all_file_level_refusals_from_format_section_13() {
     );
 
     // 3. Conflict markers
-    let conflict = read_fixture("bad_conflict_markers.md");
+    let conflict = fixture("bad_conflict_markers.md");
     let conflict_doc = Document::parse_bytes(&conflict).expect("valid UTF-8");
     assert!(conflict_doc.blocks_all_writes());
     let conflict_lines: Vec<usize> = conflict_doc
@@ -248,14 +249,14 @@ fn reports_all_file_level_refusals_from_format_section_13() {
     assert_eq!(conflict_lines, vec![5, 7, 9]);
 
     // 4. Unclosed code fence
-    let fence = read_fixture("bad_unclosed_fence.md");
+    let fence = fixture("bad_unclosed_fence.md");
     let fence_doc = Document::parse_bytes(&fence).expect("valid UTF-8");
     assert!(fence_doc.blocks_all_writes());
     assert_eq!(fence_doc.problems[0].kind, ProblemKind::UnclosedCodeFence);
     assert_eq!(fence_doc.problems[0].line, 6);
 
     // 5. Unclosed HTML comment
-    let comment = read_fixture("bad_unclosed_comment.md");
+    let comment = fixture("bad_unclosed_comment.md");
     let comment_doc = Document::parse_bytes(&comment).expect("valid UTF-8");
     assert!(comment_doc.blocks_all_writes());
     assert_eq!(
@@ -267,7 +268,7 @@ fn reports_all_file_level_refusals_from_format_section_13() {
 
 #[test]
 fn reports_task_level_refusals_and_cross_archive_duplicates() {
-    let bytes = read_fixture("bad_task_problems.md");
+    let bytes = fixture("bad_task_problems.md");
     let doc = Document::parse_bytes(&bytes).expect("valid UTF-8");
 
     assert!(!doc.blocks_all_writes());
@@ -301,7 +302,7 @@ fn reports_task_level_refusals_and_cross_archive_duplicates() {
     );
 
     // Archive duplicate check
-    let main_doc = Document::parse_bytes(&read_fixture("clean_basic.md")).expect("clean");
+    let main_doc = Document::parse_bytes(&fixture("clean_basic.md")).expect("clean");
     let archive_doc =
         Document::parse_bytes(b"## Archive\n### T-002 \xC2\xB7 Archived copy\n- status: done\n")
             .expect("archive");
@@ -333,7 +334,7 @@ fn id_config_parses_flexible_inputs_and_formats_canonically() {
 
 #[test]
 fn section_matching_ignores_leading_numbers_and_case() {
-    let bytes = read_fixture("clean_basic.md");
+    let bytes = fixture("clean_basic.md");
     let doc = Document::parse_bytes(&bytes).expect("parse");
 
     assert_eq!(strip_section_number("12. Phase 2"), "Phase 2");
@@ -381,7 +382,7 @@ fn canonical_field_order_and_insertion_lines_follow_format_section_10() {
 
 #[test]
 fn dependencies_satisfied_checks_current_and_archive_documents() {
-    let bytes = read_fixture("clean_basic.md");
+    let bytes = fixture("clean_basic.md");
     let doc = Document::parse_bytes(&bytes).expect("parse");
 
     // T-002 depends on T-001 (claimed) -> not satisfied.
@@ -403,7 +404,7 @@ fn dependencies_satisfied_checks_current_and_archive_documents() {
 fn task_level_verification_allows_intended_edit_and_rejects_unintended_changes() {
     let dir = TempDir::new().expect("tempdir");
     let path = dir.path().join("TODO.md");
-    let orig_bytes = read_fixture("clean_basic.md");
+    let orig_bytes = fixture("clean_basic.md");
     fs::write(&path, &orig_bytes).expect("write");
 
     let doc = Document::parse_bytes(&orig_bytes).expect("parse");

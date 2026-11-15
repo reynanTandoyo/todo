@@ -2,36 +2,15 @@
 
 mod common;
 
-use common::{parse_json, stderr_text};
+use common::{parse_json, run_with_stdin, stderr_text};
 
 use std::fs;
-use std::io::Write;
-use std::process::{Command, Stdio};
 
 use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
 const TRICKY: &str = r#"Keep "double", 'single', `backticks`, and $env:VAR $(sub) intact!"#;
-
-fn run_with_stdin(dir: &std::path::Path, args: &[&str], stdin_data: &str) -> std::process::Output {
-    let bin = assert_cmd::cargo::cargo_bin!("todo");
-    let mut child = Command::new(bin)
-        .current_dir(dir)
-        .args(args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-    child
-        .stdin
-        .as_mut()
-        .unwrap()
-        .write_all(stdin_data.as_bytes())
-        .unwrap();
-    child.wait_with_output().unwrap()
-}
 
 #[test]
 fn text_with_quotes_backticks_and_dollar_arrives_intact_via_stdin_and_at_file() {
