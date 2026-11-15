@@ -82,27 +82,48 @@ fn perf_5000_tasks_list_show_and_write_meet_nfr3_budgets() {
         elapsed
     };
 
-    // Warm up filesystem cache once.
+    // Warm up the file-system cache, plus one untimed write so no measured write pays the
+    // one-off costs (creating the state folder, the first snapshot, antivirus scanning of new
+    // files on CI runners). NFR-3 is about steady-state speed.
     let _ = run(&["show", "T-0001"]);
+    let _ = run(&["note", "T-0001", "warm-up", "--agent", "perf-bot"]);
 
-    let list_time = run(&["list"]);
-    let show_time = run(&["show", "T-2500"]);
-    let note_time = run(&[
-        "note",
-        "T-2500",
-        "perf benchmark note",
-        "--agent",
-        "perf-bot",
-    ]);
-    let write_time = run(&[
-        "add",
-        "--title",
-        "Perf benchmark added task",
-        "--priority",
-        "P1",
-        "--agent",
-        "perf-bot",
-    ]);
+    // Median of five runs per command, so one slow outlier on a busy CI runner doesn't decide.
+    let median = |mut times: Vec<Duration>| -> Duration {
+        times.sort();
+        times[times.len() / 2]
+    };
+    let list_time = median((0..5).map(|_| run(&["list"])).collect());
+    let show_time = median((0..5).map(|_| run(&["show", "T-2500"])).collect());
+    let note_time = median(
+        (0..5)
+            .map(|_| {
+                run(&[
+                    "note",
+                    "T-2500",
+                    "perf benchmark note",
+                    "--agent",
+                    "perf-bot",
+                ])
+            })
+            .collect(),
+    );
+    let write_time = median(
+        (0..5)
+            .map(|i| {
+                let title = format!("Perf benchmark added task {i}");
+                run(&[
+                    "add",
+                    "--title",
+                    &title,
+                    "--priority",
+                    "P1",
+                    "--agent",
+                    "perf-bot",
+                ])
+            })
+            .collect(),
+    );
 
     eprintln!(
         "NFR-3 timings (5,000 tasks, {} bytes): list={:?}, show={:?}, note={:?}, add={:?}",
