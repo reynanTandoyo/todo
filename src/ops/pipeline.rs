@@ -1,6 +1,7 @@
 //! Shared write pipeline used by every mutating `todo` command (`R-LOCK-1..6`, `R-EDIT-7`, `R-EDIT-8`, `R-IO-1..5`).
 
 use chrono::{DateTime, FixedOffset};
+use similar::TextDiff;
 
 use crate::atomic::validate_utf8;
 use crate::cli::Context;
@@ -157,6 +158,7 @@ where
     let label = file_label(&found.path);
     let archive_path = cfg.archive_path(&found.path);
 
+    let mut dry_run_diff: Option<String> = None;
     let (changed, value) = locked_read_modify_write(
         &found.path,
         &state,
@@ -169,7 +171,12 @@ where
             let now = current_time();
 
             match op(&doc, archive.as_ref(), &state, &label, &agent, now)? {
-                DocWritePlan::Unchanged(val) => Ok(WriteOutcome::Unchanged((false, val))),
+                DocWritePlan::Unchanged(val) => {
+                    if ctx.dry_run {
+                        dry_run_diff = Some(String::new());
+                    }
+                    Ok(WriteOutcome::Unchanged((false, val)))
+                }
                 DocWritePlan::Edits {
                     edits,
                     intent,
@@ -180,6 +187,19 @@ where
                         .map_err(|e| edit_error_to_todo_error(&e, &label))?;
                     let val = build_value(&applied.doc)?;
                     if !applied.changed {
+                        if ctx.dry_run {
+                            dry_run_diff = Some(String::new());
+                        }
+                        return Ok(WriteOutcome::Unchanged((false, val)));
+                    }
+                    if ctx.dry_run {
+                        let old_text = String::from_utf8_lossy(bytes);
+                        let new_text = String::from_utf8_lossy(&applied.bytes);
+                        let diff = TextDiff::from_lines(old_text.as_ref(), new_text.as_ref())
+                            .unified_diff()
+                            .header(&format!("a/{label}"), &format!("b/{label}"))
+                            .to_string();
+                        dry_run_diff = Some(diff);
                         return Ok(WriteOutcome::Unchanged((false, val)));
                     }
                     Ok(WriteOutcome::Changed {
@@ -191,11 +211,39 @@ where
         },
     )?;
 
+    if let Some(diff) = dry_run_diff {
+        if out.is_json() {
+            out.set_dry_run_diff(diff);
+        } else if diff.is_empty() {
+            out.write_line("dry-run: no changes");
+        } else {
+            out.write_str(&diff);
+            if !diff.ends_with('\n') {
+                out.write_str("\n");
+            }
+        }
+    }
+
     Ok(WriteDocResult {
         found,
         changed,
         value,
     })
+}
+
+/// Checks whether a bulk command may proceed (`R-WRITE-14`).
+///
+/// When `--yes` is missing (or `--dry-run` is active), prints `preview` (and a hint to pass
+/// `--yes`) and returns `Ok(false)` so the caller makes no changes on disk.
+pub fn require_yes_or_preview(ctx: &Context, preview: &str, out: &mut Output) -> bool {
+    if ctx.yes && !ctx.dry_run {
+        return true;
+    }
+    out.write_line(preview);
+    if !ctx.yes {
+        out.write_line("dry-run preview: pass --yes to apply these changes");
+    }
+    false
 }
 
 /// Runs the shared write pipeline targeting a single task by ID (`task_input` per `R-ID-3`).

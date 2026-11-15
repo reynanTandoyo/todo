@@ -187,10 +187,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             let new_id = TaskId(next_num);
             let id_str = cfg.id_config.format_id(new_id);
 
-            // Persist the new high-water mark while holding the write lock.
-            state.write_ids(&IdsState {
-                highest_id: next_num,
-            })?;
+            // Persist the new high-water mark while holding the write lock (unless --dry-run).
+            if !ctx.dry_run {
+                state.write_ids(&IdsState {
+                    highest_id: next_num,
+                })?;
+            }
 
             // 4. Build canonical lines for the new task (docs/format.md §10).
             let mut lines = Vec::new();
@@ -865,10 +867,12 @@ fn run_batch_from(
                 ordered_ids.push((*new_id, id_str.clone()));
             }
 
-            // All validations succeeded: persist the new high-water mark under the lock.
-            state.write_ids(&IdsState {
-                highest_id: next_num,
-            })?;
+            // All validations succeeded: persist the new high-water mark under the lock (unless --dry-run).
+            if !ctx.dry_run {
+                state.write_ids(&IdsState {
+                    highest_id: next_num,
+                })?;
+            }
 
             let edits: Vec<LineEdit> = grouped_lines
                 .into_iter()

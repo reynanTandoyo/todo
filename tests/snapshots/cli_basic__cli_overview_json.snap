@@ -12,6 +12,16 @@ expression: ok_json
       },
       {
         "kind": "write",
+        "name": "answer",
+        "summary": "Answer a question and mark it done"
+      },
+      {
+        "kind": "write",
+        "name": "ask",
+        "summary": "Ask a question for a person to answer"
+      },
+      {
+        "kind": "write",
         "name": "block",
         "summary": "Mark a task blocked with a reason"
       },
@@ -46,6 +56,11 @@ expression: ok_json
         "summary": "Take a manual editing lease on TODO.md"
       },
       {
+        "kind": "write",
+        "name": "move",
+        "summary": "Move a task to the end of another section"
+      },
+      {
         "kind": "read",
         "name": "next",
         "summary": "Pick the next ready task (optionally claiming it atomically)"
@@ -58,7 +73,12 @@ expression: ok_json
       {
         "kind": "write",
         "name": "release",
-        "summary": "Release a claimed task back to open (or clear owner on blocked)"
+        "summary": "Release a claimed task, all stale claims, or all claims of an agent"
+      },
+      {
+        "kind": "write",
+        "name": "reopen",
+        "summary": "Put a done or dropped task back to open"
       },
       {
         "kind": "write",
@@ -84,6 +104,11 @@ expression: ok_json
         "kind": "write",
         "name": "unlock",
         "summary": "End a manual editing lease on TODO.md"
+      },
+      {
+        "kind": "read",
+        "name": "where",
+        "summary": "Show resolved TODO.md, repo root, state folder, lock status, and task counts"
       }
     ],
     "version": "0.1.0"

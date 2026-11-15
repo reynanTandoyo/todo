@@ -133,9 +133,11 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             let new_id = TaskId(next_num);
             let id_str = cfg.id_config.format_id(new_id);
 
-            state.write_ids(&IdsState {
-                highest_id: next_num,
-            })?;
+            if !ctx.dry_run {
+                state.write_ids(&IdsState {
+                    highest_id: next_num,
+                })?;
+            }
 
             let matches = matching_section_indices(&doc.sections, &cfg.question_section);
             let (insert_at, need_section_heading) = match matches.as_slice() {

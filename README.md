@@ -83,11 +83,28 @@ todo note T-012 "reproduced on Windows 11" --agent agent-1
 ```powershell
 todo claim T-012 --agent agent-1
 todo release T-012 --agent agent-1
+todo release --stale --agent coordinator
+todo release --all --agent agent-1
 todo block T-012 --note "waiting on API schema" --agent agent-1
 todo unblock T-012 --note "schema merged" --agent agent-1
 todo done T-012 --note "all tests pass" --commit HEAD --agent agent-1
 todo drop T-013 --note "superseded by T-012" --agent agent-1
+todo reopen T-013 --note "needed after all" --agent agent-1
+todo move T-012 --section Done --agent agent-1
 ```
+
+### Questions, batch add, and inspection
+
+```powershell
+todo where
+todo ask "Should retries use exponential backoff?" --agent agent-1
+todo answer T-014 "Yes, cap at 30s" --agent human
+Get-Content tasks.jsonl | todo add --from - --agent coordinator
+```
+
+Task arguments also match unique case-insensitive title substrings (excluding `done` and `dropped`
+tasks). Text options accept `-` (standard input) or `@path` (a UTF-8 file) so quotes, backticks,
+and `$` pass cleanly through PowerShell.
 
 ### Manual edit leases and lock status
 
@@ -97,8 +114,17 @@ todo lock --minutes 10 --agent agent-1
 todo unlock --agent agent-1
 ```
 
-Pass `--json` to any command for machine-readable output, `--file <path>` (or `TODO_FILE`) to
-target a specific file, and `--force` to override another agent's claim.
+Pass `--json` to any command for machine-readable output, `--dry-run` to preview a write command's
+diff without modifying `TODO.md`, `--yes` to confirm bulk commands, `--file <path>` (or
+`TODO_FILE`) to target a specific file, and `--force` to override another agent's claim.
+
+## Configuration (`todo.toml`)
+
+An optional `todo.toml` next to `TODO.md` can configure `id_prefix`, `id_width`, `priorities`,
+`required_fields`, `types`, `areas`, `default_section`, `question_section`, `archive_file`,
+`claim_ttl_hours`, `lock_wait_seconds`, `lease_minutes`, `lease_max_minutes`, `snapshots_keep`,
+and `worktree` (`"shared"` or `"local"`). See [`docs/requirements.md`](docs/requirements.md) §5.14
+for defaults.
 
 ## Adding it to a project
 

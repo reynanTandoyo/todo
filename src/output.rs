@@ -24,6 +24,10 @@ struct JsonErrorBody<'a> {
 struct JsonOkEnvelope<'a, T: Serialize> {
     schema: String,
     ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dry_run: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    diff: Option<&'a str>,
     data: &'a T,
     warnings: &'a [String],
 }
@@ -44,6 +48,7 @@ struct JsonErrEnvelope<'a> {
 pub struct Output {
     json: bool,
     warnings: Vec<String>,
+    dry_run_diff: Option<String>,
     broken_pipe: bool,
     stdout: Box<dyn Write>,
     stderr: Box<dyn Write>,
@@ -56,6 +61,7 @@ impl Output {
         Self {
             json,
             warnings: Vec::new(),
+            dry_run_diff: None,
             broken_pipe: false,
             stdout: Box::new(io::stdout()),
             stderr: Box::new(io::stderr()),
@@ -68,10 +74,16 @@ impl Output {
         Self {
             json,
             warnings: Vec::new(),
+            dry_run_diff: None,
             broken_pipe: false,
             stdout,
             stderr,
         }
+    }
+
+    /// Records a `--dry-run` unified diff to include in the `--json` envelope (`R-EDIT-10`).
+    pub fn set_dry_run_diff(&mut self, diff: String) {
+        self.dry_run_diff = Some(diff);
     }
 
     /// Returns `true` if `--json` mode is active.
@@ -139,6 +151,8 @@ impl Output {
         let envelope = JsonOkEnvelope {
             schema: schema_name(command),
             ok: true,
+            dry_run: self.dry_run_diff.as_ref().map(|_| true),
+            diff: self.dry_run_diff.as_deref(),
             data,
             warnings: &self.warnings,
         };
