@@ -1,5 +1,6 @@
 //! The state folder: lock, lease, IDs and last-write records (T-012; R-HIST-1, R-LOCK-7).
 
+use std::ffi::{OsStr, OsString};
 use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::path::{Component, Path, PathBuf};
@@ -292,14 +293,23 @@ impl StateDir {
     }
 }
 
+/// Resolves the task file's path by canonicalizing its folder, never the file itself.
+///
+/// While another process replaces `TODO.md` with a rename, opening the file to canonicalize
+/// it can resolve to the replaced copy (`C:\$Extend\$Deleted\…` on Windows). That would give
+/// this process a different state folder, and so a different lock (R-LOCK-7). The folder is
+/// never replaced, so it resolves reliably.
 fn canonicalize_file_or_parent(path: &Path) -> Result<PathBuf> {
-    if let Ok(canon) = canonicalize_clean(path) {
-        return Ok(canon);
-    }
-    if let (Some(parent), Some(name)) = (path.parent(), path.file_name())
-        && let Ok(canon_parent) = canonicalize_clean(parent)
-    {
-        return Ok(canon_parent.join(name));
+    if let (Some(parent), Some(name)) = (path.parent(), path.file_name()) {
+        let parent = if parent.as_os_str().is_empty() {
+            Path::new(".")
+        } else {
+            parent
+        };
+        if let Ok(canon_parent) = canonicalize_clean(parent) {
+            let name = name_as_stored(&canon_parent, name);
+            return Ok(canon_parent.join(name));
+        }
     }
     let abs = std::path::absolute(path).map_err(|e| {
         TodoError::new(
@@ -308,6 +318,24 @@ fn canonicalize_file_or_parent(path: &Path) -> Result<PathBuf> {
         )
     })?;
     Ok(strip_verbatim_prefix(&abs))
+}
+
+/// The file name as stored in `dir`. Windows matches names ignoring case, so `todo.md` and
+/// `TODO.md` must give the same state folder (R-LOCK-7); the listing gives the stored
+/// spelling without opening the file. Falls back to `name` when nothing matches.
+fn name_as_stored(dir: &Path, name: &OsStr) -> OsString {
+    if cfg!(windows)
+        && let Some(wanted) = name.to_str().map(str::to_lowercase)
+        && let Ok(entries) = std::fs::read_dir(fs_path(dir).as_ref())
+    {
+        for entry in entries.flatten() {
+            let stored = entry.file_name();
+            if stored.to_str().is_some_and(|s| s.to_lowercase() == wanted) {
+                return stored;
+            }
+        }
+    }
+    name.to_os_string()
 }
 
 fn normalized_rel_key(file: &Path, root: &Path) -> Option<PathBuf> {
