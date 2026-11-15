@@ -571,13 +571,15 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
 
 ### T-082 · Make writes fast again on large files
-- status: open
-- owner: —
+- status: done
+- owner: w8-hydrogen
 - priority: P0 · type: fix · area: core
 - problem: after v0.3 a write takes 150 ms (perf test: add 199 ms against the 200 ms limit) while v0.1 took 59 ms; note --dry-run takes 93 ms although it writes nothing, so the write path does several full parses or other repeated work; release todo.exe grew from 0.7 MB to 4.2 MB
 - accept: on a generated 5,000-task file (about 1 MB) in a release build, add and note take under 100 ms and list and show under 60 ms on this PC, with the perf test asserting the NFR-3 limits; the release todo.exe size is explained and reduced if easy
+- commit: 6bc8845
 - reqs: NFR-3, TEST-9
 - note (2026-11-15, coordinator): added
+- note (2026-11-15, w8-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass; perf test list 41 ms, show 36 ms, note 72 ms, add 73 ms (5,000 tasks); release todo.exe 4.2 MB -> 3.06 MB (clap/toml/sha2 default features off, panic=abort; help, suggestions and error context kept)
 
 ## 7. Ideas, not planned
 
