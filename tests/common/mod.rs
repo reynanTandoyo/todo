@@ -136,6 +136,18 @@ pub fn setup_proj(tmp: &TempDir, body: &str) -> (PathBuf, PathBuf, PathBuf) {
     (home, work, todo_file)
 }
 
+/// Like [`setup_proj`], but copies `tests/fixtures/<name>` as `TODO.md`.
+#[must_use]
+pub fn setup_fixture_proj(tmp: &TempDir, name: &str) -> (PathBuf, PathBuf, PathBuf) {
+    let home = tmp.path().join("home");
+    let work = tmp.path().join("work");
+    fs::create_dir_all(&home).expect("create home");
+    fs::create_dir_all(&work).expect("create work");
+    copy_fixture(&work, name);
+    let todo_file = work.join("TODO.md");
+    (home, work, todo_file)
+}
+
 /// Writes `content` to `<dir>/TODO.md` and returns the path.
 pub fn write_todo(dir: &Path, content: &str) -> PathBuf {
     let path = dir.join("TODO.md");

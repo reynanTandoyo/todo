@@ -2,26 +2,16 @@
 
 mod common;
 
-use common::{parse_json, read_todo, stderr_text, stdout_text};
+use common::{parse_json, read_todo, setup_fixture_proj, stderr_text, stdout_text};
 
 use std::fs;
-use std::path::Path;
 
 use tempfile::TempDir;
-
-fn copy_clean_fixture(work: &Path) -> std::io::Result<()> {
-    let fixture = fs::read("tests/fixtures/clean_basic.md")?;
-    fs::write(work.join("TODO.md"), fixture)
-}
 
 #[test]
 fn show_text_output_equals_task_lines_in_file_and_accepts_flexible_ids() {
     let tmp = TempDir::new().unwrap();
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&work).unwrap();
-    copy_clean_fixture(&work).unwrap();
+    let (home, work, _) = setup_fixture_proj(&tmp, "clean_basic.md");
 
     let file_text = read_todo(&work);
     let file_lines: Vec<&str> = file_text.lines().collect();
@@ -44,11 +34,7 @@ fn show_text_output_equals_task_lines_in_file_and_accepts_flexible_ids() {
 #[test]
 fn show_json_includes_unknown_fields_notes_lines_dependencies_and_dependents() {
     let tmp = TempDir::new().unwrap();
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&work).unwrap();
-    copy_clean_fixture(&work).unwrap();
+    let (home, work, _) = setup_fixture_proj(&tmp, "clean_basic.md");
 
     // T-001 has unknown field `custom_tag`, 2 notes, lines 9..24, and T-002 depends on it.
     let out1 = common::run_todo(
@@ -137,11 +123,7 @@ fn show_finds_archived_tasks_and_archived_dependencies() {
 #[test]
 fn show_missing_task_returns_not_found_and_unsafe_file_still_warns() {
     let tmp = TempDir::new().unwrap();
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&work).unwrap();
-    copy_clean_fixture(&work).unwrap();
+    let (home, work, _) = setup_fixture_proj(&tmp, "clean_basic.md");
 
     let missing = common::run_todo(&home, &work, &["--json", "show", "T-999"], &[]).unwrap();
     assert_eq!(missing.status.code(), Some(1));

@@ -5,7 +5,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{parse_json, stderr_text, stdout_text, todo_bin};
+use common::{parse_json, read_text, stderr_text, stdout_text, todo_bin};
 
 const ARCHIVE_FIXTURE: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
@@ -84,8 +84,7 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
     let old_json: Value = parse_json(&arch_old.stdout);
     assert_eq!(old_json["data"]["count"], 2);
 
-    let archive_text =
-        fs::read_to_string(dir.path().join("TODO-archive.md")).expect("read TODO-archive.md");
+    let archive_text = read_text(&dir.path().join("TODO-archive.md"));
     assert!(archive_text.starts_with("<!-- todo-format: 1 -->"));
     assert!(archive_text.contains("## Backend"));
     assert!(archive_text.contains("### T-001 · Old done backend task"));
@@ -132,8 +131,7 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
         .output()
         .expect("run archive rest");
     assert!(arch_rest.status.success());
-    let archive_text2 =
-        fs::read_to_string(dir.path().join("TODO-archive.md")).expect("read TODO-archive.md");
+    let archive_text2 = read_text(&dir.path().join("TODO-archive.md"));
     assert!(archive_text2.contains("### T-002 · Recent done backend task"));
 
     // Adding a new task must pick T-006, never reusing archived IDs.

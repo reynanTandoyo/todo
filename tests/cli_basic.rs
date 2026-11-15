@@ -2,28 +2,17 @@
 
 mod common;
 
-use common::parse_json;
+use common::{assert_todo, parse_json};
 
 use std::process::{Command, Stdio};
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::prelude::*;
 use tempfile::TempDir;
-
-fn todo_cmd(home: &TempDir) -> assert_cmd::Command {
-    let mut cmd = cargo_bin_cmd!("todo");
-    cmd.env_remove("TODO_FILE")
-        .env_remove("TODO_AGENT")
-        .env("HOME", home.path())
-        .env("APPDATA", home.path())
-        .env("NO_COLOR", "1");
-    cmd
-}
 
 #[test]
 fn no_args_prints_overview_and_exits_zero() {
     let home = TempDir::new().unwrap();
-    todo_cmd(&home)
+    assert_todo(home.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("todo "))
@@ -34,14 +23,14 @@ fn no_args_prints_overview_and_exits_zero() {
 #[test]
 fn version_flag_prints_version() {
     let home = TempDir::new().unwrap();
-    todo_cmd(&home)
+    assert_todo(home.path())
         .arg("--version")
         .assert()
         .success()
         .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")))
         .stdout(predicate::str::contains(env!("TODO_GIT_COMMIT")));
 
-    let json_out = todo_cmd(&home)
+    let json_out = assert_todo(home.path())
         .args(["--version", "--json"])
         .output()
         .unwrap();
@@ -55,7 +44,7 @@ fn version_flag_prints_version() {
 #[test]
 fn help_lists_every_registered_command() {
     let home = TempDir::new().unwrap();
-    let output = todo_cmd(&home).arg("help").output().unwrap();
+    let output = assert_todo(home.path()).arg("help").output().unwrap();
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
     for meta in todo::cli::COMMANDS {
@@ -70,7 +59,7 @@ fn help_lists_every_registered_command() {
 #[test]
 fn help_command_explains_with_examples() {
     let home = TempDir::new().unwrap();
-    todo_cmd(&home)
+    assert_todo(home.path())
         .args(["help", "help"])
         .assert()
         .success()
@@ -81,7 +70,7 @@ fn help_command_explains_with_examples() {
 #[test]
 fn unknown_help_topic_exits_2() {
     let home = TempDir::new().unwrap();
-    todo_cmd(&home)
+    assert_todo(home.path())
         .args(["help", "nonexistent"])
         .assert()
         .code(2)
@@ -91,13 +80,13 @@ fn unknown_help_topic_exits_2() {
 #[test]
 fn invalid_agent_flag_and_env_exit_2() {
     let home = TempDir::new().unwrap();
-    todo_cmd(&home)
+    assert_todo(home.path())
         .args(["--agent", "bad name!", "help"])
         .assert()
         .code(2)
         .stderr(predicate::str::contains("invalid agent name"));
 
-    todo_cmd(&home)
+    assert_todo(home.path())
         .env("TODO_AGENT", "bad/agent")
         .arg("help")
         .assert()
@@ -108,7 +97,7 @@ fn invalid_agent_flag_and_env_exit_2() {
 #[test]
 fn valid_global_options_are_accepted() {
     let home = TempDir::new().unwrap();
-    todo_cmd(&home)
+    assert_todo(home.path())
         .args([
             "--file",
             "custom/TODO.md",
@@ -127,12 +116,12 @@ fn valid_global_options_are_accepted() {
 fn json_overview_and_error_envelopes_match_snapshots() {
     let home = TempDir::new().unwrap();
 
-    let ok_out = todo_cmd(&home).arg("--json").output().unwrap();
+    let ok_out = assert_todo(home.path()).arg("--json").output().unwrap();
     assert!(ok_out.status.success());
     let ok_json: serde_json::Value = parse_json(&ok_out.stdout);
     insta::assert_json_snapshot!("cli_overview_json", ok_json);
 
-    let err_out = todo_cmd(&home)
+    let err_out = assert_todo(home.path())
         .args(["--json", "help", "nonexistent"])
         .output()
         .unwrap();
@@ -166,14 +155,17 @@ fn closed_pipe_exits_zero() {
 #[test]
 fn help_agents_prints_builtin_rules_text() {
     let home = TempDir::new().unwrap();
-    let out = todo_cmd(&home).args(["help", "agents"]).output().unwrap();
+    let out = assert_todo(home.path())
+        .args(["help", "agents"])
+        .output()
+        .unwrap();
     assert!(out.status.success());
     assert_eq!(
         String::from_utf8(out.stdout).unwrap(),
         todo::agents::RULES_TEXT
     );
 
-    let json_out = todo_cmd(&home)
+    let json_out = assert_todo(home.path())
         .args(["--json", "help", "agents"])
         .output()
         .unwrap();

@@ -2,26 +2,16 @@
 
 mod common;
 
-use common::{parse_json, stderr_text, stdout_text};
+use common::{parse_json, setup_fixture_proj, stderr_text, stdout_text};
 
 use std::fs;
-use std::path::Path;
 
 use tempfile::TempDir;
-
-fn copy_clean_fixture(work: &Path) -> std::io::Result<()> {
-    let fixture = fs::read("tests/fixtures/clean_basic.md")?;
-    fs::write(work.join("TODO.md"), fixture)
-}
 
 #[test]
 fn list_hides_done_and_dropped_by_default_and_prints_count() {
     let tmp = TempDir::new().unwrap();
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&work).unwrap();
-    copy_clean_fixture(&work).unwrap();
+    let (home, work, _) = setup_fixture_proj(&tmp, "clean_basic.md");
 
     let out = common::run_todo(
         &home,
@@ -44,11 +34,7 @@ fn list_hides_done_and_dropped_by_default_and_prints_count() {
 #[test]
 fn list_status_filter_supports_comma_list_all_and_rejects_invalid() {
     let tmp = TempDir::new().unwrap();
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&work).unwrap();
-    copy_clean_fixture(&work).unwrap();
+    let (home, work, _) = setup_fixture_proj(&tmp, "clean_basic.md");
 
     let out_done_drop = common::run_todo(
         &home,
@@ -84,11 +70,7 @@ fn list_status_filter_supports_comma_list_all_and_rejects_invalid() {
 #[test]
 fn list_attribute_and_where_filters_work() {
     let tmp = TempDir::new().unwrap();
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&work).unwrap();
-    copy_clean_fixture(&work).unwrap();
+    let (home, work, _) = setup_fixture_proj(&tmp, "clean_basic.md");
 
     // --priority
     let p0 = common::run_todo(&home, &work, &["--json", "list", "--priority", "p0"], &[]).unwrap();
@@ -274,11 +256,7 @@ fn list_mine_stale_and_ready_filters_work() {
 #[test]
 fn list_archive_reads_archive_when_present_and_empty_when_absent() {
     let tmp = TempDir::new().unwrap();
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&work).unwrap();
-    copy_clean_fixture(&work).unwrap();
+    let (home, work, _) = setup_fixture_proj(&tmp, "clean_basic.md");
 
     let absent = common::run_todo(&home, &work, &["--json", "list", "--archive"], &[]).unwrap();
     assert!(absent.status.success());
@@ -338,11 +316,7 @@ fn list_shortens_titles_unless_wide_and_warns_on_unsafe_files() {
 #[test]
 fn list_json_matches_snapshot() {
     let tmp = TempDir::new().unwrap();
-    let home = tmp.path().join("home");
-    let work = tmp.path().join("work");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(&work).unwrap();
-    copy_clean_fixture(&work).unwrap();
+    let (home, work, _) = setup_fixture_proj(&tmp, "clean_basic.md");
 
     let out = common::run_todo(
         &home,
