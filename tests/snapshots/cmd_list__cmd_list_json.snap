@@ -1,0 +1,87 @@
+---
+source: tests/cmd_list.rs
+expression: parsed
+---
+{
+  "data": {
+    "archive": false,
+    "count": 4,
+    "tasks": [
+      {
+        "area": "greenhouse",
+        "claimed": "2026-11-15T09:30+01:00",
+        "depends": [],
+        "fields": {
+          "custom_tag": "morning-shift"
+        },
+        "id": "T-001",
+        "line_end": 24,
+        "line_start": 9,
+        "owner": "gardener-bot",
+        "priority": "P0",
+        "ready": false,
+        "section": "1. Now",
+        "stale": false,
+        "status": "claimed",
+        "title": "Water the tomato plants",
+        "type": "chore"
+      },
+      {
+        "area": "fence",
+        "claimed": null,
+        "depends": [
+          "T-001"
+        ],
+        "fields": {},
+        "id": "T-002",
+        "line_end": 34,
+        "line_start": 26,
+        "owner": null,
+        "priority": "P1",
+        "ready": false,
+        "section": "1. Now",
+        "stale": false,
+        "status": "open",
+        "title": "Repair the wooden gate",
+        "type": "maintenance"
+      },
+      {
+        "area": null,
+        "claimed": null,
+        "depends": [],
+        "fields": {},
+        "id": "T-003",
+        "line_end": 42,
+        "line_start": 38,
+        "owner": null,
+        "priority": "P2",
+        "ready": false,
+        "section": "2) Later",
+        "stale": false,
+        "status": "blocked",
+        "title": "Order compost bags",
+        "type": null
+      },
+      {
+        "area": null,
+        "claimed": null,
+        "depends": [],
+        "fields": {},
+        "id": "T-006",
+        "line_end": 62,
+        "line_start": 58,
+        "owner": null,
+        "priority": null,
+        "ready": false,
+        "section": "Questions",
+        "stale": false,
+        "status": "open",
+        "title": "Which rose variety for the arch?",
+        "type": "question"
+      }
+    ]
+  },
+  "ok": true,
+  "schema": "todo.list.v1",
+  "warnings": []
+}

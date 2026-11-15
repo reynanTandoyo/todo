@@ -11,6 +11,11 @@ expression: ok_json
         "summary": "Show overview or detailed help for a command"
       },
       {
+        "kind": "read",
+        "name": "list",
+        "summary": "List and filter tasks"
+      },
+      {
         "kind": "write",
         "name": "lock",
         "summary": "Take a manual editing lease on TODO.md"
