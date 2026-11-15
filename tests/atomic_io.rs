@@ -1,7 +1,6 @@
 //! Tests for atomic file replacement and IO safety (T-014; R-IO-1..5, TEST-7).
 
 use std::path::Path;
-use std::time::Duration;
 
 use tempfile::TempDir;
 use todo::atomic::{atomic_replace, read_file_with_snapshot, validate_utf8};
@@ -115,7 +114,7 @@ fn windows_sharing_violation_retries_and_succeeds_once_released() {
         .unwrap();
 
     let releaser = std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(250));
+        std::thread::sleep(std::time::Duration::from_millis(250));
         drop(handle);
     });
 

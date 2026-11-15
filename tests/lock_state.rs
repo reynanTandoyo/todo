@@ -116,7 +116,16 @@ fn outside_git_creates_dot_todo_with_gitignore_on_demand() {
     .unwrap();
     let state = StateDir::from_found(&found).unwrap();
     assert!(!state.is_in_git());
-    assert_eq!(state.path(), dir.join(".todo"));
+    // Compare canonically: temp folders on CI runners can use 8.3 short names
+    // (C:\Users\RUNNER~1\...), while the state folder is resolved to the long path.
+    assert_eq!(
+        state.path().file_name(),
+        Some(std::ffi::OsStr::new(".todo"))
+    );
+    assert_eq!(
+        std::fs::canonicalize(state.path().parent().unwrap()).unwrap(),
+        std::fs::canonicalize(&dir).unwrap()
+    );
     assert!(!state.path().exists());
 
     state.ensure_created().unwrap();
