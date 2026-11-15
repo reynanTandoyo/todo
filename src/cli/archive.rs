@@ -60,6 +60,9 @@ struct ArchiveJson {
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let agent = ctx.require_agent()?.to_owned();
     let found = ctx.find_todo(out)?;
+    if let Some(warning) = crate::find::synced_folder_warning(&found.path) {
+        out.warn(warning);
+    }
     let cfg = OpsConfig::load_next_to(&found.path)?;
     let state = StateDir::from_found(&found)?;
     let label = file_label(&found.path);

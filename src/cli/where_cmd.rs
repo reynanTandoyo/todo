@@ -58,6 +58,9 @@ struct WhereJson {
 pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let cfg = ctx.load_config()?;
     let loaded = load_for_read(ctx, &cfg, false, false, out)?;
+    if let Some(warning) = crate::find::synced_folder_warning(&loaded.found.path) {
+        out.warn(warning);
+    }
     let state = StateDir::from_found(&loaded.found)?;
     let status = query_status(&state)?;
 

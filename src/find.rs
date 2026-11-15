@@ -651,3 +651,29 @@ fn read_core_config(config_path: &Path) -> CoreGitConfig {
     }
     cfg
 }
+
+/// Returns `"OneDrive"` or `"Dropbox"` if `path` is inside a synced folder (`NFR-12`).
+#[must_use]
+pub fn synced_folder_service(path: &Path) -> Option<&'static str> {
+    for component in path.components() {
+        let name = component.as_os_str().to_string_lossy();
+        let lower = name.to_ascii_lowercase();
+        if lower == "onedrive" || lower.starts_with("onedrive - ") {
+            return Some("OneDrive");
+        }
+        if lower == "dropbox" || lower.starts_with("dropbox (") || lower.starts_with("dropbox - ") {
+            return Some("Dropbox");
+        }
+    }
+    None
+}
+
+/// Returns a warning message when `path` is inside a OneDrive or Dropbox folder (`NFR-12`).
+#[must_use]
+pub fn synced_folder_warning(path: &Path) -> Option<String> {
+    let service = synced_folder_service(path)?;
+    Some(format!(
+        "{} is inside a {service} folder; synced folders are not safe for parallel agents",
+        path.display()
+    ))
+}

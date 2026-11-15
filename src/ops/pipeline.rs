@@ -154,6 +154,9 @@ where
 {
     let agent = ctx.require_agent()?.to_owned();
     let found = ctx.find_todo_with_mode(cfg.worktree, out)?;
+    if let Some(warning) = crate::find::synced_folder_warning(&found.path) {
+        out.warn(warning);
+    }
     let state = StateDir::from_found(&found)?;
     let label = file_label(&found.path);
     let archive_path = cfg.archive_path(&found.path);

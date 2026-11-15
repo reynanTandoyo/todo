@@ -106,3 +106,53 @@ fn where_works_outside_git_repo() {
     assert!(json["data"]["format_version"].is_null());
     assert_eq!(json["data"]["counts"]["total"], 0);
 }
+
+#[test]
+fn warns_on_onedrive_and_dropbox_in_where_and_writes() {
+    let dir = TempDir::new().unwrap();
+    let onedrive = dir.path().join("OneDrive - Personal").join("proj");
+    fs::create_dir_all(&onedrive).unwrap();
+    fs::write(onedrive.join("TODO.md"), "## Tasks\n").unwrap();
+
+    let where_out = cargo_bin_cmd!("todo")
+        .current_dir(&onedrive)
+        .args(["where"])
+        .output()
+        .unwrap();
+    assert!(where_out.status.success());
+    let where_err = String::from_utf8(where_out.stderr).unwrap();
+    assert!(where_err.contains("OneDrive"), "stderr was: {where_err}");
+
+    let dropbox = dir.path().join("Dropbox").join("proj");
+    fs::create_dir_all(&dropbox).unwrap();
+    fs::write(dropbox.join("TODO.md"), "## Tasks\n").unwrap();
+
+    let add_out = cargo_bin_cmd!("todo")
+        .current_dir(&dropbox)
+        .args([
+            "--json",
+            "--agent",
+            "alice",
+            "add",
+            "--title",
+            "First",
+            "--priority",
+            "P2",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        add_out.status.success(),
+        "add failed: stdout={}, stderr={}",
+        String::from_utf8_lossy(&add_out.stdout),
+        String::from_utf8_lossy(&add_out.stderr)
+    );
+    let json: Value = serde_json::from_slice(&add_out.stdout).unwrap();
+    let warnings = json["warnings"].as_array().unwrap();
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.as_str().unwrap_or("").contains("Dropbox")),
+        "expected Dropbox warning, got: {warnings:?}"
+    );
+}
