@@ -250,6 +250,7 @@ register_commands! {
     Help => help,
     List => list,
     Lock => lock,
+    Next => next,
     Release => release,
     Show => show,
     Status => status,

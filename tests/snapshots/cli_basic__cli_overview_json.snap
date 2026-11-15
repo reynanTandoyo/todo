@@ -26,6 +26,11 @@ expression: ok_json
         "summary": "Take a manual editing lease on TODO.md"
       },
       {
+        "kind": "read",
+        "name": "next",
+        "summary": "Pick the next ready task (optionally claiming it atomically)"
+      },
+      {
         "kind": "write",
         "name": "release",
         "summary": "Release a claimed task back to open (or clear owner on blocked)"
