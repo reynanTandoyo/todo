@@ -1,620 +1,534 @@
+<!-- todo-format: 1 -->
 # todo — task list
 
-The work plan for building `todo` itself. The reasons behind every task are in
-[`docs/requirements.md`](docs/requirements.md); each task lists the requirement IDs it covers in
-its `reqs:` line.
+The work plan for building `todo`. What each task must achieve is in
+[`docs/requirements.md`](docs/requirements.md); the `reqs:` line names the requirements a task
+covers, and `accept:` is the check that proves it is finished. The file follows
+[`docs/format.md`](docs/format.md).
 
-**Until `todo` can manage this file, it is edited by hand.** Once the claim and write commands pass
-their tests (section 3), this file is managed with `todo`, like every other project.
+Until `todo` can manage this file, it is edited by hand. From v0.1 on, it is changed only through
+`todo`, like any other project that uses it.
 
-The format is the airline-ops-web block format, the candidate canonical format (decision F1 in
-`docs/requirements.md` §7). If F1 picks another format, this file is converted with the importer
-and becomes that importer's first real test.
-
-Fields: `status` is `open`, `claimed`, `blocked` or `done`. `priority`: P0 = needed for the first
-usable version, P1 = needed before rollout to your projects, P2 = valuable later, P3 = idea.
-`reqs` = requirement IDs. `depends` = tasks that must be done first. `accept` = the check that
-proves the task is finished.
-
-## 0. Decisions for the owner
-
-### T-001 · Decide the file layout and canonical format (F1)
-- status: open
-- owner: —
-- priority: P0 · type: decision · area: format
-- reqs: §7, F1
-- accept: the choice is written into docs/requirements.md §12 and T-010 can start
-- note (2026-11-15, claude): options and a recommendation are in docs/requirements.md §7; all parser work waits for this
-
-### T-002 · Decide claim timeout, done-task placement, worktree mode and a "won't do" status (F2–F5)
-- status: open
-- owner: —
-- priority: P1 · type: decision · area: behaviour
-- reqs: F2, F3, F4, F5
-- accept: the four answers are written into docs/requirements.md §12
-
-### T-003 · Choose a licence for the public repository (F6)
-- status: open
-- owner: —
-- priority: P1 · type: decision · area: release
-- reqs: F6, REL-5
-- accept: LICENSE file committed and named in the README
-
-### T-004 · Answer the questions about the office projects
-- status: open
-- owner: —
-- priority: P1 · type: decision · area: rollout
-- reqs: §12 office questions
-- accept: answers written into docs/requirements.md §12 and any changed requirements updated
-
-### T-005 · Decide which agents get hooks, skills or an MCP server (F7, F8)
-- status: open
-- owner: —
-- priority: P2 · type: decision · area: agent
-- reqs: F7, F8
-- accept: answers written into docs/requirements.md §12
+Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, not planned.
 
 ## 1. Foundations
 
-### T-010 · Write docs/format.md: the exact grammar of the canonical format
+### T-001 · Test fixtures
 - status: open
 - owner: —
-- priority: P0 · type: docs · area: format
-- reqs: §7.3, REL-4
+- priority: P0 · type: test · area: core
+- reqs: TEST-1
+- accept: invented fixtures cover every rule in docs/format.md, each starting with the fixture line; one deliberately messy fixture (CRLF with byte-order mark, code fences, tables, fake tasks, trailing spaces); none contains real task data
+
+### T-002 · Line model, edits and verified writes
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: core
+- reqs: R-EDIT-1, R-EDIT-2, R-EDIT-4, R-EDIT-5, R-EDIT-6, R-EDIT-7, TEST-3
 - depends: T-001
-- accept: every line shape in the fixtures is covered by the grammar; the owner has reviewed it
+- accept: every fixture reads and writes back byte-identical; the random-edit property test passes; a deliberately wrong edit is caught by the verification and nothing is written
 
-### T-011 · Create invented, labelled test fixtures
-- status: open
-- owner: —
-- priority: P0 · type: test · area: format
-- reqs: TEST-9, TEST-1
-- accept: small fixtures for the canonical format and both old formats, each starting with a test-fixture notice, covering CRLF, byte-order mark, no newline at end, code fences, rule examples in the preamble, unknown fields and non-ASCII text
-
-### T-012 · Line-span document model with a byte-exact round trip
+### T-003 · Parser for format version 1
 - status: open
 - owner: —
 - priority: P0 · type: feature · area: core
-- reqs: R-EDIT-1, R-EDIT-2, R-EDIT-5, R-EDIT-9, R-EDIT-10, TEST-2
-- depends: T-011
-- accept: parse and write back gives identical bytes for every fixture; the random-edit property test passes; a write whose result fails the outside-bytes check is refused
+- reqs: R-EDIT-3, R-EDIT-8, R-EDIT-9, R-ID-1, R-ID-3, R-DEP-1, R-OUT-4, REL-4, NFR-8, TEST-2
+- depends: T-001, T-002
+- accept: every rule and every refusal in docs/format.md has a test, including a file whose format line names version 2; problems are reported as `file:line: message`
 
-### T-013 · Task parser for the canonical format
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: core
-- reqs: R-EDIT-3, R-EDIT-4, R-EDIT-6, R-EDIT-7, R-EDIT-11, R-ID-1, R-ID-3, R-DEP-1, R-OUT-8, TEST-1
-- depends: T-010, T-012
-- accept: parser unit tests pass; an ambiguous fixture and a fixture with conflict markers are refused as `file:line: message`
-
-### T-014 · Errors, exit codes and the JSON envelope
+### T-004 · Errors, exit codes, JSON envelope and safe output
 - status: open
 - owner: —
 - priority: P0 · type: feature · area: cli
-- reqs: R-OUT-1, R-OUT-2, R-OUT-5, NFR-5, NFR-10
-- accept: docs/json.md lists every error code; Clippy rejects unwrap and expect outside tests; output piped into a command that stops early ends quietly
+- reqs: R-OUT-1, R-OUT-2, R-OUT-3, R-OUT-5, R-OUT-7, NFR-6, NFR-8
+- accept: each error code and exit code has a test; every JSON schema name carries its version (`todo.<command>.v1`); output into a pipe that closes early ends with exit 0; Clippy rejects unwrap, expect and panic outside tests
 
-### T-015 · Command-line skeleton: global options and help
+### T-005 · Command line: global options, agent name, help
 - status: open
 - owner: —
 - priority: P0 · type: feature · area: cli
-- reqs: R-OUT-6, R-CFG-1, R-CFG-4, R-CLAIM-6
-- depends: T-014
-- accept: `todo`, `todo help <command>`, `--file`, `--json`, `--agent` with `TODO_AGENT` fallback, and `--dry-run` are parsed and tested
+- reqs: R-OUT-8, R-CLAIM-5, R-CFG-1, R-CFG-3, TEST-8
+- depends: T-004
+- accept: `todo`, `todo help <command>`, `todo --version`, `--file`, `--json`, `--agent` and `TODO_AGENT` (with name checks) are tested against the built binary; a test checks that the help lists every command
 
-### T-016 · Correct non-ASCII output in Windows consoles
+### T-006 · Non-ASCII text in Windows consoles
 - status: open
 - owner: —
-- priority: P0 · type: feature · area: cli
-- reqs: R-OUT-3, R-OUT-4
-- accept: `·`, `—` and Japanese text display correctly in PowerShell 5, PowerShell 7 and cmd; piped output is plain UTF-8
+- priority: P0 · type: test · area: cli
+- reqs: R-OUT-6
+- depends: T-005
+- accept: `·`, `—` and Japanese text checked by hand in PowerShell 5, PowerShell 7, cmd and Windows Terminal, with the result recorded in a note; piped output is UTF-8 (automated test)
 
-## 2. Safety: finding, locking, writing
-
-### T-020 · Find TODO.md: --file, TODO_FILE, walk up to the repository root
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: find
-- reqs: R-FIND-1, R-FIND-2, R-FIND-3, R-FIND-4, R-FIND-7, R-FIND-8, NFR-7, TEST-5
-- accept: search tests pass, including "no TODO.md in this repository" not climbing into a parent folder, and paths with spaces, non-ASCII characters and more than 260 characters
-
-### T-021 · Linked worktrees use the main checkout's TODO.md
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: find
-- reqs: R-FIND-5, NFR-4, TEST-5
-- depends: T-020
-- accept: a test creates a real worktree in a temporary folder and resolves to the main file; `--local` opts out; works without git.exe on PATH
-
-### T-022 · State folder in the git common directory
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: lock
-- reqs: R-HIST-0, R-LOCK-6
-- depends: T-021
-- accept: the main checkout and a worktree get the same state folder; outside git it is .todo/ next to the file
-
-### T-023 · Write lock: operating-system file lock with wait, timeout and holder info
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: lock
-- reqs: R-LOCK-1, R-LOCK-2, R-LOCK-3, R-LOCK-8, R-LOCK-9, TEST-4
-- depends: T-022
-- accept: parallel add and claim tests across processes pass; a killed holder blocks others for under 2 s; a held lock makes a command exit 3 without writing
-
-### T-024 · Atomic replace with flush and Windows retry
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: io
-- reqs: R-IO-1, R-IO-2, R-IO-3, R-IO-4, R-IO-6, R-IO-7, NFR-7, TEST-6
-- accept: replacing while another handle holds the file retries and then succeeds; temporary files never remain after a failure; invalid UTF-8 and read-only files are refused; a change made by another program during the write makes the command exit 3 without writing
-
-### T-025 · Manual lease: lock, unlock, lock status
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: lock
-- reqs: R-LOCK-4
-- depends: T-023
-- accept: a lease blocks other agents but not its holder; it expires after 10 minutes (tested with a shortened time); unlock --force is recorded
-
-### T-026 · todo where
-- status: open
-- owner: —
-- priority: P1 · type: feature · area: find
-- reqs: R-FIND-6
-- depends: T-022
-- accept: prints file, how it was found, state folder, lock and lease status; --json tested
-
-## 3. Commands: parity with todo.js and todo.py
-
-### T-030 · list with filters and --json
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: cli
-- reqs: R-READ-1, R-READ-7
-- depends: T-013, T-015
-- accept: every filter has a test; default hides done tasks; JSON snapshot test
-
-### T-031 · show
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: cli
-- reqs: R-READ-2, R-DEP-2
-- depends: T-013, T-015
-- accept: raw output equals the task's bytes; JSON includes unknown fields, notes and dependency status
-
-### T-032 · claim and release, with stale takeover and --force
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: cli
-- reqs: R-WRITE-2, R-WRITE-3, R-CLAIM-1, R-CLAIM-2, R-CLAIM-3, R-CLAIM-4, R-CLAIM-6, R-IO-5, TEST-3
-- depends: T-023, T-024, T-030
-- accept: parallel claims from separate processes have exactly one winner; re-claim by the owner is a no-op; a stale claim is taken over with a note
-
-### T-033 · next, with dependencies, model filter and --claim
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: cli
-- reqs: R-READ-3, R-DEP-1
-- depends: T-032
-- accept: N processes running `next --claim` get N different tasks; a task with an unfinished dependency is never returned
-
-### T-034 · done with --note and --commit
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: cli
-- reqs: R-WRITE-4, R-DEP-4, NFR-4, TEST-3
-- depends: T-032
-- accept: refusals for non-owner and blocked tasks tested; --commit checked when git is available; accept line printed
-
-### T-035 · block and unblock
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: cli
-- reqs: R-WRITE-5, R-WRITE-6, TEST-3
-- depends: T-032
-- accept: block requires a reason; unblock returns to claimed or open; ownership rules tested
-
-### T-036 · note
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: cli
-- reqs: R-WRITE-7, R-IO-5, TEST-3
-- depends: T-023, T-024
-- accept: notes append after the last note, also on done tasks; date is the local date
-
-### T-037 · set
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: cli
-- reqs: R-WRITE-8, TEST-3
-- depends: T-032
-- accept: every option and --field key=value tested; the combined priority line is updated in place
-
-### T-038 · add: section matching, duplicate check, ID allocation
-- status: open
-- owner: —
-- priority: P0 · type: feature · area: cli
-- reqs: R-WRITE-1, R-ID-2, TEST-3
-- depends: T-023, T-024
-- accept: ambiguous section refused; duplicate title refused; parallel adds get distinct IDs
-
-### T-039 · --dry-run on every write command, preview by default for large changes
-- status: open
-- owner: —
-- priority: P1 · type: feature · area: cli
-- reqs: R-EDIT-8, R-OUT-9
-- depends: T-038
-- accept: every write command prints a diff and leaves the file byte-identical; restore, import, archive and the install commands change nothing without --yes
-
-### T-040 · Matching by title and alias
-- status: open
-- owner: —
-- priority: P1 · type: feature · area: cli
-- reqs: R-ID-4, R-ID-5
-- depends: T-032
-- accept: an ambiguous match is refused with the candidates listed; rule examples in the preamble never match
-
-### T-041 · move and reopen
-- status: open
-- owner: —
-- priority: P1 · type: feature · area: cli
-- reqs: R-WRITE-9
-- depends: T-038
-- accept: the task moves with all its lines; reopen writes a note
-
-### T-042 · ask and answer: questions for the owner
-- status: open
-- owner: —
-- priority: P1 · type: feature · area: cli
-- reqs: R-WRITE-10
-- depends: T-038
-- accept: next never returns a question; answer records the reply and closes or reopens it
-
-### T-043 · Option to move done tasks to a Done section
-- status: open
-- owner: —
-- priority: P1 · type: feature · area: cli
-- reqs: R-WRITE-11
-- depends: T-002, T-034
-- accept: with done_moves_to set, the task and its notes move to the top of that section
-
-### T-044 · Text from standard input or @file
-- status: open
-- owner: —
-- priority: P1 · type: feature · area: cli
-- reqs: R-WRITE-13
-- depends: T-015
-- accept: text with quotes, backticks and $ arrives unchanged from PowerShell via - and @file
-
-### T-045 · release --all
-- status: open
-- owner: —
-- priority: P2 · type: feature · area: cli
-- reqs: R-CLAIM-7
-- depends: T-032
-- accept: frees every claim of one agent in one locked step
-
-### T-046 · Project configuration file todo.toml
+### T-007 · Settings file todo.toml
 - status: open
 - owner: —
 - priority: P1 · type: feature · area: config
 - reqs: R-CFG-2
-- depends: T-015
-- accept: every setting has a test; an unknown setting is an error, not ignored
+- depends: T-005, T-011
+- accept: every key in requirements §5.14 has a test, including `worktree = "local"`; an unknown key or a bad value gives `todo.toml:<line>: message`
 
-## 4. Recovery, checks and bulk work
+## 2. Safety: finding, locking, writing
 
-### T-050 · Snapshots: history, diff, restore
+### T-010 · Find TODO.md
 - status: open
 - owner: —
-- priority: P1 · type: feature · area: history
-- reqs: R-HIST-1
-- depends: T-022, T-024
-- accept: every write leaves a snapshot; restore is locked and itself snapshotted; old snapshots are pruned
+- priority: P0 · type: feature · area: find
+- reqs: R-FIND-1, R-FIND-2, R-FIND-3, R-FIND-4, R-FIND-6, NFR-7, TEST-6
+- depends: T-005
+- accept: the search cases of TEST-6 pass, including a repository without TODO.md inside a parent folder that has one; paths with spaces, non-ASCII characters and more than 260 characters work
 
-### T-051 · Journal and log
+### T-011 · Linked worktrees use the main checkout's file
 - status: open
 - owner: —
-- priority: P2 · type: feature · area: history
-- reqs: R-HIST-2, R-READ-6
-- depends: T-050
-- accept: each write appends one journal line; log <id> shows the task's history
+- priority: P0 · type: feature · area: find
+- reqs: R-FIND-5, NFR-5, TEST-6
+- depends: T-010
+- accept: a test creates a real linked worktree in a temporary folder and resolves to the main checkout's file, also from a subfolder; the fallback warning is tested; works with git removed from PATH
 
-### T-052 · Detect edits made outside the tool
+### T-012 · State folder
 - status: open
 - owner: —
-- priority: P1 · type: feature · area: history
-- reqs: R-HIST-3
-- depends: T-050
-- accept: a hand edit between two commands is snapshotted and reported once
+- priority: P0 · type: feature · area: lock
+- reqs: R-HIST-1, R-LOCK-7
+- depends: T-011
+- accept: the main checkout, a worktree and different spellings of the path get the same state folder; outside git it is `.todo/` with a `.gitignore`
 
-### T-053 · check
+### T-013 · Write lock
 - status: open
 - owner: —
-- priority: P1 · type: feature · area: check
-- reqs: R-CHECK-1, R-DEP-3
+- priority: P0 · type: feature · area: lock
+- reqs: R-LOCK-1, R-LOCK-2, R-LOCK-3, R-LOCK-4, R-LOCK-5, TEST-5
+- depends: T-012
+- accept: tested through a test-only write command (cargo feature `test-hooks`): a killed holder delays others by less than 2 s; a held lock makes a command exit 3 naming the holder, without writing; reads never wait
+
+### T-014 · Atomic replace
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: io
+- reqs: R-IO-1, R-IO-2, R-IO-3, R-IO-4, R-IO-5, TEST-7
+- depends: T-002
+- accept: the TEST-7 cases pass; no temporary file remains after any failure
+
+### T-015 · Lease: lock, unlock and status
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: lock
+- reqs: R-LOCK-6
 - depends: T-013
-- accept: a fixture with each listed problem is reported with line numbers; a clean fixture exits 0
+- accept: a lease stops other agents but not its holder; it expires (tested with a shortened time); `unlock --force` names the previous holder; `status` shows the lock and the lease
 
-### T-054 · check --fix
+### T-016 · todo where
 - status: open
 - owner: —
-- priority: P2 · type: feature · area: check
-- reqs: R-CHECK-2
-- depends: T-053
-- accept: only the listed safe fixes are applied; everything else is still reported
+- priority: P1 · type: feature · area: find
+- reqs: R-FIND-7
+- depends: T-012, T-015
+- accept: every item listed in R-FIND-7 appears, in text and JSON
 
-### T-055 · summary
+## 3. Task commands
+
+### T-020 · list
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: cli
+- reqs: R-READ-1, R-READ-4
+- depends: T-003, T-010
+- accept: every filter has a test; done and dropped tasks are hidden by default; JSON output matches its snapshot
+
+### T-021 · show
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: cli
+- reqs: R-READ-2, R-DEP-2
+- depends: T-003, T-010
+- accept: text output equals the task's lines in the file; JSON includes unknown fields, notes, line numbers, dependencies with their status, and the tasks waiting on it
+
+### T-022 · claim and release
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: cli
+- reqs: R-WRITE-2, R-WRITE-3, R-WRITE-9, R-CLAIM-1, R-CLAIM-2, R-CLAIM-3, R-CLAIM-4, R-IO-6, TEST-4, TEST-5
+- depends: T-013, T-014, T-020
+- accept: 20 parallel claims of one task have exactly one winner; claiming again refreshes the claim time; a stale claim is taken over with a note; release by a non-owner needs --force; every claim and release case of the transition table has a test
+
+### T-023 · next, including --claim
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: cli
+- reqs: R-READ-3, R-DEP-1
+- depends: T-022
+- accept: 10 parallel `next --claim` get 10 different tasks; tasks with an unfinished or missing dependency and questions are never returned; an agent's own claim comes first unless --new
+
+### T-024 · done
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: cli
+- reqs: R-WRITE-4, NFR-5, TEST-4
+- depends: T-022
+- accept: `--commit HEAD` is resolved before the lock is taken; an unknown commit is refused when git is available and accepted unchecked when it isn't; the accept line is printed; refusals leave the file byte-identical
+
+### T-025 · block, unblock and drop
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: cli
+- reqs: R-WRITE-5, R-WRITE-6, TEST-4
+- depends: T-022
+- accept: a reason is required for block and drop; unblock returns to claimed or open; every remaining case of the transition table has a test
+
+### T-026 · note
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: cli
+- reqs: R-WRITE-7, R-IO-6, TEST-4
+- depends: T-013, T-014
+- accept: notes are added after the last line of the task, on any status, by any agent, with the local date
+
+### T-027 · set
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: cli
+- reqs: R-WRITE-8, R-CLAIM-3, TEST-4
+- depends: T-022
+- accept: every option, `--field` and `--unset` are tested; the combined priority line is edited in place; changing status, owner or claimed is refused
+
+### T-028 · add
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: cli
+- reqs: R-WRITE-1, R-ID-2, TEST-4, TEST-5
+- depends: T-013, T-014
+- accept: 20 parallel adds lose nothing and get distinct IDs; unknown and ambiguous sections are refused with the list of sections; a duplicate title is refused; a highest ID deleted by hand is not given out again
+
+### T-029 · Match tasks by title
 - status: open
 - owner: —
 - priority: P1 · type: feature · area: cli
-- reqs: R-READ-4
-- depends: T-030
-- accept: under 40 lines on a 5,000-task file; JSON version tested
+- reqs: R-ID-4
+- depends: T-022
+- accept: a unique match works; several or no matches are refused with the candidates; done and dropped tasks are never matched
 
-### T-056 · search
-- status: open
-- owner: —
-- priority: P2 · type: feature · area: cli
-- reqs: R-READ-5
-- depends: T-030
-- accept: finds text in fields and notes; --archive includes the archive file
-
-### T-057 · archive
+### T-030 · reopen and move
 - status: open
 - owner: —
 - priority: P1 · type: feature · area: cli
-- reqs: R-ARCH-1
-- depends: T-034
-- accept: done tasks move to TODO-archive.md; show, search --archive and depends still find them; IDs are not reused
+- reqs: R-WRITE-10
+- depends: T-028
+- accept: reopen needs a reason and clears owner and claim time; move keeps every line of the task and leaves the rest of the file unchanged
 
-### T-058 · Bulk add from JSON
+### T-031 · ask and answer
+- status: open
+- owner: —
+- priority: P1 · type: feature · area: cli
+- reqs: R-WRITE-11
+- depends: T-028
+- accept: the questions section is added when missing; next never returns a question; answer adds the answer note and marks the question done
+
+### T-032 · Text from standard input or a file
 - status: open
 - owner: —
 - priority: P1 · type: feature · area: cli
 - reqs: R-WRITE-12
-- depends: T-038
-- accept: 30 tasks are added in one locked step with consecutive IDs; one invalid entry rejects the whole batch
+- depends: T-005
+- accept: text with quotes, backticks and `$` arrives unchanged from PowerShell through `-` and `@path`
 
-### T-059 · todo edit
+### T-033 · release --stale and --all
 - status: open
 - owner: —
-- priority: P2 · type: feature · area: lock
-- reqs: R-LOCK-5, R-CHECK-3
-- depends: T-025, T-053
-- accept: takes a lease, opens the editor, checks and snapshots after it closes, releases the lease
+- priority: P1 · type: feature · area: cli
+- reqs: R-CLAIM-6
+- depends: T-022
+- accept: only stale claims are released by --stale; --all releases one agent's claims in one locked step; another agent needs --force
 
-### T-060 · apply: several operations in one locked step
+### T-034 · add --from: several tasks in one step
+- status: open
+- owner: —
+- priority: P1 · type: feature · area: cli
+- reqs: R-WRITE-13
+- depends: T-028
+- accept: 30 tasks are added in one locked step; `@ref` dependencies resolve to the new IDs; one bad entry rejects the whole batch
+
+### T-035 · --dry-run and --yes
+- status: open
+- owner: —
+- priority: P1 · type: feature · area: cli
+- reqs: R-EDIT-10, R-WRITE-14
+- depends: T-028
+- accept: every write command prints a diff with --dry-run and leaves the file byte-identical; bulk commands change nothing without --yes
+
+### T-036 · apply: several operations in one step
 - status: open
 - owner: —
 - priority: P2 · type: feature · area: cli
-- reqs: R-WRITE-14
-- depends: T-058
-- accept: all operations apply or none do; one snapshot per batch
+- reqs: R-WRITE-15
+- depends: T-034
+- accept: all operations apply or none do, with one snapshot
 
-## 5. Agent integration
+## 4. Recovery, checks and overview
 
-### T-070 · todo init
+### T-040 · Snapshots: history, diff and restore
 - status: open
 - owner: —
-- priority: P1 · type: feature · area: agent
+- priority: P1 · type: feature · area: history
+- reqs: R-HIST-2
+- depends: T-012, T-014, T-035
+- accept: every write leaves a snapshot; only the newest `snapshots_keep` remain; restore needs --yes, runs under the lock and can itself be undone
+
+### T-041 · Detect edits made outside the tool
+- status: open
+- owner: —
+- priority: P1 · type: feature · area: history
+- reqs: R-HIST-3
+- depends: T-040
+- accept: a hand edit between two commands is saved and reported once; edits during a lease are recorded without a warning
+
+### T-042 · check
+- status: open
+- owner: —
+- priority: P1 · type: feature · area: check
+- reqs: R-CHECK-1, R-DEP-3
+- depends: T-003
+- accept: a fixture for each problem listed in R-CHECK-1 is reported with its line; a clean fixture exits 0
+
+### T-043 · summary
+- status: open
+- owner: —
+- priority: P1 · type: feature · area: cli
+- reqs: R-READ-5
+- depends: T-020, T-023
+- accept: at most 40 lines on a 5,000-task file; JSON output matches its snapshot
+
+### T-044 · archive
+- status: open
+- owner: —
+- priority: P1 · type: feature · area: cli
+- reqs: R-ARCH-1
+- depends: T-024, T-025, T-035
+- accept: done and dropped tasks move to the archive under the same section names; show, list --archive and dependency checks still find them; their IDs are never given out again
+
+### T-045 · check --fix
+- status: open
+- owner: —
+- priority: P2 · type: feature · area: check
+- reqs: R-CHECK-2
+- depends: T-042
+- accept: only the repairs listed in R-CHECK-2 are made; everything else is still reported
+
+### T-046 · search
+- status: open
+- owner: —
+- priority: P2 · type: feature · area: cli
+- reqs: R-READ-6
+- depends: T-020
+- accept: finds text in titles, fields and notes; --archive searches the archive file
+
+### T-047 · Journal and log
+- status: open
+- owner: —
+- priority: P2 · type: feature · area: history
+- reqs: R-HIST-4, R-READ-7
+- depends: T-040
+- accept: each write adds one journal line; `log <task>` shows that task's entries
+
+### T-048 · edit
+- status: open
+- owner: —
+- priority: P2 · type: feature · area: lock
+- reqs: R-LOCK-8
+- depends: T-015, T-042
+- accept: the lease is taken before the editor opens and ended after it closes, with check and a snapshot in between
+
+### T-049 · Show tasks that became ready
+- status: open
+- owner: —
+- priority: P2 · type: feature · area: cli
+- reqs: R-DEP-4
+- depends: T-024, T-025
+- accept: done and drop list the tasks whose last open dependency they finished
+
+## 5. Agent setup
+
+### T-050 · Agent rules text and `todo help agents`
+- status: open
+- owner: —
+- priority: P0 · type: feature · area: agent
 - reqs: R-AGENT-1
-- depends: T-071
-- accept: creates TODO.md with preamble, rules block, sections and format line; refuses if TODO.md exists
+- depends: T-005
+- accept: one built-in text covers every point in R-AGENT-1 and is what `todo help agents` prints
 
-### T-071 · The rules text: help agents and the managed block
-- status: open
-- owner: —
-- priority: P1 · type: feature · area: agent
-- reqs: R-AGENT-5, R-AGENT-2
-- depends: T-030
-- accept: one source text feeds `todo help agents`, the AGENTS.md block and the TODO.md header block
-
-### T-072 · agents install and agents check
+### T-051 · init
 - status: open
 - owner: —
 - priority: P1 · type: feature · area: agent
 - reqs: R-AGENT-2
-- depends: T-071
-- accept: installs or updates the marked block without touching other text; reports drift
+- depends: T-042, T-050
+- accept: the new file passes `todo check`; an existing TODO.md is never overwritten
 
-### T-073 · Claude Code hooks: session summary and blocking direct edits of TODO.md
+### T-052 · agents install and agents check
 - status: open
 - owner: —
-- priority: P2 · type: feature · area: agent
+- priority: P1 · type: feature · area: agent
 - reqs: R-AGENT-3
-- depends: T-005, T-055, T-071
-- accept: a new session starts with the summary (at most 40 lines, under 2 s); an Edit or Write on TODO.md is refused with the command to use; other files are unaffected; preview without --yes; uninstall removes only the tool's own entries; works from PowerShell
+- depends: T-035, T-050
+- accept: the block is added or replaced without changing any other byte of the file; check reports missing and outdated blocks
 
-### T-074 · Claude Code skill
+### T-053 · Claude Code hooks
 - status: open
 - owner: —
 - priority: P2 · type: feature · area: agent
 - reqs: R-AGENT-4
-- depends: T-071
-- accept: `todo skill install` writes .claude/skills/todo/SKILL.md generated from the same rules text
+- depends: T-043, T-050
+- accept: a new session starts with the summary; an Edit or Write of TODO.md is stopped with the command to use; other files are unaffected; uninstall removes only the tool's entries; works from PowerShell
 
-## 6. Migration and rollout
-
-### T-080 · Import the MusicDownloader checkbox format
+### T-054 · Claude Code skill
 - status: open
 - owner: —
-- priority: P1 · type: feature · area: migrate
-- reqs: R-MIG-1
-- depends: T-001, T-038
-- accept: the checkbox fixture converts with every item, claim, note and commit kept; preview by default, writes only with --yes
+- priority: P2 · type: feature · area: agent
+- reqs: R-AGENT-5
+- depends: T-050
+- accept: the skill file is generated from the same rules text
 
-### T-081 · Honour the old scripts' locks during the switch-over
-- status: open
-- owner: —
-- priority: P1 · type: feature · area: migrate
-- reqs: R-LOCK-7
-- depends: T-023
-- accept: with legacy_lock set, todo waits while todo.js or todo.py holds its lock, and they wait while todo holds it
+## 6. Build, release and documentation
 
-### T-082 · Accept both old calling styles
-- status: open
-- owner: —
-- priority: P1 · type: feature · area: migrate
-- reqs: R-MIG-3, TEST-10
-- depends: T-040
-- accept: the command examples from both projects' AGENTS.md run unchanged (apart from the program name) against fixtures
-
-### T-083 · Switch-over plan for airline-ops-web
-- status: open
-- owner: —
-- priority: P1 · type: docs · area: rollout
-- reqs: R-MIG-2
-- depends: T-033, T-081, T-082
-- accept: written plan with before/after task counts and ID lists; carried out only after the owner approves
-
-### T-084 · Switch-over plan for MusicDownloader
-- status: open
-- owner: —
-- priority: P1 · type: docs · area: rollout
-- reqs: R-MIG-2
-- depends: T-080, T-081, T-082
-- accept: written plan with before/after item counts; carried out only after the owner approves
-
-### T-085 · First office project
-- status: open
-- owner: —
-- priority: P2 · type: docs · area: rollout
-- reqs: §12 office questions
-- depends: T-004, T-070
-- accept: one office project uses todo for a week without a lost update
-
-## 7. Build, release, documentation
-
-### T-090 · CI workflow
+### T-060 · CI workflow
 - status: open
 - owner: —
 - priority: P0 · type: chore · area: release
-- reqs: REL-1, TEST-7, NFR-1, NFR-3, NFR-6
-- accept: format check, Clippy with warnings as errors, and tests run on Windows and Linux for every push; CI also fails if todo.exe needs a DLL outside Windows itself, grows past 5 MB, or gains a networking dependency
+- reqs: REL-1, NFR-1, NFR-2, NFR-4, NFR-9, NFR-10
+- accept: format check, Clippy and tests run on Windows and Linux for every push; the Windows job fails if todo.exe needs a DLL outside Windows or reaches 5 MB; the dependency list matches NFR-9; Cargo.toml requires Rust 1.89
 
-### T-091 · Full README
+### T-061 · README
 - status: open
 - owner: —
 - priority: P0 · type: docs · area: release
-- reqs: REL-3, R-LOCK-10, NFR-9
-- depends: T-033
-- accept: build, install, use and the AGENTS.md snippet are explained in plain language and tried by following them on a clean folder
+- reqs: REL-2, NFR-11
+- depends: T-023, T-050
+- accept: build, install, use, adding to a project and the limits are explained in plain language, and the steps were followed on a clean folder
 
-### T-092 · docs/json.md and CHANGELOG.md
+### T-062 · MIT licence
+- status: open
+- owner: —
+- priority: P0 · type: chore · area: release
+- reqs: REL-3
+- accept: LICENSE holds the MIT text; the README and Cargo.toml name the licence
+
+### T-063 · docs/json.md and CHANGELOG.md
 - status: open
 - owner: —
 - priority: P1 · type: docs · area: release
-- reqs: REL-4, NFR-8
-- depends: T-014
-- accept: every JSON shape and error code is documented with an example
+- reqs: REL-5
+- depends: T-004
+- accept: every JSON shape and error code is documented with an example; CHANGELOG.md has an entry for each released version
 
-### T-093 · Release workflow with checksums
+### T-064 · Release workflow
 - status: open
 - owner: —
-- priority: P2 · type: chore · area: release
-- reqs: REL-2
-- depends: T-090
-- accept: a version tag produces todo.exe and its SHA-256 file; a tag that doesn't match Cargo.toml fails
-
-### T-094 · Performance test with 5,000 tasks
-- status: open
-- owner: —
-- priority: P1 · type: test · area: core
-- reqs: NFR-2, TEST-8
-- depends: T-030, T-038
-- accept: list under 100 ms and a write under 200 ms on a generated 5,000-task file
-
-### T-095 · Version output with the build commit
-- status: open
-- owner: —
-- priority: P2 · type: chore · area: release
+- priority: P1 · type: chore · area: release
 - reqs: REL-6
-- accept: `todo --version` prints version and commit
+- depends: T-060
+- accept: a `v*` tag publishes todo.exe and the Linux binary with SHA-256 files; a tag that doesn't match Cargo.toml fails
 
-## 8. Later / ideas
-
-### T-100 · MCP server
+### T-065 · Performance test
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: agent
-- reqs: R-AGENT-6
+- priority: P0 · type: test · area: core
+- reqs: NFR-3, TEST-9
+- depends: T-020, T-028
+- accept: on a generated 5,000-task file, list and show take under 100 ms and a write under 200 ms; runs in CI
+
+### T-066 · Version with build commit
+- status: open
+- owner: —
+- priority: P2 · type: chore · area: release
+- reqs: REL-7
 - depends: T-005
+- accept: `todo --version` prints the version and the commit
 
-### T-101 · Several projects: project list and overview
+### T-067 · Warn about synced folders
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: cli
-- reqs: R-XPROJ-1, R-CFG-3
+- priority: P2 · type: feature · area: find
+- reqs: NFR-12
+- depends: T-016
+- accept: a TODO.md inside a OneDrive or Dropbox folder produces a warning in where and in write commands
 
-### T-102 · align: compare tasks with git history
+### T-068 · Colour output
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: git
-- reqs: R-GIT-1, R-GIT-2
+- priority: P2 · type: feature · area: cli
+- reqs: R-OUT-9
+- depends: T-020
+- accept: colour appears only on a terminal, never in piped output or with NO_COLOR set
 
-### T-103 · renumber
+## 7. Ideas, not planned
+
+### T-070 · MCP server
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: cli
-- reqs: R-ID-6
+- priority: P3 · type: idea · area: agent
+- reqs: I-1
 
-### T-104 · handoff note
+### T-071 · Overview across several projects
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: agent
-- reqs: R-AGENT-7
+- priority: P3 · type: idea · area: cli
+- reqs: I-2
 
-### T-105 · touch: refresh a claim
+### T-072 · Claims tagged with an agent session
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: cli
-- reqs: R-CLAIM-5
+- priority: P3 · type: idea · area: agent
+- reqs: I-3
 
-### T-106 · PowerShell tab completion
+### T-073 · todo schema
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: cli
-- reqs: R-OUT-7
+- priority: P3 · type: idea · area: agent
+- reqs: I-4
 
-### T-107 · undo
+### T-074 · todo handoff
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: history
-- reqs: R-HIST-4
-- depends: T-051
+- priority: P3 · type: idea · area: agent
+- reqs: I-5
 
-### T-108 · Import from other formats
+### T-075 · todo renumber
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: migrate
-- reqs: R-MIG-4
-- depends: T-080
+- priority: P3 · type: idea · area: cli
+- reqs: I-6
 
-### T-109 · Claims tagged with a session, released by a SessionEnd hook
+### T-076 · Git merge driver for TODO.md
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: agent
-- reqs: R-CLAIM-8
-- depends: T-073
-- note (2026-11-15, claude): first find out how an agent's own commands can learn their session ID
+- priority: P3 · type: idea · area: git
+- reqs: I-7
 
-### T-110 · todo schema: the tool describes itself
+### T-077 · todo align
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: agent
-- reqs: R-AGENT-8
-- depends: T-092
+- priority: P3 · type: idea · area: git
+- reqs: I-8
 
-### T-111 · Git merge driver for TODO.md
+### T-078 · todo undo
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: git
-- reqs: R-GIT-3
+- priority: P3 · type: idea · area: history
+- reqs: I-9
 
-### T-112 · scan: find untracked checkboxes and TODO comments
+### T-079 · PowerShell tab completion
 - status: open
 - owner: —
-- priority: P3 · type: feature · area: migrate
-- reqs: R-MIG-5
+- priority: P3 · type: idea · area: cli
+- reqs: I-10
+
+### T-080 · todo scan
+- status: open
+- owner: —
+- priority: P3 · type: idea · area: cli
+- reqs: I-11
+
+### T-081 · Import from other task-list formats
+- status: open
+- owner: —
+- priority: P3 · type: idea · area: cli
+- reqs: I-12
