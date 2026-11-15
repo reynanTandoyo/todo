@@ -37,19 +37,23 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - accept: every rule and every refusal in docs/format.md has a test, including a file whose format line names version 2; problems are reported as `file:line: message`
 
 ### T-004 · Errors, exit codes, JSON envelope and safe output
-- status: open
-- owner: —
+- status: done
+- owner: w2-hydrogen
 - priority: P0 · type: feature · area: cli
 - reqs: R-OUT-1, R-OUT-2, R-OUT-3, R-OUT-5, R-OUT-7, NFR-6, NFR-8
 - accept: each error code and exit code has a test; every JSON schema name carries its version (`todo.<command>.v1`); output into a pipe that closes early ends with exit 0; Clippy rejects unwrap, expect and panic outside tests
+- commit: 23335c5
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 21 tests pass
 
 ### T-005 · Command line: global options, agent name, help
-- status: open
-- owner: —
+- status: done
+- owner: w2-hydrogen
 - priority: P0 · type: feature · area: cli
 - reqs: R-OUT-8, R-CLAIM-5, R-CFG-1, R-CFG-3, TEST-8
 - depends: T-004
 - accept: `todo`, `todo help <command>`, `todo --version`, `--file`, `--json`, `--agent` and `TODO_AGENT` (with name checks) are tested against the built binary; a test checks that the help lists every command
+- commit: e1ea9a3
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 21 tests pass
 
 ### T-006 · Non-ASCII text in Windows consoles
 - status: open
@@ -348,12 +352,14 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 ## 5. Agent setup
 
 ### T-050 · Agent rules text and `todo help agents`
-- status: open
-- owner: —
+- status: done
+- owner: w2-hydrogen
 - priority: P0 · type: feature · area: agent
 - reqs: R-AGENT-1
 - depends: T-005
 - accept: one built-in text covers every point in R-AGENT-1 and is what `todo help agents` prints
+- commit: a88f6da
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 21 tests pass
 
 ### T-051 · init
 - status: open
@@ -390,11 +396,13 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 ## 6. Build, release and documentation
 
 ### T-060 · CI workflow
-- status: open
-- owner: —
+- status: done
+- owner: w2-hydrogen
 - priority: P0 · type: chore · area: release
 - reqs: REL-1, NFR-1, NFR-2, NFR-4, NFR-9, NFR-10
 - accept: format check, Clippy and tests run on Windows and Linux for every push; the Windows job fails if todo.exe needs a DLL outside Windows or reaches 5 MB; the dependency list matches NFR-9; Cargo.toml requires Rust 1.89
+- commit: 2743431
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 21 tests pass
 
 ### T-061 · README
 - status: open
@@ -405,11 +413,13 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - accept: build, install, use, adding to a project and the limits are explained in plain language, and the steps were followed on a clean folder
 
 ### T-062 · MIT licence
-- status: open
-- owner: —
+- status: done
+- owner: w2-hydrogen
 - priority: P0 · type: chore · area: release
 - reqs: REL-3
 - accept: LICENSE holds the MIT text; the README and Cargo.toml name the licence
+- commit: 450c931
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 21 tests pass
 
 ### T-063 · docs/json.md and CHANGELOG.md
 - status: open
