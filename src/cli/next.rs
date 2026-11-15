@@ -8,7 +8,7 @@ use crate::doc::TaskChangeIntent;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::current_time;
 use crate::ops::{
-    DocWritePlan, NextFilter, OpsConfig, TaskJson, WhereClause, build_claim_edits,
+    DocWritePlan, NextFilter, TaskJson, WhereClause, build_claim_edits,
     build_task_json, check_task_writable, edit_doc_and_write, load_for_read, plan_claim,
     select_next_task,
 };
@@ -67,7 +67,7 @@ struct NextJson {
 
 /// Runs `todo next`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let cfg = OpsConfig::default();
+    let cfg = ctx.load_config()?;
     let where_clauses = args
         .where_clauses
         .iter()

@@ -1,11 +1,17 @@
-//! Runtime configuration and time/archive helpers for task operations.
+//! Runtime configuration, `todo.toml` loading (T-007; R-CFG-1, R-CFG-2), and time/archive helpers.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Duration, FixedOffset, Utc};
 
 use crate::doc::{IdConfig, Task};
+use crate::error::{ErrorCode, Result, TodoError};
+use crate::find::{WorktreeMode, fs_path};
 use crate::lock::LockConfig;
+
+/// File name of the optional project configuration file next to `TODO.md` (`R-CFG-2`).
+pub const CONFIG_FILENAME: &str = "todo.toml";
 
 /// Default `claim_ttl_hours` from requirements §5.14 (`R-CLAIM-4`).
 pub const DEFAULT_CLAIM_TTL_HOURS: u64 = 24;
@@ -13,25 +19,42 @@ pub const DEFAULT_CLAIM_TTL_HOURS: u64 = 24;
 /// Default `archive_file` name from requirements §5.14 (`format.md` §14).
 pub const DEFAULT_ARCHIVE_FILE: &str = "TODO-archive.md";
 
+/// Default `question_section` name from requirements §5.14 (`R-WRITE-11`).
+pub const DEFAULT_QUESTION_SECTION: &str = "Questions";
+
+/// Default `snapshots_keep` count from requirements §5.14 (`R-HIST-2`).
+pub const DEFAULT_SNAPSHOTS_KEEP: u64 = 200;
+
 /// Effective configuration for task operations (defaults from requirements §5.14).
 ///
-/// Built with defaults today (`R-CFG-1`); `todo.toml` loading (T-007) can populate this struct.
+/// Built with defaults when no `todo.toml` is present (`R-CFG-1`), or loaded from `todo.toml`
+/// next to `TODO.md` (`R-CFG-2`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OpsConfig {
     /// Task ID prefix and zero-padding width (`R-ID-1`).
     pub id_config: IdConfig,
     /// Ordered priority names from most urgent to least urgent (`R-CFG-2`).
     pub priorities: Vec<String>,
-    /// Default section name for `todo add` when `--section` is omitted (`R-WRITE-1`).
-    pub default_section: Option<String>,
     /// Fields required by `todo add` (`R-WRITE-1`, default `["priority"]`).
     pub required_fields: Vec<String>,
+    /// Allowed `type` values; empty allows any (`R-CFG-2`).
+    pub types: Vec<String>,
+    /// Allowed `area` values; empty allows any (`R-CFG-2`).
+    pub areas: Vec<String>,
+    /// Default section name for `todo add` when `--section` is omitted (`R-WRITE-1`).
+    pub default_section: Option<String>,
+    /// Section name for `todo ask` (`R-WRITE-11`, default `"Questions"`).
+    pub question_section: String,
     /// File name of the archive file next to `TODO.md` (`format.md` §14).
     pub archive_file: String,
     /// Number of hours before a claim becomes stale (`R-CLAIM-4`).
     pub claim_ttl_hours: u64,
     /// Write lock and manual lease timing settings (`R-LOCK-3`, `R-LOCK-6`).
     pub lock: LockConfig,
+    /// Number of snapshots to keep in the state folder (`R-CFG-2`, default `200`).
+    pub snapshots_keep: u64,
+    /// How linked git worktrees resolve `TODO.md` (`R-FIND-5`, `R-CFG-2`).
+    pub worktree: WorktreeMode,
 }
 
 impl Default for OpsConfig {
@@ -44,11 +67,16 @@ impl Default for OpsConfig {
                 "P2".to_string(),
                 "P3".to_string(),
             ],
-            default_section: None,
             required_fields: vec!["priority".to_string()],
+            types: Vec::new(),
+            areas: Vec::new(),
+            default_section: None,
+            question_section: DEFAULT_QUESTION_SECTION.to_string(),
             archive_file: DEFAULT_ARCHIVE_FILE.to_string(),
             claim_ttl_hours: DEFAULT_CLAIM_TTL_HOURS,
             lock: LockConfig::default(),
+            snapshots_keep: DEFAULT_SNAPSHOTS_KEEP,
+            worktree: WorktreeMode::Shared,
         }
     }
 }
@@ -114,4 +142,228 @@ impl OpsConfig {
     pub fn format_note_date(now: DateTime<FixedOffset>) -> String {
         now.format("%Y-%m-%d").to_string()
     }
+
+    /// Loads `todo.toml` sitting next to `todo_path`, or returns [`OpsConfig::default`] if absent (`R-CFG-1`, `R-CFG-2`).
+    pub fn load_next_to(todo_path: &Path) -> Result<Self> {
+        let toml_path = todo_path.with_file_name(CONFIG_FILENAME);
+        Self::load_from_file(&toml_path)
+    }
+
+    /// Loads `todo.toml` from `toml_path`, or returns [`OpsConfig::default`] if the file does not exist.
+    pub fn load_from_file(toml_path: &Path) -> Result<Self> {
+        match std::fs::read_to_string(fs_path(toml_path).as_ref()) {
+            Ok(content) => Self::from_toml_str(&content),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
+            Err(e) => Err(TodoError::new(
+                ErrorCode::BadValue,
+                format!("could not read {}: {e}", toml_path.display()),
+            )
+            .with_file(CONFIG_FILENAME)),
+        }
+    }
+
+    /// Parses and validates a `todo.toml` string, returning `todo.toml:<line>: message` on error (`R-CFG-2`).
+    pub fn from_toml_str(content: &str) -> Result<Self> {
+        let table: BTreeMap<String, toml::Spanned<toml::Value>> =
+            toml::from_str(content).map_err(|err| {
+                let line = err.span().map_or(1, |s| line_at_offset(content, s.start));
+                TodoError::new(
+                    ErrorCode::BadValue,
+                    format!("invalid TOML: {}", err.message()),
+                )
+                .with_file(CONFIG_FILENAME)
+                .with_line(line)
+            })?;
+
+        let mut cfg = Self::default();
+        let mut lease_minutes_line: Option<usize> = None;
+        let mut lease_max_line: Option<usize> = None;
+
+        for (key, spanned_val) in table {
+            let line = line_at_offset(content, spanned_val.span().start);
+            let val = spanned_val.into_inner();
+            match key.as_str() {
+                "id_prefix" => {
+                    let s = expect_string(&key, val, line)?;
+                    let trimmed = s.trim();
+                    if trimmed.is_empty()
+                        || trimmed.contains('-')
+                        || trimmed.chars().any(char::is_whitespace)
+                    {
+                        return Err(toml_err(
+                            line,
+                            "id_prefix must be a non-empty string without '-' or whitespace",
+                        ));
+                    }
+                    cfg.id_config.prefix = trimmed.to_string();
+                }
+                "id_width" => {
+                    let n = expect_u64(&key, val, line, 1)?;
+                    let width = usize::try_from(n)
+                        .ok()
+                        .filter(|&w| w <= 16)
+                        .ok_or_else(|| toml_err(line, "id_width must be between 1 and 16"))?;
+                    cfg.id_config.width = width;
+                }
+                "priorities" => {
+                    let items = expect_string_list(&key, val, line, true)?;
+                    if items.is_empty() {
+                        return Err(toml_err(line, "priorities must not be empty"));
+                    }
+                    cfg.priorities = items;
+                }
+                "required_fields" => {
+                    cfg.required_fields = expect_string_list(&key, val, line, true)?;
+                }
+                "types" => {
+                    cfg.types = expect_string_list(&key, val, line, true)?;
+                }
+                "areas" => {
+                    cfg.areas = expect_string_list(&key, val, line, true)?;
+                }
+                "default_section" => {
+                    let s = expect_string(&key, val, line)?;
+                    let trimmed = s.trim();
+                    cfg.default_section = if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed.to_string())
+                    };
+                }
+                "question_section" => {
+                    let s = expect_string(&key, val, line)?;
+                    let trimmed = s.trim();
+                    if trimmed.is_empty() {
+                        return Err(toml_err(line, "question_section must not be empty"));
+                    }
+                    cfg.question_section = trimmed.to_string();
+                }
+                "archive_file" => {
+                    let s = expect_string(&key, val, line)?;
+                    let trimmed = s.trim();
+                    if trimmed.is_empty()
+                        || trimmed == "."
+                        || trimmed == ".."
+                        || trimmed.contains('/')
+                        || trimmed.contains('\\')
+                    {
+                        return Err(toml_err(
+                            line,
+                            "archive_file must be a non-empty file name without path separators",
+                        ));
+                    }
+                    cfg.archive_file = trimmed.to_string();
+                }
+                "claim_ttl_hours" => {
+                    cfg.claim_ttl_hours = expect_u64(&key, val, line, 1)?;
+                }
+                "lock_wait_seconds" => {
+                    cfg.lock.lock_wait_seconds = expect_u64(&key, val, line, 0)?;
+                }
+                "lease_minutes" => {
+                    cfg.lock.lease_minutes = expect_u64(&key, val, line, 1)?;
+                    lease_minutes_line = Some(line);
+                }
+                "lease_max_minutes" => {
+                    cfg.lock.lease_max_minutes = expect_u64(&key, val, line, 1)?;
+                    lease_max_line = Some(line);
+                }
+                "snapshots_keep" => {
+                    cfg.snapshots_keep = expect_u64(&key, val, line, 0)?;
+                }
+                "worktree" => {
+                    let s = expect_string(&key, val, line)?;
+                    cfg.worktree = match s.as_str() {
+                        "shared" => WorktreeMode::Shared,
+                        "local" => WorktreeMode::Local,
+                        _ => {
+                            return Err(toml_err(
+                                line,
+                                format!(
+                                    "invalid worktree mode {s:?}; expected \"shared\" or \"local\""
+                                ),
+                            ));
+                        }
+                    };
+                }
+                _ => {
+                    return Err(toml_err(line, format!("unknown setting `{key}`")));
+                }
+            }
+        }
+
+        if cfg.lock.lease_minutes > cfg.lock.lease_max_minutes {
+            let line = lease_minutes_line.or(lease_max_line).unwrap_or(1);
+            return Err(toml_err(
+                line,
+                format!(
+                    "lease_minutes ({}) cannot exceed lease_max_minutes ({})",
+                    cfg.lock.lease_minutes, cfg.lock.lease_max_minutes
+                ),
+            ));
+        }
+
+        Ok(cfg)
+    }
+}
+
+fn line_at_offset(content: &str, offset: usize) -> usize {
+    let clamped = offset.min(content.len());
+    content.as_bytes()[..clamped]
+        .iter()
+        .filter(|&&b| b == b'\n')
+        .count()
+        + 1
+}
+
+fn toml_err(line: usize, message: impl Into<String>) -> TodoError {
+    TodoError::new(ErrorCode::BadValue, message)
+        .with_file(CONFIG_FILENAME)
+        .with_line(line)
+}
+
+fn expect_string(key: &str, val: toml::Value, line: usize) -> Result<String> {
+    match val {
+        toml::Value::String(s) => Ok(s),
+        _ => Err(toml_err(line, format!("{key} must be a string"))),
+    }
+}
+
+fn expect_u64(key: &str, val: toml::Value, line: usize, min: u64) -> Result<u64> {
+    let toml::Value::Integer(n) = val else {
+        return Err(toml_err(line, format!("{key} must be an integer")));
+    };
+    let Ok(u) = u64::try_from(n) else {
+        return Err(toml_err(line, format!("{key} must be >= {min}")));
+    };
+    if u < min {
+        return Err(toml_err(line, format!("{key} must be >= {min}")));
+    }
+    Ok(u)
+}
+
+fn expect_string_list(
+    key: &str,
+    val: toml::Value,
+    line: usize,
+    no_whitespace: bool,
+) -> Result<Vec<String>> {
+    let toml::Value::Array(arr) = val else {
+        return Err(toml_err(line, format!("{key} must be a list of strings")));
+    };
+    let mut out = Vec::with_capacity(arr.len());
+    for item in arr {
+        let toml::Value::String(s) = item else {
+            return Err(toml_err(line, format!("{key} must be a list of strings")));
+        };
+        let trimmed = s.trim();
+        if trimmed.is_empty() || (no_whitespace && trimmed.chars().any(char::is_whitespace)) {
+            return Err(toml_err(
+                line,
+                format!("{key} entries must be non-empty without whitespace"),
+            ));
+        }
+        out.push(trimmed.to_string());
+    }
+    Ok(out)
 }

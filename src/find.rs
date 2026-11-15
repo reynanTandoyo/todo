@@ -375,10 +375,14 @@ pub fn find_todo(opts: &FindOptions<'_>) -> Result<FoundTodo> {
 }
 
 fn walk_up_bounded(start: &Path, stop_at: &Path) -> Option<PathBuf> {
+    walk_up_bounded_file(start, stop_at, TODO_FILENAME)
+}
+
+fn walk_up_bounded_file(start: &Path, stop_at: &Path, filename: &str) -> Option<PathBuf> {
     let canon_stop = canonicalize_clean(stop_at).ok();
     let mut current = start;
     loop {
-        let candidate = current.join(TODO_FILENAME);
+        let candidate = current.join(filename);
         if path_is_file(&candidate) {
             return Some(candidate);
         }
@@ -393,6 +397,21 @@ fn walk_up_bounded(start: &Path, stop_at: &Path) -> Option<PathBuf> {
         }
         current = current.parent()?;
     }
+}
+
+/// If `start_dir` (or current dir) is inside a linked git worktree and a `todo.toml` exists
+/// between `start_dir` and the worktree root, returns its path so `worktree = "local"` can be
+/// honoured before redirecting to the main checkout.
+pub(crate) fn find_local_worktree_toml(start_dir: Option<&Path>) -> Option<PathBuf> {
+    let cwd = match start_dir {
+        Some(dir) => strip_verbatim_prefix(&std::path::absolute(dir).ok()?),
+        None => strip_verbatim_prefix(&std::env::current_dir().ok()?),
+    };
+    let git_root = find_git_root_upward(&cwd)?;
+    if let GitContext::LinkedWorktree { ref wt_root, .. } = inspect_git_root(&git_root) {
+        return walk_up_bounded_file(&cwd, wt_root, "todo.toml");
+    }
+    None
 }
 
 fn relative_subpath(child: &Path, root: &Path) -> Option<PathBuf> {

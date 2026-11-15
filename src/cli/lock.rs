@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::error::Result;
-use crate::lock::{LockConfig, acquire_lease};
+use crate::lock::acquire_lease;
 use crate::output::Output;
 use crate::state::StateDir;
 
@@ -40,9 +40,9 @@ struct LockJson {
 /// Runs `todo lock`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let agent = ctx.require_agent()?;
-    let found = ctx.find_todo(out)?;
+    let (found, ops_cfg) = ctx.find_todo_and_config(out)?;
     let state = StateDir::from_found(&found)?;
-    let cfg = LockConfig::default();
+    let cfg = ops_cfg.lock;
     let minutes = args.minutes.unwrap_or(cfg.lease_minutes);
     let lease = acquire_lease(&state, agent, args.minutes, &cfg)?;
 

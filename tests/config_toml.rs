@@ -1,0 +1,342 @@
+//! Tests for `todo.toml` configuration loading and wiring (T-007; R-CFG-1, R-CFG-2).
+
+use std::fs;
+use std::path::Path;
+use std::process::Command;
+
+use assert_cmd::cargo::cargo_bin_cmd;
+use serde_json::Value;
+use tempfile::TempDir;
+use todo::find::WorktreeMode;
+use todo::ops::OpsConfig;
+
+fn write_todo(dir: &Path, content: &str) {
+    fs::write(dir.join("TODO.md"), content).unwrap();
+}
+
+fn write_toml(dir: &Path, content: &str) {
+    fs::write(dir.join("todo.toml"), content).unwrap();
+}
+
+fn run_git(dir: &Path, args: &[&str]) {
+    let out = Command::new("git")
+        .current_dir(dir)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "git {:?} failed: {}",
+        args,
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn all_fifteen_keys_parse_and_have_expected_defaults() {
+    let def = OpsConfig::default();
+    assert_eq!(def.id_config.prefix, "T");
+    assert_eq!(def.id_config.width, 3);
+    assert_eq!(def.priorities, vec!["P0", "P1", "P2", "P3"]);
+    assert_eq!(def.required_fields, vec!["priority"]);
+    assert!(def.types.is_empty());
+    assert!(def.areas.is_empty());
+    assert_eq!(def.default_section, None);
+    assert_eq!(def.question_section, "Questions");
+    assert_eq!(def.archive_file, "TODO-archive.md");
+    assert_eq!(def.claim_ttl_hours, 24);
+    assert_eq!(def.lock.lock_wait_seconds, 30);
+    assert_eq!(def.lock.lease_minutes, 10);
+    assert_eq!(def.lock.lease_max_minutes, 60);
+    assert_eq!(def.snapshots_keep, 200);
+    assert_eq!(def.worktree, WorktreeMode::Shared);
+
+    let full = r#"
+id_prefix = "REQ"
+id_width = 4
+priorities = ["URGENT", "NORMAL", "LOW"]
+required_fields = ["priority", "type"]
+types = ["feature", "bug"]
+areas = ["cli", "docs"]
+default_section = "Backlog"
+question_section = "Open Questions"
+archive_file = "archive-2026.md"
+claim_ttl_hours = 12
+lock_wait_seconds = 5
+lease_minutes = 15
+lease_max_minutes = 45
+snapshots_keep = 50
+worktree = "local"
+"#;
+    let cfg = OpsConfig::from_toml_str(full).unwrap();
+    assert_eq!(cfg.id_config.prefix, "REQ");
+    assert_eq!(cfg.id_config.width, 4);
+    assert_eq!(cfg.priorities, vec!["URGENT", "NORMAL", "LOW"]);
+    assert_eq!(cfg.required_fields, vec!["priority", "type"]);
+    assert_eq!(cfg.types, vec!["feature", "bug"]);
+    assert_eq!(cfg.areas, vec!["cli", "docs"]);
+    assert_eq!(cfg.default_section.as_deref(), Some("Backlog"));
+    assert_eq!(cfg.question_section, "Open Questions");
+    assert_eq!(cfg.archive_file, "archive-2026.md");
+    assert_eq!(cfg.claim_ttl_hours, 12);
+    assert_eq!(cfg.lock.lock_wait_seconds, 5);
+    assert_eq!(cfg.lock.lease_minutes, 15);
+    assert_eq!(cfg.lock.lease_max_minutes, 45);
+    assert_eq!(cfg.snapshots_keep, 50);
+    assert_eq!(cfg.worktree, WorktreeMode::Local);
+}
+
+#[test]
+fn unknown_key_and_bad_values_report_todo_toml_line_and_message() {
+    let dir = TempDir::new().unwrap();
+    write_todo(dir.path(), "<!-- todo:format=1 -->\n\n## Tasks\n");
+
+    // Unknown key on line 3.
+    write_toml(
+        dir.path(),
+        "# comment\nid_prefix = \"T\"\nunknown_setting = 123\n",
+    );
+    let out = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["list"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("todo.toml:3:"),
+        "expected todo.toml:3: in stderr, got: {stderr}"
+    );
+    assert!(stderr.contains("unknown_setting"), "stderr: {stderr}");
+
+    // Bad value on line 2.
+    write_toml(dir.path(), "id_prefix = \"T\"\nworktree = \"bogus\"\n");
+    let out = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["--json", "list"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let json: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["error"]["code"], "BAD_VALUE");
+    assert_eq!(json["error"]["file"], "todo.toml");
+    assert_eq!(json["error"]["line"], 2);
+
+    // Syntax error on line 2.
+    write_toml(dir.path(), "id_prefix = \"T\"\nid_width = [unclosed\n");
+    let err = OpsConfig::load_next_to(&dir.path().join("TODO.md")).unwrap_err();
+    assert!(err.to_string().starts_with("todo.toml:2:"), "got: {}", err);
+}
+
+#[test]
+fn cli_wires_prefix_width_priorities_required_types_areas_default_section_archive_ttl_and_lease() {
+    let dir = TempDir::new().unwrap();
+    write_todo(
+        dir.path(),
+        "<!-- todo:format=1 -->\n\n## Inbox\n\n## Other\n",
+    );
+    fs::write(
+        dir.path().join("custom-archive.md"),
+        "<!-- todo:format=1 -->\n\n## Archive\n\n### REQ-0005 · Archived item\n- status: done\n- owner: alice\n- priority: HIGH\n",
+    )
+    .unwrap();
+    write_toml(
+        dir.path(),
+        r#"
+id_prefix = "REQ"
+id_width = 4
+priorities = ["HIGH", "LOW"]
+required_fields = ["priority", "type", "area"]
+types = ["bug", "feat"]
+areas = ["cli", "core"]
+default_section = "Inbox"
+archive_file = "custom-archive.md"
+claim_ttl_hours = 1
+lease_minutes = 5
+lease_max_minutes = 15
+"#,
+    );
+
+    // Missing required field `type` is refused.
+    let missing = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args([
+            "--agent",
+            "alice",
+            "add",
+            "--title",
+            "Missing type",
+            "--priority",
+            "HIGH",
+            "--area",
+            "cli",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(missing.status.code(), Some(1));
+
+    // Invalid `type` is refused.
+    let bad_type = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args([
+            "--agent",
+            "alice",
+            "add",
+            "--title",
+            "Bad type",
+            "--priority",
+            "HIGH",
+            "--type",
+            "chore",
+            "--area",
+            "cli",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(bad_type.status.code(), Some(1));
+
+    // Invalid `area` is refused.
+    let bad_area = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args([
+            "--agent",
+            "alice",
+            "add",
+            "--title",
+            "Bad area",
+            "--priority",
+            "HIGH",
+            "--type",
+            "bug",
+            "--area",
+            "ui",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(bad_area.status.code(), Some(1));
+
+    // Valid add without `--section` uses `default_section = "Inbox"`, `REQ-0006` (after archived REQ-0005).
+    let added = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args([
+            "--json",
+            "--agent",
+            "alice",
+            "add",
+            "--title",
+            "Valid task",
+            "--priority",
+            "HIGH",
+            "--type",
+            "bug",
+            "--area",
+            "cli",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(
+        added.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&added.stderr)
+    );
+    let added_json: Value = serde_json::from_slice(&added.stdout).unwrap();
+    assert_eq!(added_json["data"]["id"], "REQ-0006");
+    assert_eq!(added_json["data"]["section"], "Inbox");
+
+    // `list --archive` reads `custom-archive.md`.
+    let arch = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["--json", "list", "--archive"])
+        .output()
+        .unwrap();
+    assert_eq!(arch.status.code(), Some(0));
+    let arch_json: Value = serde_json::from_slice(&arch.stdout).unwrap();
+    assert_eq!(arch_json["data"]["tasks"][0]["id"], "REQ-0005");
+
+    // `lock` defaults to `lease_minutes = 5` and rejects `--minutes 20` (> `lease_max_minutes = 15`).
+    let too_long = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["--agent", "alice", "lock", "--minutes", "20"])
+        .output()
+        .unwrap();
+    assert_eq!(too_long.status.code(), Some(1));
+
+    let locked = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["--json", "--agent", "alice", "lock"])
+        .output()
+        .unwrap();
+    assert_eq!(locked.status.code(), Some(0));
+    let locked_json: Value = serde_json::from_slice(&locked.stdout).unwrap();
+    assert_eq!(locked_json["data"]["minutes"], 5);
+
+    let _ = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["--agent", "alice", "unlock"])
+        .output()
+        .unwrap();
+
+    // `claim_ttl_hours = 1`: a claim from 2 hours ago is stale.
+    let todo_text = fs::read_to_string(dir.path().join("TODO.md")).unwrap();
+    let stale_claim = todo_text
+        .replace("- status: open", "- status: claimed")
+        .replace(
+            "- owner: —",
+            "- owner: bob\n- claimed: 2020-01-01T00:00+00:00",
+        );
+    write_todo(dir.path(), &stale_claim);
+    let stale_list = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["--json", "list", "--stale"])
+        .output()
+        .unwrap();
+    assert_eq!(stale_list.status.code(), Some(0));
+    let stale_json: Value = serde_json::from_slice(&stale_list.stdout).unwrap();
+    assert_eq!(stale_json["data"]["count"], 1);
+}
+
+#[test]
+fn worktree_local_in_todo_toml_uses_worktrees_own_todo() {
+    let tmp = TempDir::new().unwrap();
+    let main_dir = tmp.path().join("main");
+    let wt_dir = tmp.path().join("wt");
+    fs::create_dir_all(&main_dir).unwrap();
+
+    run_git(&main_dir, &["init", "-q"]);
+    run_git(&main_dir, &["config", "user.email", "test@example.com"]);
+    run_git(&main_dir, &["config", "user.name", "Test"]);
+    write_todo(
+        &main_dir,
+        "<!-- todo:format=1 -->\n\n## Tasks\n\n### T-001 · Main task\n- status: open\n- owner: —\n- priority: P1\n",
+    );
+    run_git(&main_dir, &["add", "TODO.md"]);
+    run_git(&main_dir, &["commit", "-m", "init", "-q"]);
+    run_git(
+        &main_dir,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "wt-branch",
+            wt_dir.to_str().unwrap(),
+        ],
+    );
+
+    // Put a local TODO.md + todo.toml (worktree = "local") in the linked worktree.
+    write_todo(
+        &wt_dir,
+        "<!-- todo:format=1 -->\n\n## Tasks\n\n### T-099 · Local worktree task\n- status: open\n- owner: —\n- priority: P0\n",
+    );
+    write_toml(&wt_dir, "worktree = \"local\"\n");
+
+    let out = cargo_bin_cmd!("todo")
+        .current_dir(&wt_dir)
+        .args(["--json", "list"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let json: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["data"]["tasks"][0]["id"], "T-099");
+}

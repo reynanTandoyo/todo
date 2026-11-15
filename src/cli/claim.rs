@@ -4,7 +4,7 @@ use clap::Args as ClapArgs;
 
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::error::Result;
-use crate::ops::{OpsConfig, build_claim_edits, edit_task_and_write, plan_claim};
+use crate::ops::{build_claim_edits, edit_task_and_write, plan_claim};
 use crate::output::Output;
 
 /// Metadata for the `claim` command.
@@ -30,7 +30,7 @@ pub struct Args {
 
 /// Runs `todo claim <task>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let cfg = OpsConfig::default();
+    let cfg = ctx.load_config()?;
     let res = edit_task_and_write(
         ctx,
         &cfg,

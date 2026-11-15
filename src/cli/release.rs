@@ -4,7 +4,7 @@ use clap::Args as ClapArgs;
 
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::error::Result;
-use crate::ops::{OpsConfig, build_release_edits, edit_task_and_write, plan_release};
+use crate::ops::{build_release_edits, edit_task_and_write, plan_release};
 use crate::output::Output;
 
 /// Metadata for the `release` command.
@@ -29,7 +29,7 @@ pub struct Args {
 
 /// Runs `todo release <task>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let cfg = OpsConfig::default();
+    let cfg = ctx.load_config()?;
     let res = edit_task_and_write(
         ctx,
         &cfg,

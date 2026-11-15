@@ -93,7 +93,7 @@ struct ListJson {
 
 /// Runs `todo list`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let cfg = OpsConfig::default();
+    let cfg = ctx.load_config()?;
 
     let status_filter = match args.status.as_deref() {
         Some(raw) => Some(StatusFilter::parse(raw)?),

@@ -38,7 +38,10 @@ pub mod query;
 pub mod read;
 pub mod rules;
 
-pub use config::{DEFAULT_ARCHIVE_FILE, DEFAULT_CLAIM_TTL_HOURS, OpsConfig};
+pub use config::{
+    CONFIG_FILENAME, DEFAULT_ARCHIVE_FILE, DEFAULT_CLAIM_TTL_HOURS, DEFAULT_QUESTION_SECTION,
+    DEFAULT_SNAPSHOTS_KEEP, OpsConfig,
+};
 pub use edits::TaskEditBuilder;
 pub use pipeline::{
     DocWritePlan, WriteDocResult, WriteTaskResult, build_claim_edits, build_release_edits,

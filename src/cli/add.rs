@@ -86,17 +86,34 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     }
 
     let extra_fields = parse_extra_fields(&args.fields)?;
-    let cfg = OpsConfig::default();
+    let cfg = ctx.load_config()?;
 
-    // Validate priority (and required fields) before taking the lock.
+    // Validate priority, type, area, and required fields before taking the lock.
     let priority_val = resolve_priority(args.priority.as_deref(), &extra_fields, &cfg)?;
-    let type_val = resolve_opt(args.task_type.as_deref(), &extra_fields, "type");
-    let area_val = resolve_opt(args.area.as_deref(), &extra_fields, "area");
+    let type_val = resolve_allowed(
+        "type",
+        args.task_type.as_deref(),
+        &extra_fields,
+        &cfg.types,
+    )?;
+    let area_val = resolve_allowed("area", args.area.as_deref(), &extra_fields, &cfg.areas)?;
     let depends_val = resolve_opt(args.depends.as_deref(), &extra_fields, "depends");
     let files_val = resolve_opt(args.files.as_deref(), &extra_fields, "files");
     let problem_val = resolve_opt(args.problem.as_deref(), &extra_fields, "problem");
     let fix_val = resolve_opt(args.fix.as_deref(), &extra_fields, "fix");
     let accept_val = resolve_opt(args.accept.as_deref(), &extra_fields, "accept");
+    check_required_fields(
+        &cfg.required_fields,
+        priority_val.as_deref(),
+        type_val.as_deref(),
+        area_val.as_deref(),
+        depends_val.as_deref(),
+        files_val.as_deref(),
+        problem_val.as_deref(),
+        fix_val.as_deref(),
+        accept_val.as_deref(),
+        &extra_fields,
+    )?;
 
     let cfg_clone = cfg.clone();
     let res = edit_doc_with_state_and_write(
@@ -316,6 +333,64 @@ fn resolve_priority(
             Ok(None)
         }
     }
+}
+
+fn resolve_allowed(
+    key: &str,
+    flag: Option<&str>,
+    extra: &[(String, String)],
+    allowed: &[String],
+) -> Result<Option<String>> {
+    let Some(val) = resolve_opt(flag, extra, key) else {
+        return Ok(None);
+    };
+    if allowed.is_empty() {
+        return Ok(Some(val));
+    }
+    let Some(canonical) = allowed.iter().find(|a| a.eq_ignore_ascii_case(&val)) else {
+        return Err(TodoError::new(
+            ErrorCode::BadValue,
+            format!("invalid {key} '{val}'; expected one of: {}", allowed.join(", ")),
+        ));
+    };
+    Ok(Some(canonical.clone()))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn check_required_fields(
+    required_fields: &[String],
+    priority: Option<&str>,
+    task_type: Option<&str>,
+    area: Option<&str>,
+    depends: Option<&str>,
+    files: Option<&str>,
+    problem: Option<&str>,
+    fix: Option<&str>,
+    accept: Option<&str>,
+    extra: &[(String, String)],
+) -> Result<()> {
+    for req in required_fields {
+        let present = match req.to_ascii_lowercase().as_str() {
+            "priority" => priority.is_some(),
+            "type" => task_type.is_some(),
+            "area" => area.is_some(),
+            "depends" => depends.is_some(),
+            "files" => files.is_some(),
+            "problem" => problem.is_some(),
+            "fix" => fix.is_some(),
+            "accept" => accept.is_some(),
+            other => extra
+                .iter()
+                .any(|(k, v)| k.eq_ignore_ascii_case(other) && !v.trim().is_empty()),
+        };
+        if !present {
+            return Err(TodoError::new(
+                ErrorCode::MissingField,
+                format!("missing required field `{req}`"),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn resolve_target_section(

@@ -50,7 +50,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         return Err(TodoError::new(ErrorCode::Usage, "note text cannot be empty"));
     }
 
-    let cfg = OpsConfig::default();
+    let cfg = ctx.load_config()?;
     let res = edit_task_and_write(
         ctx,
         &cfg,

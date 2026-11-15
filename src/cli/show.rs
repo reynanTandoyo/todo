@@ -5,7 +5,7 @@ use clap::Args as ClapArgs;
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::current_time;
-use crate::ops::{OpsConfig, build_task_json, file_label, load_for_read};
+use crate::ops::{build_task_json, file_label, load_for_read};
 use crate::output::Output;
 
 /// Metadata for the `show` command.
@@ -31,7 +31,7 @@ pub struct Args {
 
 /// Runs `todo show <task>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let cfg = OpsConfig::default();
+    let cfg = ctx.load_config()?;
     let Some(task_id) = cfg.id_config.parse_user_id(&args.task) else {
         return Err(TodoError::new(
             ErrorCode::NotFound,

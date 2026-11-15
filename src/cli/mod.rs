@@ -19,7 +19,11 @@ use clap::{Args as ClapArgs, Parser, Subcommand, error::ErrorKind};
 use serde::Serialize;
 
 use crate::error::{ErrorCode, ExitCode, Result, TodoError};
-use crate::find::{ExplicitSource, FindOptions, FoundTodo, WorktreeMode, find_todo};
+use crate::find::{
+    ExplicitSource, FindOptions, FoundBy, FoundTodo, WorktreeMode, find_local_worktree_toml,
+    find_todo,
+};
+use crate::ops::OpsConfig;
 use crate::output::Output;
 
 /// Whether a command reads `TODO.md`, writes `TODO.md`, or is meta/help.
@@ -141,8 +145,64 @@ impl Context {
     }
 
     /// Locates `TODO.md` using the resolved context and emits any discovery warnings/notices.
+    ///
+    /// Also checks `todo.toml` for `worktree = "local"` (`R-CFG-2`, `R-FIND-5`).
     pub fn find_todo(&self, out: &mut Output) -> Result<FoundTodo> {
-        self.find_todo_with_mode(WorktreeMode::Shared, out)
+        let (found, _) = self.find_todo_and_config(out)?;
+        Ok(found)
+    }
+
+    /// Locates `TODO.md` and loads `todo.toml` next to it, respecting `worktree = "local"`.
+    pub fn find_todo_and_config(&self, out: &mut Output) -> Result<(FoundTodo, OpsConfig)> {
+        let (found, cfg) = self.resolve_todo_and_config_quiet()?;
+        emit_find_notices(&found, out);
+        Ok((found, cfg))
+    }
+
+    /// Loads `OpsConfig` from `todo.toml` next to `TODO.md` without emitting discovery notices.
+    pub fn load_config(&self) -> Result<OpsConfig> {
+        let (_, cfg) = self.resolve_todo_and_config_quiet()?;
+        Ok(cfg)
+    }
+
+    fn resolve_todo_and_config_quiet(&self) -> Result<(FoundTodo, OpsConfig)> {
+        if self.file.is_none()
+            && let Some(local_toml) = find_local_worktree_toml(None)
+        {
+            let local_cfg = OpsConfig::load_from_file(&local_toml)?;
+            if local_cfg.worktree == WorktreeMode::Local {
+                let found = find_todo(&FindOptions {
+                    explicit_file: None,
+                    explicit_source: None,
+                    start_dir: None,
+                    worktree: WorktreeMode::Local,
+                })?;
+                let cfg = OpsConfig::load_next_to(&found.path)?;
+                return Ok((found, cfg));
+            }
+        }
+
+        let found = find_todo(&FindOptions {
+            explicit_file: self.file.as_deref(),
+            explicit_source: self.file_source,
+            start_dir: None,
+            worktree: WorktreeMode::Shared,
+        })?;
+        let cfg = OpsConfig::load_next_to(&found.path)?;
+        if self.file.is_none()
+            && cfg.worktree == WorktreeMode::Local
+            && found.found_by == FoundBy::WorktreeMain
+        {
+            let local_found = find_todo(&FindOptions {
+                explicit_file: None,
+                explicit_source: None,
+                start_dir: None,
+                worktree: WorktreeMode::Local,
+            })?;
+            let local_cfg = OpsConfig::load_next_to(&local_found.path)?;
+            return Ok((local_found, local_cfg));
+        }
+        Ok((found, cfg))
     }
 
     /// Locates `TODO.md` with an explicit [`WorktreeMode`] and emits any discovery warnings/notices.
@@ -157,15 +217,19 @@ impl Context {
             start_dir: None,
             worktree,
         })?;
-        for w in &found.warnings {
-            out.warn(w);
-        }
-        if !out.is_json()
-            && let Some(ref notice) = found.notice
-        {
-            let _ = writeln!(std::io::stderr(), "{notice}");
-        }
+        emit_find_notices(&found, out);
         Ok(found)
+    }
+}
+
+fn emit_find_notices(found: &FoundTodo, out: &mut Output) {
+    for w in &found.warnings {
+        out.warn(w);
+    }
+    if !out.is_json()
+        && let Some(ref notice) = found.notice
+    {
+        let _ = writeln!(std::io::stderr(), "{notice}");
     }
 }
 

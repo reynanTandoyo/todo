@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::error::Result;
-use crate::lock::{LockConfig, WriteOutcome, locked_read_modify_write};
+use crate::lock::{WriteOutcome, locked_read_modify_write};
 use crate::output::Output;
 use crate::state::StateDir;
 
@@ -45,9 +45,9 @@ struct TestAppendJson<'a> {
 /// Runs `todo __test-append`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let agent = ctx.require_agent()?;
-    let found = ctx.find_todo(out)?;
+    let (found, ops_cfg) = ctx.find_todo_and_config(out)?;
     let state = StateDir::from_found(&found)?;
-    let cfg = LockConfig::default();
+    let cfg = ops_cfg.lock;
 
     locked_read_modify_write(
         &found.path,

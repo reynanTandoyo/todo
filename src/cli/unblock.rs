@@ -37,7 +37,7 @@ pub struct Args {
 
 /// Runs `todo unblock <task>`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let cfg = OpsConfig::default();
+    let cfg = ctx.load_config()?;
     let res = edit_task_and_write(
         ctx,
         &cfg,

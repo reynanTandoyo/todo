@@ -74,7 +74,7 @@ pub fn load_for_read(
     load_archive_for_deps: bool,
     out: &mut Output,
 ) -> Result<LoadedRead> {
-    let found = ctx.find_todo(out)?;
+    let found = ctx.find_todo_with_mode(cfg.worktree, out)?;
 
     if from_archive {
         let archive_path = cfg.archive_path(&found.path);

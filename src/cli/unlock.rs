@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::error::Result;
-use crate::lock::{LockConfig, UnlockOutcome, release_lease};
+use crate::lock::{UnlockOutcome, release_lease};
 use crate::output::Output;
 use crate::state::StateDir;
 
@@ -33,9 +33,9 @@ struct UnlockJson {
 /// Runs `todo unlock`.
 pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let agent = ctx.require_agent()?;
-    let found = ctx.find_todo(out)?;
+    let (found, ops_cfg) = ctx.find_todo_and_config(out)?;
     let state = StateDir::from_found(&found)?;
-    let cfg = LockConfig::default();
+    let cfg = ops_cfg.lock;
 
     match release_lease(&state, agent, ctx.force, &cfg)? {
         UnlockOutcome::Unlocked { agent: holder } => {
