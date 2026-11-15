@@ -1,3 +1,4 @@
+#![allow(clippy::expect_used)] // whole file is test code; helpers outside #[test] may expect()
 use std::fs;
 use std::path::Path;
 
