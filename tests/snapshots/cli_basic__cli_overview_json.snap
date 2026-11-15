@@ -7,8 +7,28 @@ expression: ok_json
     "commands": [
       {
         "kind": "write",
+        "name": "add",
+        "summary": "Add a new task to a section"
+      },
+      {
+        "kind": "write",
+        "name": "block",
+        "summary": "Mark a task blocked with a reason"
+      },
+      {
+        "kind": "write",
         "name": "claim",
         "summary": "Claim a task for an agent"
+      },
+      {
+        "kind": "write",
+        "name": "done",
+        "summary": "Mark a task done"
+      },
+      {
+        "kind": "write",
+        "name": "drop",
+        "summary": "Mark a task dropped with a reason"
       },
       {
         "kind": "meta",
@@ -32,8 +52,18 @@ expression: ok_json
       },
       {
         "kind": "write",
+        "name": "note",
+        "summary": "Add a dated note to a task"
+      },
+      {
+        "kind": "write",
         "name": "release",
         "summary": "Release a claimed task back to open (or clear owner on blocked)"
+      },
+      {
+        "kind": "write",
+        "name": "set",
+        "summary": "Edit fields or title of a task"
       },
       {
         "kind": "read",
@@ -44,6 +74,11 @@ expression: ok_json
         "kind": "read",
         "name": "status",
         "summary": "Show write lock and manual lease status"
+      },
+      {
+        "kind": "write",
+        "name": "unblock",
+        "summary": "Unblock a blocked task back to claimed or open"
       },
       {
         "kind": "write",
