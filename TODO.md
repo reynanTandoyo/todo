@@ -150,36 +150,44 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 ## 3. Task commands
 
 ### T-020 · list
-- status: open
-- owner: —
+- status: done
+- owner: w4a-hydrogen
 - priority: P0 · type: feature · area: cli
 - reqs: R-READ-1, R-READ-4
 - depends: T-003, T-010
 - accept: every filter has a test; done and dropped tasks are hidden by default; JSON output matches its snapshot
+- commit: 885136d
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 101 tests pass; list, show and next read this repository's TODO.md correctly
 
 ### T-021 · show
-- status: open
-- owner: —
+- status: done
+- owner: w4a-hydrogen
 - priority: P0 · type: feature · area: cli
 - reqs: R-READ-2, R-DEP-2
 - depends: T-003, T-010
 - accept: text output equals the task's lines in the file; JSON includes unknown fields, notes, line numbers, dependencies with their status, and the tasks waiting on it
+- commit: 45e4761
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 101 tests pass; list, show and next read this repository's TODO.md correctly
 
 ### T-022 · claim and release
-- status: open
-- owner: —
+- status: done
+- owner: w4a-hydrogen
 - priority: P0 · type: feature · area: cli
 - reqs: R-WRITE-2, R-WRITE-3, R-WRITE-9, R-CLAIM-1, R-CLAIM-2, R-CLAIM-3, R-CLAIM-4, R-IO-6, TEST-4, TEST-5
 - depends: T-013, T-014, T-020
 - accept: 20 parallel claims of one task have exactly one winner; claiming again refreshes the claim time; a stale claim is taken over with a note; release by a non-owner needs --force; every claim and release case of the transition table has a test
+- commit: 22b9400
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 101 tests pass; list, show and next read this repository's TODO.md correctly
 
 ### T-023 · next, including --claim
-- status: open
-- owner: —
+- status: done
+- owner: w4a-hydrogen
 - priority: P0 · type: feature · area: cli
 - reqs: R-READ-3, R-DEP-1
 - depends: T-022
 - accept: 10 parallel `next --claim` get 10 different tasks; tasks with an unfinished or missing dependency and questions are never returned; an agent's own claim comes first unless --new
+- commit: 816e8bc
+- note (2026-11-15, coordinator): done — verified on dev: fmt, clippy and 101 tests pass; list, show and next read this repository's TODO.md correctly
 
 ### T-024 · done
 - status: open
