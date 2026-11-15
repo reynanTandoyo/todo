@@ -229,10 +229,7 @@ pub fn filter_tasks<'a>(
             {
                 return false;
             }
-            if filter.stale_only && !cfg.is_claim_stale(task, now) {
-                return false;
-            }
-            true
+            !filter.stale_only || cfg.is_claim_stale(task, now)
         })
         .collect()
 }
