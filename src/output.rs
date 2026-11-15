@@ -1,6 +1,6 @@
-//! Output: text and the JSON envelope, safe when a pipe closes (T-004; R-OUT-1, R-OUT-5, R-OUT-7).
+//! Output: text and the JSON envelope, safe when a pipe closes (T-004, T-068; R-OUT-1, R-OUT-5, R-OUT-7, R-OUT-9).
 
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 
 use serde::Serialize;
 
@@ -40,6 +40,16 @@ struct JsonErrEnvelope<'a> {
     warnings: &'a [String],
 }
 
+/// Returns `true` when ANSI colour should be enabled: only on a terminal and never with `NO_COLOR` (`R-OUT-9`).
+#[must_use]
+pub const fn should_use_color(is_terminal: bool, no_color: bool) -> bool {
+    is_terminal && !no_color
+}
+
+fn no_color_env() -> bool {
+    std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty())
+}
+
 /// Manages standard output, standard error, warnings, and `--json` envelopes.
 ///
 /// Never uses `println!` or `eprintln!`. If the reader of stdout closes the pipe
@@ -47,6 +57,8 @@ struct JsonErrEnvelope<'a> {
 /// process can exit `0` (R-OUT-7).
 pub struct Output {
     json: bool,
+    stdout_color: bool,
+    stderr_color: bool,
     warnings: Vec<String>,
     dry_run_diff: Option<String>,
     broken_pipe: bool,
@@ -58,8 +70,11 @@ impl Output {
     /// Creates an [`Output`] connected to process `stdout` and `stderr`.
     #[must_use]
     pub fn stdio(json: bool) -> Self {
+        let no_color = no_color_env();
         Self {
             json,
+            stdout_color: !json && should_use_color(io::stdout().is_terminal(), no_color),
+            stderr_color: should_use_color(io::stderr().is_terminal(), no_color),
             warnings: Vec::new(),
             dry_run_diff: None,
             broken_pipe: false,
@@ -68,17 +83,83 @@ impl Output {
         }
     }
 
-    /// Creates an [`Output`] with custom writers (primarily for tests).
+    /// Creates an [`Output`] with custom writers (primarily for tests, with colour disabled).
     #[must_use]
     pub fn with_writers(json: bool, stdout: Box<dyn Write>, stderr: Box<dyn Write>) -> Self {
+        Self::with_writers_color(json, false, false, stdout, stderr)
+    }
+
+    /// Creates an [`Output`] with custom writers and explicit colour flags (for tests).
+    #[must_use]
+    pub fn with_writers_color(
+        json: bool,
+        stdout_color: bool,
+        stderr_color: bool,
+        stdout: Box<dyn Write>,
+        stderr: Box<dyn Write>,
+    ) -> Self {
         Self {
             json,
+            stdout_color: !json && stdout_color,
+            stderr_color,
             warnings: Vec::new(),
             dry_run_diff: None,
             broken_pipe: false,
             stdout,
             stderr,
         }
+    }
+
+    /// Returns `true` if ANSI colour output is enabled on stdout (`R-OUT-9`).
+    #[must_use]
+    pub const fn use_color(&self) -> bool {
+        self.stdout_color && !self.json
+    }
+
+    /// Wraps `text` in an ANSI SGR sequence when stdout colour is enabled.
+    #[must_use]
+    pub fn paint(&self, ansi_code: &str, text: &str) -> String {
+        if self.use_color() {
+            format!("\x1b[{ansi_code}m{text}\x1b[0m")
+        } else {
+            text.to_string()
+        }
+    }
+
+    /// Formats `text` in bold when stdout colour is enabled.
+    #[must_use]
+    pub fn bold(&self, text: &str) -> String {
+        self.paint("1", text)
+    }
+
+    /// Formats `text` in dim style when stdout colour is enabled.
+    #[must_use]
+    pub fn dim(&self, text: &str) -> String {
+        self.paint("2", text)
+    }
+
+    /// Formats `text` in red when stdout colour is enabled.
+    #[must_use]
+    pub fn red(&self, text: &str) -> String {
+        self.paint("31", text)
+    }
+
+    /// Formats `text` in green when stdout colour is enabled.
+    #[must_use]
+    pub fn green(&self, text: &str) -> String {
+        self.paint("32", text)
+    }
+
+    /// Formats `text` in yellow when stdout colour is enabled.
+    #[must_use]
+    pub fn yellow(&self, text: &str) -> String {
+        self.paint("33", text)
+    }
+
+    /// Formats `text` in cyan when stdout colour is enabled.
+    #[must_use]
+    pub fn cyan(&self, text: &str) -> String {
+        self.paint("36", text)
     }
 
     /// Records a `--dry-run` unified diff to include in the `--json` envelope (`R-EDIT-10`).
@@ -114,7 +195,12 @@ impl Output {
             self.warnings.push(msg);
         } else {
             self.warnings.push(msg.clone());
-            self.write_stderr_line(&format!("warning: {msg}"));
+            let line = if self.stderr_color {
+                format!("\x1b[33mwarning:\x1b[0m {msg}")
+            } else {
+                format!("warning: {msg}")
+            };
+            self.write_stderr_line(&line);
         }
     }
 
@@ -183,7 +269,12 @@ impl Output {
                 self.write_stdout_bytes(&serialized);
             }
         } else {
-            self.write_stderr_line(&format!("error: {err}"));
+            let line = if self.stderr_color {
+                format!("\x1b[31merror:\x1b[0m {err}")
+            } else {
+                format!("error: {err}")
+            };
+            self.write_stderr_line(&line);
         }
     }
 
@@ -330,5 +421,35 @@ mod tests {
         out.write_line("first line");
         assert!(out.broken_pipe());
         out.write_line("second line");
+    }
+
+    #[test]
+    fn color_only_on_terminal_and_without_no_color() {
+        assert!(should_use_color(true, false));
+        assert!(!should_use_color(false, false));
+        assert!(!should_use_color(true, true));
+        assert!(!should_use_color(false, true));
+
+        let out_buf = SharedBuf::default();
+        let err_buf = SharedBuf::default();
+        let mut colored = Output::with_writers_color(
+            false,
+            true,
+            true,
+            Box::new(out_buf.clone()),
+            Box::new(err_buf.clone()),
+        );
+        assert!(colored.use_color());
+        assert_eq!(colored.green("ok"), "\x1b[32mok\x1b[0m");
+        colored.warn("heads up");
+        colored.emit_error("check", &TodoError::new(ErrorCode::BadValue, "bad"));
+        let err_str = String::from_utf8(err_buf.0.borrow().clone()).unwrap();
+        assert!(err_str.contains("\x1b[33mwarning:\x1b[0m heads up"));
+        assert!(err_str.contains("\x1b[31merror:\x1b[0m bad"));
+
+        let json_colored =
+            Output::with_writers_color(true, true, true, Box::new(out_buf), Box::new(err_buf));
+        assert!(!json_colored.use_color());
+        assert_eq!(json_colored.green("ok"), "ok");
     }
 }

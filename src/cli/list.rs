@@ -166,7 +166,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     };
 
     for task in &tasks {
-        let line = format_task_line(task, &cfg, prio_width, owner_width, max_width);
+        let line = format_task_line(task, &cfg, prio_width, owner_width, max_width, out);
         out.write_line(&line);
     }
 
@@ -182,25 +182,45 @@ fn format_task_line(
     prio_width: usize,
     owner_width: usize,
     max_width: Option<usize>,
+    out: &Output,
 ) -> String {
     let id_str = cfg.id_config.format_id(task.id);
     let prio = task.priority.as_deref().unwrap_or("-");
     let status = task.status.as_str();
 
-    let prefix = if owner_width > 0 {
+    let plain_prefix = if owner_width > 0 {
         let owner = task.owner.as_deref().unwrap_or("-");
         format!("{id_str}  {prio:<prio_width$}  {status:<7}  {owner:<owner_width$}  ")
     } else {
         format!("{id_str}  {prio:<prio_width$}  {status:<7}  ")
     };
 
+    let colored_prefix = if out.use_color() {
+        let id_c = out.cyan(&id_str);
+        let status_padded = format!("{status:<7}");
+        let status_c = match task.status {
+            crate::doc::Status::Done => out.green(&status_padded),
+            crate::doc::Status::Claimed | crate::doc::Status::Blocked => out.yellow(&status_padded),
+            crate::doc::Status::Dropped => out.red(&status_padded),
+            crate::doc::Status::Open => out.dim(&status_padded),
+        };
+        if owner_width > 0 {
+            let owner = task.owner.as_deref().unwrap_or("-");
+            format!("{id_c}  {prio:<prio_width$}  {status_c}  {owner:<owner_width$}  ")
+        } else {
+            format!("{id_c}  {prio:<prio_width$}  {status_c}  ")
+        }
+    } else {
+        plain_prefix.clone()
+    };
+
     match max_width {
-        None => format!("{prefix}{}", task.title),
+        None => format!("{colored_prefix}{}", task.title),
         Some(limit) => {
-            let prefix_chars = prefix.chars().count();
+            let prefix_chars = plain_prefix.chars().count();
             let avail = limit.saturating_sub(prefix_chars);
             let title = truncate_chars(&task.title, avail);
-            format!("{prefix}{title}")
+            format!("{colored_prefix}{title}")
         }
     }
 }
