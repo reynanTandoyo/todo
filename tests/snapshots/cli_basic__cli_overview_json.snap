@@ -66,6 +66,11 @@ expression: ok_json
         "summary": "List saved snapshots of TODO.md"
       },
       {
+        "kind": "meta",
+        "name": "init",
+        "summary": "Create a new TODO.md with format line, agent rules, and ## Tasks"
+      },
+      {
         "kind": "read",
         "name": "list",
         "summary": "List and filter tasks"

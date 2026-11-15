@@ -376,6 +376,7 @@ register_commands! {
     Drop => drop,
     Help => help,
     History => history,
+    Init => init,
     List => list,
     Lock => lock,
     Move => move_cmd,
