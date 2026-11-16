@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          allowed="chrono clap serde serde_json sha2 similar toml assert_cmd insta predicates proptest tempfile"
+          allowed="chrono clap clap_complete serde serde_json sha2 similar toml assert_cmd insta predicates proptest tempfile"
           deps=$(cargo tree --depth 1 --prefix none | awk '
             NR == 1 { next }
             /^\[dev-dependencies\]$/ { next }
