@@ -151,6 +151,11 @@ expression: ok_json
         "summary": "Restore TODO.md from a saved snapshot"
       },
       {
+        "kind": "meta",
+        "name": "schema",
+        "summary": "Describe commands, options, JSON shapes and exit codes as JSON"
+      },
+      {
         "kind": "read",
         "name": "search",
         "summary": "Search titles, fields, and notes for matching text"
