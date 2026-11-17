@@ -689,6 +689,7 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - commit: 51a1dfa
 - reqs: R-DISC-1
 - note (2026-11-17, v5-scan): done — todo scan and scan --add (shared add_batch_text with add --from); git ls-files or folder walk; title is the text after the marker (changed at merge)
+- note (2026-11-17, claude-main): follow-up commit f6981d9: markers wrapped in a backtick or quote are skipped
 
 ### T-081 · Import from other task-list formats
 - status: done
