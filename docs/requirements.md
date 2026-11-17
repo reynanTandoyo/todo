@@ -700,7 +700,8 @@ Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write
 - **v0.4** — ideas the owner promoted on 2026-11-16: `import --from checkbox` (R-IMP-1), session-tagged
   claims (R-CLAIM-7) and tab completion (R-OUT-10).
 - **v0.5** — ideas the owner promoted on 2026-11-17: `align` (R-GIT-1), the merge driver
-  (R-GIT-2, R-GIT-3), `scan` (R-DISC-1) and `schema` (R-SCHEMA-1).
+  (R-GIT-2, R-GIT-3), `scan` (R-DISC-1) and `schema` (R-SCHEMA-1); plus the `by` field
+  (R-WRITE-16).
 
 ---
 

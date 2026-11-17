@@ -80,7 +80,7 @@ Returned by `show` (plus `block_lines`), `add`, `claim`, `release`, `done`, `dro
   "ok": true,
   "data": {
     "name": "todo",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "about": "Concurrency-safe editor for TODO.md task lists",
     "commands": [
       { "kind": "read", "name": "list", "summary": "List and filter tasks" }
@@ -96,7 +96,7 @@ Returned by `show` (plus `block_lines`), `add`, `claim`, `release`, `done`, `dro
 {
   "schema": "todo.version.v1",
   "ok": true,
-  "data": { "version": "0.4.0", "commit": "abc1234" },
+  "data": { "version": "0.5.0", "commit": "abc1234" },
   "warnings": []
 }
 ```
@@ -490,6 +490,47 @@ When finishing or dropping a task makes other tasks ready, their summaries appea
 - `guard`: `{"allowed":true,"target":"src/main.rs"}`
 - `skill`: `{"file":".claude/skills/todo/SKILL.md","applied":true,"changed":true,"created":true}`
 
+### `todo align --json` (`todo.align.v1`, `R-GIT-1`)
+
+```json
+{"clean":false,"count":1,"findings":[
+  {"task":"T-002","line":28,"kind":"COMMITTED_NOT_DONE","commits":["7d23e38"]}
+]}
+```
+
+`kind` is `COMMITTED_NOT_DONE`, `DONE_WITHOUT_COMMIT` or `COMMIT_MISSING`. With findings the
+envelope is still `"ok":true` and the exit code is 1. Without usable git history the result is an
+error envelope with `NO_GIT_HISTORY` and exit 5.
+
+### `todo merge-driver install|uninstall --json` (`todo.merge-driver.v1`, `R-GIT-3`)
+
+```json
+{"action":"install","changed":true,"attributes_file":"C:\work\shop\.gitattributes","path":"TODO.md"}
+```
+
+`merge-driver run` is called by git and prints nothing on success.
+
+### `todo scan --json` (`todo.scan.v1`, `R-DISC-1`)
+
+```json
+{"count":1,"found":[{"path":"src/a.rs","line":1,"text":"TODO: tidy this"}],"added":["T-002"]}
+```
+
+`text` is the comment from the marker on; `added` (the new task IDs) is present only with `--add`.
+
+### `todo schema --json` (`todo.schema.v1`, `R-SCHEMA-1`)
+
+`data` has `tool`, `version`, `commit`, `envelope`, `exit_codes` (`{code, meaning}`),
+`error_codes`, `task` (the `TaskJson` fields), `global_options` and `commands`. Each command is
+`{"name","schema","summary","subcommands":[…],"arguments":[…],"options":[…]}`, and each option
+`{"name","value_name","required","repeatable","help"}`. `todo schema <command>` returns just that
+command.
+
+### `by` field (`R-WRITE-16`)
+
+`done` may add `{"fields":{"by":"reyna-gh"}}` to the task: the person who finished it, after
+`.mailmap`. Never an email address.
+
 ---
 
 ## Error Codes (`R-OUT-2`, `R-OUT-3`)
@@ -515,3 +556,4 @@ When finishing or dropping a task makes other tasks ready, their summaries appea
 | `UNSAFE_FILE` | 4 | Invalid UTF-8, conflict markers, unclosed fence/comment, duplicate ID, or `init` target exists | `{"code":"UNSAFE_FILE","message":"TODO.md:4: git conflict marker"}` |
 | `READ_ONLY` | 4 | Target file is read-only | `{"code":"READ_ONLY","message":"TODO.md is read-only"}` |
 | `WRITE_FAILED` | 4 | Atomic write or rename failed | `{"code":"WRITE_FAILED","message":"failed writing temporary file"}` |
+| `NO_GIT_HISTORY` | 5 | `align` without git, outside a repository, in a shallow clone or with no commits | `{"code":"NO_GIT_HISTORY","message":"not inside a git repository"}` |

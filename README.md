@@ -40,6 +40,32 @@ Open a new terminal window so the updated `PATH` takes effect, then verify:
 todo --version
 ```
 
+### Updating
+
+Download `todo.exe` from the latest
+[GitHub release](https://github.com/reynanTandoyo/todo/releases/latest) and copy it over the old
+one:
+
+```powershell
+Copy-Item "$HOME\Downloads\todo.exe" (Get-Command todo).Source -Force
+Unblock-File (Get-Command todo).Source
+todo --version
+```
+
+`Unblock-File` removes the "downloaded from the internet" mark, so Windows doesn't show the
+SmartScreen prompt for the unsigned `.exe`. If the copy fails with "file in use", a `todo` command
+is still running; try again a moment later. Each release also has a `.sha256` file to compare with
+`Get-FileHash todo.exe`.
+
+On Linux, download `todo-linux-x86_64` and install it as `todo`:
+
+```bash
+install -m 755 ~/Downloads/todo-linux-x86_64 ~/.local/bin/todo
+```
+
+Colleagues may run different versions against the same `TODO.md`: the file format is unchanged and
+older versions keep fields they don't know.
+
 ## Using it
 
 Every write command needs an agent name via `--agent <name>` or the `TODO_AGENT` environment

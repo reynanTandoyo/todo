@@ -2,6 +2,19 @@
 
 All notable changes to `todo` are documented in this file.
 
+## [0.5.0] - 2026-11-18
+
+### Added
+- `todo align`: compare `TODO.md` with the git history and report open tasks that already have commits (`COMMITTED_NOT_DONE`), done tasks without a commit (`DONE_WITHOUT_COMMIT`) and `commit` fields naming commits that don't exist (`COMMIT_MISSING`); exit 1 with findings, exit 5 with the new error code `NO_GIT_HISTORY` when there is no usable history (`R-GIT-1`).
+- `todo merge-driver install|uninstall|run`: a git merge driver that merges `TODO.md` task by task during `git pull`, `merge`, `rebase` and `cherry-pick`, keeps notes from both sides, and marks real conflicts per task block; it falls back to `git merge-file` (`R-GIT-2`, `R-GIT-3`). Run `todo merge-driver install` once in each clone.
+- `todo scan [<path>…] [--add]`: find `TODO:` and `FIXME:` comments in the project and optionally add them as tasks with `files: <path>:<line>` (`R-DISC-1`).
+- `todo schema [<command>]`: a machine-readable JSON description of every command, option, exit code, error code and task field, generated from the command definitions (`R-SCHEMA-1`).
+- `by` field: `done` records who finished a task, from the commit author or the git user name, mapped through the repository's `.mailmap` so each contributor has one name; `list --by <name>` filters by it and `check` warns about names missing from `.mailmap`. No email address is written (`R-WRITE-16`).
+
+### Changed
+- Exit code 5 is now used (by `align`); `todo --json` lists the new commands.
+- Tests run `todo` without the developer's global git configuration and with a fixed clock where claims must not expire.
+
 ## [0.4.0] - 2026-11-16
 
 ### Added
