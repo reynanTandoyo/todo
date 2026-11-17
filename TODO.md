@@ -327,12 +327,14 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, w7-hydrogen): done — verified by coordinator: fmt, clippy (Windows and Linux) and 150 tests pass, also with an 8.3 short temp path
 
 ### T-085 · done records who finished a task (by, via .mailmap)
-- status: open
-- owner: —
+- status: done
+- owner: v5-by
 - priority: P2 · type: feature · area: cli
 - accept: done and apply's done write by: from the commit author (%aN) or git user.name mapped via git check-mailmap; no git or no name leaves it out; existing by replaced, reopen removes it; list --by filters; check warns about by values not on the .mailmap left side without changing the exit code; tests use temp repos with a .mailmap
+- commit: 4e8a7bd
 - reqs: R-WRITE-16
 - note (2026-11-17, claude-main): added
+- note (2026-11-17, v5-by): done — by: from commit author (%aN) or git user.name via check-mailmap; reopen removes it; list --by; check warns about names not in .mailmap; verified in a throwaway repo with two identities mapped to one name
 
 ## 4. Recovery, checks and overview
 
