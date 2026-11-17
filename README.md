@@ -128,6 +128,28 @@ the usual completion folders of those shells (`todo completions zsh > _todo` int
 `$fpath`, `todo completions fish > ~/.config/fish/completions/todo.fish`). The PowerShell script
 completes command and option names; it does not list option values such as `--status`.
 
+### Merging `TODO.md` with git
+
+Two branches that both add tasks or notes to `TODO.md` conflict in plain git even though nothing
+overlaps. The optional merge driver merges the file task by task. Run this once in each clone
+(`todo` must be on `PATH` when git merges):
+
+```powershell
+todo merge-driver install
+git merge other-branch
+todo merge-driver uninstall
+```
+
+`install` sets `merge.todo.name` and `merge.todo.driver` in `.git/config` and adds the line
+`TODO.md merge=todo` to `.gitattributes` (commit that file so every clone uses the driver; other
+lines are left alone; `--path <pattern>` uses another pattern). Tasks changed on different sides,
+different fields of one task, and new tasks added at the same place merge cleanly, and notes added on
+both sides are all kept, ours first. A task whose same field was changed differently on both sides,
+or that was added with the same ID on both sides, gets `<<<<<<< ours` / `=======` / `>>>>>>> theirs`
+markers around the whole task block; fix it by hand and `git add TODO.md`. Prose conflicts, input
+that is not valid UTF-8 and files with different format versions are left to `git merge-file`. Task
+IDs are recognised with the default prefix `T`. Run `todo help merge-driver` for details.
+
 ### Importing a checkbox list
 
 `todo import --from checkbox` turns a Markdown checkbox list (`- [ ]`, `- [~]`, `- [!]`, `- [x]`

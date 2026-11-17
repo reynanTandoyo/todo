@@ -466,6 +466,33 @@ or with `--json` the task as it is after the change.
   - `--out` defaults to the source file itself (converting in place). When the target exists, the old
     file is first saved next to it as `<name>.pre-import`.
 
+### 5.17 Git merge driver — GIT
+
+- **R-GIT-1 COULD** The merge driver is opt-in: nothing uses it until `merge-driver install` has been
+  run in a repository, and it needs git only because git is what calls it and what it falls back to
+  (`git merge-file`). Without the driver, `todo` behaves exactly as before (NFR-5).
+- **R-GIT-2 COULD** `todo merge-driver run <base> <ours> <theirs> [<path>]` merges three versions of
+  `TODO.md` task by task and writes the result to `<ours>`; exit 0 when clean, 1 when conflicts are
+  left. A task is identified by its ID.
+  - Tasks changed on different sides, different fields of one task, and tasks added with different
+    IDs (even at the same place) merge cleanly. Notes added on both sides are all kept, ours first.
+    A field is one `- key: value` line.
+  - A task whose same field was changed differently on both sides, whose heading changed differently,
+    that one side changed and the other removed, or that was added with the same ID and different
+    content on both sides is a conflict: git-style markers (`<<<<<<< ours`, `=======`,
+    `>>>>>>> theirs`) around the whole task block.
+  - Conflicting prose or other non-task lines, input that is not valid UTF-8 or that the parser would
+    refuse to write (conflict markers, open code fence, repeated task ID or field), and different
+    format versions make the driver fall back to `git merge-file` on the whole files.
+  - Every output line is byte for byte a line of one of the inputs, with its own line ending (D18).
+    The one exception: a last line without ending that is no longer last gets an ending.
+  - Task IDs are recognised with the default prefix `T`.
+- **R-GIT-3 COULD** `todo merge-driver install [--path <pattern>]` sets `merge.todo.name` and
+  `merge.todo.driver "todo merge-driver run %O %A %B %P"` in the repository's git config and adds
+  `<pattern> merge=todo` (default `TODO.md`) to `.gitattributes` at the repository root;
+  `uninstall` removes exactly those. Both can be repeated with no further change, and every other
+  line of `.gitattributes` stays byte for byte as it was.
+
 ---
 
 ## 6. Commands at a glance
@@ -485,6 +512,7 @@ or with `--json` the task as it is after the change.
 | `hooks install`, `hooks uninstall`, `guard`, `skill install` | Claude Code extras | setup | COULD |
 | `import --from checkbox` | convert a Markdown checkbox list | write | COULD |
 | `completions <shell>` | tab-completion script | — | COULD |
+| `merge-driver install`, `merge-driver uninstall`, `merge-driver run` | git merge driver for `TODO.md` | setup | COULD |
 
 Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write commands), `--yes`
 (bulk commands), `--force` (where allowed).
@@ -515,7 +543,8 @@ Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write
 - **NFR-3 MUST** `list` and `show` on a 600 KB file take under 100 ms; a write takes under 200 ms
   plus any lock wait (measured on a generated 5,000-task file).
 - **NFR-4 MUST** No network access, telemetry, background process, database or installer.
-- **NFR-5 MUST** git is optional; only `done --commit` uses it (`git rev-parse`), and only when git
+- **NFR-5 MUST** git is optional; only `done --commit` uses it (`git rev-parse`) and, once the user
+  has installed it, the merge driver (R-GIT-1), and only when git
   is on `PATH`. Everything else, including worktree detection, works without it.
 - **NFR-6 MUST** No crashes: every failure ends with a message and an exit code. `unwrap`, `expect`
   and `panic!` are not used outside tests (enforced by Clippy).
@@ -620,6 +649,7 @@ Recorded so they aren't lost; each becomes a requirement only by a decision reco
 - **I-5** `todo handoff`: a summary note of an agent's open claims for whoever continues.
 - **I-6** `todo renumber`: change a task's ID and every reference to it.
 - **I-7** A git merge driver that merges `TODO.md` task by task.
+  *Moved to requirements (R-GIT-1 to R-GIT-3).*
 - **I-8** `todo align`: compare tasks with git history and report likely-finished or unproven tasks
   (exit 5 when the history is missing).
 - **I-9** `todo undo`: revert an agent's last change if nothing has happened since.
