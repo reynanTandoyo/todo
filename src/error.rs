@@ -86,6 +86,8 @@ pub enum ErrorCode {
     ReadOnly,
     /// Writing or replacing the file failed.
     WriteFailed,
+    /// git history is not available (git missing, not a repository, shallow clone or no commits).
+    NoGitHistory,
 }
 
 impl ErrorCode {
@@ -112,6 +114,7 @@ impl ErrorCode {
             Self::UnsafeFile => "UNSAFE_FILE",
             Self::ReadOnly => "READ_ONLY",
             Self::WriteFailed => "WRITE_FAILED",
+            Self::NoGitHistory => "NO_GIT_HISTORY",
         }
     }
 
@@ -131,6 +134,7 @@ impl ErrorCode {
             | Self::MissingField
             | Self::BadValue => ExitCode::Refused,
             Self::Busy | Self::LeaseHeld | Self::ChangedDuringWrite => ExitCode::Busy,
+            Self::NoGitHistory => ExitCode::CheckError,
             Self::NoFile | Self::UnsafeFile | Self::ReadOnly | Self::WriteFailed => {
                 ExitCode::FileError
             }

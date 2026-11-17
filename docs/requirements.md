@@ -471,15 +471,16 @@ or with `--json` the task as it is after the change.
 - **R-GIT-1 COULD** `align` compares `TODO.md` with the git history of the current branch and only
   reports; it never changes the file (see §13). It reads every commit reachable from `HEAD`
   (`git log`) and links a commit to a task when the commit subject starts with the task's ID
-  followed by `:` or a space (`T-012: …`, case as written). It reports three kinds of finding:
+  followed by `:` or a space (`T-012: …`; the prefix from `todo.toml`, any case). It reports three
+  kinds of finding:
   - `COMMITTED_NOT_DONE`: an `open`, `claimed` or `blocked` task has at least one linked commit
     (lists the commits);
   - `DONE_WITHOUT_COMMIT`: a `done` task has no `commit` field and no linked commit;
   - `COMMIT_MISSING`: a `done` task's `commit` field names a commit that doesn't exist.
   `dropped` tasks and questions are ignored. Exit `0` when there are no findings, `1` when there
   are (like `check`), and `5` with error code `NO_GIT_HISTORY` when git isn't on `PATH`, the folder
-  isn't in a git repository, or the repository is shallow. Output is one line per finding,
-  `TODO.md:<line>: T-012 <KIND>: …`; with `--json`, `data.findings` is a list of
+  isn't in a git repository, or the repository is shallow or has no commits. Output is one line
+  per finding, `TODO.md:<line>: T-012 <KIND> (<commits>)`; with `--json`, `data.findings` is a list of
   `{task, line, kind, commits}`.
 - **R-GIT-2 COULD** `merge-driver run <base> <ours> <theirs> [<path>]` is a git merge driver for
   `TODO.md` (git calls it with `%O %A %B %P`). It merges task by task and writes the result into

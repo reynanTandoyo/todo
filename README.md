@@ -102,6 +102,7 @@ todo search "timeout" --archive
 todo log T-012
 todo check
 todo check --fix --agent agent-1
+todo align
 todo ask "Should retries use exponential backoff?" --agent agent-1
 todo answer T-014 "Yes, cap at 30s" --agent human
 Get-Content tasks.jsonl | todo add --from - --agent coordinator

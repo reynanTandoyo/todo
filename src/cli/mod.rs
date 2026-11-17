@@ -534,6 +534,7 @@ macro_rules! register_commands {
 register_commands! {
     Add => add,
     Agents => agents,
+    Align => align,
     Answer => answer,
     Apply => apply,
     Archive => archive,
@@ -634,7 +635,7 @@ where
                         None => help::print_overview(&mut out, "overview"),
                     };
                     match result {
-                        Ok(()) => ExitCode::Ok,
+                        Ok(()) => out.requested_exit().unwrap_or(ExitCode::Ok),
                         Err(err) => {
                             out.emit_error(cmd_name, &err);
                             err.exit_code
