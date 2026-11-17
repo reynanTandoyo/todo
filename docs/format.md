@@ -125,6 +125,7 @@ the tool knows can be read, with a warning, but not written.
 | `files` | free text | none |
 | `problem`, `fix`, `accept` | free text | none |
 | `commit` | commit hashes separated by commas | none |
+| `by` | the person who finished the task, written by `done` (git name after `.mailmap`) | not recorded |
 | any other key | kept as written; shown in JSON under `fields` | — |
 
 - Each of these fields appears at most once per task. A task with a repeated field can be read, but

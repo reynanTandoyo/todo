@@ -292,6 +292,21 @@ or with `--json` the task as it is after the change.
   `hooks install`, `skill install` — show what they would do and only do it with `--yes`.
 - **R-WRITE-15 COULD** `apply <file|->` runs several operations given as JSON lines in one locked
   step: all apply or none do, with one snapshot.
+- **R-WRITE-16 COULD** `done` (and `apply`'s `done` operation) records the person behind the work
+  in a `by` field, so a task shows which contributor finished it, not only which agent.
+  - With `--commit`, the name is the author of that commit as git shows it with `.mailmap` applied
+    (`git log -1 --format=%aN <commit>`). Without `--commit`, it is `git config user.name` with
+    `user.email`, mapped through `.mailmap` (`git check-mailmap`).
+  - A `.mailmap` file at the repository root (git's own format, committed and shared) is how a team
+    gives every contributor one name, for example their GitHub username, however their computers
+    are set up. No email address is ever written to `TODO.md`.
+  - When git isn't on `PATH`, the folder isn't in a repository, or no name is set, `by` is left out
+    and `done` works as before (NFR-5). An existing `by` line is replaced; `reopen` removes it.
+  - `list --by <name>` lists tasks whose `by` equals the name (ignoring case); it implies
+    `--status all`.
+  - When `.mailmap` exists, `check` warns about every `by` value that isn't a name on the left side
+    of `.mailmap` (written before the mapping was added, or a missing entry). The warning doesn't
+    change the exit code.
 
 ### 5.8 Claims — CLAIM
 
@@ -593,8 +608,8 @@ Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write
 - **NFR-3 MUST** `list` and `show` on a 600 KB file take under 100 ms; a write takes under 200 ms
   plus any lock wait (measured on a generated 5,000-task file).
 - **NFR-4 MUST** No network access, telemetry, background process, database or installer.
-- **NFR-5 MUST** git is optional and used only when it is on `PATH`: by `done --commit`
-  (`git rev-parse`), `align` (R-GIT-1), `merge-driver` (R-GIT-2, R-GIT-3) and `scan` (R-DISC-1, file
+- **NFR-5 MUST** git is optional and used only when it is on `PATH`: by `done` (`git rev-parse`
+  for `--commit`, the `by` name of R-WRITE-16), `align` (R-GIT-1), `merge-driver` (R-GIT-2, R-GIT-3) and `scan` (R-DISC-1, file
   list). Everything else, including worktree detection, works without it.
 - **NFR-6 MUST** No crashes: every failure ends with a message and an exit code. `unwrap`, `expect`
   and `panic!` are not used outside tests (enforced by Clippy).
