@@ -4,7 +4,7 @@ use std::io::{self, IsTerminal, Write};
 
 use serde::Serialize;
 
-use crate::error::{ErrorCode, ErrorDetails, TodoError};
+use crate::error::{ErrorCode, ErrorDetails, ExitCode, TodoError};
 
 /// Builds the versioned JSON schema name `todo.<command>.v1` (R-OUT-1, NFR-8).
 #[must_use]
@@ -62,6 +62,7 @@ pub struct Output {
     warnings: Vec<String>,
     dry_run_diff: Option<String>,
     broken_pipe: bool,
+    exit_override: Option<ExitCode>,
     stdout: Box<dyn Write>,
     stderr: Box<dyn Write>,
 }
@@ -78,6 +79,7 @@ impl Output {
             warnings: Vec::new(),
             dry_run_diff: None,
             broken_pipe: false,
+            exit_override: None,
             stdout: Box::new(io::stdout()),
             stderr: Box::new(io::stderr()),
         }
@@ -105,9 +107,22 @@ impl Output {
             warnings: Vec::new(),
             dry_run_diff: None,
             broken_pipe: false,
+            exit_override: None,
             stdout,
             stderr,
         }
+    }
+
+    /// Asks for a non-zero exit code after a successful run, for read commands that print their
+    /// findings as a normal result (for example `todo align` exits 1 when it has findings).
+    pub fn set_exit(&mut self, code: ExitCode) {
+        self.exit_override = Some(code);
+    }
+
+    /// The exit code requested with [`Self::set_exit`], if any.
+    #[must_use]
+    pub const fn requested_exit(&self) -> Option<ExitCode> {
+        self.exit_override
     }
 
     /// Returns `true` if ANSI colour output is enabled on stdout (`R-OUT-9`).

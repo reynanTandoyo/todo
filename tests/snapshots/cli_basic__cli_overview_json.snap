@@ -16,6 +16,11 @@ expression: ok_json
         "summary": "Install or check the managed agent-rules block in AGENTS.md"
       },
       {
+        "kind": "read",
+        "name": "align",
+        "summary": "Compare tasks with git history and report mismatches"
+      },
+      {
         "kind": "write",
         "name": "answer",
         "summary": "Answer a question and mark it done"

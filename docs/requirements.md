@@ -342,7 +342,7 @@ or with `--json` the task as it is after the change.
 - **R-OUT-3 MUST** Error codes are stable names: `NO_FILE`, `NO_AGENT`, `USAGE`, `NOT_FOUND`,
   `AMBIGUOUS`, `ALREADY_CLAIMED`, `NOT_OWNER`, `BAD_TRANSITION`, `DUPLICATE_TITLE`,
   `UNKNOWN_SECTION`, `AMBIGUOUS_SECTION`, `MISSING_FIELD`, `BAD_VALUE`, `BUSY`, `LEASE_HELD`,
-  `CHANGED_DURING_WRITE`, `UNSAFE_FILE`, `READ_ONLY`, `WRITE_FAILED`. New codes may be added; existing
+  `CHANGED_DURING_WRITE`, `UNSAFE_FILE`, `READ_ONLY`, `WRITE_FAILED`, `NO_GIT_HISTORY`. New codes may be added; existing
   ones never change meaning.
 - **R-OUT-4 MUST** Problems in the file are reported as `TODO.md:123: message`.
 - **R-OUT-5 MUST** Results go to standard output, warnings and errors to standard error (with
@@ -466,6 +466,20 @@ or with `--json` the task as it is after the change.
   - `--out` defaults to the source file itself (converting in place). When the target exists, the old
     file is first saved next to it as `<name>.pre-import`.
 
+### 5.17 Git alignment — GIT
+
+- **R-GIT-1 COULD** `todo align` compares tasks with the git history of the repository that holds
+  `TODO.md` and never changes any file. It makes one `git log` call for commit subjects and one
+  `git cat-file --batch-check` call for the `commit` fields, and reports per task (ID prefix from
+  `todo.toml`; a commit "mentions" a task when its subject starts with the task ID, e.g. `T-012: …`):
+  - `COMMITTED_NOT_DONE`: status open, claimed or blocked, and a commit mentions it.
+  - `DONE_WITHOUT_COMMIT`: status done, no `commit` field, and no commit mentions it.
+  - `COMMIT_MISSING`: status done and a `commit` value does not exist in the repository.
+  Text output is `TODO.md:<line>: <ID> <KIND> (<commits>)`; `--json` gives schema `todo.align.v1`
+  with `data.findings` as a list of `{task, line, kind, commits}`. Exit 0 when there are no
+  findings, 1 when there are, and 5 with error code `NO_GIT_HISTORY` when git is not on `PATH`, the
+  folder is not in a repository, the repository is shallow, or it has no commits.
+
 ---
 
 ## 6. Commands at a glance
@@ -485,6 +499,7 @@ or with `--json` the task as it is after the change.
 | `hooks install`, `hooks uninstall`, `guard`, `skill install` | Claude Code extras | setup | COULD |
 | `import --from checkbox` | convert a Markdown checkbox list | write | COULD |
 | `completions <shell>` | tab-completion script | — | COULD |
+| `align` | compare tasks with git history | read | COULD |
 
 Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write commands), `--yes`
 (bulk commands), `--force` (where allowed).
@@ -515,7 +530,7 @@ Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write
 - **NFR-3 MUST** `list` and `show` on a 600 KB file take under 100 ms; a write takes under 200 ms
   plus any lock wait (measured on a generated 5,000-task file).
 - **NFR-4 MUST** No network access, telemetry, background process, database or installer.
-- **NFR-5 MUST** git is optional; only `done --commit` uses it (`git rev-parse`), and only when git
+- **NFR-5 MUST** git is optional; only `done --commit` (`git rev-parse`) and `align` use it, and only when git
   is on `PATH`. Everything else, including worktree detection, works without it.
 - **NFR-6 MUST** No crashes: every failure ends with a message and an exit code. `unwrap`, `expect`
   and `panic!` are not used outside tests (enforced by Clippy).
@@ -620,8 +635,7 @@ Recorded so they aren't lost; each becomes a requirement only by a decision reco
 - **I-5** `todo handoff`: a summary note of an agent's open claims for whoever continues.
 - **I-6** `todo renumber`: change a task's ID and every reference to it.
 - **I-7** A git merge driver that merges `TODO.md` task by task.
-- **I-8** `todo align`: compare tasks with git history and report likely-finished or unproven tasks
-  (exit 5 when the history is missing).
+- **I-8** (built: see R-GIT-1) `todo align`.
 - **I-9** `todo undo`: revert an agent's last change if nothing has happened since.
 - **I-10** PowerShell tab completion.
   *Moved to requirements (R-OUT-10) by the owner's decision of 2026-11-16.*
