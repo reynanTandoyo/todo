@@ -36,6 +36,35 @@ impl ExitCode {
     pub const fn as_u8(self) -> u8 {
         self as u8
     }
+
+    /// Every exit code, in numeric order (listed by `todo schema`).
+    pub const ALL: &'static [Self] = &[
+        Self::Ok,
+        Self::Refused,
+        Self::Usage,
+        Self::Busy,
+        Self::FileError,
+        Self::CheckError,
+    ];
+
+    /// Plain-English meaning of this exit code (R-OUT-2), shown by `todo schema`.
+    #[must_use]
+    pub const fn meaning(self) -> &'static str {
+        match self {
+            Self::Ok => "Command succeeded.",
+            Self::Refused => {
+                "Refused by a rule: claimed by someone else, status not allowed, no or ambiguous match, or problems found by check."
+            }
+            Self::Usage => "Wrong usage: bad arguments, or no agent name for a write command.",
+            Self::Busy => {
+                "Busy: a lock or lease is held, or the file changed during the write. Try again."
+            }
+            Self::FileError => {
+                "File problem: not found, unsafe to write, read-only, or the write failed."
+            }
+            Self::CheckError => "A check could not run, for example align without git history.",
+        }
+    }
 }
 
 impl From<ExitCode> for std::process::ExitCode {
@@ -115,6 +144,66 @@ impl ErrorCode {
             Self::ReadOnly => "READ_ONLY",
             Self::WriteFailed => "WRITE_FAILED",
             Self::NoGitHistory => "NO_GIT_HISTORY",
+        }
+    }
+
+    /// Every error code, in the order R-OUT-3 lists them. A new code must be added here;
+    /// a unit test fails if it is missing, and `todo schema` lists exactly these.
+    pub const ALL: &'static [Self] = &[
+        Self::NoFile,
+        Self::NoAgent,
+        Self::Usage,
+        Self::NotFound,
+        Self::Ambiguous,
+        Self::AlreadyClaimed,
+        Self::NotOwner,
+        Self::BadTransition,
+        Self::DuplicateTitle,
+        Self::UnknownSection,
+        Self::AmbiguousSection,
+        Self::MissingField,
+        Self::BadValue,
+        Self::Busy,
+        Self::LeaseHeld,
+        Self::ChangedDuringWrite,
+        Self::UnsafeFile,
+        Self::ReadOnly,
+        Self::WriteFailed,
+        Self::NoGitHistory,
+    ];
+
+    /// Plain-English meaning of this error code, shown by `todo schema`.
+    #[must_use]
+    pub const fn meaning(self) -> &'static str {
+        match self {
+            Self::NoFile => {
+                "TODO.md, or the file given with --file or TODO_FILE, could not be found."
+            }
+            Self::NoAgent => "A write command ran without --agent or TODO_AGENT.",
+            Self::Usage => "Invalid command-line arguments or options.",
+            Self::NotFound => "The requested task or item was not found.",
+            Self::Ambiguous => "The selector matched more than one task.",
+            Self::AlreadyClaimed => "The task is already claimed by another agent.",
+            Self::NotOwner => "The task is owned by another agent and --force was not given.",
+            Self::BadTransition => "The status change is not allowed from the current status.",
+            Self::DuplicateTitle => "Another task already has the same title.",
+            Self::UnknownSection => "The named section does not exist in TODO.md.",
+            Self::AmbiguousSection => "The section name matched more than one section.",
+            Self::MissingField => "A required field is missing.",
+            Self::BadValue => "A field or setting value is invalid.",
+            Self::Busy => "The lock is held by another process. Try again.",
+            Self::LeaseHeld => "A manual edit lease is held by another agent. Try again.",
+            Self::ChangedDuringWrite => {
+                "TODO.md changed on disk between the read and the write. Try again."
+            }
+            Self::UnsafeFile => {
+                "The file is unsafe to write: invalid UTF-8, conflict markers, an unclosed fence or comment, or an unknown format version."
+            }
+            Self::ReadOnly => "The target file is read-only.",
+            Self::WriteFailed => "Writing or replacing the file failed.",
+            Self::NoGitHistory => {
+                "git is not on PATH, or there is no usable history: not a repository, a shallow clone, or no commits."
+            }
         }
     }
 
@@ -340,5 +429,38 @@ mod tests {
         assert_eq!(ExitCode::Busy.as_i32(), 3);
         assert_eq!(ExitCode::FileError.as_i32(), 4);
         assert_eq!(ExitCode::CheckError.as_i32(), 5);
+    }
+
+    #[test]
+    fn all_lists_every_error_code_exactly_once() {
+        // Count the variants of `ErrorCode` in this file's source, so a new code cannot be
+        // left out of `ErrorCode::ALL` (and therefore out of `todo schema`).
+        let source = include_str!("error.rs");
+        let body = source
+            .split("pub enum ErrorCode {")
+            .nth(1)
+            .and_then(|rest| rest.split("\n}").next())
+            .expect("ErrorCode enum in error.rs");
+        let variants = body
+            .lines()
+            .map(str::trim)
+            .filter(|line| {
+                line.ends_with(',')
+                    && line.starts_with(|c: char| c.is_ascii_uppercase())
+                    && !line.contains(' ')
+            })
+            .count();
+        assert_eq!(ErrorCode::ALL.len(), variants);
+
+        let mut strings: Vec<&str> = ErrorCode::ALL.iter().map(|c| c.as_str()).collect();
+        strings.sort_unstable();
+        strings.dedup();
+        assert_eq!(strings.len(), ErrorCode::ALL.len(), "duplicate error code");
+    }
+
+    #[test]
+    fn all_exit_codes_are_listed_in_order() {
+        let numbers: Vec<i32> = ExitCode::ALL.iter().map(|c| c.as_i32()).collect();
+        assert_eq!(numbers, [0, 1, 2, 3, 4, 5]);
     }
 }

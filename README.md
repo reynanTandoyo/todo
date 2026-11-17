@@ -58,6 +58,17 @@ todo help agents
 todo --version
 ```
 
+`todo schema` prints a JSON description of this build: the commands with their arguments and options,
+the JSON envelope, every exit code and error code with its meaning, and the task fields. Use it to
+let an agent discover the interface; `todo schema show` describes one command, and `--json` wraps the
+description in a `todo.schema.v1` envelope.
+
+```powershell
+todo schema
+todo schema hooks install
+todo schema --json
+```
+
 ### Reading tasks
 
 ```powershell
