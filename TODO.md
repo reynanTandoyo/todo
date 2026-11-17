@@ -591,6 +591,14 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-15, coordinator): added
 - note (2026-11-15, coordinator): dropped — stopped by the owner after measuring: only 2.3% duplicated code (jscpd). Kept: shared task operations for claim/release/done/drop/block/unblock/reopen/answer/note/set and apply/add --from, shared test helpers (tests/common), shared section lookup and read loading, answer note per format.md (about 520 lines removed, behaviour unchanged, 152 tests pass). See docs/refactoring.md
 
+### T-084 · cmd_apply test fails once its fixed claim date is over 24 hours old
+- status: done
+- owner: claude-main
+- priority: P1 · type: bug · area: test
+- commit: ed481d5
+- note (2026-11-17, claude-main): added
+- note (2026-11-17, claude-main): done — TODO_TEST_NOW pinned in tests/cmd_apply.rs; the full suite passes again on dev
+
 ## 7. Ideas, not planned
 
 ### T-070 · MCP server
