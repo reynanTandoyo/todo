@@ -342,7 +342,7 @@ or with `--json` the task as it is after the change.
 - **R-OUT-3 MUST** Error codes are stable names: `NO_FILE`, `NO_AGENT`, `USAGE`, `NOT_FOUND`,
   `AMBIGUOUS`, `ALREADY_CLAIMED`, `NOT_OWNER`, `BAD_TRANSITION`, `DUPLICATE_TITLE`,
   `UNKNOWN_SECTION`, `AMBIGUOUS_SECTION`, `MISSING_FIELD`, `BAD_VALUE`, `BUSY`, `LEASE_HELD`,
-  `CHANGED_DURING_WRITE`, `UNSAFE_FILE`, `READ_ONLY`, `WRITE_FAILED`. New codes may be added; existing
+  `CHANGED_DURING_WRITE`, `UNSAFE_FILE`, `READ_ONLY`, `WRITE_FAILED`, `NO_GIT_HISTORY`. New codes may be added; existing
   ones never change meaning.
 - **R-OUT-4 MUST** Problems in the file are reported as `TODO.md:123: message`.
 - **R-OUT-5 MUST** Results go to standard output, warnings and errors to standard error (with
@@ -466,6 +466,74 @@ or with `--json` the task as it is after the change.
   - `--out` defaults to the source file itself (converting in place). When the target exists, the old
     file is first saved next to it as `<name>.pre-import`.
 
+### 5.17 Git — GIT
+
+- **R-GIT-1 COULD** `align` compares `TODO.md` with the git history of the current branch and only
+  reports; it never changes the file (see §13). It reads every commit reachable from `HEAD`
+  (`git log`) and links a commit to a task when the commit subject starts with the task's ID
+  followed by `:` or a space (`T-012: …`, case as written). It reports three kinds of finding:
+  - `COMMITTED_NOT_DONE`: an `open`, `claimed` or `blocked` task has at least one linked commit
+    (lists the commits);
+  - `DONE_WITHOUT_COMMIT`: a `done` task has no `commit` field and no linked commit;
+  - `COMMIT_MISSING`: a `done` task's `commit` field names a commit that doesn't exist.
+  `dropped` tasks and questions are ignored. Exit `0` when there are no findings, `1` when there
+  are (like `check`), and `5` with error code `NO_GIT_HISTORY` when git isn't on `PATH`, the folder
+  isn't in a git repository, or the repository is shallow. Output is one line per finding,
+  `TODO.md:<line>: T-012 <KIND>: …`; with `--json`, `data.findings` is a list of
+  `{task, line, kind, commits}`.
+- **R-GIT-2 COULD** `merge-driver run <base> <ours> <theirs> [<path>]` is a git merge driver for
+  `TODO.md` (git calls it with `%O %A %B %P`). It merges task by task and writes the result into
+  `<ours>`; exit `0` means merged cleanly, any other exit means conflicts are left in `<ours>`. It
+  never takes the lock and never touches the real `TODO.md`.
+  - Tasks are matched by ID. A task changed on one side only takes that side's block. A task
+    changed on both sides is merged line by line: notes added on either side are all kept (ours
+    first, then theirs); any other field set differently on both sides is a conflict.
+  - A task added on one side is kept at the position it was added (after the same preceding line).
+    The same ID added on both sides with different content is a conflict; the driver never
+    renumbers.
+  - A task removed on one side (for example archived) is removed when the other side left it
+    unchanged, and is a conflict otherwise.
+  - A conflict is written as git-style markers (`<<<<<<< ours` / `=======` / `>>>>>>> theirs`)
+    around the whole task block, and the driver exits `1`.
+  - Lines outside tasks (format line, preamble, section headings, prose) are taken from the side
+    that changed them. When both sides changed them differently, when any input fails to parse,
+    or when the format versions differ, the driver falls back to a plain three-way line merge
+    (`git merge-file`) of the whole file, which is what git would have done without it.
+  - Every output line is copied byte for byte from one of the inputs, line endings included
+    (R-EDIT-1, D18).
+- **R-GIT-3 COULD** `merge-driver install` registers the driver for the repository:
+  `git config merge.todo.name` and `merge.todo.driver "todo merge-driver run %O %A %B %P"`, and a
+  `<TODO.md path> merge=todo` line in the repository's `.gitattributes` (added once, other lines
+  kept byte for byte). `merge-driver uninstall` removes both. Both are safe to run twice.
+
+### 5.18 Discovery — DISC
+
+- **R-DISC-1 COULD** `scan [<path>…]` finds `TODO:` and `FIXME:` comments in source files and offers
+  them as tasks.
+  - Files: those listed by `git ls-files` (tracked and untracked but not ignored) when git is
+    available, otherwise a walk of the folder that skips hidden folders, `target` and
+    `node_modules`. `TODO.md`, `TODO-archive.md`, files over 1 MB and files that aren't valid UTF-8
+    are skipped. Paths default to the folder that holds `TODO.md`.
+  - A match is the marker (`TODO:` or `FIXME:`, case-sensitive, not part of a longer word) and
+    the rest of the line after it, trimmed and with a trailing `*/`, `-->` or `#}` removed; an empty
+    rest is skipped.
+  - A match is already known when it names a task ID (`TODO(T-012):`, `TODO: T-012 …`) or its text
+    equals an existing task title (any case); known matches are not offered.
+  - Without `--add` it only reports `path:line: text` per new match (exit `0`). With `--add` it adds
+    every new match as an open task in one locked write, like `add --from` (R-WRITE-13): the text is
+    the title (cut to 120 characters), `files: <path>:<line>`, plus `--section` and `--priority`
+    when given. `--dry-run` works with `--add`.
+
+### 5.19 Schema — SCHEMA
+
+- **R-SCHEMA-1 COULD** `schema` prints a machine-readable description of the tool as JSON: the tool
+  version; the JSON envelope (R-OUT-1); every exit code and error code with its meaning
+  (R-OUT-2, R-OUT-3); every command with its arguments and options (name, value name, required,
+  repeatable, help text) and its schema name `todo.<command>.v1`; and the fields of a task as
+  `show --json` returns them. Commands and options are generated from the command definitions, so
+  they can't fall out of date. `schema <command>` prints only that command. With `--json` the
+  description is the `data` of a `todo.schema.v1` envelope.
+
 ---
 
 ## 6. Commands at a glance
@@ -485,6 +553,10 @@ or with `--json` the task as it is after the change.
 | `hooks install`, `hooks uninstall`, `guard`, `skill install` | Claude Code extras | setup | COULD |
 | `import --from checkbox` | convert a Markdown checkbox list | write | COULD |
 | `completions <shell>` | tab-completion script | — | COULD |
+| `align` | compare tasks with git history | read | COULD |
+| `merge-driver install`, `merge-driver uninstall`, `merge-driver run` | git merge driver for `TODO.md` | setup | COULD |
+| `scan`, `scan --add` | find `TODO:` comments in code | read / write | COULD |
+| `schema` | machine-readable description of the tool | read | COULD |
 
 Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write commands), `--yes`
 (bulk commands), `--force` (where allowed).
@@ -515,8 +587,9 @@ Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write
 - **NFR-3 MUST** `list` and `show` on a 600 KB file take under 100 ms; a write takes under 200 ms
   plus any lock wait (measured on a generated 5,000-task file).
 - **NFR-4 MUST** No network access, telemetry, background process, database or installer.
-- **NFR-5 MUST** git is optional; only `done --commit` uses it (`git rev-parse`), and only when git
-  is on `PATH`. Everything else, including worktree detection, works without it.
+- **NFR-5 MUST** git is optional and used only when it is on `PATH`: by `done --commit`
+  (`git rev-parse`), `align` (R-GIT-1), `merge-driver` (R-GIT-2, R-GIT-3) and `scan` (R-DISC-1, file
+  list). Everything else, including worktree detection, works without it.
 - **NFR-6 MUST** No crashes: every failure ends with a message and an exit code. `unwrap`, `expect`
   and `panic!` are not used outside tests (enforced by Clippy).
 - **NFR-7 MUST** Paths with spaces, non-ASCII characters and more than 260 characters work.
@@ -605,6 +678,8 @@ Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write
   Code hooks and skill, colour, the synced-folder warning.
 - **v0.4** — ideas the owner promoted on 2026-11-16: `import --from checkbox` (R-IMP-1), session-tagged
   claims (R-CLAIM-7) and tab completion (R-OUT-10).
+- **v0.5** — ideas the owner promoted on 2026-11-17: `align` (R-GIT-1), the merge driver
+  (R-GIT-2, R-GIT-3), `scan` (R-DISC-1) and `schema` (R-SCHEMA-1).
 
 ---
 
@@ -613,19 +688,30 @@ Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write
 Recorded so they aren't lost; each becomes a requirement only by a decision recorded here.
 
 - **I-1** An MCP server exposing the commands as tools.
+  *Dropped by the owner's decision of 2026-11-17: agents already use the CLI with `--json` (D10),
+  and D14 rules out an MCP server.*
 - **I-2** A list of projects and an overview across them.
 - **I-3** Claims tagged with an agent session, released by a Claude Code `SessionEnd` hook.
   *Moved to requirements (R-CLAIM-7) by the owner's decision of 2026-11-16.*
 - **I-4** `todo schema`: a machine-readable description of commands, JSON shapes and exit codes.
+  *Moved to requirements (R-SCHEMA-1) by the owner's decision of 2026-11-17.*
 - **I-5** `todo handoff`: a summary note of an agent's open claims for whoever continues.
+  *Dropped by the owner's decision of 2026-11-17: `todo note` already does this.*
 - **I-6** `todo renumber`: change a task's ID and every reference to it.
+  *Dropped by the owner's decision of 2026-11-17: commit messages keep the old ID, so renumbering
+  breaks the link to the history.*
 - **I-7** A git merge driver that merges `TODO.md` task by task.
+  *Moved to requirements (R-GIT-2, R-GIT-3) by the owner's decision of 2026-11-17.*
 - **I-8** `todo align`: compare tasks with git history and report likely-finished or unproven tasks
   (exit 5 when the history is missing).
+  *Moved to requirements (R-GIT-1) by the owner's decision of 2026-11-17.*
 - **I-9** `todo undo`: revert an agent's last change if nothing has happened since.
+  *Dropped by the owner's decision of 2026-11-17: `reopen`, `release`, `set` and `restore` already
+  reverse any change.*
 - **I-10** PowerShell tab completion.
   *Moved to requirements (R-OUT-10) by the owner's decision of 2026-11-16.*
 - **I-11** `todo scan`: find `TODO:` comments in source code and offer them as tasks.
+  *Moved to requirements (R-DISC-1) by the owner's decision of 2026-11-17.*
 - **I-12** Import from other task-list formats (checkbox lists, todo.txt).
   *Checkbox lists moved to requirements (R-IMP-1) by the owner's decision of 2026-11-16; todo.txt
   stays an idea.*
@@ -640,6 +726,6 @@ Recorded so they aren't lost; each becomes a requirement only by a decision reco
 - Other record types (decision records, plans, issues).
 - Syncing with GitHub Issues, Jira or other trackers.
 - Locking across machines or real-time sync; git handles sharing between machines.
-- Changing a task's status automatically, for example from git history.
+- Changing a task's status automatically, for example from git history (`align` only reports).
 - Network access of any kind, including self-update.
 - macOS builds, an installer and code signing.
