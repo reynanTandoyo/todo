@@ -37,6 +37,7 @@ fn apply_runs_multiple_ops_with_one_snapshot_and_is_atomic_on_error() {
 
     let bad_out = cargo_bin_cmd!("todo")
         .current_dir(dir.path())
+        .env("TODO_TEST_NOW", "2026-11-15T12:00:00+01:00")
         .args([
             "--json",
             "--agent",
@@ -50,6 +51,7 @@ fn apply_runs_multiple_ops_with_one_snapshot_and_is_atomic_on_error() {
     assert_eq!(read_text(&path), initial);
     let hist_out = cargo_bin_cmd!("todo")
         .current_dir(dir.path())
+        .env("TODO_TEST_NOW", "2026-11-15T12:00:00+01:00")
         .args(["--json", "history"])
         .output()
         .unwrap();
@@ -66,6 +68,7 @@ fn apply_runs_multiple_ops_with_one_snapshot_and_is_atomic_on_error() {
     let bin = assert_cmd::cargo::cargo_bin!("todo");
     let mut child = Command::new(bin)
         .current_dir(dir.path())
+        .env("TODO_TEST_NOW", "2026-11-15T12:00:00+01:00")
         .args(["--json", "--agent", "alice", "apply", "-"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -95,6 +98,7 @@ fn apply_runs_multiple_ops_with_one_snapshot_and_is_atomic_on_error() {
     // Exactly one snapshot was recorded.
     let hist_out2 = cargo_bin_cmd!("todo")
         .current_dir(dir.path())
+        .env("TODO_TEST_NOW", "2026-11-15T12:00:00+01:00")
         .args(["--json", "history"])
         .output()
         .unwrap();
