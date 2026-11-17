@@ -519,7 +519,8 @@ or with `--json` the task as it is after the change.
     available, otherwise a walk of the folder that skips hidden folders, `target` and
     `node_modules`. `TODO.md`, `TODO-archive.md`, files over 1 MB and files that aren't valid UTF-8
     are skipped. Paths default to the folder that holds `TODO.md`.
-  - A match is the marker (`TODO:` or `FIXME:`, case-sensitive, not part of a longer word) and
+  - A match is the marker (`TODO:` or `FIXME:`, case-sensitive, not part of a longer word, not
+    directly wrapped in `` ` ``, `"` or `'`, which marks text about markers) and
     the rest of the line after it, trimmed and with a trailing `*/`, `-->` or `#}` removed; an empty
     rest is skipped.
   - A match is already known when it names a task ID (`TODO(T-012):`, `TODO: T-012 …`) or its text

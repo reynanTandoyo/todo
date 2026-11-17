@@ -264,8 +264,16 @@ struct Comment<'a> {
 fn marker_comment(line: &str) -> Option<Comment<'_>> {
     let start = MARKERS
         .iter()
-        .flat_map(|m| line.match_indices(m).map(|(i, _)| i))
-        .filter(|&i| line[..i].chars().next_back().is_none_or(|c| !is_word_char(c)))
+        .flat_map(|m| line.match_indices(m).map(|(i, m)| (i, i + m.len())))
+        .filter(|&(i, end)| {
+            let before = line[..i].chars().next_back();
+            let after = line[end..].chars().next();
+            // Not part of a longer word, and not quoted (`TODO:`, "TODO:"): a quoted marker is
+            // text about markers, not a comment.
+            before.is_none_or(|c| !is_word_char(c) && !is_quote(c))
+                && after.is_none_or(|c| !is_quote(c))
+        })
+        .map(|(i, _)| i)
         .min()?;
     let text = strip_closers(&line[start..]);
     // The first colon is the marker's own colon.
@@ -293,6 +301,10 @@ fn strip_closers(text: &str) -> &str {
 
 fn is_word_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
+}
+
+fn is_quote(c: char) -> bool {
+    matches!(c, '`' | '"' | '\'')
 }
 
 /// Whether the comment is already tracked: the line names a task ID, or the comment text or its

@@ -58,6 +58,11 @@ fn scan_without_git_lists_new_markers_and_skips_noise() {
     huge.push_str(&"x".repeat(1_000_001));
     write_file(&work, "big.rs", &huge);
     write_file(&work, "docs/archive.md", "TODO: keep me\n");
+    write_file(
+        &work,
+        "docs/quoted.md",
+        "Find `TODO:` comments.\nlet m = [\"TODO:\", 'FIXME:'];\n",
+    );
 
     let out = todo(&home, &work, &["scan"]);
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
