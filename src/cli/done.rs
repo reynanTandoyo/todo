@@ -11,6 +11,7 @@ use crate::cli::{
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::TaskOp;
+use crate::ops::identity::done_by;
 use crate::output::Output;
 
 /// Metadata for the `done` command.
@@ -18,7 +19,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "done",
     summary: "Mark a task done",
     kind: CommandKind::Write,
-    details: "Marks the task `done`, sets the calling agent as `owner`, removes `claimed`, and appends a `done` note. If `--commit` is given, `HEAD` is resolved via `git rev-parse` before the write lock is taken and unknown commits are refused when `git` is available. Prints the task's `accept` line as a reminder.",
+    details: "Marks the task `done`, sets the calling agent as `owner`, removes `claimed`, and appends a `done` note. If `--commit` is given, `HEAD` is resolved via `git rev-parse` before the write lock is taken and unknown commits are refused when `git` is available. When git can tell who did the work, records it as `by` (the author of `--commit`, otherwise the configured `user.name`, in both cases after `.mailmap`; never an email address); without git or a name, `by` is left out. Prints the task's `accept` line as a reminder.",
     examples: &[
         "todo done T-012 --agent agent-1",
         "todo done T-012 --agent agent-1 --note \"all checks pass\" --commit HEAD",
@@ -57,9 +58,15 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     let resolved_note = resolve_opt_text_arg(args.note.as_deref())?;
     let (found, cfg) = ctx.load_config_with_found()?;
+    // Who did the work (R-WRITE-16); looked up before the lock, left out when git can't say.
+    let by = done_by(
+        found.path.parent().filter(|p| !p.as_os_str().is_empty()),
+        resolved_commit.as_deref(),
+    );
     let op = TaskOp::Done {
         note: resolved_note.as_deref(),
         commit: resolved_commit.as_deref(),
+        by: by.as_deref(),
     };
     let res = edit_one_task(ctx, out, META.name, &args.task, &op, &cfg, Some(found))?;
     report_task_with_ready(out, META.name, &res, true);

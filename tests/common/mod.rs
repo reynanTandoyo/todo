@@ -51,6 +51,8 @@ pub fn clean_todo_command(home: &Path, work_dir: &Path) -> Command {
         .env_remove("CLAUDE_CODE_SESSION_ID")
         .env("HOME", home)
         .env("APPDATA", home)
+        .env("GIT_CONFIG_GLOBAL", home.join("gitconfig-none"))
+        .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("NO_COLOR", "1");
     cmd
 }
@@ -65,6 +67,8 @@ pub fn assert_todo(home: &Path) -> assert_cmd::Command {
         .env_remove("CLAUDE_CODE_SESSION_ID")
         .env("HOME", home)
         .env("APPDATA", home)
+        .env("GIT_CONFIG_GLOBAL", home.join("gitconfig-none"))
+        .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("NO_COLOR", "1");
     cmd
 }

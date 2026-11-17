@@ -104,6 +104,28 @@ todo reopen T-013 --note "needed after all" --agent agent-1
 todo move T-012 --section Done --agent agent-1
 ```
 
+### Who finished a task
+
+`todo done` (and the `done` operation of `apply`) adds a `by` line with the person behind the work,
+taken from git: the author of `--commit`, or without `--commit` the repository's `user.name`. Both go
+through `.mailmap`, so a team can give every contributor one name however their computers are set
+up. No email address is ever written to `TODO.md`. Without git, outside a repository or without a
+name, `by` is left out and `done` works as before. `reopen` removes it.
+
+```powershell
+Set-Content .mailmap @'
+# Proper Name <proper@email> [Commit Name] <commit@email>
+Ada Lovelace <ada@example.org> <ada@laptop.invalid>
+Ada Lovelace <ada@example.org> Ada L <ada@work.invalid>
+'@
+todo done T-012 --commit HEAD --agent agent-1
+todo list --by "ada lovelace"
+todo check
+```
+
+`list --by <name>` ignores case and implies `--status all`. When `.mailmap` exists, `todo check`
+warns about every `by` value that is not a name in it (the exit code does not change).
+
 ### Questions, batch operations, and inspection
 
 ```powershell

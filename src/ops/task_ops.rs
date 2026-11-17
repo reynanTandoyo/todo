@@ -55,6 +55,8 @@ pub enum TaskOp<'a> {
         note: Option<&'a str>,
         /// Optional commit value for the `commit` field.
         commit: Option<&'a str>,
+        /// Optional `by` value: the person behind the work (`R-WRITE-16`).
+        by: Option<&'a str>,
     },
     /// Drop the task with a reason.
     Drop {
@@ -172,6 +174,7 @@ impl TaskOp<'_> {
                     Self::Reopen { .. } => {
                         builder.set_owner(None);
                         builder.remove_claimed();
+                        builder.unset_field("by");
                     }
                     _ => {}
                 }
@@ -179,11 +182,13 @@ impl TaskOp<'_> {
             }
         };
 
-        if let Self::Done {
-            commit: Some(c), ..
-        } = self
-        {
-            builder.set_field("commit", c);
+        if let Self::Done { commit, by, .. } = self {
+            if let Some(c) = commit {
+                builder.set_field("commit", c);
+            }
+            if let Some(b) = by {
+                builder.set_field("by", b);
+            }
         }
         if let Self::Set { changes } = self {
             for change in *changes {
