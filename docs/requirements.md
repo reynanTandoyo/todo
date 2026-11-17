@@ -525,8 +525,8 @@ or with `--json` the task as it is after the change.
   - A match is already known when it names a task ID (`TODO(T-012):`, `TODO: T-012 …`) or its text
     equals an existing task title (any case); known matches are not offered.
   - Without `--add` it only reports `path:line: text` per new match (exit `0`). With `--add` it adds
-    every new match as an open task in one locked write, like `add --from` (R-WRITE-13): the text is
-    the title (cut to 120 characters), `files: <path>:<line>`, plus `--section` and `--priority`
+    every new match as an open task in one locked write, like `add --from` (R-WRITE-13): the text
+    after the marker is the title (cut to 120 characters), `files: <path>:<line>`, plus `--section` and `--priority`
     when given. `--dry-run` works with `--add`.
 
 ### 5.19 Schema — SCHEMA

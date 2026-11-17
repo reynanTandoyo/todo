@@ -563,6 +563,7 @@ register_commands! {
     Release => release,
     Reopen => reopen,
     Restore => restore,
+    Scan => scan,
     Schema => schema,
     Search => search,
     Set => set,
