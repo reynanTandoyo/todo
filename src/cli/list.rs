@@ -23,13 +23,14 @@ pub const META: CommandMeta = CommandMeta {
     name: "list",
     summary: "List and filter tasks",
     kind: CommandKind::Read,
-    details: "Prints one line per matching task (ID, priority, status, owner if any, and title) followed by a count. Done and dropped tasks are hidden unless `--status` or `--archive` is passed.",
+    details: "Prints one line per matching task (ID, priority, status, owner if any, and title) followed by a count. Done and dropped tasks are hidden unless `--status`, `--by` or `--archive` is passed. `--by <name>` lists the tasks that person finished (the `by` field written by `done`, case-insensitive).",
     examples: &[
         "todo list",
         "todo list --status open,claimed --priority P0",
         "todo list --ready",
         "todo list --mine --agent alice",
         "todo list --where custom_tag=morning-shift",
+        "todo list --by alice",
         "todo list --archive",
     ],
 };
@@ -60,6 +61,10 @@ pub struct Args {
     /// Filter by owner agent name.
     #[arg(long, value_name = "AGENT")]
     pub owner: Option<String>,
+
+    /// Filter by the person who finished the task (`by` field; case-insensitive; implies `--status all`).
+    #[arg(long, value_name = "NAME")]
+    pub by: Option<String>,
 
     /// Filter by any field (`key=value`, case-insensitive; repeatable).
     #[arg(long = "where", value_name = "KEY=VALUE")]
@@ -97,14 +102,22 @@ struct ListJson {
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let (found, cfg) = ctx.load_config_with_found()?;
 
+    // `--by` looks at finished work, so it implies `--status all` unless a status is given (R-WRITE-16).
     let status_filter = match args.status.as_deref() {
         Some(raw) => Some(StatusFilter::parse(raw)?),
+        None if args.by.is_some() => Some(StatusFilter::All),
         None => None,
     };
 
     let mut parsed_where = Vec::with_capacity(args.where_clauses.len());
     for raw in &args.where_clauses {
         parsed_where.push(WhereClause::parse(raw)?);
+    }
+    if let Some(name) = args.by.as_deref() {
+        parsed_where.push(WhereClause {
+            key: "by".to_string(),
+            value: name.trim().to_string(),
+        });
     }
 
     let mine_agent = if args.mine {

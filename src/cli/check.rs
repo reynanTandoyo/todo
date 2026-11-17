@@ -18,6 +18,7 @@ use crate::error::{ErrorCode, ExitCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::history::{OutsideEditOutcome, detect_outside_edit};
 use crate::lock::current_time;
+use crate::ops::identity::{mailmap_proper_names, repo_root};
 use crate::ops::{
     DocWritePlan, OpsConfig, edit_doc_and_write, file_label, read_optional_archive,
 };
@@ -172,6 +173,9 @@ pub(crate) fn collect_problems(
             let now = current_time();
             check_tasks(&doc, archive.as_ref(), &cfg, &label, now, &mut problems);
 
+            // 3b. `by` names against `.mailmap` (warnings only; R-WRITE-16).
+            warn_unmapped_by(&doc, &found.path, &label, out);
+
             // 4. Dependency checks (missing IDs, dropped dependencies, cycles; R-DEP-3).
             check_dependencies(&doc, archive.as_ref(), &label, &mut problems);
 
@@ -304,6 +308,31 @@ pub(crate) fn check_tasks(
                 message: format!("{id_str}: area {area:?} is not in configured areas"),
             });
         }
+    }
+}
+
+/// Warns about every `by` value that is not a proper name in the repository's `.mailmap`
+/// (`R-WRITE-16`). Does nothing without a `.mailmap`; never changes the exit code.
+fn warn_unmapped_by(doc: &Document, todo_path: &Path, label: &str, out: &mut Output) {
+    let Some(root) = todo_path.parent().and_then(repo_root) else {
+        return;
+    };
+    let Ok(bytes) = fs::read(fs_path(&root.join(".mailmap"))) else {
+        return;
+    };
+    let names = mailmap_proper_names(&String::from_utf8_lossy(&bytes));
+    for task in &doc.tasks {
+        let Some(by) = task.field_value("by") else {
+            continue;
+        };
+        if by.is_empty() || names.iter().any(|n| n.eq_ignore_ascii_case(by)) {
+            continue;
+        }
+        out.warn(format!(
+            "{label}:{}: {}: by {by:?} is not a name in .mailmap",
+            task.heading_line + 1,
+            doc.id_config.format_id(task.id)
+        ));
     }
 }
 

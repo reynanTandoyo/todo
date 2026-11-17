@@ -22,6 +22,7 @@ use crate::ops::{
     check_task_writable, file_label, forced_note_text, highest_task_number, parse_doc_for_write, read_optional_archive,
     resolve_task_in_doc,
 };
+use crate::ops::identity::done_by;
 use crate::output::Output;
 use crate::state::{IdsState, StateDir};
 
@@ -187,6 +188,22 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let label = file_label(&found.path);
     let archive_path = cfg.archive_path(&found.path);
 
+    // Who did the work, per `done` operation (R-WRITE-16); asked of git before the lock is taken.
+    let git_dir = found.path.parent().filter(|p| !p.as_os_str().is_empty());
+    let mut configured: Option<Option<String>> = None;
+    let done_bys: Vec<Option<String>> = ops
+        .iter()
+        .map(|op| match op {
+            ApplyOp::Done { commit, .. } => match commit.as_deref().map(str::trim) {
+                Some(c) if !c.is_empty() => done_by(git_dir, Some(c)),
+                _ => configured
+                    .get_or_insert_with(|| done_by(git_dir, None))
+                    .clone(),
+            },
+            _ => None,
+        })
+        .collect();
+
     let mut lock_warnings = Vec::new();
     let mut dry_run_diff: Option<String> = None;
     let applied = locked_read_modify_write_with_warnings(
@@ -220,6 +237,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                     &agent,
                     ctx.force,
                     ctx.session.as_deref(),
+                    done_bys[idx].as_deref(),
                     now,
                     &mut highest_id,
                     &mut refs,
@@ -407,6 +425,7 @@ fn apply_one_op(
     agent: &str,
     force: bool,
     session: Option<&str>,
+    done_by: Option<&str>,
     now: chrono::DateTime<chrono::FixedOffset>,
     highest_id: &mut u64,
     refs: &mut BTreeMap<String, String>,
@@ -535,7 +554,7 @@ fn apply_one_op(
                 now,
                 session,
             };
-            apply_task_op(other, op_num, doc, archive, label, &env, refs)
+            apply_task_op(other, op_num, doc, archive, label, &env, refs, done_by)
         }
     }
 }
@@ -571,6 +590,7 @@ fn text_or_note<'a>(
 ///
 /// Only the parts specific to `apply` live here: reading the JSON fields, `@ref` names and the
 /// `operation #N` error messages.
+#[allow(clippy::too_many_arguments)]
 fn apply_task_op(
     op: &ApplyOp,
     op_num: usize,
@@ -579,6 +599,7 @@ fn apply_task_op(
     label: &str,
     env: &OpEnv<'_>,
     refs: &BTreeMap<String, String>,
+    done_by: Option<&str>,
 ) -> Result<(&'static str, String, Vec<LineEdit>, TaskChangeIntent)> {
     let mut dep_owned = String::new();
     let mut changes: Vec<SetChange<'_>> = Vec::new();
@@ -590,6 +611,7 @@ fn apply_task_op(
             TaskOp::Done {
                 note: note.as_deref(),
                 commit: commit.as_deref().map(str::trim),
+                by: done_by,
             },
         ),
         ApplyOp::Drop { task, note } => (
