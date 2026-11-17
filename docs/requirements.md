@@ -501,11 +501,15 @@ or with `--json` the task as it is after the change.
     or when the format versions differ, the driver falls back to a plain three-way line merge
     (`git merge-file`) of the whole file, which is what git would have done without it.
   - Every output line is copied byte for byte from one of the inputs, line endings included
-    (R-EDIT-1, D18).
-- **R-GIT-3 COULD** `merge-driver install` registers the driver for the repository:
-  `git config merge.todo.name` and `merge.todo.driver "todo merge-driver run %O %A %B %P"`, and a
-  `<TODO.md path> merge=todo` line in the repository's `.gitattributes` (added once, other lines
-  kept byte for byte). `merge-driver uninstall` removes both. Both are safe to run twice.
+    (R-EDIT-1, D18). The one exception: a last line without a line ending that is no longer last
+    gets one.
+  - Task IDs are recognised with the default prefix `T`; with another prefix the file is merged as
+    prose (`git merge-file`).
+- **R-GIT-3 COULD** `merge-driver install [--path <pattern>]` registers the driver for the
+  repository: `git config merge.todo.name` and
+  `merge.todo.driver "todo merge-driver run %O %A %B %P"`, and a `<pattern> merge=todo` line
+  (default `TODO.md`) in the `.gitattributes` at the repository root (added once, other lines kept
+  byte for byte). `merge-driver uninstall` removes both. Both are safe to run twice.
 
 ### 5.18 Discovery — DISC
 

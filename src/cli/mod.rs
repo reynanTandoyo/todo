@@ -555,6 +555,7 @@ register_commands! {
     Init => init,
     List => list,
     Lock => lock,
+    MergeDriver => merge_driver,
     Log => log,
     Move => move_cmd,
     Next => next,

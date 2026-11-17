@@ -121,6 +121,11 @@ expression: ok_json
         "summary": "Take a manual editing lease on TODO.md"
       },
       {
+        "kind": "meta",
+        "name": "merge-driver",
+        "summary": "Git merge driver that merges TODO.md task by task"
+      },
+      {
         "kind": "read",
         "name": "log",
         "summary": "Show journal entries for a task"
