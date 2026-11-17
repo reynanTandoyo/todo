@@ -2,3 +2,4 @@
 *.tmp
 *.snap.new
 .claude/*.bak
+.claude/worktrees/
