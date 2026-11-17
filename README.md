@@ -156,6 +156,21 @@ file order. The command checks the result like `todo check`, compares the task c
 of converted lines and reports both. It does not take the write lock; use it on lists that agents
 are not using yet.
 
+### Finding TODO comments in code
+
+`todo scan` lists the `TODO:` and `FIXME:` comments in the folder that holds `TODO.md`, as
+`path:line: text`. With git it looks at the files git knows about (tracked and not ignored); without
+git it walks the folder, skipping hidden folders, `target` and `node_modules`. Comments that already
+name a task ID or repeat a task title are left out.
+
+```powershell
+todo scan
+todo scan --add --section Now --priority P2 --agent coordinator   # adds them in one locked write
+todo scan --add --dry-run --priority P2 --agent coordinator       # shows what would be added
+```
+
+Each added task gets `files: <path>:<line>`, and its title is the comment text cut to 120 characters.
+
 ### Claims tagged with an agent session
 
 A claim can carry the agent session that made it, so claims of a session that has ended are not

@@ -540,6 +540,39 @@ fn run_batch_from(
     out: &mut Output,
 ) -> Result<()> {
     let raw = read_batch_input(from_src)?;
+    let res = add_batch_text(&raw, default_section_flag, ctx, out)?;
+    if out.is_json() {
+        out.emit_json_ok(
+            META.name,
+            &BatchAddJson {
+                count: res.ids.len(),
+                ids: res.ids,
+                added: res.added,
+            },
+        );
+    } else {
+        for id in &res.ids {
+            out.write_line(&format!("{id}: add ok"));
+        }
+    }
+    Ok(())
+}
+
+/// The IDs given to the tasks of a batch (in entry order) and their JSON.
+pub(crate) struct BatchAdded {
+    pub ids: Vec<String>,
+    pub added: Vec<TaskJson>,
+}
+
+/// Adds the tasks given as JSON lines in one locked write, all or none (R-WRITE-13).
+///
+/// Shared by `todo add --from` and `todo scan --add`. Prints nothing; the caller reports the result.
+pub(crate) fn add_batch_text(
+    raw: &str,
+    default_section_flag: Option<&str>,
+    ctx: &Context,
+    out: &mut Output,
+) -> Result<BatchAdded> {
     let (found, cfg) = ctx.load_config_with_found()?;
 
     let mut entries = Vec::new();
@@ -850,19 +883,8 @@ fn run_batch_from(
         },
     )?;
 
-    if out.is_json() {
-        out.emit_json_ok(
-            META.name,
-            &BatchAddJson {
-                count: res.value.0.len(),
-                ids: res.value.0,
-                added: res.value.1,
-            },
-        );
-    } else {
-        for id in &res.value.0 {
-            out.write_line(&format!("{id}: add ok"));
-        }
-    }
-    Ok(())
+    Ok(BatchAdded {
+        ids: res.value.0,
+        added: res.value.1,
+    })
 }

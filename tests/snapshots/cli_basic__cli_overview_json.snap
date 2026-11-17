@@ -1,5 +1,6 @@
 ---
 source: tests/cli_basic.rs
+assertion_line: 122
 expression: ok_json
 ---
 {
@@ -149,6 +150,11 @@ expression: ok_json
         "kind": "write",
         "name": "restore",
         "summary": "Restore TODO.md from a saved snapshot"
+      },
+      {
+        "kind": "read",
+        "name": "scan",
+        "summary": "Find TODO: and FIXME: comments in the project"
       },
       {
         "kind": "read",
