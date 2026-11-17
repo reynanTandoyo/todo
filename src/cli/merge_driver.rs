@@ -753,7 +753,10 @@ fn repo_root() -> Result<PathBuf> {
         ));
     }
     let text = String::from_utf8_lossy(&o.stdout);
-    Ok(PathBuf::from(text.trim_end_matches(['\r', '\n'])))
+    // git prints `C:/x/y` on Windows; rebuilding from components gives native separators.
+    Ok(Path::new(text.trim_end_matches(['\r', '\n']))
+        .components()
+        .collect())
 }
 
 fn config_get(root: &Path, key: &str) -> Result<Option<String>> {
