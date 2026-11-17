@@ -601,10 +601,11 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-17, claude-main): dropped — Owner decision 2026-11-17: no MCP server. Agents already use the CLI with --json (D10, D14); an MCP server adds dependencies and a second interface. I-1 marked dropped in docs/requirements.md.
 
 ### T-071 · Overview across several projects
-- status: open
+- status: dropped
 - owner: —
 - priority: P3 · type: idea · area: cli
 - reqs: I-2
+- note (2026-11-17, claude-main): dropped — Owner decision 2026-11-17: work happens per project session; todo summary already shows each project's state (I-2 dropped).
 
 ### T-072 · Claims tagged with an agent session
 - status: done
@@ -616,8 +617,10 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-16, r4-sonnet): done — session field after claimed; --session/TODO_SESSION/CLAUDE_CODE_SESSION_ID; release --session; hidden session-end hook command; hooks install/uninstall SessionEnd
 
 ### T-073 · todo schema
-- status: open
-- owner: —
+- status: claimed
+- owner: v5-schema
+- claimed: 2026-11-17T23:03+01:00
+- session: 9b3e4452-fc26-4ec3-ac36-74c6bb6abff1
 - priority: P2 · type: feature · area: agent
 - accept: todo schema prints JSON with version, envelope, exit codes, error codes, task fields and every command with its options; a test checks every clap subcommand and every error code appears; schema <command> prints one; --json wraps it in todo.schema.v1
 - reqs: R-SCHEMA-1
@@ -637,15 +640,19 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-17, claude-main): dropped — Owner decision 2026-11-17: commit messages keep the old ID, so renumbering breaks the link to history (I-6 dropped).
 
 ### T-076 · Git merge driver for TODO.md
-- status: open
-- owner: —
+- status: claimed
+- owner: v5-merge
+- claimed: 2026-11-17T23:03+01:00
+- session: 9b3e4452-fc26-4ec3-ac36-74c6bb6abff1
 - priority: P2 · type: feature · area: git
 - accept: merge-driver run merges tasks changed on different sides cleanly (exit 0), keeps notes from both sides, conflicts (exit 1, markers around the task block) on the same field changed both ways and on the same new ID; falls back to git merge-file for prose conflicts or unparsable input; output bytes come only from inputs (CRLF kept); merge-driver install/uninstall are idempotent and a real git merge in a temp repo uses the driver
 - reqs: R-GIT-2, R-GIT-3
 
 ### T-077 · todo align
-- status: open
-- owner: —
+- status: claimed
+- owner: v5-align
+- claimed: 2026-11-17T23:03+01:00
+- session: 9b3e4452-fc26-4ec3-ac36-74c6bb6abff1
 - priority: P2 · type: feature · area: git
 - accept: todo align reports COMMITTED_NOT_DONE, DONE_WITHOUT_COMMIT and COMMIT_MISSING against a temp git repo; exit 0/1/5 as specified (5 + NO_GIT_HISTORY outside git and in a shallow clone); --json envelope todo.align.v1; never changes TODO.md
 - reqs: R-GIT-1
@@ -667,8 +674,10 @@ Priorities: P0 = v0.1 (MUST), P1 = v0.2 (SHOULD), P2 = v0.3 (COULD), P3 = idea, 
 - note (2026-11-16, r4-sonnet): done — todo completions <shell> (powershell, bash, zsh, fish, elvish) with clap_complete; README profile line
 
 ### T-080 · todo scan
-- status: open
-- owner: —
+- status: claimed
+- owner: v5-scan
+- claimed: 2026-11-17T23:03+01:00
+- session: 9b3e4452-fc26-4ec3-ac36-74c6bb6abff1
 - priority: P2 · type: feature · area: cli
 - accept: todo scan lists new TODO:/FIXME: matches as path:line: text, skips known ones (task ID or same title), TODO.md, binaries and big files; works with and without git; scan --add adds them in one locked write with files: path:line; --dry-run writes nothing
 - reqs: R-DISC-1

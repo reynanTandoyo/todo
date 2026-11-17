@@ -691,6 +691,8 @@ Recorded so they aren't lost; each becomes a requirement only by a decision reco
   *Dropped by the owner's decision of 2026-11-17: agents already use the CLI with `--json` (D10),
   and D14 rules out an MCP server.*
 - **I-2** A list of projects and an overview across them.
+  *Dropped by the owner's decision of 2026-11-17: work happens in each project's own session, where
+  `todo summary` already shows that project's state.*
 - **I-3** Claims tagged with an agent session, released by a Claude Code `SessionEnd` hook.
   *Moved to requirements (R-CLAIM-7) by the owner's decision of 2026-11-16.*
 - **I-4** `todo schema`: a machine-readable description of commands, JSON shapes and exit codes.
