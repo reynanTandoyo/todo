@@ -550,8 +550,9 @@ or with `--json` the task as it is after the change.
   archive file and names the command to use instead (direct edits are allowed while a lease is
   live); at session end, `todo session-end`, which releases the claims of the ending session
   (R-CLAIM-7). It keeps a backup; it changes only the managed entries and keeps every other byte of
-  the file, key order and inline formatting included (as `migrate --yes` does, R-MIG-2); it marks its
-  entries so `hooks uninstall` removes only those, and works from PowerShell.
+  the file, key order and inline formatting included (as `migrate --yes` does, R-MIG-2). It marks
+  its entries so `hooks uninstall` removes only those, and `hooks uninstall` keeps every other byte
+  the same way; uninstall does not create the file when there is none. It works from PowerShell.
 - **R-AGENT-5 COULD** `skill install --yes` writes `.claude/skills/todo/SKILL.md` in the project
   folder (R-AGENT-3), from the same rules text.
 
