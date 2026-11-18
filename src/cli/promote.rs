@@ -5,8 +5,9 @@ use clap::Args as ClapArgs;
 use crate::cli::add::find_section;
 use crate::cli::move_cmd::section_move_edits;
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::{Document, EntryKind, LineEdit, Task, TaskChangeIntent, sanitize_trimmed_value};
+use crate::doc::{Document, LineEdit, Task, TaskChangeIntent, sanitize_trimmed_value};
 use crate::error::{ErrorCode, Result, TodoError};
+use crate::ops::milestone;
 use crate::ops::{
     DocWritePlan, OpEnv, TaskOp, build_task_json, check_promotable, check_task_writable,
     edit_doc_and_write, resolve_task_in_doc,
@@ -76,19 +77,10 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             let id_str = cfg.id_config.format_id(task.id);
             check_promotable(task, &id_str)?;
 
+            // The parent rules are the ones `add` and `set` apply (R-MILE-1): NOT_FOUND when missing,
+            // BAD_VALUE when it is not a milestone.
             let milestone = match args.milestone.as_deref() {
-                Some(input) => {
-                    let parent = resolve_task_in_doc(doc, input)?;
-                    if parent.kind() != EntryKind::Milestone {
-                        let parent_id = cfg.id_config.format_id(parent.id);
-                        return Err(TodoError::new(
-                            ErrorCode::BadValue,
-                            format!("task {parent_id} is not a milestone; --milestone names a milestone"),
-                        )
-                        .with_task(parent_id));
-                    }
-                    Some(cfg.id_config.format_id(parent.id))
-                }
+                Some(input) => Some(milestone::check_parent(doc, &cfg, Some(task), input)?),
                 None => None,
             };
 

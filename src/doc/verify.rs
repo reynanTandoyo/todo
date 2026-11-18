@@ -270,6 +270,7 @@ fn tasks_semantically_equal(
         && a.owner == b.owner
         && a.claimed == b.claimed
         && a.priority == b.priority
+        && a.difficulty == b.difficulty
         && a.task_type == b.task_type
         && a.area == b.area
         && a.files == b.files

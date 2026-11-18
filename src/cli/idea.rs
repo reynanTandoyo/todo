@@ -43,9 +43,16 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     if clean_idea.is_empty() {
         return Err(TodoError::new(ErrorCode::BadValue, "idea cannot be empty"));
     }
-    let about_input = args.about.as_deref().map(sanitize_trimmed_value);
-
     let cfg = ctx.load_config()?;
+    let about_target = match args.about.as_deref() {
+        Some(raw) => Some(cfg.id_config.parse_user_id(raw).ok_or_else(|| {
+            TodoError::new(
+                ErrorCode::BadValue,
+                format!("--about expects a task ID such as T-002, not {raw:?}"),
+            )
+        })?),
+        None => None,
+    };
     let cfg_clone = cfg.clone();
     let res = edit_doc_with_state_and_write(
         ctx,
@@ -66,8 +73,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 .with_task(existing_id));
             }
 
-            let about_id = match about_input.as_deref() {
-                Some(input) => Some(resolve_about(doc, archive, &cfg, input)?),
+            let about_id = match about_target {
+                Some(target) => Some(resolve_about(doc, archive, &cfg, target)?),
                 None => None,
             };
 
@@ -153,24 +160,23 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     Ok(())
 }
 
-/// The canonical ID of the task or milestone `input` names, which must exist in `TODO.md` or the
+/// The canonical ID of the task or milestone `target` names, which must exist in `TODO.md` or the
 /// archive (`R-KIND-1`, as `ask --about` does, `R-KIND-2`).
 fn resolve_about(
     doc: &Document,
     archive: Option<&Document>,
     cfg: &OpsConfig,
-    input: &str,
+    target: TaskId,
 ) -> Result<String> {
-    let exists = |id: TaskId| {
-        doc.task_by_id(id).is_some() || archive.is_some_and(|a| a.task_by_id(id).is_some())
-    };
-    match cfg.id_config.parse_user_id(input) {
-        Some(id) if exists(id) => Ok(cfg.id_config.format_id(id)),
-        _ => Err(TodoError::new(
-            ErrorCode::NotFound,
-            format!("--about: task {input} not found"),
-        )),
+    let exists = doc.task_by_id(target).is_some()
+        || archive.is_some_and(|a| a.task_by_id(target).is_some());
+    if !exists {
+        let id_str = cfg.id_config.format_id(target);
+        return Err(
+            TodoError::new(ErrorCode::NotFound, format!("task {id_str} not found")).with_task(id_str),
+        );
     }
+    Ok(cfg.id_config.format_id(target))
 }
 
 /// Where a new idea goes: the end of `section` (`insert_at`, `false`), or the end of the file with

@@ -8,11 +8,13 @@ use clap::Args as ClapArgs;
 use serde::{Deserialize, Serialize};
 
 use crate::cli::{CommandKind, CommandMeta, Context, resolve_opt_text_arg, resolve_text_arg};
-use crate::doc::{Document, LineEdit, Status, TaskChangeIntent, TaskId, sanitize_trimmed_value};
+use crate::doc::{
+    Document, EntryKind, LineEdit, Status, TaskChangeIntent, TaskId, sanitize_trimmed_value,
+};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
     DocWritePlan, NewTask, OpsConfig, TaskJson, build_task_json, edit_doc_with_found_and_state_and_write,
-    highest_task_number, matching_section_indices,
+    highest_task_number, matching_section_indices, milestone,
 };
 use crate::output::Output;
 use crate::state::IdsState;
@@ -48,6 +50,10 @@ pub struct Args {
     #[arg(long, value_name = "VALUE")]
     pub priority: Option<String>,
 
+    /// How hard the task is: one of the configured `difficulties` (default `easy`, `medium`, `hard`).
+    #[arg(long, value_name = "VALUE")]
+    pub difficulty: Option<String>,
+
     /// Task type (e.g. `feature`, `bug`, `chore`).
     #[arg(long = "type", value_name = "VALUE")]
     pub task_type: Option<String>,
@@ -55,6 +61,14 @@ pub struct Args {
     /// Area (e.g. `cli`, `docs`).
     #[arg(long, value_name = "VALUE")]
     pub area: Option<String>,
+
+    /// Parent milestone: the ID or title of the milestone this entry belongs to.
+    #[arg(long, value_name = "TASK")]
+    pub milestone: Option<String>,
+
+    /// Goal of a milestone; a milestone needs one.
+    #[arg(long, value_name = "TEXT")]
+    pub goal: Option<String>,
 
     /// Dependencies (comma-separated task IDs).
     #[arg(long, value_name = "IDS")]
@@ -114,6 +128,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     // Validate priority, type, area, and required fields before taking the lock.
     let priority_val = resolve_priority(args.priority.as_deref(), &extra_fields, &cfg)?;
+    let difficulty_val = resolve_allowed(
+        "difficulty",
+        args.difficulty.as_deref(),
+        &extra_fields,
+        &cfg.difficulties,
+    )?;
     let type_val = resolve_allowed(
         "type",
         args.task_type.as_deref(),
@@ -121,6 +141,14 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         &cfg.types,
     )?;
     let area_val = resolve_allowed("area", args.area.as_deref(), &extra_fields, &cfg.areas)?;
+    let milestone_val = resolve_opt(args.milestone.as_deref(), &extra_fields, "milestone");
+    let goal_arg = resolve_opt_text_arg(args.goal.as_deref())?;
+    let goal_val = resolve_opt(goal_arg.as_deref(), &extra_fields, "goal");
+    milestone::check_new_entry_fields(
+        type_val.as_deref(),
+        milestone_val.as_deref(),
+        goal_val.as_deref(),
+    )?;
     let files_arg = resolve_opt_text_arg(args.files.as_deref())?;
     let problem_arg = resolve_opt_text_arg(args.problem.as_deref())?;
     let fix_arg = resolve_opt_text_arg(args.fix.as_deref())?;
@@ -133,6 +161,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     check_required_fields(
         &cfg.required_fields,
         priority_val.as_deref(),
+        difficulty_val.as_deref(),
         type_val.as_deref(),
         area_val.as_deref(),
         depends_val.as_deref(),
@@ -164,11 +193,17 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 .with_task(existing_id));
             }
 
-            // 2. Resolve target section (R-WRITE-1).
+            // 2. The parent milestone must exist and be a milestone (R-MILE-1).
+            let milestone_id = match milestone_val.as_deref() {
+                Some(value) => Some(milestone::check_parent(doc, &cfg, None, value)?),
+                None => None,
+            };
+
+            // 3. Resolve target section (R-WRITE-1).
             let section_idx = resolve_target_section(doc, args.section.as_deref(), &cfg)?;
             let section = &doc.sections[section_idx];
 
-            // 3. Allocate next monotonic ID across TODO.md, archive, and ids.json (R-ID-2).
+            // 4. Allocate next monotonic ID across TODO.md, archive, and ids.json (R-ID-2).
             let max_state = state.read_ids()?.map_or(0, |s| s.highest_id);
             let next_num = highest_task_number(doc, archive, max_state)
                 .checked_add(1)
@@ -183,13 +218,16 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 })?;
             }
 
-            // 4. Build canonical lines for the new task (docs/format.md §10).
+            // 5. Build canonical lines for the new task (docs/format.md §10).
             let date = OpsConfig::format_note_date(now);
             let lines = NewTask {
                 title: &clean_title,
                 priority: priority_val.as_deref(),
+                difficulty: difficulty_val.as_deref(),
                 task_type: type_val.as_deref(),
                 area: area_val.as_deref(),
+                milestone: milestone_id.as_deref(),
+                goal: goal_val.as_deref(),
                 depends: depends_val.as_deref(),
                 files: files_val.as_deref(),
                 problem: problem_val.as_deref(),
@@ -348,6 +386,7 @@ fn resolve_allowed(
 fn check_required_fields(
     required_fields: &[String],
     priority: Option<&str>,
+    difficulty: Option<&str>,
     task_type: Option<&str>,
     area: Option<&str>,
     depends: Option<&str>,
@@ -360,6 +399,7 @@ fn check_required_fields(
     for req in required_fields {
         let present = match req.to_ascii_lowercase().as_str() {
             "priority" => priority.is_some(),
+            "difficulty" => difficulty.is_some(),
             "type" => task_type.is_some(),
             "area" => area.is_some(),
             "depends" => depends.is_some(),
@@ -449,6 +489,60 @@ fn section_names_joined(doc: &Document) -> String {
         .join(", ")
 }
 
+/// Checks the `@ref` milestones of a batch before anything is written (R-MILE-1): each names an
+/// entry of the same batch that is a milestone, and no chain of references leads back to itself.
+fn check_batch_milestones(entries: &[ValidatedBatchEntry]) -> Result<()> {
+    for entry in entries {
+        let Some(target) = entry.milestone.as_deref().and_then(|m| m.strip_prefix('@')) else {
+            continue;
+        };
+        let Some(parent) = entries
+            .iter()
+            .find(|e| e.ref_name.as_deref() == Some(target))
+        else {
+            return Err(TodoError::new(
+                ErrorCode::BadValue,
+                format!("unknown milestone reference @{target}"),
+            ));
+        };
+        if EntryKind::from_type(parent.task_type.as_deref()) != EntryKind::Milestone {
+            return Err(TodoError::new(
+                ErrorCode::BadValue,
+                format!("@{target} is not a milestone, so it cannot hold tasks"),
+            ));
+        }
+    }
+    for entry in entries {
+        let Some(start) = entry.ref_name.as_deref() else {
+            continue;
+        };
+        let mut current = start;
+        for _ in 0..=entries.len() {
+            let next = entries
+                .iter()
+                .find(|e| e.ref_name.as_deref() == Some(current))
+                .and_then(|e| e.milestone.as_deref().and_then(|m| m.strip_prefix('@')));
+            let Some(next) = next else {
+                break;
+            };
+            if next == start {
+                return Err(TodoError::new(
+                    ErrorCode::BadValue,
+                    format!("@{start} would be its own ancestor through its milestone"),
+                ));
+            }
+            current = next;
+        }
+    }
+    Ok(())
+}
+
+/// Adds the batch line number to a refusal, as the other `--from` errors do (`R-OUT-4`).
+fn at_batch_line(mut err: TodoError, line_no: usize) -> TodoError {
+    err.message = format!("--from line {line_no}: {}", err.message);
+    err.with_line(line_no)
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum DependsInput {
@@ -464,9 +558,12 @@ struct BatchAddEntry {
     title: String,
     section: Option<String>,
     priority: Option<String>,
+    difficulty: Option<String>,
     #[serde(rename = "type")]
     task_type: Option<String>,
     area: Option<String>,
+    milestone: Option<String>,
+    goal: Option<String>,
     depends: Option<DependsInput>,
     files: Option<String>,
     problem: Option<String>,
@@ -481,8 +578,12 @@ struct ValidatedBatchEntry {
     title: String,
     section: Option<String>,
     priority: Option<String>,
+    difficulty: Option<String>,
     task_type: Option<String>,
     area: Option<String>,
+    /// Parent milestone as given: an ID, or `@ref` naming an entry of the same batch (R-MILE-1).
+    milestone: Option<String>,
+    goal: Option<String>,
     depends_tokens: Vec<String>,
     files: Option<String>,
     problem: Option<String>,
@@ -649,8 +750,32 @@ pub(crate) fn add_batch_text(
         }
 
         let priority = resolve_priority(parsed.priority.as_deref(), &extra, &cfg)?;
+        let difficulty = resolve_allowed(
+            "difficulty",
+            parsed.difficulty.as_deref(),
+            &extra,
+            &cfg.difficulties,
+        )?;
         let task_type = resolve_allowed("type", parsed.task_type.as_deref(), &extra, &cfg.types)?;
         let area = resolve_allowed("area", parsed.area.as_deref(), &extra, &cfg.areas)?;
+        let parent = parsed
+            .milestone
+            .as_deref()
+            .map(sanitize_trimmed_value)
+            .filter(|s| !s.is_empty())
+            .or_else(|| resolve_opt(None, &extra, "milestone"));
+        let goal = parsed
+            .goal
+            .as_deref()
+            .map(sanitize_trimmed_value)
+            .filter(|s| !s.is_empty())
+            .or_else(|| resolve_opt(None, &extra, "goal"));
+        milestone::check_new_entry_fields(
+            task_type.as_deref(),
+            parent.as_deref(),
+            goal.as_deref(),
+        )
+        .map_err(|e| at_batch_line(e, line_no))?;
         let files = parsed
             .files
             .as_deref()
@@ -705,6 +830,7 @@ pub(crate) fn add_batch_text(
         check_required_fields(
             &cfg.required_fields,
             priority.as_deref(),
+            difficulty.as_deref(),
             task_type.as_deref(),
             area.as_deref(),
             depends_summary.as_deref(),
@@ -728,8 +854,11 @@ pub(crate) fn add_batch_text(
             title,
             section,
             priority,
+            difficulty,
             task_type,
             area,
+            milestone: parent,
+            goal,
             depends_tokens,
             files,
             problem,
@@ -745,6 +874,7 @@ pub(crate) fn add_batch_text(
             "no tasks found in --from input",
         ));
     }
+    check_batch_milestones(&entries)?;
 
     let cfg_clone = cfg.clone();
     let res = edit_doc_with_found_and_state_and_write(
@@ -794,6 +924,20 @@ pub(crate) fn add_batch_text(
             let mut ordered_ids = Vec::with_capacity(entries.len());
 
             for (entry, (new_id, id_str)) in entries.iter().zip(allocated_ids.iter()) {
+                // A `@ref` parent is an entry of this batch (checked before the lock); any other
+                // parent must already be a milestone in TODO.md (R-MILE-1).
+                let milestone_id = match entry.milestone.as_deref() {
+                    Some(value) => match value.strip_prefix('@') {
+                        Some(name) => Some(ref_to_id.get(name).cloned().ok_or_else(|| {
+                            TodoError::new(
+                                ErrorCode::BadValue,
+                                format!("unknown milestone reference {value:?}"),
+                            )
+                        })?),
+                        None => Some(milestone::check_parent(doc, &cfg, None, value)?),
+                    },
+                    None => None,
+                };
                 let sec_idx = resolve_target_section(doc, entry.section.as_deref(), &cfg)?;
                 let insert_at = doc.sections[sec_idx].content_end;
 
@@ -820,8 +964,11 @@ pub(crate) fn add_batch_text(
                 let lines = NewTask {
                     title: &entry.title,
                     priority: entry.priority.as_deref(),
+                    difficulty: entry.difficulty.as_deref(),
                     task_type: entry.task_type.as_deref(),
                     area: entry.area.as_deref(),
+                    milestone: milestone_id.as_deref(),
+                    goal: entry.goal.as_deref(),
                     depends: depends_val.as_deref(),
                     files: entry.files.as_deref(),
                     problem: entry.problem.as_deref(),

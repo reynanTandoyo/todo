@@ -44,6 +44,8 @@ pub struct OpsConfig {
     pub types: Vec<String>,
     /// Allowed `area` values; empty allows any (`R-CFG-2`).
     pub areas: Vec<String>,
+    /// Allowed `difficulty` values, easiest first; never empty (`R-CFG-2`, `R-WRITE-18`).
+    pub difficulties: Vec<String>,
     /// Default section name for `todo add` when `--section` is omitted (`R-WRITE-1`).
     pub default_section: Option<String>,
     /// Section name for `todo ask` (`R-WRITE-11`, default `"Questions"`).
@@ -75,6 +77,7 @@ impl Default for OpsConfig {
             required_fields: vec!["priority".to_string()],
             types: Vec::new(),
             areas: Vec::new(),
+            difficulties: vec!["easy".to_string(), "medium".to_string(), "hard".to_string()],
             default_section: None,
             question_section: DEFAULT_QUESTION_SECTION.to_string(),
             idea_section: DEFAULT_IDEA_SECTION.to_string(),
@@ -106,6 +109,56 @@ impl OpsConfig {
             .iter()
             .position(|cfg_p| cfg_p.eq_ignore_ascii_case(p))
             .unwrap_or(self.priorities.len())
+    }
+
+    /// Returns the position of `difficulty` in [`Self::difficulties`] (0 = easiest), ignoring
+    /// case; `None` when there is no difficulty or it is not a configured one.
+    #[must_use]
+    pub fn difficulty_rank(&self, difficulty: Option<&str>) -> Option<usize> {
+        let d = difficulty?;
+        self.difficulties
+            .iter()
+            .position(|cfg_d| cfg_d.eq_ignore_ascii_case(d.trim()))
+    }
+
+    /// Returns the configured spelling of one `difficulty` value (`R-WRITE-18`).
+    ///
+    /// An unknown value is refused with `BAD_VALUE` and the list of allowed values.
+    pub fn canonical_difficulty(&self, raw: &str) -> Result<String> {
+        let value = raw.trim();
+        match self
+            .difficulties
+            .iter()
+            .find(|d| d.eq_ignore_ascii_case(value))
+        {
+            Some(canonical) => Ok(canonical.clone()),
+            None => Err(TodoError::new(
+                ErrorCode::BadValue,
+                format!(
+                    "invalid difficulty '{value}'; expected one of: {}",
+                    self.difficulties.join(", ")
+                ),
+            )),
+        }
+    }
+
+    /// Parses a comma-separated list of difficulties, such as `--difficulty easy,medium`, into
+    /// configured spellings. An empty list or an unknown value is refused with `BAD_VALUE`.
+    pub fn difficulty_list(&self, raw: &str) -> Result<Vec<String>> {
+        let mut out = Vec::new();
+        for part in raw.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+            out.push(self.canonical_difficulty(part)?);
+        }
+        if out.is_empty() {
+            return Err(TodoError::new(
+                ErrorCode::BadValue,
+                format!(
+                    "no difficulty given; expected one or more of: {}",
+                    self.difficulties.join(", ")
+                ),
+            ));
+        }
+        Ok(out)
     }
 
     /// Computes the age of `task`'s claim relative to `now` in UTC (`R-IO-6`).
@@ -226,6 +279,13 @@ impl OpsConfig {
                 }
                 "areas" => {
                     cfg.areas = expect_string_list(&key, val, line, true)?;
+                }
+                "difficulties" => {
+                    let items = expect_string_list(&key, val, line, true)?;
+                    if items.is_empty() {
+                        return Err(toml_err(line, "difficulties must not be empty"));
+                    }
+                    cfg.difficulties = items;
                 }
                 "default_section" => {
                     let s = expect_string(&key, val, line)?;

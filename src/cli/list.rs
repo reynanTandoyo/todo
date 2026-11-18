@@ -46,6 +46,10 @@ pub struct Args {
     #[arg(long, value_name = "PRIORITY")]
     pub priority: Option<String>,
 
+    /// Filter by difficulty: a comma-separated list of configured difficulties (`R-WRITE-18`).
+    #[arg(long, value_name = "LIST")]
+    pub difficulty: Option<String>,
+
     /// Filter by section name (ignores leading numbers and case).
     #[arg(long, value_name = "SECTION")]
     pub section: Option<String>,
@@ -130,10 +134,15 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         load_for_read_with_found(found, &cfg, args.archive, !args.archive && args.ready, out)?;
     let now = current_time();
 
+    let difficulties = match args.difficulty.as_deref() {
+        Some(raw) => Some(cfg.difficulty_list(raw)?),
+        None => None,
+    };
     let filter = ListFilter {
         status: status_filter,
         priority: args.priority.as_deref(),
         section: args.section.as_deref(),
+        difficulties: difficulties.as_deref(),
         task_type: args.task_type.as_deref(),
         area: args.area.as_deref(),
         owner: args.owner.as_deref(),
@@ -179,6 +188,13 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         .max()
         .unwrap_or(1)
         .max(2);
+    // The difficulty column is shown only when a listed task has a difficulty (like `owner`).
+    let difficulty_width = tasks
+        .iter()
+        .filter_map(|t| t.difficulty.as_deref())
+        .map(char_len)
+        .max()
+        .unwrap_or(0);
     let max_width = if args.wide {
         None
     } else {
@@ -195,6 +211,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             task,
             &cfg,
             prio_width,
+            difficulty_width,
             owner_width,
             max_width,
             use_color,
@@ -243,6 +260,7 @@ fn write_task_line_into(
     task: &Task,
     cfg: &OpsConfig,
     prio_width: usize,
+    difficulty_width: usize,
     owner_width: usize,
     max_width: Option<usize>,
     use_color: bool,
@@ -274,6 +292,12 @@ fn write_task_line_into(
     out.push_str(prio);
     push_spaces(out, prio_pad + 2);
 
+    if difficulty_width > 0 {
+        let difficulty = task.difficulty.as_deref().unwrap_or("-");
+        out.push_str(difficulty);
+        push_spaces(out, difficulty_width.saturating_sub(char_len(difficulty)) + 2);
+    }
+
     let status_code = match task.status {
         crate::doc::Status::Done => "32",
         crate::doc::Status::Claimed | crate::doc::Status::Blocked => "33",
@@ -294,6 +318,9 @@ fn write_task_line_into(
     }
 
     let mut plain_prefix_chars = id_chars + 2 + prio_chars + prio_pad + 2 + 7 + 2;
+    if difficulty_width > 0 {
+        plain_prefix_chars += difficulty_width + 2;
+    }
     if owner_width > 0 {
         let owner = task.owner.as_deref().unwrap_or("-");
         let owner_chars = char_len(owner);

@@ -114,6 +114,8 @@ fn idea_needs_no_priority_and_creates_the_ideas_section_at_the_end() {
     assert_eq!(stdout_text(&out), "T-002: idea ok\n");
 
     let text = p.text();
+    // Every write adds the tool stamp (R-VER-1), idea included.
+    assert!(text.contains("<!-- todo-tool: "), "{text}");
     assert!(
         text.ends_with(
             "- note (2026-11-15, planner): added\n\n## Ideas\n\n\

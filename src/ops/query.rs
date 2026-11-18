@@ -114,6 +114,13 @@ impl WhereClause {
     }
 }
 
+/// Whether `task` has a difficulty that is one of `list` (ignoring case; `R-WRITE-18`).
+fn has_difficulty_in(task: &Task, list: &[String]) -> bool {
+    task.difficulty
+        .as_deref()
+        .is_some_and(|d| list.iter().any(|w| w.eq_ignore_ascii_case(d)))
+}
+
 /// Filters for `todo list` (`R-READ-1`).
 #[derive(Debug, Clone, Default)]
 pub struct ListFilter<'a> {
@@ -127,6 +134,8 @@ pub struct ListFilter<'a> {
     pub task_type: Option<&'a str>,
     /// Match `area` ignoring case.
     pub area: Option<&'a str>,
+    /// Match any of these `difficulty` values (`--difficulty`; configured spellings).
+    pub difficulties: Option<&'a [String]>,
     /// Match `owner` ignoring case (or nobody forms).
     pub owner: Option<&'a str>,
     /// Field predicates (`--where key=value`).
@@ -202,6 +211,11 @@ pub fn filter_tasks<'a>(
                     return false;
                 }
             }
+            if let Some(list) = filter.difficulties
+                && !has_difficulty_in(task, list)
+            {
+                return false;
+            }
             if let Some(owner_q) = filter.owner {
                 if is_nobody_owner(owner_q) {
                     if task.owner.is_some() {
@@ -244,6 +258,10 @@ pub struct NextFilter<'a> {
     pub task_type: Option<&'a str>,
     /// Match `area`.
     pub area: Option<&'a str>,
+    /// Match any of these `difficulty` values (`--difficulty`; configured spellings).
+    pub difficulties: Option<&'a [String]>,
+    /// Match this `difficulty` or easier, in the configured order (`--max-difficulty`).
+    pub max_difficulty: Option<&'a str>,
     /// Field predicates (`--where key=value`).
     pub where_clauses: &'a [WhereClause],
     /// Current agent name, if provided (`--agent` / `TODO_AGENT`).
@@ -307,6 +325,23 @@ pub fn select_next_task<'a>(
         {
             return false;
         }
+        if let Some(list) = filter.difficulties
+            && !has_difficulty_in(task, list)
+        {
+            return false;
+        }
+        if let Some(max) = filter.max_difficulty {
+            let within = match (
+                cfg.difficulty_rank(task.difficulty.as_deref()),
+                cfg.difficulty_rank(Some(max)),
+            ) {
+                (Some(task_rank), Some(max_rank)) => task_rank <= max_rank,
+                _ => false,
+            };
+            if !within {
+                return false;
+            }
+        }
         filter.where_clauses.iter().all(|w| w.matches(task))
     };
 
@@ -318,6 +353,7 @@ pub fn select_next_task<'a>(
             .iter()
             .filter(|t| {
                 t.status == Status::Claimed
+                    && !t.is_milestone()
                     && t.owner
                         .as_deref()
                         .is_some_and(|o| agent_names_equal(o, agent))

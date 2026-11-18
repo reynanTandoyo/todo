@@ -8,6 +8,7 @@ use similar::TextDiff;
 
 use crate::atomic::{atomic_replace, atomic_write_bytes, read_file_with_snapshot};
 use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::doc::stamp_bytes;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::import::{ConvertedTask, ImportEnv, convert_checkbox};
@@ -80,7 +81,11 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         now: current_time(),
         label: &label,
     };
-    let converted = convert_checkbox(&source.bytes, &env)?;
+    let mut converted = convert_checkbox(&source.bytes, &env)?;
+    // The imported TODO.md carries the tool stamp like any file this tool writes (R-VER-1).
+    converted.bytes = stamp_bytes(&converted.bytes, cfg.id_config.clone()).map_err(|e| {
+        TodoError::new(ErrorCode::WriteFailed, e.to_string()).with_file(label.clone())
+    })?;
 
     let existing = match read_file_with_snapshot(&target) {
         Ok(read) => Some(read),

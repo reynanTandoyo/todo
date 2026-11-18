@@ -276,6 +276,16 @@ pub fn plan_claim(
     cfg: &OpsConfig,
 ) -> Result<ClaimPlan> {
     let id_str = cfg.id_config.format_id(task.id);
+    if task.is_milestone() {
+        // R-MILE-2: a milestone is never claimed; its tasks are.
+        return Err(TodoError::new(
+            ErrorCode::BadTransition,
+            format!(
+                "cannot claim milestone {id_str}: a milestone is never claimed; claim one of the tasks below it"
+            ),
+        )
+        .with_task(id_str));
+    }
     let claimed_timestamp = OpsConfig::format_claimed_timestamp(now);
 
     match task.status {

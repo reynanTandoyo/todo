@@ -49,6 +49,7 @@ Returned by `show` (plus `block_lines`), `add`, `claim`, `release`, `done`, `dro
   "status": "claimed",
   "owner": "agent-1",
   "priority": "P1",
+  "difficulty": "hard",
   "type": "feature",
   "area": "cli",
   "depends": ["T-003"],
@@ -136,6 +137,7 @@ For `todo help agents --json`, `data` is `{"topic":"agents","rules":"..."}`.
         "status": "open",
         "owner": null,
         "priority": "P1",
+        "difficulty": null,
         "type": null,
         "area": null,
         "depends": [],
@@ -165,6 +167,7 @@ For `todo help agents --json`, `data` is `{"topic":"agents","rules":"..."}`.
     "status": "open",
     "owner": null,
     "priority": "P1",
+    "difficulty": null,
     "type": null,
     "area": null,
     "depends": [],
@@ -301,6 +304,8 @@ Problems found (`exit 1`): `ok: false`, `error.code: "BAD_VALUE"`, `error.detail
 
 Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `TaskJson`.
 
+- `answer --json` (`todo.answer.v1`): the question's `TaskJson`, plus `about` with the `TaskJson` of the entry the question names in its `about` field. `about` is left out when the question has none.
+- `show --json` and every other `TaskJson` carry `questions`: the questions whose `about` field names the entry, each `{"id", "title", "status", "archived"}`, in file order (`[]` when there are none).
 - `add --from <file|-> --json` (`todo.add.v1`): `{"added": [<TaskJson>, ...], "count": N}`.
 - `release --stale --json` / `release --all --json` (`todo.release.v1`): `{"released": [<TaskJson>, ...], "count": N}`.
 
