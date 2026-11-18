@@ -6,7 +6,7 @@ use clap::Args as ClapArgs;
 use serde::Serialize;
 
 use crate::cli::{CommandKind, CommandMeta, Context, load_read};
-use crate::doc::{EntryKind, Status};
+use crate::doc::{EntryKind, Progress, Status};
 use crate::error::Result;
 use crate::lock::current_time;
 use crate::ops::is_task_ready;
@@ -17,7 +17,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "summary",
     summary: "Show a compact session-start overview of TODO.md",
     kind: CommandKind::Read,
-    details: "Prints at most 40 lines summarizing counts by status and open priority, active/stale claims, blocked tasks with their latest reason, the next 5 ready tasks, open questions, and how many ideas are waiting (ideas are not counted as tasks).",
+    details: "Prints at most 40 lines summarizing counts by status and open priority, the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, the next 5 ready tasks, open questions, and how many ideas are waiting (ideas are not counted as tasks).",
     examples: &["todo summary", "todo summary --json"],
 };
 
@@ -43,6 +43,16 @@ struct StatusCounts {
 struct PriorityCount {
     priority: String,
     count: usize,
+}
+
+/// A top-level milestone that is not done or dropped, with its progress (`R-MILE-3`).
+#[derive(Serialize)]
+struct MilestoneSummary {
+    id: String,
+    title: String,
+    priority: Option<String>,
+    status: &'static str,
+    progress: Progress,
 }
 
 #[derive(Serialize)]
@@ -82,6 +92,7 @@ struct SummaryJson {
     file: String,
     counts: StatusCounts,
     open_by_priority: Vec<PriorityCount>,
+    milestones: Vec<MilestoneSummary>,
     claimed: Vec<ClaimedSummary>,
     blocked: Vec<BlockedSummary>,
     next_ready: Vec<ReadySummary>,
@@ -213,10 +224,29 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         });
     }
 
+    // Top-level milestones that are open or blocked; a milestone is never claimed (R-MILE-2).
+    let milestones: Vec<MilestoneSummary> = doc
+        .tasks
+        .iter()
+        .filter(|t| {
+            t.is_milestone()
+                && matches!(t.status, Status::Open | Status::Blocked)
+                && doc.milestone_ancestors(t).is_empty()
+        })
+        .map(|t| MilestoneSummary {
+            id: doc.id_config.format_id(t.id),
+            title: t.title.clone(),
+            priority: t.priority.clone(),
+            status: t.status.as_str(),
+            progress: doc.progress(t.id),
+        })
+        .collect();
+
     let payload = SummaryJson {
         file: loaded.file_label.clone(),
         counts,
         open_by_priority,
+        milestones,
         claimed,
         blocked,
         next_ready,
@@ -257,6 +287,23 @@ fn format_summary_lines(s: &SummaryJson) -> Vec<String> {
             .map(|p| format!("{}={}", p.priority, p.count))
             .collect();
         lines.push(format!("open by priority: {}", parts.join(" ")));
+    }
+
+    if !s.milestones.is_empty() {
+        lines.push(format!("milestones ({}):", s.milestones.len()));
+        for m in s.milestones.iter().take(5) {
+            let prio = m.priority.as_deref().unwrap_or("—");
+            lines.push(format!(
+                "  {} [{}] · {} · {}/{} done, {}",
+                m.id, prio, m.title, m.progress.done, m.progress.total, m.status
+            ));
+        }
+        if s.milestones.len() > 5 {
+            lines.push(format!(
+                "  ... and {} more milestones",
+                s.milestones.len() - 5
+            ));
+        }
     }
 
     if s.counts.ideas > 0 {

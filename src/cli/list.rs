@@ -6,9 +6,10 @@ use clap::Args as ClapArgs;
 use serde::Serialize;
 
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::Task;
+use crate::doc::{EntryKind, Task};
 use crate::error::Result;
 use crate::lock::current_time;
+use crate::ops::milestone::resolve_milestone;
 use crate::ops::{
     ListFilter, ListTaskJson, OpsConfig, StatusFilter, WhereClause, build_list_task_json,
     filter_tasks, load_for_read_with_found,
@@ -23,7 +24,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "list",
     summary: "List and filter tasks",
     kind: CommandKind::Read,
-    details: "Prints one line per matching task (ID, priority, status, owner if any, and title) followed by a count. Done and dropped tasks are hidden unless `--status`, `--by` or `--archive` is passed. `--by <name>` lists the tasks that person finished (the `by` field written by `done`, case-insensitive).",
+    details: "Prints one line per matching task (ID, priority, status, owner if any, and title) followed by a count. Done and dropped tasks are hidden unless `--status`, `--by` or `--archive` is passed. `--by <name>` lists the tasks that person finished (the `by` field written by `done`, case-insensitive). `--kind <list>` keeps the given kinds (milestone, task, question, idea). `--milestone <task>` keeps the entries below that milestone, at any depth.",
     examples: &[
         "todo list",
         "todo list --status open,claimed --priority P0",
@@ -31,6 +32,8 @@ pub const META: CommandMeta = CommandMeta {
         "todo list --mine --agent alice",
         "todo list --where custom_tag=morning-shift",
         "todo list --by alice",
+        "todo list --kind milestone",
+        "todo list --milestone T-010",
         "todo list --archive",
     ],
 };
@@ -86,6 +89,14 @@ pub struct Args {
     #[arg(long)]
     pub stale: bool,
 
+    /// Filter by kind: a comma-separated list of `milestone`, `task`, `question` and `idea` (`R-KIND-3`).
+    #[arg(long, value_name = "LIST")]
+    pub kind: Option<String>,
+
+    /// Show only the entries below this milestone, at any depth (an ID or a title; `R-MILE-3`).
+    #[arg(long, value_name = "MILESTONE")]
+    pub milestone: Option<String>,
+
     /// List tasks from `TODO-archive.md` instead of `TODO.md`.
     #[arg(long)]
     pub archive: bool,
@@ -130,9 +141,19 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         None
     };
 
+    let kinds = match args.kind.as_deref() {
+        Some(raw) => Some(EntryKind::parse_kind_list(raw)?),
+        None => None,
+    };
+
     let loaded =
         load_for_read_with_found(found, &cfg, args.archive, !args.archive && args.ready, out)?;
     let now = current_time();
+
+    let milestone = match args.milestone.as_deref() {
+        Some(raw) => Some(resolve_milestone(&loaded.doc, raw)?.id),
+        None => None,
+    };
 
     let difficulties = match args.difficulty.as_deref() {
         Some(raw) => Some(cfg.difficulty_list(raw)?),
@@ -151,6 +172,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         mine_agent,
         stale_only: args.stale,
         archive_mode: args.archive,
+        kinds: kinds.as_deref(),
+        milestone,
     };
 
     let t_filter = crate::timing::PhaseTimer::start("list.filter");
