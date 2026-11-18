@@ -9,7 +9,7 @@ use serde_json::{Map, Value};
 use similar::TextDiff;
 
 use crate::agents::hooks_file::{
-    HOOK_EVENTS, canonical_entries, detect_indent, is_managed_hook,
+    HOOK_EVENTS, detect_indent, install_hook_text, is_managed_hook,
 };
 use crate::agents::project::{BACKUP_REL_PATH, SETTINGS_REL_PATH};
 use crate::atomic::atomic_write_bytes;
@@ -102,18 +102,20 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         })?
     };
 
-    let action_name = match args.action {
+    // Install edits the text in place, so every byte outside the managed entries stays (T-126).
+    // Uninstall still rewrites the parsed settings.
+    let (action_name, new_text) = match args.action {
         HooksAction::Install => {
-            install_hooks(&mut root)?;
-            "install"
+            let text = install_hook_text(old_text).map_err(|msg| {
+                TodoError::new(ErrorCode::BadValue, msg).with_file(label.clone())
+            })?;
+            ("install", text)
         }
         HooksAction::Uninstall => {
             uninstall_hooks(&mut root)?;
-            "uninstall"
+            ("uninstall", format_preserving_style(old_text, &root)?)
         }
     };
-
-    let new_text = format_preserving_style(old_text, &root)?;
     let new_bytes = new_text.as_bytes();
     let changed = old_bytes.as_deref() != Some(new_bytes);
 
@@ -190,54 +192,6 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         out.write_line(&format!("{label}: already up to date"));
     }
 
-    Ok(())
-}
-
-fn install_hooks(root: &mut Value) -> Result<()> {
-    let root_obj = root.as_object_mut().ok_or_else(|| {
-        TodoError::new(
-            ErrorCode::BadValue,
-            format!("{SETTINGS_REL_PATH} root must be a JSON object"),
-        )
-    })?;
-    let hooks_val = root_obj
-        .entry("hooks")
-        .or_insert_with(|| Value::Object(Map::new()));
-    let hooks_obj = hooks_val.as_object_mut().ok_or_else(|| {
-        TodoError::new(
-            ErrorCode::BadValue,
-            "`hooks` in settings.json must be a JSON object",
-        )
-    })?;
-
-    // SessionStart -> todo summary; PreToolUse -> todo guard; SessionEnd -> todo session-end
-    // (releases the claims of the ending session; R-CLAIM-7). `migrate` writes the same entries.
-    for (event, entry) in canonical_entries() {
-        upsert_hook_entry(hooks_obj, event, entry)?;
-    }
-
-    Ok(())
-}
-
-fn upsert_hook_entry(
-    hooks_obj: &mut Map<String, Value>,
-    event: &str,
-    entry: Value,
-) -> Result<()> {
-    let arr_val = hooks_obj
-        .entry(event)
-        .or_insert_with(|| Value::Array(Vec::new()));
-    let arr = arr_val.as_array_mut().ok_or_else(|| {
-        TodoError::new(
-            ErrorCode::BadValue,
-            format!("`hooks.{event}` in settings.json must be a JSON array"),
-        )
-    })?;
-    if let Some(existing) = arr.iter_mut().find(|v| is_managed_hook(v)) {
-        *existing = entry;
-    } else {
-        arr.push(entry);
-    }
     Ok(())
 }
 

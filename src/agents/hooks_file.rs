@@ -118,25 +118,17 @@ pub(crate) fn outdated_hook_entries(text: &str) -> Result<Vec<HookEdit>, String>
             continue;
         }
         let elements = array_elements(bytes, member.start).ok_or_else(layout)?;
-        let mut managed = None;
-        for (start, end) in elements {
-            let value: Value = serde_json::from_str(text.get(start..end).ok_or_else(layout)?)
-                .map_err(|e| format!("not valid JSON: {e}"))?;
-            if is_managed_hook(&value) {
-                managed = Some((start..end, value));
-                break;
-            }
-        }
-        let Some((range, value)) = managed else {
+        let Some((start, end, value)) = managed_element(text, &elements)? else {
             continue;
         };
+        let range = start..end;
         if value == canonical {
             continue;
         }
         edits.push(HookEdit {
             event,
             range,
-            text: render_entry(&canonical, &indent, eol)?,
+            text: render_value(&canonical, &indent, eol, 3)?,
         });
     }
     Ok(edits)
@@ -146,41 +138,274 @@ pub(crate) fn outdated_hook_entries(text: &str) -> Result<Vec<HookEdit>, String>
 /// fall on the text.
 #[must_use]
 pub(crate) fn apply_hook_edits(text: &str, edits: &[HookEdit]) -> Option<String> {
-    let mut sorted: Vec<&HookEdit> = edits.iter().collect();
-    sorted.sort_by_key(|e| e.range.start);
+    let splices: Vec<Splice> = edits
+        .iter()
+        .map(|e| Splice {
+            range: e.range.clone(),
+            text: e.text.clone(),
+        })
+        .collect();
+    splice_text(text, &splices)
+}
+
+/// Replaces the bytes in `range` by `text`. An empty range inserts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Splice {
+    range: Range<usize>,
+    text: String,
+}
+
+/// The text with each splice applied. Splices at the same place keep the order they are given in.
+/// `None` if they overlap or do not fall on the text.
+fn splice_text(text: &str, splices: &[Splice]) -> Option<String> {
+    let mut sorted: Vec<&Splice> = splices.iter().collect();
+    sorted.sort_by_key(|s| s.range.start);
     let mut out = String::with_capacity(text.len());
     let mut pos = 0;
-    for edit in sorted {
-        if edit.range.start < pos {
+    for splice in sorted {
+        if splice.range.start < pos || splice.range.end < splice.range.start {
             return None;
         }
-        out.push_str(text.get(pos..edit.range.start)?);
-        out.push_str(&edit.text);
-        pos = edit.range.end;
+        out.push_str(text.get(pos..splice.range.start)?);
+        out.push_str(&splice.text);
+        pos = splice.range.end;
     }
     out.push_str(text.get(pos..)?);
     Some(out)
 }
 
-/// Formats a hook entry with the file's indentation. The entry sits three levels deep (the root
-/// object, `hooks`, and the event's array), so every line after the first is indented that far.
-fn render_entry(entry: &Value, indent: &str, eol: &str) -> Result<String, String> {
+/// The settings text with the managed hook entries installed, for `hooks install` (`R-AGENT-4`).
+///
+/// Only the bytes of the entries that change are touched, as `migrate --yes` does: an outdated
+/// managed entry is replaced where it sits, and a missing entry, event array or `hooks` object is
+/// inserted at the end of the object or array it belongs to. Every other byte, including key
+/// order and inline formatting, stays as it is. Empty text becomes a new settings object. Errors
+/// name what cannot be installed; nothing is changed then.
+pub(crate) fn install_hook_text(text: &str) -> Result<String, String> {
+    let text = if text.trim().is_empty() { "{}\n" } else { text };
+    let root: Value = serde_json::from_str(text).map_err(|e| format!("not valid JSON: {e}"))?;
+    let root_map = root
+        .as_object()
+        .ok_or("the root of settings.json must be a JSON object")?;
+
+    let indent = detect_indent(text);
+    let eol = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    let bytes = text.as_bytes();
+    let layout = || "unexpected layout; hooks not changed".to_string();
+    let root_open = skip_ws(bytes, 0);
+    let root_members = object_members(bytes, root_open).ok_or_else(layout)?;
+
+    let mut splices = Vec::new();
+    match root_map.get("hooks") {
+        None => {
+            // The members sit at depth 1, the events at depth 2 (`hooks` is a member of the root).
+            let mut events = Vec::new();
+            for (event, entry) in canonical_entries() {
+                events.push(member_text(
+                    event,
+                    &Value::Array(vec![entry]),
+                    &indent,
+                    eol,
+                    2,
+                )?);
+            }
+            let hooks = block(&events, '{', '}', &indent, eol, 2);
+            let item = format!("\"hooks\": {hooks}");
+            let last_end = root_members.last().map(|m| m.end);
+            splices.push(
+                insert_items(bytes, root_open, last_end, &[item], &indent, eol, 1)
+                    .ok_or_else(layout)?,
+            );
+        }
+        Some(Value::Object(hook_map)) => {
+            let hooks = last_member(&root_members, "hooks").ok_or_else(layout)?;
+            let hook_members = object_members(bytes, hooks.start).ok_or_else(layout)?;
+            let mut missing = Vec::new();
+            for (event, entry) in canonical_entries() {
+                match hook_map.get(event) {
+                    None => missing.push(member_text(
+                        event,
+                        &Value::Array(vec![entry]),
+                        &indent,
+                        eol,
+                        2,
+                    )?),
+                    Some(Value::Array(_)) => {
+                        let member = last_member(&hook_members, event).ok_or_else(layout)?;
+                        splices.extend(install_event(
+                            bytes,
+                            text,
+                            member.start,
+                            &entry,
+                            &indent,
+                            eol,
+                        )?);
+                    }
+                    Some(_) => {
+                        return Err(format!(
+                            "`hooks.{event}` in settings.json must be a JSON array"
+                        ));
+                    }
+                }
+            }
+            if !missing.is_empty() {
+                let last_end = hook_members.last().map(|m| m.end);
+                splices.push(
+                    insert_items(bytes, hooks.start, last_end, &missing, &indent, eol, 2)
+                        .ok_or_else(layout)?,
+                );
+            }
+        }
+        Some(_) => {
+            return Err("`hooks` in settings.json must be a JSON object".to_string());
+        }
+    }
+    splice_text(text, &splices).ok_or_else(layout)
+}
+
+/// The splices that bring one event's array (opening at `open`) up to date: the managed entry is
+/// replaced if it differs, or the canonical entry is added at the end when there is none.
+fn install_event(
+    bytes: &[u8],
+    text: &str,
+    open: usize,
+    canonical: &Value,
+    indent: &str,
+    eol: &str,
+) -> Result<Vec<Splice>, String> {
+    let layout = || "unexpected layout; hooks not changed".to_string();
+    let elements = array_elements(bytes, open).ok_or_else(layout)?;
+    let rendered = render_value(canonical, indent, eol, 3)?;
+    match managed_element(text, &elements)? {
+        Some((_, _, value)) if value == *canonical => Ok(Vec::new()),
+        Some((start, end, _)) => Ok(vec![Splice {
+            range: start..end,
+            text: rendered,
+        }]),
+        None => {
+            let last_end = elements.last().map(|e| e.1);
+            let splice = insert_items(bytes, open, last_end, &[rendered], indent, eol, 3)
+                .ok_or_else(layout)?;
+            Ok(vec![splice])
+        }
+    }
+}
+
+/// The first managed entry among the array elements at `elements` (byte ranges in `text`).
+fn managed_element(
+    text: &str,
+    elements: &[(usize, usize)],
+) -> Result<Option<(usize, usize, Value)>, String> {
+    for &(start, end) in elements {
+        let slice = text
+            .get(start..end)
+            .ok_or_else(|| "unexpected layout; hooks not changed".to_string())?;
+        let value: Value =
+            serde_json::from_str(slice).map_err(|e| format!("not valid JSON: {e}"))?;
+        if is_managed_hook(&value) {
+            return Ok(Some((start, end, value)));
+        }
+    }
+    Ok(None)
+}
+
+/// The splice that adds `items` to the object or array that opens at `open`, with the items at
+/// `depth` levels of indentation. After its last item (`last_end`) when it has one, otherwise in
+/// place of its empty brackets. `None` when there is nothing to add or the brackets are missing.
+fn insert_items(
+    bytes: &[u8],
+    open: usize,
+    last_end: Option<usize>,
+    items: &[String],
+    indent: &str,
+    eol: &str,
+    depth: usize,
+) -> Option<Splice> {
+    if items.is_empty() {
+        return None;
+    }
+    let close = value_end(bytes, open)?.checked_sub(1)?;
+    match last_end {
+        Some(end) => Some(Splice {
+            range: end..end,
+            text: format!(",{}", joined(items, indent, eol, depth)),
+        }),
+        None => Some(Splice {
+            range: open..close + 1,
+            text: block(
+                items,
+                char::from(*bytes.get(open)?),
+                char::from(*bytes.get(close)?),
+                indent,
+                eol,
+                depth,
+            ),
+        }),
+    }
+}
+
+/// `items` as the whole contents of a new object or array, with its brackets: the items at
+/// `depth` levels, the closing bracket one level less.
+fn block(
+    items: &[String],
+    open: char,
+    close: char,
+    indent: &str,
+    eol: &str,
+    depth: usize,
+) -> String {
+    format!(
+        "{open}{}{eol}{}{close}",
+        joined(items, indent, eol, depth),
+        indent.repeat(depth.saturating_sub(1))
+    )
+}
+
+/// `items`, each on its own line at `depth` levels, separated by commas (no comma after the last).
+fn joined(items: &[String], indent: &str, eol: &str, depth: usize) -> String {
+    let pad = indent.repeat(depth);
+    items
+        .iter()
+        .map(|item| format!("{eol}{pad}{item}"))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// One object member as text: its quoted key, then its value formatted at `depth` levels.
+fn member_text(
+    key: &str,
+    value: &Value,
+    indent: &str,
+    eol: &str,
+    depth: usize,
+) -> Result<String, String> {
+    let key = serde_json::to_string(key).map_err(|e| format!("could not format a key: {e}"))?;
+    Ok(format!(
+        "{key}: {}",
+        render_value(value, indent, eol, depth)?
+    ))
+}
+
+/// Formats `value` as pretty JSON in the file's indentation. The value starts on a line `depth`
+/// levels deep, so every line after the first is indented that far.
+fn render_value(value: &Value, indent: &str, eol: &str, depth: usize) -> Result<String, String> {
     let mut buf = Vec::new();
     let formatter = PrettyFormatter::with_indent(indent.as_bytes());
     let mut ser = Serializer::with_formatter(&mut buf, formatter);
-    entry
+    value
         .serialize(&mut ser)
         .map_err(|e| format!("could not format a hook entry: {e}"))?;
     let rendered =
         String::from_utf8(buf).map_err(|e| format!("could not format a hook entry: {e}"))?;
-    let pad = format!("{eol}{}", indent.repeat(3));
+    let pad = format!("{eol}{}", indent.repeat(depth));
     Ok(rendered.split('\n').collect::<Vec<_>>().join(&pad))
 }
 
-/// One member of a JSON object: its key, and where its value starts.
+/// One member of a JSON object: its key, and where its value starts and ends.
 struct Member {
     key: String,
     start: usize,
+    end: usize,
 }
 
 /// The last member named `key`, which is the one serde_json keeps when a key repeats.
@@ -267,7 +492,7 @@ fn object_members(b: &[u8], start: usize) -> Option<Vec<Member>> {
         }
         i = skip_ws(b, i + 1);
         let end = value_end(b, i)?;
-        members.push(Member { key, start: i });
+        members.push(Member { key, start: i, end });
         i = skip_ws(b, end);
         match b.get(i)? {
             b',' => i = skip_ws(b, i + 1),
@@ -383,5 +608,101 @@ mod tests {
         assert_eq!(root.len(), 2);
         assert_eq!(root[1].key, "b");
         assert_eq!(b.get(root[1].start), Some(&b'['));
+        assert_eq!(root[1].end, b.len() - 1);
+    }
+
+    #[test]
+    fn installing_into_empty_text_writes_the_three_events_and_is_then_current() {
+        let fresh = install_hook_text("").expect("install");
+        assert!(fresh.ends_with("}\n"), "{fresh}");
+        let value: Value = serde_json::from_str(&fresh).expect("json");
+        for event in HOOK_EVENTS {
+            assert!(value["hooks"][event].is_array(), "{event}: {fresh}");
+        }
+        assert!(outdated_hook_entries(&fresh).expect("scan").is_empty());
+        assert_eq!(install_hook_text(&fresh).expect("again"), fresh);
+    }
+
+    #[test]
+    fn a_current_file_comes_back_unchanged_whatever_its_formatting() {
+        let text = "{\"hooks\":{\"SessionStart\":[{\"_managed_by\":\"todo\",\"hooks\":[{\"command\":\"todo summary\",\"type\":\"command\"}]}],\"PreToolUse\":[{\"_managed_by\":\"todo\",\"matcher\":\"Edit|Write|MultiEdit\",\"hooks\":[{\"type\":\"command\",\"command\":\"todo guard\"}]}],\"SessionEnd\":[{\"_managed_by\":\"todo\",\"hooks\":[{\"type\":\"command\",\"command\":\"todo session-end\"}]}]}}";
+        assert_eq!(install_hook_text(text).expect("install"), text);
+    }
+
+    #[test]
+    fn install_keeps_key_order_inline_formatting_and_escapes() {
+        let text = "{\"zeta\": 1,\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"echo \\u00e9\"}]}]},\"alpha\":[1,2]}\n";
+        let fixed = install_hook_text(text).expect("install");
+        assert!(
+            fixed.starts_with("{\"zeta\": 1,\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Bash\""),
+            "{fixed}"
+        );
+        assert!(fixed.ends_with("},\"alpha\":[1,2]}\n"), "{fixed}");
+        assert!(fixed.contains("echo \\u00e9"), "{fixed}");
+        let value: Value = serde_json::from_str(&fixed).expect("json");
+        assert_eq!(
+            value["hooks"]["PreToolUse"].as_array().map(Vec::len),
+            Some(2)
+        );
+        assert!(outdated_hook_entries(&fixed).expect("scan").is_empty());
+    }
+
+    #[test]
+    fn an_outdated_managed_entry_is_replaced_where_it_sits_and_the_rest_is_kept() {
+        let old = "{\"_managed_by\": \"todo\", \"hooks\": [{\"type\": \"command\", \"command\": \"todo summ\"}]}";
+        let user = "{\"matcher\": \"Bash\", \"hooks\": [{\"type\": \"command\", \"command\": \"echo \\\"}]\"}]}";
+        let text = settings(&format!("{user},\n      {old}"));
+        let fixed = install_hook_text(&text).expect("install");
+        let before = text.find(old).expect("old entry");
+        assert!(fixed.starts_with(text.get(..before).expect("prefix")));
+        assert!(fixed.contains(user));
+        assert!(fixed.contains("todo summary"));
+        assert!(!fixed.contains("todo summ\""));
+        assert!(fixed.ends_with("\n  }\n}\n"), "{fixed}");
+        assert!(outdated_hook_entries(&fixed).expect("rescan").is_empty());
+    }
+
+    #[test]
+    fn a_missing_hooks_object_is_added_after_the_last_setting_in_the_file_style() {
+        let text = "{\r\n    \"env\": {\"A\": 1}\r\n}\r\n";
+        let fixed = install_hook_text(text).expect("install");
+        assert!(
+            fixed.starts_with("{\r\n    \"env\": {\"A\": 1},\r\n    \"hooks\": {\r\n"),
+            "{fixed}"
+        );
+        assert!(fixed.ends_with("\r\n}\r\n"), "{fixed}");
+        assert!(!fixed.replace("\r\n", "").contains('\n'), "{fixed}");
+        assert!(outdated_hook_entries(&fixed).expect("scan").is_empty());
+    }
+
+    #[test]
+    fn empty_hooks_and_empty_event_arrays_are_filled() {
+        let text = "{\"hooks\": {\"SessionEnd\": []}}";
+        let fixed = install_hook_text(text).expect("install");
+        assert!(
+            fixed.starts_with("{\"hooks\": {\"SessionEnd\": [\n"),
+            "{fixed}"
+        );
+        let value: Value = serde_json::from_str(&fixed).expect("json");
+        assert_eq!(
+            value["hooks"]["SessionEnd"].as_array().map(Vec::len),
+            Some(1)
+        );
+        assert!(value["hooks"]["SessionStart"].is_array());
+        assert!(outdated_hook_entries(&fixed).expect("scan").is_empty());
+
+        let empty = install_hook_text("{\"hooks\": {}}").expect("install");
+        let value: Value = serde_json::from_str(&empty).expect("json");
+        for event in HOOK_EVENTS {
+            assert!(value["hooks"][event].is_array(), "{event}: {empty}");
+        }
+    }
+
+    #[test]
+    fn shapes_that_cannot_hold_the_entries_are_refused() {
+        assert!(install_hook_text("[]").is_err());
+        assert!(install_hook_text("{\"hooks\": []}").is_err());
+        assert!(install_hook_text("{\"hooks\": {\"SessionEnd\": {}}}").is_err());
+        assert!(install_hook_text("{\"hooks\": ").is_err());
     }
 }
