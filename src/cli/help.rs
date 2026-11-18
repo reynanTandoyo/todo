@@ -1,5 +1,7 @@
 //! `todo help` command: overview and per-command help with examples (T-005; R-OUT-8).
 
+pub mod update;
+
 use clap::Args as ClapArgs;
 use serde::Serialize;
 
@@ -75,6 +77,10 @@ pub fn run(args: Args, _ctx: &Context, out: &mut Output) -> Result<()> {
             } else {
                 out.write_str(crate::agents::RULES_TEXT);
             }
+            Ok(())
+        }
+        Some(topic) if topic.eq_ignore_ascii_case("update") => {
+            update::emit(out, std::env::current_exe().ok().as_deref());
             Ok(())
         }
         Some(topic) => {
