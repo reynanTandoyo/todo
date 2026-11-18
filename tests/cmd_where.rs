@@ -163,7 +163,7 @@ fn where_counts_tasks_and_counts_milestones_questions_and_ideas_apart() {
     )
     .unwrap();
 
-    let text_out = cargo_bin_cmd!("todo")
+    let text_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["where"])
         .output()
@@ -179,7 +179,7 @@ fn where_counts_tasks_and_counts_milestones_questions_and_ideas_apart() {
         "stdout: {stdout}"
     );
 
-    let json_out = cargo_bin_cmd!("todo")
+    let json_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "where"])
         .output()

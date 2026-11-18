@@ -129,7 +129,7 @@ fn hooks_uninstall_keeps_every_other_byte_of_the_settings() {
     let initial = "{\n  \"zeta\": {\"caf\\u00e9\": [1, 2]},\n  \"permissions\": {\"allow\": [\"Bash(git status)\"]},\n  \"env\": {\"B\": \"2\"},\n  \"alpha\": true\n}\n";
     fs::write(&settings_path, initial).unwrap();
 
-    let install = cargo_bin_cmd!("todo")
+    let install = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["hooks", "install", "--yes"])
         .output()
@@ -139,7 +139,7 @@ fn hooks_uninstall_keeps_every_other_byte_of_the_settings() {
     assert_ne!(installed, initial);
 
     // Uninstall removes exactly what install added: the original bytes come back.
-    let uninstall = cargo_bin_cmd!("todo")
+    let uninstall = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["hooks", "uninstall", "--yes"])
         .output()
@@ -149,7 +149,7 @@ fn hooks_uninstall_keeps_every_other_byte_of_the_settings() {
     assert_eq!(read_text(&claude_dir.join("settings.json.bak")), installed);
 
     // Nothing is left to remove: a second run changes nothing.
-    let again = cargo_bin_cmd!("todo")
+    let again = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["hooks", "uninstall", "--yes"])
         .output()
@@ -163,7 +163,7 @@ fn hooks_uninstall_does_not_create_a_settings_file() {
     let dir = TempDir::new().unwrap();
     fs::write(dir.path().join("TODO.md"), TODO_MD).unwrap();
 
-    let uninstall = cargo_bin_cmd!("todo")
+    let uninstall = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["hooks", "uninstall", "--yes"])
         .output()
