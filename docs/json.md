@@ -321,20 +321,33 @@ ones only for the whole tree (no milestone argument and no `--area`); otherwise 
   "schema": "todo.where.v1",
   "ok": true,
   "data": {
-    "todo_file": "C:\\Project\\todo\\TODO.md",
-    "found_by": "git_worktree_main",
-    "state_dir": "C:\\Project\\todo\\.git\\todo\\TODO.md",
-    "archive_file": "C:\\Project\\todo\\TODO-archive.md",
-    "archive_exists": false,
-    "config_file": "C:\\Project\\todo\\todo.toml",
-    "config_exists": false
+    "file": "C:\\Project\\todo\\TODO.md",
+    "found_by": "worktree-main",
+    "repo_root": "C:\\Project\\todo",
+    "state_dir": "C:\\Project\\todo\\.git\\todo\\todo.md",
+    "write_lock": { "held": false },
+    "format_version": 2,
+    "tool_stamp": "0.6.0",
+    "running_version": "0.6.0",
+    "counts": { "open": 10, "claimed": 4, "blocked": 0, "done": 27, "dropped": 3, "total": 44 }
   },
   "warnings": []
 }
 ```
 
-When the format version is newer than this todo knows, `where` still succeeds but leaves out
-`counts`, because the tasks are not read (R-VER-2).
+- `file` is the `TODO.md` in use and `found_by` says how it was found (`flag`, `env`, `walk`,
+  `worktree-main`, ...). `repo_root` is the git repository root, or `null` outside a repository.
+- `state_dir` is the folder that holds the lock and the state files. `write_lock.held` is `true`
+  while a command holds the write lock; then `write_lock` also has `holder` with `agent`,
+  `command`, `pid` and `started_at`.
+- `lease` is present only while a manual lease (`todo lock`) is active: `agent`, `started_at`,
+  `expires_at` and `remaining_seconds`.
+- `format_version` is the version in the format line (`format.md` §4), or `null` when the file has
+  none. `tool_stamp` is the version in the tool line (`R-VER-1`), or `null` when there is none, and
+  `running_version` is the version of the todo that ran. When the stamp is newer than
+  `running_version`, a warning says to run `todo help update`.
+- `counts` holds the number of entries per status. When the format version is newer than this todo
+  knows, `where` still succeeds but leaves out `counts`, because the tasks are not read (R-VER-2).
 
 ### `todo check --json` (`todo.check.v1`)
 

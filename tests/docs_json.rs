@@ -165,3 +165,34 @@ fn show_example_in_json_md_has_the_keys_of_show_json() {
     assert_eq!(example["schema"], real["schema"]);
     assert_same_keys(&example["data"], &real["data"], "show <task> --json");
 }
+
+#[test]
+fn where_example_in_json_md_has_the_keys_of_where_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo where --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(
+        dir.path().join("TODO.md"),
+        "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 2 -->
+<!-- todo-tool: 0.6.0 -->
+# Fixture
+
+## Tasks
+
+### T-001 · First task
+- status: open
+- owner: —
+- priority: P1
+",
+    )
+    .expect("write TODO.md");
+    let out = run_in(dir.path(), &["where", "--json"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "where --json");
+}
