@@ -5,7 +5,7 @@ use clap::Args as ClapArgs;
 use crate::cli::{CommandKind, CommandMeta, Context, load_read};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::current_time;
-use crate::ops::{build_task_json, file_label, resolve_task_by_title};
+use crate::ops::{build_task_json, file_label, questions_about, resolve_task_by_title};
 use crate::output::Output;
 
 /// Metadata for the `show` command.
@@ -13,7 +13,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "show",
     summary: "Show full details of a task",
     kind: CommandKind::Read,
-    details: "Prints the task block exactly as it appears in TODO.md (or TODO-archive.md if archived). With `--json`, returns all known and unknown fields, notes, line numbers, dependencies with their statuses, and tasks waiting on this task.",
+    details: "Prints the task block exactly as it appears in TODO.md (or TODO-archive.md if archived), then the questions about it with their status. With `--json`, returns all known and unknown fields, notes, line numbers, dependencies with their statuses, tasks waiting on this task, and the questions about it (`questions`). Works for milestones too.",
     examples: &[
         "todo show T-001",
         "todo show 1",
@@ -67,6 +67,22 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     for line in &primary_doc.line_doc.lines[task.block_range.clone()] {
         out.write_line(&line.text);
+    }
+
+    let questions = questions_about(primary_doc, secondary_doc, archived, task.id, &cfg);
+    if !questions.is_empty() {
+        out.write_line("");
+        out.write_line(&format!(
+            "Questions about {}:",
+            cfg.id_config.format_id(task.id)
+        ));
+        for question in &questions {
+            let archived_note = if question.archived { " (archived)" } else { "" };
+            out.write_line(&format!(
+                "- {} · {} · {}{archived_note}",
+                question.id, question.status, question.title
+            ));
+        }
     }
     Ok(())
 }
