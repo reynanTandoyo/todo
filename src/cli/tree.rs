@@ -7,7 +7,7 @@ use clap::Args as ClapArgs;
 use serde::Serialize;
 
 use crate::cli::{CommandKind, CommandMeta, Context, load_read};
-use crate::doc::{Document, EntryKind, Progress, Status, Task, TaskId};
+use crate::doc::{Document, EntryKind, MilestoneIndex, Progress, Status, Task, TaskId};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::OpsConfig;
 use crate::ops::milestone::resolve_milestone;
@@ -254,6 +254,7 @@ fn build_tree(
 ) -> Vec<TreeNode> {
     let mut builder = TreeBuilder {
         doc,
+        index: doc.milestone_index(),
         selection,
         archived,
         visited: BTreeSet::new(),
@@ -292,6 +293,8 @@ fn build_tree(
 /// Builds nodes for the tree, visiting each entry once so a cycle of milestones cannot loop.
 struct TreeBuilder<'a> {
     doc: &'a Document,
+    /// The milestone tree, indexed once for the whole build (T-125).
+    index: MilestoneIndex<'a>,
     selection: Selection<'a>,
     archived: bool,
     visited: BTreeSet<TaskId>,
@@ -304,11 +307,10 @@ impl<'a> TreeBuilder<'a> {
         if !self.visited.insert(task.id) {
             return None;
         }
-        let doc = self.doc;
         let all = self.selection.all;
         if task.is_milestone() {
-            let children: Vec<TreeNode> = doc
-                .children_of(task.id)
+            let entries: Vec<&'a Task> = self.index.children_of(task.id).to_vec();
+            let children: Vec<TreeNode> = entries
                 .into_iter()
                 .filter(|child| matches!(child.kind(), EntryKind::Task | EntryKind::Milestone))
                 .filter_map(|child| self.node(child, false))
@@ -341,7 +343,7 @@ impl<'a> TreeBuilder<'a> {
             difficulty: task.difficulty.clone(),
             area: task.area.clone(),
             goal: if milestone { task.goal.clone() } else { None },
-            progress: milestone.then(|| self.doc.progress(task.id)),
+            progress: milestone.then(|| self.index.progress(task.id)),
             archived: self.archived,
             children,
         }

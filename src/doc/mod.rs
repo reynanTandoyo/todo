@@ -45,5 +45,5 @@ pub use parser::{
     inspect_problems, is_nobody_owner, is_valid_agent_name, strip_section_number,
 };
 pub use stamp::{stamp_bytes, tool_line_text};
-pub use tree::{EntryKind, Progress};
+pub use tree::{EntryKind, MilestoneIndex, Progress};
 pub use verify::{AppliedDocEdits, TaskChangeIntent, verify_task_edits};

@@ -234,6 +234,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     }
 
     // Top-level milestones that are open or blocked; a milestone is never claimed (R-MILE-2).
+    let index = doc.milestone_index();
     let milestones: Vec<MilestoneSummary> = doc
         .tasks
         .iter()
@@ -247,7 +248,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             title: t.title.clone(),
             priority: t.priority.clone(),
             status: t.status.as_str(),
-            progress: doc.progress(t.id),
+            progress: index.progress(t.id),
         })
         .collect();
 
