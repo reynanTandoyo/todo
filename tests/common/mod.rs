@@ -19,13 +19,32 @@ use tempfile::TempDir;
 /// First line of every invented fixture (AGENTS.md "Test rules").
 pub const FIXTURE_MARKER: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->";
 
-/// A `todo` command with the inherited environment as the test process has it.
+/// The environment variables `todo` reads: the task list and agent (`TODO_FILE`, `TODO_AGENT`), the
+/// session variables (Claude Code exports its session ID to the commands it runs, and tests must not
+/// tag claims with it) and the test hooks. The helpers remove all of them, so a test never sees the
+/// task list, agent or clock of the environment that runs it (TEST-8).
+const TODO_ENVIRONMENT: &[&str] = &[
+    "TODO_FILE",
+    "TODO_AGENT",
+    "TODO_SESSION",
+    "CLAUDE_CODE_SESSION_ID",
+    "TODO_TEST_NOW",
+    "TODO_TEST_LOCK_WAIT_MS",
+    "TODO_TEST_LEASE_SECONDS",
+    "TODO_TEST_BEFORE_RENAME_READY_FILE",
+    "TODO_TEST_BEFORE_RENAME_HOLD_MS",
+    "TODO_TEST_TIMING",
+];
+
+/// A `todo` command with the other variables of the environment as the test process has them, and
+/// without the `TODO_*` variables of [`TODO_ENVIRONMENT`]. A test that sets one of them with
+/// `.env` after this call still gets it.
 #[must_use]
 pub fn todo_bin() -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_todo"));
-    // Claude Code exports its session ID to the commands it runs; tests must not tag claims.
-    cmd.env_remove("TODO_SESSION")
-        .env_remove("CLAUDE_CODE_SESSION_ID");
+    for var in TODO_ENVIRONMENT {
+        cmd.env_remove(var);
+    }
     cmd
 }
 
@@ -39,16 +58,12 @@ pub fn run_in(dir: &Path, args: &[&str]) -> Output {
         .expect("run todo")
 }
 
-/// Builds a `todo` command with a clean test environment (TEST-8): no `TODO_FILE` or
-/// `TODO_AGENT`, `HOME` and `APPDATA` pointing at `home`, colour off.
+/// Builds a `todo` command with a clean test environment (TEST-8): no `TODO_*` variables (see
+/// [`todo_bin`]), `HOME` and `APPDATA` pointing at `home`, colour off.
 #[must_use]
 pub fn clean_todo_command(home: &Path, work_dir: &Path) -> Command {
     let mut cmd = todo_bin();
     cmd.current_dir(work_dir)
-        .env_remove("TODO_FILE")
-        .env_remove("TODO_AGENT")
-        .env_remove("TODO_SESSION")
-        .env_remove("CLAUDE_CODE_SESSION_ID")
         .env("HOME", home)
         .env("APPDATA", home)
         .env("GIT_CONFIG_GLOBAL", home.join("gitconfig-none"))
@@ -61,11 +76,10 @@ pub fn clean_todo_command(home: &Path, work_dir: &Path) -> Command {
 #[must_use]
 pub fn assert_todo(home: &Path) -> assert_cmd::Command {
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("todo");
-    cmd.env_remove("TODO_FILE")
-        .env_remove("TODO_AGENT")
-        .env_remove("TODO_SESSION")
-        .env_remove("CLAUDE_CODE_SESSION_ID")
-        .env("HOME", home)
+    for var in TODO_ENVIRONMENT {
+        cmd.env_remove(var);
+    }
+    cmd.env("HOME", home)
         .env("APPDATA", home)
         .env("GIT_CONFIG_GLOBAL", home.join("gitconfig-none"))
         .env("GIT_CONFIG_NOSYSTEM", "1")
