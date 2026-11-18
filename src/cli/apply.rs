@@ -81,6 +81,7 @@ enum ApplyOp {
         title: String,
         section: Option<String>,
         priority: String,
+        difficulty: Option<String>,
         #[serde(rename = "type")]
         task_type: Option<String>,
         area: Option<String>,
@@ -124,6 +125,7 @@ enum ApplyOp {
         task: String,
         title: Option<String>,
         priority: Option<String>,
+        difficulty: Option<String>,
         #[serde(rename = "type")]
         task_type: Option<String>,
         area: Option<String>,
@@ -438,6 +440,7 @@ fn apply_one_op(
             title,
             section,
             priority,
+            difficulty,
             task_type,
             area,
             depends,
@@ -475,6 +478,13 @@ fn apply_one_op(
                 Some(dep) => Some(resolve_depends(dep, refs)?).filter(|d| !d.is_empty()),
                 None => None,
             };
+            let difficulty = match difficulty
+                .as_deref()
+                .or_else(|| fields.get("difficulty").map(String::as_str))
+            {
+                Some(raw) => Some(cfg.canonical_difficulty(raw)?),
+                None => None,
+            };
             let extra: Vec<(String, String)> = fields
                 .iter()
                 .map(|(k, v)| (k.clone(), v.trim().to_string()))
@@ -482,6 +492,7 @@ fn apply_one_op(
             let lines = NewTask {
                 title: clean_title,
                 priority: Some(priority.trim()),
+                difficulty: difficulty.as_deref(),
                 task_type: trim(task_type),
                 area: trim(area),
                 depends: dep_str.as_deref(),
@@ -644,6 +655,7 @@ fn apply_task_op(
             task,
             title,
             priority,
+            difficulty,
             task_type,
             area,
             depends,
@@ -661,6 +673,7 @@ fn apply_task_op(
             }
             let named = [
                 ("priority", priority),
+                ("difficulty", difficulty),
                 ("type", task_type),
                 ("area", area),
             ];

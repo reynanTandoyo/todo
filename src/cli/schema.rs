@@ -195,6 +195,7 @@ fn task_fields() -> TaskFieldsJson {
         claimed: Some("2026-11-15T18:00+01:00".to_string()),
         stale: false,
         priority: Some("P1".to_string()),
+        difficulty: Some("medium".to_string()),
         task_type: Some("feature".to_string()),
         area: Some("cli".to_string()),
         depends: vec!["T-000".to_string()],

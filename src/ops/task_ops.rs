@@ -194,6 +194,11 @@ impl TaskOp<'_> {
             for change in *changes {
                 match *change {
                     SetChange::Title(t) => builder.set_title(t),
+                    SetChange::Field("difficulty", v) => {
+                        // Only configured difficulties are written (`R-WRITE-18`).
+                        let canonical = cfg.canonical_difficulty(v)?;
+                        builder.set_field("difficulty", &canonical);
+                    }
                     SetChange::Field(k, v) => builder.set_field(k, v),
                     SetChange::Unset(k) => builder.unset_field(k),
                 }
@@ -240,6 +245,8 @@ pub struct NewTask<'a> {
     pub title: &'a str,
     /// `priority` value.
     pub priority: Option<&'a str>,
+    /// `difficulty` value (one of the configured difficulties; `R-WRITE-18`).
+    pub difficulty: Option<&'a str>,
     /// `type` value.
     pub task_type: Option<&'a str>,
     /// `area` value.
@@ -271,6 +278,7 @@ impl NewTask<'_> {
         ];
         let combined: Vec<String> = [
             ("priority", self.priority),
+            ("difficulty", self.difficulty),
             ("type", self.task_type),
             ("area", self.area),
         ]
@@ -292,7 +300,15 @@ impl NewTask<'_> {
             }
         }
         let known = [
-            "priority", "type", "area", "depends", "files", "problem", "fix", "accept",
+            "priority",
+            "difficulty",
+            "type",
+            "area",
+            "depends",
+            "files",
+            "problem",
+            "fix",
+            "accept",
         ];
         for (k, v) in self.extra {
             if !known.contains(&k.as_str()) {
