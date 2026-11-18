@@ -313,6 +313,22 @@ pub(crate) fn check_tasks(
                 message: format!("{id_str}: area {area:?} is not in configured areas"),
             });
         }
+
+        // `difficulties` always has values (default easy, medium, hard), so there is no empty-list case.
+        if let Some(ref difficulty) = task.difficulty
+            && !cfg
+                .difficulties
+                .iter()
+                .any(|d| d.eq_ignore_ascii_case(difficulty))
+        {
+            problems.push(CheckProblem {
+                file: label.to_string(),
+                line,
+                message: format!(
+                    "{id_str}: difficulty {difficulty:?} is not in configured difficulties"
+                ),
+            });
+        }
     }
 }
 
