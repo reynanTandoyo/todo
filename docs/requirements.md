@@ -928,9 +928,19 @@ todo never searches the PC for task lists. A project is known only when someone 
   - `project remove <name|path>` removes an entry (exit 1, `NOT_FOUND`, when there is none) and
     `project list` lists them. Each entry records the name, the absolute path of the `TODO.md` and
     the time it was added.
+  - The file is JSON: `{"format": 1, "projects": [{"name": …, "path": …, "added": …}]}`, the projects
+    in the order they were added. A file in a newer format is refused with `TOOL_TOO_OLD` (R-VER-2).
+    A file that is not a register is refused with `UNSAFE_FILE`; nothing is written in either case.
+  - Names are compared ignoring case and surrounding spaces. A `remove` argument is matched as a name
+    first; when no name matches, it is taken as the path of a `TODO.md` or of its folder, compared as
+    R-LOCK-7 compares paths.
   - The register is written under its own operating-system lock (`<register file>.lock`, waiting as
-    in R-LOCK-3) by replacing the file in one step (R-IO-1), so parallel `project add`s lose
-    nothing. These commands change no `TODO.md` and need no agent name.
+    in R-LOCK-3: 30 seconds, then exit 3 `BUSY`). Unlike the write lock, the register has no holder
+    file, so the message names no holder. The file is replaced in one step (R-IO-1), so parallel
+    `project add`s lose nothing. These commands change no `TODO.md` and need no agent name.
+  - `project add` finds the `TODO.md` from the folder as the other commands search (R-FIND-3 to
+    R-FIND-5, including `worktree = "local"`); `--file` and `TODO_FILE` do not apply. A path that is
+    not a folder is refused with `NO_FILE`.
   - `init` may suggest `todo project add`, but never registers a project by itself.
   - Paths with spaces and non-ASCII characters work (NFR-7). Tests point the register at a
     temporary folder.
@@ -940,6 +950,13 @@ todo never searches the PC for task lists. A project is known only when someone 
   projects that still need a migration stand out. A registered path that is gone, can't be parsed
   or needs a newer todo is listed with its problem and doesn't stop the others. `--json` is
   supported.
+  - The figures come from each project's `TODO.md` only (not its archive): tasks per status (R-KIND-3),
+    the top-level milestones that are done out of those not dropped, the stale claims (R-CLAIM-4) and
+    the open questions. A project is marked as needing a migration when its format is older than this
+    todo's, or its stamp is missing or older than the running version; `todo migrate --yes` clears it.
+  - The JSON schema is `todo.projects.v1`: `todo.overview.v1` is the output of `todo --json` with no
+    command. Exit code 0 whenever the register can be read, also when some projects show a problem.
+  - A register that is missing or empty gives a line that says so, and no project.
 
 ```powershell
 todo project add "C:\Users\Example\Projekte\Grafik Engine" --name renderer

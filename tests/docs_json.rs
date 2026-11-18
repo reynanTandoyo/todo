@@ -15,7 +15,7 @@ use std::path::Path;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{parse_json, run_in, stderr_text};
+use common::{parse_json, run_in, stderr_text, todo_bin};
 
 /// Fixture for the `show` example: milestone `T-011` under `T-010`, with a dependency, a
 /// dependent, a question about it and a task below it.
@@ -482,5 +482,135 @@ fn help_update_example_in_json_md_has_the_keys_of_help_update_json() {
         &example["data"]["windows"]["steps"][0],
         &real["data"]["windows"]["steps"][0],
         "help update --json windows step",
+    );
+}
+
+/// A readable `TODO.md` for the project examples (REL-5, T-093).
+const PROJECT_FIXTURE: &str = "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 2 -->
+<!-- todo-tool: 0.6.0 -->
+# Fixture
+
+## Tasks
+
+### T-001 · First task
+- status: open
+- owner: —
+- priority: P1
+";
+
+/// Writes `PROJECT_FIXTURE` as `<dir>/renderer/TODO.md` and returns the folder.
+fn project_folder(dir: &Path) -> std::path::PathBuf {
+    let folder = dir.join("renderer");
+    fs::create_dir_all(&folder).expect("create project folder");
+    fs::write(folder.join("TODO.md"), PROJECT_FIXTURE).expect("write TODO.md");
+    folder
+}
+
+/// `todo` in `folder` with the register at `register`.
+fn project_todo(folder: &Path, register: &Path, args: &[&str]) -> std::process::Output {
+    todo_bin()
+        .current_dir(folder)
+        .env("TODO_REGISTER", register)
+        .args(args)
+        .output()
+        .expect("run todo")
+}
+
+#[test]
+fn project_add_example_in_json_md_has_the_keys_of_project_add_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo project add --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    let folder = project_folder(dir.path());
+    let register = dir.path().join("register").join("projects.json");
+    let out = project_todo(&folder, &register, &["--json", "project", "add"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "project add --json");
+}
+
+#[test]
+fn project_remove_example_in_json_md_has_the_keys_of_project_remove_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo project remove <name|path> --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    let folder = project_folder(dir.path());
+    let register = dir.path().join("register").join("projects.json");
+    let added = project_todo(&folder, &register, &["project", "add"]);
+    assert!(added.status.success(), "stderr: {}", stderr_text(&added));
+    let out = project_todo(
+        &folder,
+        &register,
+        &["--json", "project", "remove", "renderer"],
+    );
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "project remove --json");
+}
+
+#[test]
+fn project_list_example_in_json_md_has_the_keys_of_project_list_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo project list --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    let folder = project_folder(dir.path());
+    let register = dir.path().join("register").join("projects.json");
+    let added = project_todo(&folder, &register, &["project", "add"]);
+    assert!(added.status.success(), "stderr: {}", stderr_text(&added));
+    let out = project_todo(&folder, &register, &["--json", "project", "list"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "project list --json");
+    assert_same_keys(
+        &example["data"]["projects"][0],
+        &real["data"]["projects"][0],
+        "project list --json project",
+    );
+}
+
+#[test]
+fn overview_example_in_json_md_has_the_keys_of_overview_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo overview --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    let folder = project_folder(dir.path());
+    let register = dir.path().join("register").join("projects.json");
+    let added = project_todo(&folder, &register, &["project", "add"]);
+    assert!(added.status.success(), "stderr: {}", stderr_text(&added));
+    // A second project whose file is gone, which shows the problem keys.
+    let archive = dir.path().join("archiv");
+    fs::create_dir_all(&archive).expect("create archive folder");
+    fs::write(archive.join("TODO.md"), PROJECT_FIXTURE).expect("write TODO.md");
+    let added = project_todo(&archive, &register, &["project", "add", "--name", "archiv"]);
+    assert!(added.status.success(), "stderr: {}", stderr_text(&added));
+    fs::remove_file(archive.join("TODO.md")).expect("remove TODO.md");
+
+    let out = project_todo(&folder, &register, &["--json", "overview"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "overview --json");
+    assert_same_keys(
+        &example["data"]["projects"][0],
+        &real["data"]["projects"][0],
+        "overview --json project",
+    );
+    assert_same_keys(
+        &example["data"]["projects"][1],
+        &real["data"]["projects"][1],
+        "overview --json problem project",
     );
 }

@@ -26,6 +26,7 @@ pub const FIXTURE_MARKER: &str = "<!-- TEST FIXTURE: invented data, not a real t
 const TODO_ENVIRONMENT: &[&str] = &[
     "TODO_FILE",
     "TODO_AGENT",
+    "TODO_REGISTER",
     "TODO_SESSION",
     "CLAUDE_CODE_SESSION_ID",
     "TODO_TEST_NOW",
@@ -86,13 +87,16 @@ pub fn run_in(dir: &Path, args: &[&str]) -> Output {
 }
 
 /// Builds a `todo` command with a clean test environment (TEST-8): no `TODO_*` variables (see
-/// [`todo_bin`]), `HOME` and `APPDATA` pointing at `home`, colour off.
+/// [`todo_bin`]), `HOME`, `APPDATA`, `LOCALAPPDATA` and `XDG_DATA_HOME` pointing into `home`, so the
+/// project register (R-PROJ-1) is never the one of the user who runs the tests; colour off.
 #[must_use]
 pub fn clean_todo_command(home: &Path, work_dir: &Path) -> Command {
     let mut cmd = todo_bin();
     cmd.current_dir(work_dir)
         .env("HOME", home)
         .env("APPDATA", home)
+        .env("LOCALAPPDATA", home.join("local-appdata"))
+        .env("XDG_DATA_HOME", home.join("xdg-data"))
         .env("GIT_CONFIG_GLOBAL", home.join("gitconfig-none"))
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("NO_COLOR", "1");
@@ -105,6 +109,8 @@ pub fn assert_todo(home: &Path) -> assert_cmd::Command {
     let mut cmd = assert_todo_bin();
     cmd.env("HOME", home)
         .env("APPDATA", home)
+        .env("LOCALAPPDATA", home.join("local-appdata"))
+        .env("XDG_DATA_HOME", home.join("xdg-data"))
         .env("GIT_CONFIG_GLOBAL", home.join("gitconfig-none"))
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("NO_COLOR", "1");

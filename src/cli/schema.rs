@@ -10,7 +10,7 @@ use clap::{Arg, ArgAction, Args as ClapArgs, Command as ClapCommand, CommandFact
 use serde::Serialize;
 use serde_json::{Value, json};
 
-use crate::cli::{Cli, CommandKind, CommandMeta, Context};
+use crate::cli::{Cli, CommandKind, CommandMeta, Context, json_name_of};
 use crate::error::{ErrorCode, ExitCode, Result, TodoError};
 use crate::ops::TaskJson;
 use crate::output::{Output, schema_name};
@@ -279,7 +279,7 @@ fn describe_command(cmd: &ClapCommand, path: &[String], globals: &BTreeSet<Strin
     let top_level = path.first().map_or("", String::as_str);
     CommandJson {
         name: path.join(" "),
-        schema: schema_name(top_level),
+        schema: schema_name(json_name_of(top_level)),
         summary: cmd.get_about().map(ToString::to_string).unwrap_or_default(),
         subcommands: visible_subcommands(cmd)
             .map(|sub| sub.get_name().to_string())

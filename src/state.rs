@@ -299,7 +299,7 @@ impl StateDir {
 /// it can resolve to the replaced copy (`C:\$Extend\$Deleted\…` on Windows). That would give
 /// this process a different state folder, and so a different lock (R-LOCK-7). The folder is
 /// never replaced, so it resolves reliably.
-fn canonicalize_file_or_parent(path: &Path) -> Result<PathBuf> {
+pub(crate) fn canonicalize_file_or_parent(path: &Path) -> Result<PathBuf> {
     if let (Some(parent), Some(name)) = (path.parent(), path.file_name()) {
         let parent = if parent.as_os_str().is_empty() {
             Path::new(".")

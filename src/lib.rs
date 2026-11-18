@@ -14,6 +14,7 @@ pub mod import;
 pub mod lock;
 pub mod ops;
 pub mod output;
+pub mod register;
 pub mod report;
 pub mod state;
 pub(crate) mod timing;

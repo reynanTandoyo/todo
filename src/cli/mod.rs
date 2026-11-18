@@ -600,6 +600,8 @@ register_commands! {
     Move => move_cmd,
     Next => next,
     Note => note,
+    Overview => overview,
+    Project => project,
     Promote => promote,
     Release => release,
     Report => report,
@@ -617,6 +619,18 @@ register_commands! {
     Unblock => unblock,
     Unlock => unlock,
     Where => where_cmd,
+}
+
+/// The name a command's `--json` output uses in its schema, `todo.<name>.v1`: the command's name,
+/// except for `overview`. `todo --json` with no command already uses `todo.overview.v1` for the list
+/// of commands, so the projects overview uses `projects` (`docs/json.md`).
+#[must_use]
+pub fn json_name_of(command: &str) -> &str {
+    if command == overview::META.name {
+        overview::JSON_NAME
+    } else {
+        command
+    }
 }
 
 /// Version string including the build commit (`REL-7`).
@@ -672,7 +686,10 @@ where
         Ok(cli) => {
             parse_timer.finish();
             let mut out = Output::stdio(cli.global.json);
-            let cmd_name = cli.command.as_ref().map_or("overview", |c| c.meta().name);
+            let cmd_name = cli
+                .command
+                .as_ref()
+                .map_or("overview", |c| json_name_of(c.meta().name));
 
             let exit = match Context::from_global(&cli.global) {
                 Ok(ctx) => {

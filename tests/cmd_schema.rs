@@ -66,9 +66,10 @@ fn every_command_names_its_versioned_schema() {
     for command in data["commands"].as_array().unwrap() {
         let name = command["name"].as_str().unwrap();
         let top = name.split(' ').next().unwrap();
+        // `overview` names its output `projects`: `todo.overview.v1` is `todo --json` (`json_name_of`).
         assert_eq!(
             command["schema"],
-            format!("todo.{top}.v1"),
+            format!("todo.{}.v1", todo::cli::json_name_of(top)),
             "schema name of {name}"
         );
     }
