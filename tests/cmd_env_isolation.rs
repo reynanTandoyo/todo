@@ -38,13 +38,13 @@ fn helpers_ignore_the_todo_variables_of_the_environment() {
     fs::create_dir_all(outside.parent().unwrap()).unwrap();
     fs::write(&outside, OUTSIDE_BODY).unwrap();
 
-    let child = Command::new(std::env::current_exe().unwrap())
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    common::clear_todo_environment(&mut command)
         .args(["--exact", TEST_NAME])
         .env(CHILD_MARKER, "1")
         .env("TODO_FILE", &outside)
-        .env("TODO_AGENT", "env-agent")
-        .output()
-        .unwrap();
+        .env("TODO_AGENT", "env-agent");
+    let child = command.output().unwrap();
     assert!(
         child.status.success(),
         "the checks failed in the child process:\n{}\n{}",

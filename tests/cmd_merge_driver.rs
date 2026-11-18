@@ -5,7 +5,7 @@ mod common;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use common::{FIXTURE_MARKER, git, todo_bin};
 use tempfile::TempDir;
@@ -169,7 +169,7 @@ fn different_new_tasks_at_the_same_place_are_both_kept() {
     fs::write(&bb, &base).unwrap();
     fs::write(&oo, add(2, "Mine")).unwrap();
     fs::write(&tt, add(3, "Yours")).unwrap();
-    let st = Command::new("git")
+    let st = common::git_command()
         .arg("merge-file")
         .args([&oo, &bb, &tt])
         .status()
@@ -301,7 +301,7 @@ fn install_and_uninstall_are_idempotent_and_keep_other_lines() {
         fs::read_to_string(&attrs).unwrap(),
         "*.png binary\r\n*.md text eol=lf\r\n"
     );
-    let cfg = Command::new("git")
+    let cfg = common::git_command()
         .current_dir(d.path())
         .args(["config", "--local", "--get", "merge.todo.driver"])
         .output()
@@ -372,7 +372,7 @@ fn real_git_merge_is_clean_with_the_driver_where_plain_git_conflicts() {
     commit_all(dir, "main");
 
     // Plain git: conflict.
-    let plain = Command::new("git")
+    let plain = common::git_command()
         .current_dir(dir)
         .args(["merge", "--no-commit", "--no-ff", "other"])
         .output()
@@ -397,7 +397,7 @@ fn real_git_merge_is_clean_with_the_driver_where_plain_git_conflicts() {
     git(dir, &["config", "merge.todo.driver", &driver]);
     commit_all(dir, "attributes");
 
-    let merged = Command::new("git")
+    let merged = common::git_command()
         .current_dir(dir)
         .args(["merge", "-q", "-m", "merge", "other"])
         .env("GIT_AUTHOR_NAME", "Test")

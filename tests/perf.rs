@@ -12,7 +12,7 @@ use common::{stderr_text, stdout_text};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 use std::time::{Duration, Instant};
 
 use tempfile::TempDir;
@@ -145,14 +145,12 @@ fn generate_milestone_tree_file() -> String {
 /// its output and how long it took. The command must succeed.
 fn run_todo(home: &Path, work: &Path, args: &[&str]) -> (Output, Duration) {
     let start = Instant::now();
-    let output = Command::new(env!("CARGO_BIN_EXE_todo"))
+    let output = common::todo_bin()
         .args(args)
         .current_dir(work)
         .env("HOME", home)
         .env("USERPROFILE", home)
         .env("APPDATA", home)
-        .env_remove("TODO_FILE")
-        .env_remove("TODO_AGENT")
         .output()
         .unwrap();
     let elapsed = start.elapsed();

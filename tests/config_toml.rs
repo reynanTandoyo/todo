@@ -4,7 +4,6 @@ mod common;
 
 use std::fs;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -76,7 +75,7 @@ fn unknown_key_and_bad_values_report_todo_toml_line_and_message() {
         dir.path(),
         "# comment\nid_prefix = \"T\"\nunknown_setting = 123\n",
     );
-    let out = cargo_bin_cmd!("todo")
+    let out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["list"])
         .output()
@@ -91,7 +90,7 @@ fn unknown_key_and_bad_values_report_todo_toml_line_and_message() {
 
     // Bad value on line 2.
     write_toml(dir.path(), "id_prefix = \"T\"\nworktree = \"bogus\"\n");
-    let out = cargo_bin_cmd!("todo")
+    let out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "list"])
         .output()
@@ -139,7 +138,7 @@ lease_max_minutes = 15
     );
 
     // Missing required field `type` is refused.
-    let missing = cargo_bin_cmd!("todo")
+    let missing = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--agent",
@@ -157,7 +156,7 @@ lease_max_minutes = 15
     assert_eq!(missing.status.code(), Some(1));
 
     // Invalid `type` is refused.
-    let bad_type = cargo_bin_cmd!("todo")
+    let bad_type = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--agent",
@@ -177,7 +176,7 @@ lease_max_minutes = 15
     assert_eq!(bad_type.status.code(), Some(1));
 
     // Invalid `area` is refused.
-    let bad_area = cargo_bin_cmd!("todo")
+    let bad_area = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--agent",
@@ -197,7 +196,7 @@ lease_max_minutes = 15
     assert_eq!(bad_area.status.code(), Some(1));
 
     // Valid add without `--section` uses `default_section = "Inbox"`, `REQ-0006` (after archived REQ-0005).
-    let added = cargo_bin_cmd!("todo")
+    let added = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json",
@@ -226,7 +225,7 @@ lease_max_minutes = 15
     assert_eq!(added_json["data"]["section"], "Inbox");
 
     // `list --archive` reads `custom-archive.md`.
-    let arch = cargo_bin_cmd!("todo")
+    let arch = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "list", "--archive"])
         .output()
@@ -236,14 +235,14 @@ lease_max_minutes = 15
     assert_eq!(arch_json["data"]["tasks"][0]["id"], "REQ-0005");
 
     // `lock` defaults to `lease_minutes = 5` and rejects `--minutes 20` (> `lease_max_minutes = 15`).
-    let too_long = cargo_bin_cmd!("todo")
+    let too_long = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--agent", "alice", "lock", "--minutes", "20"])
         .output()
         .unwrap();
     assert_eq!(too_long.status.code(), Some(1));
 
-    let locked = cargo_bin_cmd!("todo")
+    let locked = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "--agent", "alice", "lock"])
         .output()
@@ -252,7 +251,7 @@ lease_max_minutes = 15
     let locked_json: Value = parse_json(&locked.stdout);
     assert_eq!(locked_json["data"]["minutes"], 5);
 
-    let _ = cargo_bin_cmd!("todo")
+    let _ = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--agent", "alice", "unlock"])
         .output()
@@ -267,7 +266,7 @@ lease_max_minutes = 15
             "- owner: bob\n- claimed: 2020-01-01T00:00+00:00",
         );
     write_todo(dir.path(), &stale_claim);
-    let stale_list = cargo_bin_cmd!("todo")
+    let stale_list = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "list", "--stale"])
         .output()
@@ -311,7 +310,7 @@ fn worktree_local_in_todo_toml_uses_worktrees_own_todo() {
     );
     write_toml(&wt_dir, "worktree = \"local\"\n");
 
-    let out = cargo_bin_cmd!("todo")
+    let out = common::assert_todo_bin()
         .current_dir(&wt_dir)
         .args(["--json", "list"])
         .output()

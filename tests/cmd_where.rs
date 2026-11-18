@@ -4,7 +4,6 @@ mod common;
 
 use std::fs;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -26,7 +25,7 @@ fn where_prints_all_r_find_7_items_in_text_and_json() {
     .unwrap();
 
     // Acquire a manual lease so lease status is also populated.
-    let lock_out = cargo_bin_cmd!("todo")
+    let lock_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--agent", "alice", "lock", "--minutes", "5"])
         .output()
@@ -34,7 +33,7 @@ fn where_prints_all_r_find_7_items_in_text_and_json() {
     assert_eq!(lock_out.status.code(), Some(0));
 
     // Text mode
-    let text_out = cargo_bin_cmd!("todo")
+    let text_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["where"])
         .output()
@@ -54,7 +53,7 @@ fn where_prints_all_r_find_7_items_in_text_and_json() {
     );
 
     // JSON mode
-    let json_out = cargo_bin_cmd!("todo")
+    let json_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "where"])
         .output()
@@ -82,7 +81,7 @@ fn where_works_outside_git_repo() {
     let dir = TempDir::new().unwrap();
     fs::write(dir.path().join("TODO.md"), "## Tasks\n").unwrap();
 
-    let json_out = cargo_bin_cmd!("todo")
+    let json_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "where"])
         .output()
@@ -102,7 +101,7 @@ fn warns_on_onedrive_and_dropbox_in_where_and_writes() {
     fs::create_dir_all(&onedrive).unwrap();
     fs::write(onedrive.join("TODO.md"), "## Tasks\n").unwrap();
 
-    let where_out = cargo_bin_cmd!("todo")
+    let where_out = common::assert_todo_bin()
         .current_dir(&onedrive)
         .args(["where"])
         .output()
@@ -115,7 +114,7 @@ fn warns_on_onedrive_and_dropbox_in_where_and_writes() {
     fs::create_dir_all(&dropbox).unwrap();
     fs::write(dropbox.join("TODO.md"), "## Tasks\n").unwrap();
 
-    let add_out = cargo_bin_cmd!("todo")
+    let add_out = common::assert_todo_bin()
         .current_dir(&dropbox)
         .args([
             "--json",
@@ -164,7 +163,7 @@ fn where_counts_tasks_and_counts_milestones_questions_and_ideas_apart() {
     )
     .unwrap();
 
-    let text_out = cargo_bin_cmd!("todo")
+    let text_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["where"])
         .output()
@@ -180,7 +179,7 @@ fn where_counts_tasks_and_counts_milestones_questions_and_ideas_apart() {
         "stdout: {stdout}"
     );
 
-    let json_out = cargo_bin_cmd!("todo")
+    let json_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "where"])
         .output()

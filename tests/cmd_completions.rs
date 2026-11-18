@@ -98,7 +98,9 @@ fn powershell_profile_line_completes_commands_and_options() {
         tmp.path().display(),
         std::env::var("PATH").unwrap_or_default()
     );
-    let Ok(out) = std::process::Command::new("powershell.exe")
+    let mut shell = std::process::Command::new("powershell.exe");
+    common::clear_todo_environment(&mut shell);
+    let Ok(out) = shell
         .args(["-NoProfile", "-NonInteractive", "-Command", script])
         .env("PATH", path)
         .output()

@@ -36,12 +36,39 @@ const TODO_ENVIRONMENT: &[&str] = &[
     "TODO_TEST_TIMING",
 ];
 
+/// Removes the `TODO_*` variables of [`TODO_ENVIRONMENT`] from `cmd`, so the process it starts sees
+/// none of them. Every child process a test starts goes through this, `git` included: git can start
+/// `todo` itself (a merge driver, for example).
+pub fn clear_todo_environment(cmd: &mut Command) -> &mut Command {
+    for var in TODO_ENVIRONMENT {
+        cmd.env_remove(var);
+    }
+    cmd
+}
+
 /// A `todo` command with the other variables of the environment as the test process has them, and
 /// without the `TODO_*` variables of [`TODO_ENVIRONMENT`]. A test that sets one of them with
 /// `.env` after this call still gets it.
 #[must_use]
 pub fn todo_bin() -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_todo"));
+    clear_todo_environment(&mut cmd);
+    cmd
+}
+
+/// A `git` command without the `TODO_*` variables of [`TODO_ENVIRONMENT`] (see
+/// [`clear_todo_environment`]).
+#[must_use]
+pub fn git_command() -> Command {
+    let mut cmd = Command::new("git");
+    clear_todo_environment(&mut cmd);
+    cmd
+}
+
+/// `assert_cmd` variant of [`todo_bin`], for tests that use `assert_cmd` matchers.
+#[must_use]
+pub fn assert_todo_bin() -> assert_cmd::Command {
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("todo");
     for var in TODO_ENVIRONMENT {
         cmd.env_remove(var);
     }
@@ -75,10 +102,7 @@ pub fn clean_todo_command(home: &Path, work_dir: &Path) -> Command {
 /// `assert_cmd` variant of [`clean_todo_command`], for tests that use `assert_cmd` matchers.
 #[must_use]
 pub fn assert_todo(home: &Path) -> assert_cmd::Command {
-    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("todo");
-    for var in TODO_ENVIRONMENT {
-        cmd.env_remove(var);
-    }
+    let mut cmd = assert_todo_bin();
     cmd.env("HOME", home)
         .env("APPDATA", home)
         .env("GIT_CONFIG_GLOBAL", home.join("gitconfig-none"))
@@ -238,7 +262,7 @@ pub fn copy_clean_fixture(dir: &Path) {
 /// Runs `git` with `args` in `dir`, panicking on failure, and returns trimmed stdout.
 /// Sets a fixed author and committer so commits work without a global identity.
 pub fn git(dir: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
+    let out = git_command()
         .current_dir(dir)
         .args(args)
         .env("GIT_AUTHOR_NAME", "Test")

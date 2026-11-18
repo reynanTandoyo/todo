@@ -6,7 +6,6 @@ use common::parse_json;
 
 use std::fs;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -50,7 +49,7 @@ fn search_finds_text_in_titles_fields_and_notes_and_archive() {
     .unwrap();
 
     // Search in TODO.md: matches title of T-001 and note of T-002.
-    let out = cargo_bin_cmd!("todo")
+    let out = common::assert_todo_bin()
         .current_dir(&work)
         .env("HOME", &home)
         .env("APPDATA", &home)
@@ -65,7 +64,7 @@ fn search_finds_text_in_titles_fields_and_notes_and_archive() {
     assert!(stdout.contains("2 matches in 2 tasks"), "{stdout}");
 
     // Search in field value.
-    let field_out = cargo_bin_cmd!("todo")
+    let field_out = common::assert_todo_bin()
         .current_dir(&work)
         .env("HOME", &home)
         .env("APPDATA", &home)
@@ -80,7 +79,7 @@ fn search_finds_text_in_titles_fields_and_notes_and_archive() {
     assert_eq!(json["data"]["matches"][0]["field"], "problem");
 
     // Search in archive.
-    let arch_out = cargo_bin_cmd!("todo")
+    let arch_out = common::assert_todo_bin()
         .current_dir(&work)
         .env("HOME", &home)
         .env("APPDATA", &home)

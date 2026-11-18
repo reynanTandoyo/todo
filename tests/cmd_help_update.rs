@@ -18,12 +18,9 @@ const LATEST_RELEASE: &str = "https://github.com/reynanTandoyo/todo/releases/lat
 
 /// Runs `program` with `args` in `work`, with a clean environment and `home` as the user folder.
 fn run_program(program: &Path, work: &Path, home: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(program)
+    let mut cmd = std::process::Command::new(program);
+    common::clear_todo_environment(&mut cmd)
         .current_dir(work)
-        .env_remove("TODO_FILE")
-        .env_remove("TODO_AGENT")
-        .env_remove("TODO_SESSION")
-        .env_remove("CLAUDE_CODE_SESSION_ID")
         .env("HOME", home)
         .env("APPDATA", home)
         .env("NO_COLOR", "1")

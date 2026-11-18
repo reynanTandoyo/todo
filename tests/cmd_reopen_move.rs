@@ -6,7 +6,6 @@ use common::{parse_json, read_text, stderr_text};
 
 use std::fs;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -44,14 +43,14 @@ fn reopen_requires_note_clears_owner_and_claimed_and_follows_transitions() {
     fs::write(dir.path().join("TODO.md"), FIXTURE).unwrap();
 
     // Missing or empty --note is refused.
-    let no_note = cargo_bin_cmd!("todo")
+    let no_note = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--agent", "carol", "reopen", "T-001"])
         .output()
         .unwrap();
     assert_eq!(no_note.status.code(), Some(2));
 
-    let empty_note = cargo_bin_cmd!("todo")
+    let empty_note = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--agent", "carol", "reopen", "T-001", "--note", "   "])
         .output()
@@ -59,7 +58,7 @@ fn reopen_requires_note_clears_owner_and_claimed_and_follows_transitions() {
     assert_eq!(empty_note.status.code(), Some(1));
 
     // Reopening an already-open task is refused with BAD_TRANSITION.
-    let bad_trans = cargo_bin_cmd!("todo")
+    let bad_trans = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json", "--agent", "carol", "reopen", "T-003", "--note", "why",
@@ -71,7 +70,7 @@ fn reopen_requires_note_clears_owner_and_claimed_and_follows_transitions() {
     assert_eq!(bad_json["error"]["code"], "BAD_TRANSITION");
 
     // Reopen done task T-001.
-    let ok_done = cargo_bin_cmd!("todo")
+    let ok_done = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json",
@@ -91,7 +90,7 @@ fn reopen_requires_note_clears_owner_and_claimed_and_follows_transitions() {
     assert!(done_json["data"]["claimed"].is_null());
 
     // Reopen dropped task T-002.
-    let ok_drop = cargo_bin_cmd!("todo")
+    let ok_drop = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json",
@@ -117,7 +116,7 @@ fn move_keeps_every_line_and_leaves_rest_of_file_unchanged() {
     fs::write(&path, FIXTURE).unwrap();
 
     // Moving to the same section is a no-op (bytes unchanged).
-    let same = cargo_bin_cmd!("todo")
+    let same = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--agent", "alice", "move", "T-003", "--section", "Backlog"])
         .output()
@@ -126,7 +125,7 @@ fn move_keeps_every_line_and_leaves_rest_of_file_unchanged() {
     assert_eq!(read_text(&path), FIXTURE);
 
     // Move T-003 to Now.
-    let moved = cargo_bin_cmd!("todo")
+    let moved = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json",
