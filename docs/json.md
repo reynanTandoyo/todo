@@ -228,21 +228,61 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
 
 ### `todo next --json` (`todo.next.v1`)
 
+`task` is the Shared `TaskJson` shape (see above) of the task that `next` hands out. The example is
+the output for a fixture with one open task:
+
 ```json
 {
   "schema": "todo.next.v1",
   "ok": true,
   "data": {
-    "found": true,
+    "task": {
+      "id": "T-001",
+      "title": "Write the parser",
+      "section": "Tasks",
+      "archived": false,
+      "status": "open",
+      "owner": null,
+      "claimed": null,
+      "stale": false,
+      "priority": "P1",
+      "difficulty": "easy",
+      "type": "feature",
+      "area": "cli",
+      "goal": null,
+      "milestone": null,
+      "milestones": [],
+      "children": [],
+      "why": "the reader needs it first",
+      "depends": [],
+      "dependencies": [],
+      "dependents": [],
+      "questions": [],
+      "ready": true,
+      "files": null,
+      "problem": null,
+      "fix": null,
+      "accept": null,
+      "commit": [],
+      "fields": {},
+      "notes": [
+        { "date": "2026-11-15", "agent": "planner", "text": "added", "line": 12 }
+      ],
+      "line_start": 7,
+      "line_end": 12
+    },
     "claimed": false,
-    "already_theirs": false,
-    "task": { "id": "T-001", "title": "First task", "status": "open" }
+    "already_claimed": false
   },
   "warnings": []
 }
 ```
 
-When no ready task exists, `"found": false, "task": null`.
+- `claimed` is `true` when `--claim` wrote the claim in this run; then `task` shows the claim
+  (`owner` and `claimed`, and a `session` entry in `fields` when a session is known).
+- `already_claimed` is `true` when the task was already the agent's own claim. `next` returns that
+  task first unless `--new` is given.
+- When no ready task exists, `task` is `null` and `claimed` and `already_claimed` are `false`.
 
 ### `todo summary --json` (`todo.summary.v1`)
 
@@ -329,7 +369,7 @@ ones only for the whole tree (no milestone argument and no `--area`); otherwise 
     "format_version": 2,
     "tool_stamp": "0.6.0",
     "running_version": "0.6.0",
-    "counts": { "open": 10, "claimed": 4, "blocked": 0, "done": 27, "dropped": 3, "total": 44 }
+    "counts": { "open": 10, "claimed": 4, "blocked": 0, "done": 27, "dropped": 3, "total": 44, "milestones": 2, "questions": 1, "ideas": 3 }
   },
   "warnings": []
 }
@@ -346,8 +386,11 @@ ones only for the whole tree (no milestone argument and no `--area`); otherwise 
   none. `tool_stamp` is the version in the tool line (`R-VER-1`), or `null` when there is none, and
   `running_version` is the version of the todo that ran. When the stamp is newer than
   `running_version`, a warning says to run `todo help update`.
-- `counts` holds the number of entries per status. When the format version is newer than this todo
-  knows, `where` still succeeds but leaves out `counts`, because the tasks are not read (R-VER-2).
+- `counts` holds the number of tasks per status (`open`, `claimed`, `blocked`, `done`, `dropped`) and
+  `total`, their sum. `milestones`, `questions` and `ideas` count the entries of those kinds that are
+  not done or dropped, apart from the tasks (`R-KIND-3`). When the format version is newer than this
+  todo knows, `where` still succeeds but leaves out `counts`, because the tasks are not read
+  (R-VER-2).
 
 ### `todo check --json` (`todo.check.v1`)
 

@@ -4,7 +4,7 @@ use clap::Args as ClapArgs;
 use serde::Serialize;
 
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::{Document, Status};
+use crate::doc::{Document, EntryKind, Status};
 use crate::error::Result;
 use crate::lock::{LeaseStatus, query_status};
 use crate::ops::{format_is_newer, load_for_where};
@@ -17,7 +17,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "where",
     summary: "Show resolved TODO.md, repo root, state folder, lock status, and task counts",
     kind: CommandKind::Read,
-    details: "Prints the active TODO.md file and how it was found, the git repository root (if any), the state folder, the write lock and manual lease status, the format version, the tool stamp in the file and the running todo version, and the number of tasks per status. When the format version is newer than this todo knows, the tasks are not counted (R-VER-2).",
+    details: "Prints the active TODO.md file and how it was found, the git repository root (if any), the state folder, the write lock and manual lease status, the format version, the tool stamp in the file and the running todo version, and the number of tasks per status; milestones, questions and ideas that are not done or dropped are counted apart (R-KIND-3). When the format version is newer than this todo knows, the tasks are not counted (R-VER-2).",
     examples: &["todo where", "todo where --json"],
 };
 
@@ -34,12 +34,20 @@ struct WriteLockJson {
 
 #[derive(Serialize)]
 struct StatusCountsJson {
+    /// Tasks per status (R-KIND-3): milestones, questions and ideas are not counted here.
     open: usize,
     claimed: usize,
     blocked: usize,
     done: usize,
     dropped: usize,
+    /// Tasks only: `open + claimed + blocked + done + dropped`.
     total: usize,
+    /// Milestones that are not done or dropped, counted apart from the tasks (R-KIND-3).
+    milestones: usize,
+    /// Questions that are not done or dropped, counted apart from the tasks (R-KIND-3).
+    questions: usize,
+    /// Ideas that are not done or dropped, counted apart from the tasks (R-KIND-1).
+    ideas: usize,
 }
 
 #[derive(Serialize)]
@@ -69,17 +77,29 @@ fn status_counts(doc: &Document) -> StatusCountsJson {
         blocked: 0,
         done: 0,
         dropped: 0,
-        total: doc.tasks.len(),
+        total: 0,
+        milestones: 0,
+        questions: 0,
+        ideas: 0,
     };
     for task in &doc.tasks {
-        match task.status {
-            Status::Open => counts.open += 1,
-            Status::Claimed => counts.claimed += 1,
-            Status::Blocked => counts.blocked += 1,
-            Status::Done => counts.done += 1,
-            Status::Dropped => counts.dropped += 1,
+        let finished = matches!(task.status, Status::Done | Status::Dropped);
+        // Only tasks are counted per status (R-KIND-3); the other kinds are counted apart.
+        match task.kind() {
+            EntryKind::Task => match task.status {
+                Status::Open => counts.open += 1,
+                Status::Claimed => counts.claimed += 1,
+                Status::Blocked => counts.blocked += 1,
+                Status::Done => counts.done += 1,
+                Status::Dropped => counts.dropped += 1,
+            },
+            EntryKind::Milestone if !finished => counts.milestones += 1,
+            EntryKind::Question if !finished => counts.questions += 1,
+            EntryKind::Idea if !finished => counts.ideas += 1,
+            EntryKind::Milestone | EntryKind::Question | EntryKind::Idea => {}
         }
     }
+    counts.total = counts.open + counts.claimed + counts.blocked + counts.done + counts.dropped;
     counts
 }
 
@@ -169,10 +189,16 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         }
         out.write_line(&format!("Running todo version: {running_version}"));
         match &counts {
-            Some(c) => out.write_line(&format!(
-                "Tasks: {} total (open: {}, claimed: {}, blocked: {}, done: {}, dropped: {})",
-                c.total, c.open, c.claimed, c.blocked, c.done, c.dropped
-            )),
+            Some(c) => {
+                out.write_line(&format!(
+                    "Tasks: {} total (open: {}, claimed: {}, blocked: {}, done: {}, dropped: {})",
+                    c.total, c.open, c.claimed, c.blocked, c.done, c.dropped
+                ));
+                out.write_line(&format!(
+                    "Not tasks, not done or dropped: milestones {}, questions {}, ideas {}",
+                    c.milestones, c.questions, c.ideas
+                ));
+            }
             None => out.write_line(&format!(
                 "Tasks: not counted, the format version {} is newer than this todo supports",
                 format_version.unwrap_or_default()

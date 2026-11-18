@@ -118,6 +118,61 @@ fn hooks_install_keeps_key_order_and_every_other_byte_of_the_settings() {
 }
 
 #[test]
+fn hooks_uninstall_keeps_every_other_byte_of_the_settings() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("TODO.md"), TODO_MD).unwrap();
+    let claude_dir = dir.path().join(".claude");
+    fs::create_dir_all(&claude_dir).unwrap();
+    let settings_path = claude_dir.join("settings.json");
+
+    // The same settings as the install test: keys out of order, an escape, inline arrays.
+    let initial = "{\n  \"zeta\": {\"caf\\u00e9\": [1, 2]},\n  \"permissions\": {\"allow\": [\"Bash(git status)\"]},\n  \"env\": {\"B\": \"2\"},\n  \"alpha\": true\n}\n";
+    fs::write(&settings_path, initial).unwrap();
+
+    let install = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["hooks", "install", "--yes"])
+        .output()
+        .unwrap();
+    assert!(install.status.success());
+    let installed = read_text(&settings_path);
+    assert_ne!(installed, initial);
+
+    // Uninstall removes exactly what install added: the original bytes come back.
+    let uninstall = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["hooks", "uninstall", "--yes"])
+        .output()
+        .unwrap();
+    assert!(uninstall.status.success());
+    assert_eq!(read_text(&settings_path), initial);
+    assert_eq!(read_text(&claude_dir.join("settings.json.bak")), installed);
+
+    // Nothing is left to remove: a second run changes nothing.
+    let again = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["hooks", "uninstall", "--yes"])
+        .output()
+        .unwrap();
+    assert!(again.status.success());
+    assert_eq!(read_text(&settings_path), initial);
+}
+
+#[test]
+fn hooks_uninstall_does_not_create_a_settings_file() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("TODO.md"), TODO_MD).unwrap();
+
+    let uninstall = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["hooks", "uninstall", "--yes"])
+        .output()
+        .unwrap();
+    assert!(uninstall.status.success());
+    assert!(!dir.path().join(".claude").join("settings.json").exists());
+}
+
+#[test]
 fn guard_blocks_todo_and_archive_unless_leased_and_allows_other_files() {
     let dir = TempDir::new().unwrap();
     fs::write(
