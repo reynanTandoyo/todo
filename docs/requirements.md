@@ -540,16 +540,20 @@ or with `--json` the task as it is after the change.
 - **R-AGENT-3 SHOULD** `agents install [--into FILE] --yes` writes or updates the rules block in
   `AGENTS.md` (default), `CLAUDE.md` or another file, leaving the rest of the file byte for byte;
   `agents check` reports a missing or outdated block.
-- **R-AGENT-4 COULD** `hooks install --yes` adds three Claude Code hooks to the project's
-  `.claude/settings.json`: at session start, `todo summary` (at most 40 lines, within 2 seconds);
+  - The project folder is the folder that holds `TODO.md`, found as `check` finds it, whatever the
+    current folder is. `agents check`, `agents install`, `skill install` (R-AGENT-5) and
+    `hooks install` (R-AGENT-4) all use it. `--into FILE` is relative to it; an absolute path is
+    used as given. Without a `TODO.md` they stop with the not-found error (`todo init` creates one).
+- **R-AGENT-4 COULD** `hooks install --yes` adds three Claude Code hooks to
+  `.claude/settings.json` in the project folder (R-AGENT-3): at session start, `todo summary` (at most 40 lines, within 2 seconds);
   before Edit, Write or MultiEdit, `todo guard`, which stops direct edits of `TODO.md` and the
   archive file and names the command to use instead (direct edits are allowed while a lease is
   live); at session end, `todo session-end`, which releases the claims of the ending session
   (R-CLAIM-7). It keeps a backup; it changes only the managed entries and keeps every other byte of
   the file, key order and inline formatting included (as `migrate --yes` does, R-MIG-2); it marks its
   entries so `hooks uninstall` removes only those, and works from PowerShell.
-- **R-AGENT-5 COULD** `skill install --yes` writes `.claude/skills/todo/SKILL.md` from the same rules
-  text.
+- **R-AGENT-5 COULD** `skill install --yes` writes `.claude/skills/todo/SKILL.md` in the project
+  folder (R-AGENT-3), from the same rules text.
 
 ### 5.16 Import — IMP
 

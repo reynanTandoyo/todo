@@ -1,7 +1,6 @@
 //! `todo skill` command: install the Claude Code skill from the built-in rules text (`T-054`; R-AGENT-5).
 
 use std::fs;
-use std::path::PathBuf;
 
 use clap::{Args as ClapArgs, Subcommand};
 use serde::Serialize;
@@ -21,7 +20,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "skill",
     summary: "Install the Claude Code skill for working with TODO.md",
     kind: CommandKind::Meta,
-    details: "`skill install --yes` writes `.claude/skills/todo/SKILL.md` generated from the same built-in rules text as `todo help agents`.",
+    details: "`skill install --yes` writes `.claude/skills/todo/SKILL.md` generated from the same built-in rules text as `todo help agents`. The file goes in the folder that holds `TODO.md`, whatever the current folder.",
     examples: &["todo skill install", "todo skill install --yes"],
 };
 
@@ -58,7 +57,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 }
 
 fn run_install(ctx: &Context, out: &mut Output) -> Result<()> {
-    let target = PathBuf::from(SKILL_REL_PATH);
+    // The skill is in the folder of TODO.md, not the current folder (T-127).
+    let target = ctx.project_dir(out)?.join(SKILL_REL_PATH);
     let label = SKILL_REL_PATH.to_string();
 
     let old_bytes = match fs::read(fs_path(&target).as_ref()) {

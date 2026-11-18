@@ -12,9 +12,14 @@ use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
+/// A minimal `TODO.md`, so that the commands find the project folder.
+const TODO_MD: &str = "<!-- todo-format: 2 -->\n\n## Tasks\n";
+
 #[test]
 fn hooks_install_and_uninstall_preserve_other_entries_and_formatting() {
     let dir = TempDir::new().unwrap();
+    // The settings are in the folder of TODO.md, so there is a TODO.md (R-AGENT-4).
+    fs::write(dir.path().join("TODO.md"), TODO_MD).unwrap();
     let claude_dir = dir.path().join(".claude");
     fs::create_dir_all(&claude_dir).unwrap();
     let settings_path = claude_dir.join("settings.json");
@@ -76,6 +81,7 @@ fn hooks_install_and_uninstall_preserve_other_entries_and_formatting() {
 #[test]
 fn hooks_install_keeps_key_order_and_every_other_byte_of_the_settings() {
     let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("TODO.md"), TODO_MD).unwrap();
     let claude_dir = dir.path().join(".claude");
     fs::create_dir_all(&claude_dir).unwrap();
     let settings_path = claude_dir.join("settings.json");

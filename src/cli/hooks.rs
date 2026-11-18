@@ -1,7 +1,7 @@
 //! `todo hooks` command: install or uninstall Claude Code hooks in `.claude/settings.json` (`T-053`; R-AGENT-4).
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use clap::{Args as ClapArgs, Subcommand};
 use serde::Serialize;
@@ -24,7 +24,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "hooks",
     summary: "Install or uninstall Claude Code hooks in .claude/settings.json",
     kind: CommandKind::Meta,
-    details: "`hooks install --yes` adds a `SessionStart` hook (`todo summary`), a `PreToolUse` hook (`todo guard` for `Edit|Write|MultiEdit`) and a `SessionEnd` hook (`todo session-end`, which releases the ending session's claims) to `.claude/settings.json`, keeping a backup and preserving formatting. `hooks uninstall --yes` removes only the entries added by `todo`.",
+    details: "`hooks install --yes` adds a `SessionStart` hook (`todo summary`), a `PreToolUse` hook (`todo guard` for `Edit|Write|MultiEdit`) and a `SessionEnd` hook (`todo session-end`, which releases the ending session's claims) to `.claude/settings.json` in the folder that holds `TODO.md`, keeping a backup and preserving formatting. `hooks uninstall --yes` removes only the entries added by `todo`.",
     examples: &[
         "todo hooks install",
         "todo hooks install --yes",
@@ -63,8 +63,10 @@ struct HooksJson {
 
 /// Runs `todo hooks`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let settings_path = PathBuf::from(SETTINGS_REL_PATH);
-    let backup_path = PathBuf::from(BACKUP_REL_PATH);
+    // The settings file is in the folder of TODO.md, not the current folder (T-127).
+    let dir = ctx.project_dir(out)?;
+    let settings_path = dir.join(SETTINGS_REL_PATH);
+    let backup_path = dir.join(BACKUP_REL_PATH);
     let label = SETTINGS_REL_PATH.to_string();
 
     let old_bytes = match fs::read(fs_path(&settings_path).as_ref()) {

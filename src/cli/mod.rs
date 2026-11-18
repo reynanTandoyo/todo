@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use clap::{Args as ClapArgs, Parser, Subcommand, error::ErrorKind};
 use serde::Serialize;
 
+use crate::agents::project::project_dir_of;
 use crate::doc::{Document, Task};
 use crate::error::{ErrorCode, ExitCode, Result, TodoError};
 use crate::find::{
@@ -178,6 +179,13 @@ impl Context {
     pub fn find_todo(&self, out: &mut Output) -> Result<FoundTodo> {
         let (found, _) = self.find_todo_and_config(out)?;
         Ok(found)
+    }
+
+    /// The project folder (`R-AGENT-3`): the folder that holds `TODO.md`, found as `check` finds
+    /// it. The agent commands use it whatever the current folder is (T-127).
+    pub fn project_dir(&self, out: &mut Output) -> Result<PathBuf> {
+        let found = self.find_todo(out)?;
+        Ok(project_dir_of(&found.path))
     }
 
     /// Locates `TODO.md` and loads `todo.toml` next to it, respecting `worktree = "local"`.

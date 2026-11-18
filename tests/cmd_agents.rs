@@ -12,6 +12,10 @@ fn agents_install_and_check_preserve_surrounding_bytes_and_report_missing_or_out
     let dir = TempDir::new().expect("tempdir");
     let agents_path = dir.path().join("AGENTS.md");
 
+    // The agent files are in the folder of TODO.md, so there is a TODO.md (R-AGENT-3).
+    let init = run_in(dir.path(), &["init"]);
+    assert!(init.status.success(), "init failed: {}", stderr_text(&init));
+
     // 1. Missing file -> agents check exits 1.
     let missing_check = run_in(dir.path(), &["agents", "check"]);
     assert_eq!(missing_check.status.code(), Some(1));
