@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::atomic::{read_file_with_snapshot, validate_utf8};
 use crate::cli::Context;
-use crate::doc::{Document, IdConfig, Status, Task};
+use crate::doc::{Document, EntryKind, IdConfig, Status, Task};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, fs_path};
 use crate::ops::config::OpsConfig;
@@ -185,6 +185,9 @@ fn load_for_read_inner(
 }
 
 /// Returns `true` if `task` is eligible to be handed out by `next` / `list --ready` (`R-READ-3`).
+///
+/// Only entries of kind task are handed out, so questions, ideas and milestones never are
+/// (`R-KIND-3`).
 #[must_use]
 pub fn is_task_ready(
     doc: &Document,
@@ -195,14 +198,7 @@ pub fn is_task_ready(
 ) -> bool {
     let status_eligible = task.status == Status::Open
         || (task.status == Status::Claimed && cfg.is_claim_stale(task, now));
-    if !status_eligible {
-        return false;
-    }
-    if task
-        .task_type
-        .as_deref()
-        .is_some_and(|t| t.eq_ignore_ascii_case("question"))
-    {
+    if !status_eligible || task.kind() != EntryKind::Task {
         return false;
     }
     doc.dependencies_satisfied(task, archive)

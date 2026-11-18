@@ -720,13 +720,22 @@ todo tree T-010
 ### 5.21 Kinds of entry — KIND
 
 - **R-KIND-1 COULD** Ideas are kept without being handed out as work.
-  `todo idea <text> [--about <task>]` adds an entry with `type: idea` to the section named by
-  `idea_section` (default `Ideas`, added at the end of the file if missing); it needs no priority,
-  whatever `required_fields` says. `next` never returns an idea, and `summary` counts ideas apart
-  from open tasks. `promote <idea> --priority P [--milestone <task>] [--section S]` turns an idea
-  into an ordinary task: it removes `type: idea`, sets the priority (and the milestone), moves the
-  entry to the end of section S when given (as `move` does) and adds a note (format.md §9).
-  `promote` of an entry that isn't an idea is refused (exit 1, `BAD_TRANSITION`).
+  `todo idea <text> [--about <task>]` adds an entry with `type: idea` and the note `added` to the
+  section named by `idea_section` (default `Ideas`, added at the end of the file if missing). It
+  needs no priority, whatever `required_fields` says. A title equal to that of an active task is
+  refused (`DUPLICATE_TITLE`, as `add` and `ask` do), and an `--about` ID that doesn't exist is
+  refused (exit 1, `NOT_FOUND`, as `ask --about` is, R-KIND-2); the file is left unchanged.
+  `next` never returns an idea, not even one already claimed by the asking agent. `summary` counts
+  the ideas that are not done or dropped apart from the work: they are left out of `total` and
+  the status and priority counts, shown as `ideas: N` in text and as `counts.ideas` in JSON.
+  `promote <idea> --priority P [--milestone <task>] [--section S]` turns an idea into an ordinary
+  task: `--priority` is required and must be a configured priority; it removes `type: idea`, sets
+  the priority and the milestone (which must name a milestone: `NOT_FOUND` when missing,
+  `BAD_VALUE` when it names another kind of entry), keeps `about`, and adds the note
+  `promoted from idea` (format.md §9). The status and owner don't change, and the ownership rule of
+  `set` applies (R-CLAIM-3). `--section S` moves the entry to the end of section S in the same
+  write, as `move` does; without it the entry stays where it is. `promote` of an entry that isn't
+  an idea is refused (exit 1, `BAD_TRANSITION`) and the file is left unchanged.
 - **R-KIND-2 COULD** Questions can refer to the entry they are about.
   `ask <question> --about <task>` writes `- about: <ID>`, and is refused (exit 1, `NOT_FOUND`) when
   that ID doesn't exist. `show` of a milestone or task lists the questions about it with their

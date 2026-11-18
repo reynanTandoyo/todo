@@ -16,11 +16,13 @@
 //!   preservation and parsed-task equivalence outside the intended [`TaskChangeIntent`] (R-EDIT-7).
 
 pub mod id;
+pub mod kind;
 pub mod lines;
 pub mod parser;
 pub mod verify;
 
 pub use id::{DEFAULT_ID_PREFIX, DEFAULT_ID_WIDTH, IdConfig, TaskId};
+pub use kind::EntryKind;
 pub use lines::{
     AppliedLineEdits, EditError, ExpectedByteChange, Line, LineDoc, LineEdit, LineEnding, UTF8_BOM,
     Utf8DecodeError, sanitize_single_line, sanitize_trimmed_value, verify_byte_edits,
