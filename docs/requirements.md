@@ -763,9 +763,13 @@ todo tree T-010
 - **R-VER-2 COULD** A tool refuses a format it doesn't know. When the format line names a version
   the running tool doesn't know, every command that reads or writes tasks exits 4 with the error
   `TOOL_TOO_OLD`; the message names the todo version stamped in the file and the running version,
-  and says to update the todo executable first (`todo help update`). Nothing is written. Only
-  `where`, `help`, `schema`, `completions` and `--version` still work. The per-user commands
-  (`project`, `overview`, `report --html --all`) never open a project's tasks to write them; they
+  and says to update the todo executable first (`todo help update`). Nothing is written. Commands
+  that interpret or change task content refuse; the ones that never read it (`status`, `history`,
+  `diff`, `lock`, `unlock`, `agents`, `skill`, `hooks`, `guard`, `session-end`, `merge-driver`) keep
+  working, and so do `help`, `schema`, `completions` and `--version`. `where` keeps working: it
+  shows the format version, the tool stamp and the running version, and counts no tasks. The
+  per-user commands (`project`, `overview`, `report --html --all`) never open a project's tasks to
+  write them; they
   show such a project with this problem and carry on with the others. A file in a known format with
   a higher stamp only warns (R-VER-1). (todo 0.5 and older read a newer format with a warning but
   refuse to write it; this rule starts with 0.6.)

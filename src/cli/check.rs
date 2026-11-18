@@ -21,6 +21,7 @@ use crate::lock::current_time;
 use crate::ops::identity::{mailmap_proper_names, repo_root};
 use crate::ops::{
     DocWritePlan, OpsConfig, edit_doc_and_write, file_label, read_optional_archive,
+    require_known_format,
 };
 use crate::output::Output;
 use crate::state::StateDir;
@@ -145,6 +146,7 @@ pub(crate) fn collect_problems(
                         .with_file(label.clone())
                         .with_line(e.line)
                 })?;
+            require_known_format(&doc, &label)?;
 
             // 1. Parser problems (conflict markers, unclosed fence/comment, unknown format version,
             //    duplicate IDs, repeated fields, unknown statuses, probable mistake headings).
