@@ -81,6 +81,22 @@ pub fn check_parent(
     Ok(parent_id)
 }
 
+/// Resolves a milestone argument (an ID or a title, as elsewhere) to the milestone it names in `doc`
+/// (`R-MILE-3`). A missing task is `NOT_FOUND`; a task that is not a milestone is `BAD_VALUE`,
+/// because only a milestone has entries below it.
+pub fn resolve_milestone<'a>(doc: &'a Document, input: &str) -> Result<&'a Task> {
+    let task = resolve_task_in_doc(doc, input.trim())?;
+    if !task.is_milestone() {
+        let id_str = doc.id_config.format_id(task.id);
+        return Err(TodoError::new(
+            ErrorCode::BadValue,
+            format!("task {id_str} is not a milestone; only a milestone has entries below it"),
+        )
+        .with_task(id_str));
+    }
+    Ok(task)
+}
+
 /// The canonical form of a `milestone` value that [`check_parent`] has already accepted.
 #[must_use]
 pub fn canonical_parent(doc: &Document, cfg: &OpsConfig, value: &str) -> String {

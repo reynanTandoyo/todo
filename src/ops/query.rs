@@ -3,7 +3,8 @@
 use chrono::{DateTime, FixedOffset};
 
 use crate::doc::{
-    Document, Section, Status, Task, agent_names_equal, is_nobody_owner, strip_section_number,
+    Document, EntryKind, Section, Status, Task, TaskId, agent_names_equal, is_nobody_owner,
+    strip_section_number,
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::config::OpsConfig;
@@ -147,6 +148,10 @@ pub struct ListFilter<'a> {
     pub stale_only: bool,
     /// Whether listing `TODO-archive.md`.
     pub archive_mode: bool,
+    /// Match any of these kinds (`--kind`, `R-KIND-3`).
+    pub kinds: Option<&'a [EntryKind]>,
+    /// Only entries below this milestone, at any depth (`--milestone`, `R-MILE-3`).
+    pub milestone: Option<TaskId>,
 }
 
 /// Filters `doc.tasks` according to `filter` and returns matching task references in file order.
@@ -227,6 +232,19 @@ pub fn filter_tasks<'a>(
                 {
                     return false;
                 }
+            }
+            if let Some(kinds) = filter.kinds
+                && !kinds.contains(&task.kind())
+            {
+                return false;
+            }
+            if let Some(milestone) = filter.milestone
+                && !doc
+                    .milestone_ancestors(task)
+                    .iter()
+                    .any(|a| a.id == milestone)
+            {
+                return false;
             }
             if !filter.where_clauses.iter().all(|w| w.matches(task)) {
                 return false;

@@ -1,5 +1,6 @@
 ---
 source: tests/cmd_summary.rs
+assertion_line: 78
 expression: json
 ---
 {
@@ -38,6 +39,7 @@ expression: json
       "total": 7
     },
     "file": "TODO.md",
+    "milestones": [],
     "next_ready": [
       {
         "id": "T-001",

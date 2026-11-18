@@ -571,6 +571,7 @@ register_commands! {
     Skill => skill,
     Status => status,
     Summary => summary,
+    Tree => tree,
     Unblock => unblock,
     Unlock => unlock,
     Where => where_cmd,

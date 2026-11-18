@@ -1,0 +1,91 @@
+---
+source: tests/cmd_tree.rs
+expression: data
+---
+{
+  "all": false,
+  "area": null,
+  "file": "TODO.md",
+  "ideas": [
+    {
+      "about": null,
+      "archived": false,
+      "id": "T-009",
+      "status": "open",
+      "title": "Try a new idea"
+    }
+  ],
+  "milestone": null,
+  "milestones": 2,
+  "nodes": [
+    {
+      "archived": false,
+      "area": null,
+      "children": [
+        {
+          "archived": false,
+          "area": null,
+          "children": [],
+          "difficulty": null,
+          "goal": "point and directional lights match the reference images",
+          "id": "T-002",
+          "kind": "milestone",
+          "priority": "P1",
+          "progress": {
+            "done": 1,
+            "total": 1
+          },
+          "status": "open",
+          "title": "Lighting"
+        },
+        {
+          "archived": false,
+          "area": "gpu",
+          "children": [],
+          "difficulty": "hard",
+          "goal": null,
+          "id": "T-004",
+          "kind": "task",
+          "priority": "P2",
+          "progress": null,
+          "status": "open",
+          "title": "GPU compiler"
+        }
+      ],
+      "difficulty": null,
+      "goal": "the test scene renders with lighting at 60 frames per second",
+      "id": "T-001",
+      "kind": "milestone",
+      "priority": "P1",
+      "progress": {
+        "done": 1,
+        "total": 2
+      },
+      "status": "open",
+      "title": "Develop the renderer"
+    },
+    {
+      "archived": false,
+      "area": "docs",
+      "children": [],
+      "difficulty": null,
+      "goal": null,
+      "id": "T-006",
+      "kind": "task",
+      "priority": "P2",
+      "progress": null,
+      "status": "claimed",
+      "title": "Write the docs"
+    }
+  ],
+  "questions": [
+    {
+      "about": "T-001",
+      "archived": false,
+      "id": "T-008",
+      "status": "open",
+      "title": "Renderer question"
+    }
+  ],
+  "tasks": 2
+}

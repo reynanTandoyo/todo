@@ -202,6 +202,11 @@ expression: ok_json
         "summary": "Show a compact session-start overview of TODO.md"
       },
       {
+        "kind": "read",
+        "name": "tree",
+        "summary": "Show milestones and their tasks as a tree, with progress"
+      },
+      {
         "kind": "write",
         "name": "unblock",
         "summary": "Unblock a blocked task back to claimed or open"
