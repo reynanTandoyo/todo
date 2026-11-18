@@ -346,6 +346,8 @@ pub struct NewTask<'a> {
     pub milestone: Option<&'a str>,
     /// `goal` value, for a milestone (R-MILE-1).
     pub goal: Option<&'a str>,
+    /// `why` value: what the task is for.
+    pub why: Option<&'a str>,
     /// `depends` value (comma-separated IDs).
     pub depends: Option<&'a str>,
     /// `files` value.
@@ -386,6 +388,7 @@ impl NewTask<'_> {
         for (key, value) in [
             ("milestone", self.milestone),
             ("goal", self.goal),
+            ("why", self.why),
             ("depends", self.depends),
             ("files", self.files),
             ("problem", self.problem),
@@ -403,6 +406,7 @@ impl NewTask<'_> {
             "area",
             "milestone",
             "goal",
+            "why",
             "depends",
             "files",
             "problem",

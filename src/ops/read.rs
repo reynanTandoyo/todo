@@ -316,6 +316,8 @@ pub struct TaskJson {
     pub milestones: Vec<MilestoneRefJson>,
     /// The entries whose milestone is this entry (`R-MILE-2`).
     pub children: Vec<ChildJson>,
+    /// `- why:` value, if present: what the task is for (R-WRITE-17).
+    pub why: Option<String>,
     /// Canonicalized or raw dependency strings from `- depends:`.
     pub depends: Vec<String>,
     /// Detailed dependency statuses (`R-DEP-2`).
@@ -563,6 +565,7 @@ pub fn build_task_json(
         milestone: task.milestone.clone(),
         milestones,
         children,
+        why: task.why.clone(),
         depends: task.depends.iter().map(|d| d.raw.clone()).collect(),
         dependencies,
         dependents,

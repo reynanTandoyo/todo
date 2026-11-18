@@ -70,6 +70,10 @@ pub struct Args {
     #[arg(long, value_name = "TEXT")]
     pub goal: Option<String>,
 
+    /// `why` field value: what the task is for.
+    #[arg(long, value_name = "TEXT")]
+    pub why: Option<String>,
+
     /// Dependencies (comma-separated task IDs).
     #[arg(long, value_name = "IDS")]
     pub depends: Option<String>,
@@ -149,10 +153,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         milestone_val.as_deref(),
         goal_val.as_deref(),
     )?;
+    let why_arg = resolve_opt_text_arg(args.why.as_deref())?;
     let files_arg = resolve_opt_text_arg(args.files.as_deref())?;
     let problem_arg = resolve_opt_text_arg(args.problem.as_deref())?;
     let fix_arg = resolve_opt_text_arg(args.fix.as_deref())?;
     let accept_arg = resolve_opt_text_arg(args.accept.as_deref())?;
+    let why_val = resolve_opt(why_arg.as_deref(), &extra_fields, "why");
     let depends_val = resolve_opt(args.depends.as_deref(), &extra_fields, "depends");
     let files_val = resolve_opt(files_arg.as_deref(), &extra_fields, "files");
     let problem_val = resolve_opt(problem_arg.as_deref(), &extra_fields, "problem");
@@ -160,15 +166,18 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let accept_val = resolve_opt(accept_arg.as_deref(), &extra_fields, "accept");
     check_required_fields(
         &cfg.required_fields,
-        priority_val.as_deref(),
-        difficulty_val.as_deref(),
-        type_val.as_deref(),
-        area_val.as_deref(),
-        depends_val.as_deref(),
-        files_val.as_deref(),
-        problem_val.as_deref(),
-        fix_val.as_deref(),
-        accept_val.as_deref(),
+        RequiredValues {
+            priority: priority_val.as_deref(),
+            difficulty: difficulty_val.as_deref(),
+            task_type: type_val.as_deref(),
+            area: area_val.as_deref(),
+            why: why_val.as_deref(),
+            depends: depends_val.as_deref(),
+            files: files_val.as_deref(),
+            problem: problem_val.as_deref(),
+            fix: fix_val.as_deref(),
+            accept: accept_val.as_deref(),
+        },
         &extra_fields,
     )?;
 
@@ -228,6 +237,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 area: area_val.as_deref(),
                 milestone: milestone_id.as_deref(),
                 goal: goal_val.as_deref(),
+                why: why_val.as_deref(),
                 depends: depends_val.as_deref(),
                 files: files_val.as_deref(),
                 problem: problem_val.as_deref(),
@@ -382,31 +392,38 @@ fn resolve_allowed(
     Ok(Some(canonical.clone()))
 }
 
-#[allow(clippy::too_many_arguments)]
+/// The values of the fields that `required_fields` can name, as the caller resolved them.
+#[derive(Clone, Copy)]
+struct RequiredValues<'a> {
+    priority: Option<&'a str>,
+    difficulty: Option<&'a str>,
+    task_type: Option<&'a str>,
+    area: Option<&'a str>,
+    why: Option<&'a str>,
+    depends: Option<&'a str>,
+    files: Option<&'a str>,
+    problem: Option<&'a str>,
+    fix: Option<&'a str>,
+    accept: Option<&'a str>,
+}
+
 fn check_required_fields(
     required_fields: &[String],
-    priority: Option<&str>,
-    difficulty: Option<&str>,
-    task_type: Option<&str>,
-    area: Option<&str>,
-    depends: Option<&str>,
-    files: Option<&str>,
-    problem: Option<&str>,
-    fix: Option<&str>,
-    accept: Option<&str>,
+    values: RequiredValues<'_>,
     extra: &[(String, String)],
 ) -> Result<()> {
     for req in required_fields {
         let present = match req.to_ascii_lowercase().as_str() {
-            "priority" => priority.is_some(),
-            "difficulty" => difficulty.is_some(),
-            "type" => task_type.is_some(),
-            "area" => area.is_some(),
-            "depends" => depends.is_some(),
-            "files" => files.is_some(),
-            "problem" => problem.is_some(),
-            "fix" => fix.is_some(),
-            "accept" => accept.is_some(),
+            "priority" => values.priority.is_some(),
+            "difficulty" => values.difficulty.is_some(),
+            "type" => values.task_type.is_some(),
+            "area" => values.area.is_some(),
+            "why" => values.why.is_some(),
+            "depends" => values.depends.is_some(),
+            "files" => values.files.is_some(),
+            "problem" => values.problem.is_some(),
+            "fix" => values.fix.is_some(),
+            "accept" => values.accept.is_some(),
             other => extra
                 .iter()
                 .any(|(k, v)| k.eq_ignore_ascii_case(other) && !v.trim().is_empty()),
@@ -564,6 +581,7 @@ struct BatchAddEntry {
     area: Option<String>,
     milestone: Option<String>,
     goal: Option<String>,
+    why: Option<String>,
     depends: Option<DependsInput>,
     files: Option<String>,
     problem: Option<String>,
@@ -584,6 +602,7 @@ struct ValidatedBatchEntry {
     /// Parent milestone as given: an ID, or `@ref` naming an entry of the same batch (R-MILE-1).
     milestone: Option<String>,
     goal: Option<String>,
+    why: Option<String>,
     depends_tokens: Vec<String>,
     files: Option<String>,
     problem: Option<String>,
@@ -776,6 +795,12 @@ pub(crate) fn add_batch_text(
             goal.as_deref(),
         )
         .map_err(|e| at_batch_line(e, line_no))?;
+        let why = parsed
+            .why
+            .as_deref()
+            .map(sanitize_trimmed_value)
+            .filter(|s| !s.is_empty())
+            .or_else(|| resolve_opt(None, &extra, "why"));
         let files = parsed
             .files
             .as_deref()
@@ -829,15 +854,18 @@ pub(crate) fn add_batch_text(
         };
         check_required_fields(
             &cfg.required_fields,
-            priority.as_deref(),
-            difficulty.as_deref(),
-            task_type.as_deref(),
-            area.as_deref(),
-            depends_summary.as_deref(),
-            files.as_deref(),
-            problem.as_deref(),
-            fix.as_deref(),
-            accept.as_deref(),
+            RequiredValues {
+                priority: priority.as_deref(),
+                difficulty: difficulty.as_deref(),
+                task_type: task_type.as_deref(),
+                area: area.as_deref(),
+                why: why.as_deref(),
+                depends: depends_summary.as_deref(),
+                files: files.as_deref(),
+                problem: problem.as_deref(),
+                fix: fix.as_deref(),
+                accept: accept.as_deref(),
+            },
             &extra,
         )?;
 
@@ -859,6 +887,7 @@ pub(crate) fn add_batch_text(
             area,
             milestone: parent,
             goal,
+            why,
             depends_tokens,
             files,
             problem,
@@ -969,6 +998,7 @@ pub(crate) fn add_batch_text(
                     area: entry.area.as_deref(),
                     milestone: milestone_id.as_deref(),
                     goal: entry.goal.as_deref(),
+                    why: entry.why.as_deref(),
                     depends: depends_val.as_deref(),
                     files: entry.files.as_deref(),
                     problem: entry.problem.as_deref(),

@@ -24,6 +24,7 @@ pub const CANONICAL_FIELD_ORDER: &[&str] = &[
     "milestone",
     "about",
     "goal",
+    "why",
     "depends",
     "files",
     "problem",
@@ -33,7 +34,7 @@ pub const CANONICAL_FIELD_ORDER: &[&str] = &[
 ];
 
 /// Number of known fields tracked for repeated-field detection (`known_field_index`).
-const KNOWN_FIELD_SLOTS: usize = 15;
+const KNOWN_FIELD_SLOTS: usize = 16;
 
 /// Accepted heading separators between `<ID>` and `<title>` (`docs/format.md` §6),
 /// canonical separator first.
@@ -370,6 +371,10 @@ pub struct Task {
     /// Where `goal` is defined, if present.
     pub goal_loc: Option<FieldLocation>,
 
+    /// `- why:` value and line index: what the task is for (`docs/format.md` §8).
+    pub why: Option<String>,
+    pub why_line: Option<usize>,
+
     /// Parsed dependency references from `- depends:`.
     pub depends: Vec<DependencyRef>,
     /// Raw `- depends:` value, if present.
@@ -496,6 +501,7 @@ impl Task {
             "area" => self.area.as_deref(),
             "milestone" => self.milestone.as_deref(),
             "goal" => self.goal.as_deref(),
+            "why" => self.why.as_deref(),
             "depends" => self.depends_raw.as_deref(),
             "files" => self.files.as_deref(),
             "problem" => self.problem.as_deref(),
@@ -1224,6 +1230,8 @@ fn parse_task_block(
         milestone_loc: None,
         goal: None,
         goal_loc: None,
+        why: None,
+        why_line: None,
         depends: Vec::new(),
         depends_raw: None,
         depends_line: None,
@@ -1451,6 +1459,14 @@ fn parse_task_block(
                     };
                     task.goal_loc = Some(FieldLocation::OwnLine(idx));
                 }
+                "why" => {
+                    task.why = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
+                    task.why_line = Some(idx);
+                }
                 "depends" => {
                     task.depends = parse_depends_list(value_str, id_config);
                     task.depends_raw = Some(owned_val);
@@ -1527,6 +1543,7 @@ const fn known_field_index(key: &str) -> Option<usize> {
         b"difficulty" => Some(12),
         b"milestone" => Some(13),
         b"goal" => Some(14),
+        b"why" => Some(15),
         _ => None,
     }
 }
