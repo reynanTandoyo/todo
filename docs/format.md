@@ -281,7 +281,8 @@ writes, with exit 4 and `TOOL_TOO_OLD` (§4).
 `archive` moves a task there, the whole block goes to the end of the section with the same name in
 the archive; missing sections are added at the end. A new archive file starts with the format line,
 the tool line and `# Archive`. The archive is changed only under the lock of `TODO.md`, and its IDs
-count when the next ID is chosen. It carries its own format and tool lines and is migrated in the
+count when the next ID is chosen. If `TODO.md` cannot be replaced after the archive was written, the
+archive is put back as it was (a new archive is removed), so a task is never in both files. It carries its own format and tool lines and is migrated in the
 same step as `TODO.md` (§18). Entries that belong to a milestone are archived only with their whole
 tree (§17).
 

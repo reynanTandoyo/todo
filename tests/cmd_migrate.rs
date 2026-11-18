@@ -9,7 +9,10 @@ use std::fs;
 
 use tempfile::TempDir;
 
-use common::{copy_fixture, parse_json, read_todo, run_in, stderr_text, stdout_text};
+use common::{
+    copy_fixture, count_tmp_files, parse_json, read_todo, run_in, set_read_only, stderr_text,
+    stdout_text,
+};
 
 /// The running version, as Cargo.toml gives it.
 const RUNNING: &str = env!("CARGO_PKG_VERSION");
@@ -236,6 +239,96 @@ fn json_output_lists_each_migrated_file_with_its_versions() {
     assert_eq!(json["data"]["migrated"][0]["file"], "TODO.md");
     assert_eq!(json["data"]["migrated"][0]["from"], 1);
     assert_eq!(json["data"]["migrated"][0]["to"], 2);
+}
+
+/// An archive in format 1 that holds one old task.
+fn format1_archive() -> String {
+    format!(
+        "{MARKER}\n<!-- todo-format: 1 -->\n# Archive\n\n## Done\n\n### T-000 · Old task\n\
+         - status: done\n- owner: bob\n- note (2026-11-01, bob): done\n"
+    )
+}
+
+#[test]
+fn a_read_only_todo_md_stops_the_migration_before_the_archive_is_migrated() {
+    let dir = TempDir::new().expect("tempdir");
+    copy_fixture(dir.path(), "migrate_format1_lf.md");
+    let todo = dir.path().join("TODO.md");
+    let archive = dir.path().join("TODO-archive.md");
+    let todo_before = read_todo(dir.path());
+    let archive_before = format1_archive();
+    fs::write(&archive, &archive_before).expect("archive");
+    set_read_only(&todo, true);
+
+    // Both a migrating `migrate` and a migrating write (`note`) are refused.
+    let commands: [&[&str]; 2] = [
+        &["migrate", "--yes", "--agent", "bob"],
+        &["note", "T-001", "checked the wicks", "--agent", "bob"],
+    ];
+    let mut outs = Vec::new();
+    for args in commands {
+        outs.push(run_in(dir.path(), args));
+    }
+    set_read_only(&todo, false);
+
+    for out in &outs {
+        assert_eq!(out.status.code(), Some(4), "{}", stderr_text(out));
+        assert!(
+            stderr_text(out).contains("read-only"),
+            "{}",
+            stderr_text(out)
+        );
+    }
+    assert_eq!(
+        fs::read_to_string(&archive).expect("archive"),
+        archive_before
+    );
+    assert_eq!(read_todo(dir.path()), todo_before);
+    assert_eq!(count_tmp_files(dir.path()), 0);
+}
+
+/// TODO.md as another program leaves it while `migrate` waits to replace it.
+#[cfg(feature = "test-hooks")]
+const EXTERNAL_EDIT: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
+# Edited by hand while migrate ran\n";
+
+#[cfg(feature = "test-hooks")]
+#[test]
+fn migrate_puts_the_old_archive_back_when_todo_md_changes_before_it_is_replaced() {
+    let tmp = TempDir::new().expect("tempdir");
+    let home = tmp.path().join("home");
+    let work = tmp.path().join("work");
+    fs::create_dir_all(&home).expect("home");
+    fs::create_dir_all(&work).expect("work");
+    copy_fixture(&work, "migrate_format1_lf.md");
+    let archive_before = format1_archive();
+    fs::write(work.join("TODO-archive.md"), &archive_before).expect("archive");
+
+    let ready = tmp.path().join("rename.ready");
+    let ready_str = ready.to_string_lossy().into_owned();
+    let child = common::spawn_todo(
+        &home,
+        &work,
+        &["migrate", "--yes", "--agent", "bob"],
+        &[
+            ("TODO_TEST_BEFORE_RENAME_READY_FILE", ready_str.as_str()),
+            ("TODO_TEST_BEFORE_RENAME_HOLD_MS", "1000"),
+        ],
+    )
+    .expect("spawn migrate");
+    common::wait_for_file(&ready, std::time::Duration::from_secs(10))
+        .expect("migrate reached a rename");
+    // The first pause is the replace of the migrated archive: TODO.md changes during it.
+    fs::write(work.join("TODO.md"), EXTERNAL_EDIT).expect("external edit");
+    let out = child.wait_with_output().expect("wait for migrate");
+
+    assert_eq!(out.status.code(), Some(3), "{}", stderr_text(&out));
+    assert_eq!(
+        fs::read_to_string(work.join("TODO-archive.md")).expect("archive"),
+        archive_before
+    );
+    assert_eq!(read_todo(&work), EXTERNAL_EDIT);
+    assert_eq!(count_tmp_files(&work), 0);
 }
 
 #[test]

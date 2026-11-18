@@ -226,6 +226,24 @@ pub fn write_todo(dir: &Path, content: &str) -> PathBuf {
     path
 }
 
+/// Sets or clears the read-only attribute of `path`. Tests clear it again before the temporary
+/// folder is removed, which Windows needs for a read-only file.
+pub fn set_read_only(path: &Path, read_only: bool) {
+    let mut perms = fs::metadata(path).expect("file metadata").permissions();
+    perms.set_readonly(read_only);
+    fs::set_permissions(path, perms).expect("set permissions");
+}
+
+/// Counts the temporary files (`*.tmp`) left in `dir`.
+#[must_use]
+pub fn count_tmp_files(dir: &Path) -> usize {
+    fs::read_dir(dir)
+        .expect("read dir")
+        .filter_map(Result::ok)
+        .filter(|e| e.file_name().to_string_lossy().ends_with(".tmp"))
+        .count()
+}
+
 /// Reads the UTF-8 text of `path`; panics if it cannot be read.
 #[must_use]
 pub fn read_text(path: &Path) -> String {

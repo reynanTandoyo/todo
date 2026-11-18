@@ -368,18 +368,27 @@ where
                 cfg.snapshots_keep,
             )?;
             snap_timer.finish();
-            // The archive file (changed by this write, or migrated in it) is written after the
-            // snapshot and before TODO.md is replaced, so a failed archive write leaves TODO.md as
-            // it was, and a snapshot that cannot be recorded leaves the archive as it was (R-MIG-1,
-            // R-ARCH-1).
+            // The archive files (changed by this write, or migrated in it) are written after the
+            // snapshot and before TODO.md is replaced, so a snapshot that cannot be recorded leaves
+            // them as they were (R-MIG-1, R-ARCH-1). TODO.md is checked to be replaceable before the
+            // first of them is written, so a read-only file is refused with nothing changed. If the
+            // replace of TODO.md still fails, each archive file is put back as it was, so that a
+            // moved task is never in both files.
+            atomic::check_writable(todo_path)?;
             let archive_writes = archive
                 .iter()
                 .chain(migration.as_ref().and_then(|m| m.archive.as_ref()));
+            let mut replaced: Vec<ReplacedArchive<'_>> = Vec::new();
             for write in archive_writes {
-                write_archive_file(write)?;
+                match write_archive_file(write) {
+                    Ok(done) => replaced.push(done),
+                    Err(err) => return Err(with_put_back(err, put_back_archives(&replaced))),
+                }
             }
             let replace_timer = crate::timing::PhaseTimer::start("lock.atomic_replace");
-            atomic::atomic_replace(todo_path, &read.snapshot, &new_bytes)?;
+            if let Err(err) = atomic::atomic_replace(todo_path, &read.snapshot, &new_bytes) {
+                return Err(with_put_back(err, put_back_archives(&replaced)));
+            }
             replace_timer.finish();
             let post_timer = crate::timing::PhaseTimer::start("lock.post_hash_and_last_write");
             let post_mtime = std::fs::metadata(fs_path(todo_path).as_ref())
@@ -421,13 +430,84 @@ where
     }
 }
 
+/// An archive file that a write has replaced, with the bytes it held before (R-ARCH-1). Kept so that
+/// [`put_back_archive`] can restore it when TODO.md is not replaced.
+struct ReplacedArchive<'a> {
+    /// The write that replaced the file.
+    write: &'a ArchiveWrite,
+    /// The file's bytes before the write; `None` when the write created the file.
+    before: Option<Vec<u8>>,
+}
+
 /// Writes one archive file of a write: replaces it when it was read (guarded by its snapshot), or
-/// creates it when it did not exist.
-fn write_archive_file(write: &ArchiveWrite) -> Result<()> {
-    match &write.expected {
+/// creates it when it did not exist. Returns what it held before, for [`put_back_archive`].
+fn write_archive_file(write: &ArchiveWrite) -> Result<ReplacedArchive<'_>> {
+    let before = read_existing(&write.path)?.map(|read| read.bytes);
+    let replaced = match &write.expected {
         Some(expected) => atomic::atomic_replace(&write.path, expected, &write.new_bytes),
         None => atomic::atomic_write_bytes(&write.path, &write.new_bytes),
+    };
+    replaced?;
+    Ok(ReplacedArchive { write, before })
+}
+
+/// Reads the file at `path` with its snapshot, or returns `None` when there is no such file.
+fn read_existing(path: &Path) -> Result<Option<atomic::ReadFile>> {
+    match atomic::read_file_with_snapshot(path) {
+        Ok(read) => Ok(Some(read)),
+        Err(err) if err.code == ErrorCode::NoFile => Ok(None),
+        Err(err) => Err(err),
     }
+}
+
+/// Puts back an archive file that [`write_archive_file`] replaced: the bytes it held before, or no
+/// file when the write created it. A file that no longer holds what the write put there was changed
+/// by someone else since, so it is left as it is and reported.
+fn put_back_archive(replaced: &ReplacedArchive<'_>) -> Result<()> {
+    let path = replaced.write.path.as_path();
+    let current = read_existing(path)?;
+    match (&replaced.before, current) {
+        (None, None) => Ok(()),
+        (_, Some(current)) if current.bytes == replaced.write.new_bytes => match &replaced.before {
+            Some(before) => atomic::atomic_replace(path, &current.snapshot, before),
+            None => std::fs::remove_file(fs_path(path).as_ref()).map_err(|e| {
+                TodoError::new(
+                    ErrorCode::WriteFailed,
+                    format!("failed removing {}: {e}", path.display()),
+                )
+            }),
+        },
+        _ => Err(TodoError::new(
+            ErrorCode::ChangedDuringWrite,
+            format!(
+                "{} no longer holds what this write put there, so it was left as it is",
+                path.display()
+            ),
+        )),
+    }
+}
+
+/// Puts back the archive files that a failed write had replaced, most recent first. Returns what
+/// could not be put back, or `None` when everything was.
+fn put_back_archives(replaced: &[ReplacedArchive<'_>]) -> Option<String> {
+    let problems: Vec<String> = replaced
+        .iter()
+        .rev()
+        .filter_map(|r| put_back_archive(r).err().map(|e| e.message))
+        .collect();
+    (!problems.is_empty()).then(|| problems.join("; "))
+}
+
+/// The error of a write that failed after it replaced archive files. When some of them could not be
+/// put back, the error says so, since they then still hold the moved tasks.
+fn with_put_back(mut err: TodoError, problems: Option<String>) -> TodoError {
+    if let Some(problems) = problems {
+        err.message = format!(
+            "{}; but the archive file could not be put back, so it still holds the moved tasks: {problems}",
+            err.message
+        );
+    }
+    err
 }
 
 pub(crate) fn random_retry_delay() -> Duration {

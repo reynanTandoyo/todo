@@ -2,6 +2,11 @@
 
 All notable changes to `todo` are documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- A failed replace of `TODO.md` after `archive` or a migration no longer leaves the moved tasks in both files: a read-only `TODO.md` is refused before `TODO-archive.md` is written, and a replace that fails afterwards puts the archive back as it was (`R-ARCH-1`, `R-MIG-1`).
+
 ## [0.6.0] - 2026-11-18
 
 ### Changed — file format version 2 (read this before updating)
