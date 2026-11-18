@@ -40,34 +40,17 @@ When `--dry-run` is active on a write command, `"dry_run": true` and `"diff": ".
 
 ## Shared `TaskJson` Shape
 
-Returned by `show` (plus `block_lines`), `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, and `next.task`:
+Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, and as `next.task`. The example is the `show` output under "`todo show <task> --json`" below, which lists every key. Every key is always present: a value that is not set is `null`, and a list or an object with nothing in it is `[]` or `{}`.
 
-```json
-{
-  "id": "T-012",
-  "title": "Add retry logic",
-  "status": "claimed",
-  "owner": "agent-1",
-  "priority": "P1",
-  "difficulty": "hard",
-  "type": "feature",
-  "area": "cli",
-  "depends": ["T-003"],
-  "claimed": "2026-11-15T18:00+01:00",
-  "stale": false,
-  "ready": false,
-  "section": "Tasks",
-  "line_start": 42,
-  "line_end": 49,
-  "notes": [
-    {
-      "date": "2026-11-15",
-      "author": "agent-1",
-      "text": "started work"
-    }
-  ]
-}
-```
+- `type` is the `type` field as written; `section` is the `##` section the entry is under, or `null`.
+- `archived` is `true` for an entry read from `TODO-archive.md`.
+- `stale` is `true` when the claim is past its timeout (`R-CLAIM-4`); `ready` is `true` when `next` could hand the entry out now.
+- `milestones` lists the milestones above the entry, from the top down, with `goal` and `status`; `milestone` is the parent as written.
+- `children` lists the entries whose `milestone` is this entry, with `kind` (`task` or `milestone`).
+- `depends` holds the dependency tokens as written. `dependencies` has one entry per token: `raw`, `id`, `exists`, `archived`, `status`, `title` and `satisfied` (`true` when the target is done or dropped; `null` and `false` when it does not exist).
+- `dependents` lists the tasks whose `depends` names this entry; `questions` the questions whose `about` names it (`R-KIND-2`).
+- `fields` holds the unknown `key: value` fields as written.
+- `notes` has `date`, `agent`, `text` and `line`, the 1-based line of the note in the file. `line_start` and `line_end` are the 1-based first and last lines of the block.
 
 ---
 
@@ -186,36 +169,62 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
 
 ### `todo show <task> --json` (`todo.show.v1`)
 
+`data` is the Shared `TaskJson` shape, for the milestone `T-011`. The fixture has a parent milestone (`T-010`), a dependency (`T-003`), a dependent (`T-020`), a question about it (`T-005`) and a task below it (`T-012`):
+
 ```json
 {
   "schema": "todo.show.v1",
   "ok": true,
   "data": {
-    "id": "T-001",
-    "title": "First task",
+    "id": "T-011",
+    "title": "Lighting",
+    "section": "Tasks",
+    "archived": false,
     "status": "open",
     "owner": null,
-    "priority": "P1",
-    "difficulty": null,
-    "type": null,
-    "area": null,
-    "depends": [],
     "claimed": null,
     "stale": false,
-    "ready": true,
-    "section": "Tasks",
-    "line_start": 7,
-    "line_end": 11,
-    "archived": false,
-    "block_lines": ["### T-001 · First task", "- status: open"],
-    "depends_on": [
-      { "id": "T-000", "status": "done", "title": "Setup", "found": true, "archived": false }
+    "priority": "P1",
+    "difficulty": null,
+    "type": "milestone",
+    "area": null,
+    "goal": "point and directional lights match the reference images",
+    "milestone": "T-010",
+    "milestones": [
+      { "id": "T-010", "title": "Develop the renderer", "goal": "the test scene renders with lighting at 60 frames per second", "status": "open" }
     ],
-    "waiting_on_this": []
+    "children": [
+      { "id": "T-012", "title": "C shader", "kind": "task", "status": "open" }
+    ],
+    "why": null,
+    "depends": ["T-003"],
+    "dependencies": [
+      { "raw": "T-003", "id": "T-003", "exists": true, "archived": false, "status": "done", "title": "Setup", "satisfied": true }
+    ],
+    "dependents": [
+      { "id": "T-020", "title": "Ship lighting", "status": "open", "archived": false }
+    ],
+    "questions": [
+      { "id": "T-005", "title": "Are shadows in scope?", "status": "open", "archived": false }
+    ],
+    "ready": false,
+    "files": null,
+    "problem": null,
+    "fix": null,
+    "accept": null,
+    "commit": [],
+    "fields": {},
+    "notes": [
+      { "date": "2026-11-15", "agent": "planner", "text": "added", "line": 27 }
+    ],
+    "line_start": 20,
+    "line_end": 27
   },
   "warnings": []
 }
 ```
+
+`warnings` holds the warnings that the text output prints on standard error.
 
 ### `todo next --json` (`todo.next.v1`)
 
