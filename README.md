@@ -116,6 +116,20 @@ todo next --agent agent-1
 todo next --claim --agent agent-1
 ```
 
+### HTML report for people
+
+```powershell
+todo report --html
+todo report --html --open
+todo report --html --out "$env:USERPROFILE\Desktop\tasks.html"
+```
+
+`todo report --html` writes one read-only page: the work as a tree of milestones with their goals
+and progress, the unfinished tasks per area, open questions, ideas, and the done and dropped entries.
+It prints the path of `report.html` in the state folder, which git never sees. It takes no lock,
+never changes `TODO.md`, and needs no network. `--out` writes the page elsewhere, and `--open` opens
+it with the system's default program for HTML files.
+
 ### Adding and editing tasks
 
 ```powershell

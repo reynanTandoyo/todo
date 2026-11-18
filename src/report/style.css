@@ -1,0 +1,320 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --fg: #1d1d1a;
+  --muted: #5d5c57;
+  --line: #d8d5cb;
+  --accent: #1f5aa6;
+  --chip: #ebe9e2;
+  --chip-fg: #2f2e29;
+  --blocked: #8a4a00;
+  --stale: #a3252a;
+  --done: #2b6a38;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161613;
+    --surface: #1e1e1a;
+    --fg: #ebeae4;
+    --muted: #a7a59c;
+    --line: #3b3a34;
+    --accent: #8ab6ee;
+    --chip: #2b2b26;
+    --chip-fg: #dcdbd3;
+    --blocked: #f2b45e;
+    --stale: #ff8c84;
+    --done: #8fd39f;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 24px 16px 48px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+header,
+main,
+footer {
+  max-width: 60rem;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 2rem;
+  line-height: 1.2;
+  margin: 0.25rem 0;
+}
+
+h2 {
+  font-size: 1.25rem;
+  margin: 2.25rem 0 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+h4 {
+  font-size: 0.95rem;
+  margin: 1rem 0 0.4rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+.kicker,
+.source,
+.hint,
+.muted,
+.empty {
+  color: var(--muted);
+}
+
+.kicker {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.source {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+}
+
+ol,
+ul,
+dl,
+dd,
+p {
+  margin: 0;
+}
+
+ol,
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+.counts,
+.jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+}
+
+.counts {
+  margin-bottom: 0.75rem;
+}
+
+.counts .n {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.jump {
+  font-size: 0.95rem;
+}
+
+.chip {
+  display: inline-block;
+  margin: 0.1rem 0.25rem 0.1rem 0;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--chip-fg);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.chip.stale {
+  color: var(--stale);
+  font-weight: 600;
+}
+
+.reason {
+  color: var(--blocked);
+}
+
+.reason.dropped {
+  color: var(--muted);
+}
+
+.id {
+  margin-right: 0.4rem;
+  color: var(--muted);
+  font-family: ui-monospace, Consolas, "Cascadia Mono", monospace;
+  font-size: 0.9rem;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.done-mark {
+  color: var(--done);
+  font-weight: 600;
+}
+
+.areas li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.areas .count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+details {
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line);
+}
+
+summary {
+  cursor: pointer;
+}
+
+.more {
+  margin: 0.5rem 0 0.25rem 0.25rem;
+}
+
+dl.fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.2rem 0.9rem;
+  font-size: 0.95rem;
+}
+
+dl.fields dt {
+  color: var(--muted);
+}
+
+dl.fields dd {
+  margin: 0;
+}
+
+ul.notes li {
+  margin: 0.25rem 0;
+  font-size: 0.95rem;
+}
+
+.when {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.who {
+  font-weight: 600;
+}
+
+/* The work tree: a milestone with its goal, and what is below it indented. */
+.tree > .node {
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.tree > .node:first-child {
+  border-top: 0;
+}
+
+.milestone-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+}
+
+.goal {
+  margin: 0.25rem 0 0.2rem;
+}
+
+.progress-text {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+progress {
+  width: 7rem;
+  height: 0.6rem;
+  vertical-align: middle;
+  accent-color: var(--done);
+}
+
+ol.children {
+  margin: 0.35rem 0 0 1.1rem;
+  padding: 0 0 0 0.85rem;
+  border-left: 2px solid var(--line);
+}
+
+ol.children > .node {
+  padding: 0.35rem 0;
+}
+
+ol.children > .node details {
+  border-top: 0;
+  padding: 0.2rem 0;
+}
+
+.item {
+  padding: 0.15rem 0;
+}
+
+.item + .item {
+  border-top: 1px solid var(--line);
+}
+
+.item details {
+  border-top: 0;
+}
+
+.kind-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  body {
+    padding: 16px 16px 40px;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+  }
+
+  ol.children {
+    margin-left: 0.4rem;
+    padding-left: 0.6rem;
+  }
+
+  dl.fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0 0;
+  }
+
+  dl.fields dt {
+    margin-top: 0.4rem;
+  }
+
+  progress {
+    width: 5rem;
+  }
+}

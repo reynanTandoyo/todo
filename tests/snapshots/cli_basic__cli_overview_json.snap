@@ -167,6 +167,11 @@ expression: ok_json
         "summary": "Release a claimed task, all stale claims, all claims of an agent or of a session"
       },
       {
+        "kind": "read",
+        "name": "report",
+        "summary": "Write one HTML page for people: the work, questions, ideas, done and dropped"
+      },
+      {
         "kind": "write",
         "name": "reopen",
         "summary": "Put a done or dropped task back to open"

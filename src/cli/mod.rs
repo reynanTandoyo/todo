@@ -602,6 +602,7 @@ register_commands! {
     Note => note,
     Promote => promote,
     Release => release,
+    Report => report,
     Reopen => reopen,
     Restore => restore,
     Scan => scan,
