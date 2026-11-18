@@ -336,11 +336,18 @@ Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `T
     "count": 2,
     "tasks": [
       { "id": "T-001", "title": "Old task", "status": "done", "section": "Tasks" }
+    ],
+    "kept_back": [
+      { "id": "T-002", "title": "Lighting", "status": "done", "section": "Tasks", "reason": "milestone T-000 is still open" }
     ]
   },
   "warnings": []
 }
 ```
+
+`kept_back` lists the finished entries that stayed in `TODO.md` because of the milestone rules
+(R-ARCH-2), in file order, each with the `reason` in words; `[]` when there are none. `count` and
+`tasks` list only the entries that moved, a whole milestone tree included.
 
 ### `todo migrate --json` (`todo.migrate.v1`)
 

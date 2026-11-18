@@ -482,8 +482,11 @@ or with `--json` the task as it is after the change.
   is moved only when its top-level milestone is done or dropped and nothing in that tree is still
   open, claimed or blocked; then the whole tree (the top-level milestone and every entry below it,
   at any depth) moves in the same step. Entries without a milestone and without entries below them
-  are archived as before. `--older-than` is measured on the top-level milestone. The preview and the
-  result say how many finished entries were kept back, and why. So every milestone still in
+  are archived as before. An entry whose milestone chain does not reach a top-level milestone (its
+  parent is missing or is not a milestone, or the chain loops) stays in `TODO.md`; so does a tree
+  that an entry outside it still names, and a finished entry that other entries name as their
+  milestone while it is not a milestone. `--older-than` is measured on the top-level milestone. The
+  preview and the result say how many finished entries were kept back, and why. So every milestone still in
   `TODO.md` has all its entries there and its progress count is right. `show`, `tree --all` and
   `list --archive --milestone` find an archived tree.
 
