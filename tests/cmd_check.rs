@@ -82,22 +82,22 @@ fn unclosed() {}
         assert!(stdout.contains("TODO.md:8:"), "fence line: {stdout}");
     }
 
-    // 3. Unclosed HTML comment & unknown format version
+    // 3. Unclosed HTML comment. A format version newer than this todo is refused instead
+    //    (R-VER-2); see tests/cmd_format_newer.rs.
     {
         let dir = TempDir::new().expect("tempdir");
         fs::write(
             dir.path().join("TODO.md"),
             "\
-<!-- todo-format: 99 -->
+<!-- todo-format: 1 -->
 <!-- TEST FIXTURE: invented data, not a real task list -->
 # Version
 <!-- unclosed comment
 ",
         )
-        .expect("write bad version");
+        .expect("write unclosed comment");
         let (code, stdout, _) = run_check(dir.path());
         assert_eq!(code, 1);
-        assert!(stdout.contains("TODO.md:1:"), "version line: {stdout}");
         assert!(stdout.contains("TODO.md:4:"), "comment line: {stdout}");
     }
 

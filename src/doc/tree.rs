@@ -6,8 +6,11 @@
 
 use std::collections::BTreeSet;
 
+use serde::Serialize;
+
 use crate::doc::id::TaskId;
 use crate::doc::parser::{Document, Status, Task};
+use crate::error::{ErrorCode, Result, TodoError};
 
 /// The kind of an entry, taken from its `type` (`docs/format.md` §16).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,6 +47,45 @@ impl EntryKind {
             Self::Idea => "idea",
         }
     }
+
+    /// Parses a comma-separated `--kind` list such as `milestone,task` (`R-KIND-3`). Matching ignores
+    /// ASCII case. An unknown kind, or an empty list, is `BAD_VALUE`.
+    pub fn parse_kind_list(raw: &str) -> Result<Vec<Self>> {
+        let mut kinds: Vec<Self> = Vec::new();
+        for part in raw.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+            let kind = match part.to_ascii_lowercase().as_str() {
+                "task" => Self::Task,
+                "milestone" => Self::Milestone,
+                "question" => Self::Question,
+                "idea" => Self::Idea,
+                _ => {
+                    return Err(TodoError::new(
+                        ErrorCode::BadValue,
+                        format!("unknown kind `{part}`; use milestone, task, question or idea"),
+                    ));
+                }
+            };
+            if !kinds.contains(&kind) {
+                kinds.push(kind);
+            }
+        }
+        if kinds.is_empty() {
+            return Err(TodoError::new(
+                ErrorCode::BadValue,
+                "--kind needs one or more of: milestone, task, question, idea",
+            ));
+        }
+        Ok(kinds)
+    }
+}
+
+/// Progress of a milestone: `done` tasks out of `total` tasks below it (`R-MILE-3`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Progress {
+    /// Tasks below the milestone that are done.
+    pub done: usize,
+    /// Tasks below the milestone that are not dropped.
+    pub total: usize,
 }
 
 impl Task {
@@ -168,6 +210,28 @@ impl Document {
             .iter()
             .filter(|t| self.is_ready_to_close(t))
             .collect()
+    }
+
+    /// The progress of milestone `id` (`R-MILE-3`): `done` counts the done tasks below it at any
+    /// depth, `total` every task below it that isn't dropped. Milestones, questions and ideas are
+    /// not counted.
+    #[must_use]
+    pub fn progress(&self, id: TaskId) -> Progress {
+        let mut progress = Progress { done: 0, total: 0 };
+        for task in self.entries_below(id) {
+            if task.kind() != EntryKind::Task {
+                continue;
+            }
+            match task.status {
+                Status::Dropped => {}
+                Status::Done => {
+                    progress.done += 1;
+                    progress.total += 1;
+                }
+                Status::Open | Status::Claimed | Status::Blocked => progress.total += 1,
+            }
+        }
+        progress
     }
 }
 

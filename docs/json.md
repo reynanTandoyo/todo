@@ -216,6 +216,7 @@ When no ready task exists, `"found": false, "task": null`.
     "file": "TODO.md",
     "counts": { "open": 2, "claimed": 1, "blocked": 1, "done": 3, "dropped": 0, "total": 7 },
     "open_by_priority": [{ "priority": "P0", "count": 1 }],
+    "milestones": [{ "id": "T-010", "title": "Develop the renderer", "priority": "P1", "status": "open", "progress": { "done": 1, "total": 3 } }],
     "claimed": [
       { "id": "T-002", "title": "Work", "owner": "alice", "claimed": "2026-11-15T18:00+01:00", "age_hours": 2, "stale": false }
     ],
@@ -228,6 +229,50 @@ When no ready task exists, `"found": false, "task": null`.
 ```
 
 `ready_to_close` (`R-MILE-6`) lists the milestones that are ready to close, as `{ "id", "title" }`; the key is left out when there are none.
+
+### `todo tree --json` (`todo.tree.v1`)
+
+`nodes` is nested: each milestone lists its `children` (milestones and tasks, in file order), and
+top-level tasks come after the top-level milestones. `progress` is `{done, total}` for a milestone
+and `null` for a task; `goal` is set only for a milestone. `questions` and `ideas` list the open
+ones only for the whole tree (no milestone argument and no `--area`); otherwise they are `[]`.
+`archived` is `true` for an entry from `TODO-archive.md`, which is read and shown only with `--all`
+(done and dropped entries are shown only with `--all` too).
+
+```json
+{
+  "schema": "todo.tree.v1",
+  "ok": true,
+  "data": {
+    "file": "TODO.md",
+    "all": false,
+    "milestone": null,
+    "area": null,
+    "milestones": 1,
+    "tasks": 1,
+    "nodes": [
+      {
+        "id": "T-010",
+        "title": "Develop the renderer",
+        "kind": "milestone",
+        "status": "open",
+        "priority": "P1",
+        "difficulty": null,
+        "area": null,
+        "goal": "the test scene renders with lighting at 60 frames per second",
+        "progress": { "done": 1, "total": 2 },
+        "archived": false,
+        "children": [
+          { "id": "T-012", "title": "C shader", "kind": "task", "status": "open", "priority": "P1", "difficulty": "hard", "area": "cli", "goal": null, "progress": null, "archived": false, "children": [] }
+        ]
+      }
+    ],
+    "questions": [],
+    "ideas": []
+  },
+  "warnings": []
+}
+```
 
 ### `todo where --json` (`todo.where.v1`)
 
@@ -247,6 +292,9 @@ When no ready task exists, `"found": false, "task": null`.
   "warnings": []
 }
 ```
+
+When the format version is newer than this todo knows, `where` still succeeds but leaves out
+`counts`, because the tasks are not read (R-VER-2).
 
 ### `todo check --json` (`todo.check.v1`)
 
@@ -579,3 +627,4 @@ command.
 | `READ_ONLY` | 4 | Target file is read-only | `{"code":"READ_ONLY","message":"TODO.md is read-only"}` |
 | `WRITE_FAILED` | 4 | Atomic write or rename failed | `{"code":"WRITE_FAILED","message":"failed writing temporary file"}` |
 | `NO_GIT_HISTORY` | 5 | `align` without git, outside a repository, in a shallow clone or with no commits | `{"code":"NO_GIT_HISTORY","message":"not inside a git repository"}` |
+| `TOOL_TOO_OLD` | 4 | `TODO.md` or the archive names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 99 is newer than this todo 0.5.0 supports; ...","file":"TODO.md","line":2}` |

@@ -7,7 +7,7 @@ use crate::cli::{CommandKind, CommandMeta, Context, write_milestone_chain};
 use crate::doc::TaskChangeIntent;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::current_time;
-use crate::ops::milestone::resolve_milestone_filter;
+use crate::ops::milestone::resolve_milestone;
 use crate::ops::{
     DocWritePlan, NextFilter, TaskJson, WhereClause, build_claim_edits, build_task_json,
     check_task_writable, edit_doc_with_found_and_state_and_write, load_for_read_with_found,
@@ -107,7 +107,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             out,
             |doc, archive, _state, label, agent, now| {
                 let milestone = match args.milestone.as_deref() {
-                    Some(raw) => Some(resolve_milestone_filter(doc, &cfg, raw)?),
+                    Some(raw) => Some(resolve_milestone(doc, raw)?.id),
                     None => None,
                 };
                 let filter = NextFilter {
@@ -181,7 +181,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         let loaded = load_for_read_with_found(found, &cfg, false, true, out)?;
         let now = current_time();
         let milestone = match args.milestone.as_deref() {
-            Some(raw) => Some(resolve_milestone_filter(&loaded.doc, &cfg, raw)?),
+            Some(raw) => Some(resolve_milestone(&loaded.doc, raw)?.id),
             None => None,
         };
         let filter = NextFilter {

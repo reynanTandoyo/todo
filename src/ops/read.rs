@@ -9,11 +9,14 @@ use serde::Serialize;
 
 use crate::atomic::{read_file_with_snapshot, validate_utf8};
 use crate::cli::Context;
-use crate::doc::{Document, EntryKind, IdConfig, Status, Task, TaskId};
+use crate::doc::{
+    Document, EntryKind, IdConfig, SUPPORTED_FORMAT_VERSION, Status, Task, TaskId, ToolStamp,
+};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, fs_path};
 use crate::ops::config::OpsConfig;
 use crate::output::Output;
+use crate::version::RUNNING_VERSION;
 
 /// A `TODO.md` (or archive) document loaded for a read command (`R-LOCK-5`, `R-EDIT-8`).
 #[derive(Debug, Clone)]
@@ -39,9 +42,57 @@ pub fn file_label(path: &Path) -> String {
         .unwrap_or_else(|| "TODO.md".to_string())
 }
 
+/// Returns `true` when `doc` declares a format version newer than this todo knows (R-VER-2).
+#[must_use]
+pub fn format_is_newer(doc: &Document) -> bool {
+    doc.declared_format_version
+        .is_some_and(|v| v > SUPPORTED_FORMAT_VERSION)
+}
+
+/// Refuses a document whose format line names a version newer than this todo knows (R-VER-2,
+/// `docs/format.md` §4). Every command that interprets or changes task content calls this on the
+/// parsed document, so an old todo never hands out tasks it misreads.
+///
+/// `label` is the file name used in the error (`TODO.md`, `TODO-archive.md`).
+pub fn require_known_format(doc: &Document, label: &str) -> Result<()> {
+    if !format_is_newer(doc) {
+        return Ok(());
+    }
+    let version = doc.declared_format_version.unwrap_or_default();
+    let line = doc.format_line.map_or(1, |idx| idx + 1);
+    let written_by = match &doc.tool_stamp {
+        Some(ToolStamp {
+            version: Some(stamp),
+            ..
+        }) => format!("was last written by todo {stamp}"),
+        Some(ToolStamp { value, .. }) => {
+            format!("has the tool line '{value}', which is not a version")
+        }
+        None => "has no tool line, so it counts as written by todo 0.5.0 or older".to_string(),
+    };
+    Err(TodoError::new(
+        ErrorCode::ToolTooOld,
+        format!(
+            "format version {version} is newer than this todo {RUNNING_VERSION} supports; the file {written_by}. Update the todo executable first (`todo help update`)."
+        ),
+    )
+    .with_file(label)
+    .with_line(line))
+}
+
+/// [`require_known_format`] for raw bytes, for commands that check a file before parsing it for
+/// their own purpose. Bytes that are not UTF-8 pass here: the command's own checks report them.
+pub fn require_known_format_bytes(bytes: &[u8], label: &str, id_config: &IdConfig) -> Result<()> {
+    match Document::parse_bytes_with_config(bytes, id_config.clone()) {
+        Ok(doc) => require_known_format(&doc, label),
+        Err(_) => Ok(()),
+    }
+}
+
 /// Parses an optional archive file if it exists on disk.
 ///
-/// Returns `Ok(None)` if the file does not exist (`NotFound`).
+/// Returns `Ok(None)` if the file does not exist (`NotFound`). An archive in a format version
+/// newer than this todo is refused (R-VER-2).
 pub fn read_optional_archive(archive_path: &Path, id_config: IdConfig) -> Result<Option<Document>> {
     match std::fs::read(fs_path(archive_path).as_ref()) {
         Ok(bytes) => {
@@ -49,9 +100,10 @@ pub fn read_optional_archive(archive_path: &Path, id_config: IdConfig) -> Result
             let _ = validate_utf8(&bytes, &label)?;
             let doc = Document::parse_bytes_with_config(&bytes, id_config).map_err(|e| {
                 TodoError::new(ErrorCode::UnsafeFile, e.to_string())
-                    .with_file(label)
+                    .with_file(label.clone())
                     .with_line(e.line)
             })?;
+            require_known_format(&doc, &label)?;
             Ok(Some(doc))
         }
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
@@ -63,10 +115,20 @@ pub fn read_optional_archive(archive_path: &Path, id_config: IdConfig) -> Result
     }
 }
 
+/// What a read does with `TODO.md` when its format version is newer than this todo (R-VER-2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NewerFormat {
+    /// Refuse with `TOOL_TOO_OLD`: every command that interprets tasks.
+    Refuse,
+    /// Load it anyway, for `where`, which only shows the format and the stamp.
+    Show,
+}
+
 /// Loads `TODO.md` (or `TODO-archive.md` when `from_archive` is `true`) without taking any lock (`R-LOCK-5`).
 ///
 /// Emits any parse problems/warnings on `out` per `R-EDIT-8` and `docs/format.md` §13 so read
-/// commands still work on files with write-blocking problems.
+/// commands still work on files with write-blocking problems. A file in a format version newer
+/// than this todo is refused with `TOOL_TOO_OLD` (R-VER-2).
 pub fn load_for_read(
     ctx: &Context,
     cfg: &OpsConfig,
@@ -77,7 +139,22 @@ pub fn load_for_read(
     let find_timer = crate::timing::PhaseTimer::start("read.find_todo");
     let found = ctx.find_todo_with_mode(cfg.worktree, out)?;
     find_timer.finish();
-    load_for_read_inner(found, cfg, from_archive, load_archive_for_deps, out)
+    load_for_read_inner(
+        found,
+        cfg,
+        from_archive,
+        load_archive_for_deps,
+        out,
+        NewerFormat::Refuse,
+    )
+}
+
+/// Loads `TODO.md` for `todo where`, which shows the format version and the tool stamp of a file
+/// that this todo cannot read (R-VER-2). The caller must not count or list its tasks when
+/// [`format_is_newer`] is `true`. The archive is never loaded here.
+pub fn load_for_where(ctx: &Context, cfg: &OpsConfig, out: &mut Output) -> Result<LoadedRead> {
+    let found = ctx.find_todo_with_mode(cfg.worktree, out)?;
+    load_for_read_inner(found, cfg, false, false, out, NewerFormat::Show)
 }
 
 /// Like [`load_for_read`], reusing an already-located [`FoundTodo`] so callers that also loaded
@@ -90,7 +167,14 @@ pub(crate) fn load_for_read_with_found(
     out: &mut Output,
 ) -> Result<LoadedRead> {
     crate::cli::emit_find_notices(&found, out);
-    load_for_read_inner(found, cfg, from_archive, load_archive_for_deps, out)
+    load_for_read_inner(
+        found,
+        cfg,
+        from_archive,
+        load_archive_for_deps,
+        out,
+        NewerFormat::Refuse,
+    )
 }
 
 fn load_for_read_inner(
@@ -99,6 +183,7 @@ fn load_for_read_inner(
     from_archive: bool,
     load_archive_for_deps: bool,
     out: &mut Output,
+    newer_format: NewerFormat,
 ) -> Result<LoadedRead> {
     if from_archive {
         let archive_path = cfg.archive_path(&found.path);
@@ -155,6 +240,9 @@ fn load_for_read_inner(
                 .with_line(e.line)
         })?;
     parse_timer.finish();
+    if newer_format == NewerFormat::Refuse {
+        require_known_format(&doc, &label)?;
+    }
 
     for problem in &doc.problems {
         out.warn(problem.format_with_path(&label));

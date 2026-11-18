@@ -257,7 +257,7 @@ by task commands; only the format and tool lines are kept up to date (R-VER-1, R
 - **R-READ-5 SHOULD** `summary` prints a session-start overview of at most 40 lines: tasks per
   status; open tasks per priority; claimed tasks with owner and age, stale ones marked; blocked
   tasks with their latest reason; the next five ready tasks; open questions; and a warning if the
-  file was edited outside the tool. From v0.6 it also shows the top-level open milestones with
+  file was edited outside the tool. From v0.6 it also shows the top-level milestones that are open or blocked, with
   progress (R-MILE-3), milestones ready to close (R-MILE-6), the number of ideas apart from open
   tasks (R-KIND-1), and a line naming `todo migrate --yes` while project files are out of date
   (R-MIG-2), still within 40 lines.
@@ -695,13 +695,17 @@ todo tree T-010
     with its goal and its progress, and the area next to every entry that has one. Top-level tasks
     without a milestone come last. Done and dropped entries are hidden unless `--all`.
     `tree --area <list>` shows only the tasks in those areas, with the milestones above them.
-    `tree --json` is nested.
+    `tree --json` is nested. `tree <milestone>` always shows that milestone, even when it is done,
+    with what is below it. Without a milestone or `--area`, the open questions and ideas follow the
+    tree, each in its own list (R-KIND-3).
   - Progress is `done/total`, counted over every task below the milestone at any depth: `done`
     counts done tasks, `total` every task that isn't dropped. Milestones, questions and ideas
     aren't counted. `summary`, `overview` and the HTML report use the same count.
-  - `list --milestone <task>` lists every entry below that milestone, at any depth.
+  - `list --milestone <task>` lists every entry below that milestone, at any depth; a task that is
+    not a milestone is refused (`BAD_VALUE`).
     `list --kind <list>` filters by kind (`milestone`, `task`, `question`, `idea`; R-KIND-3).
-  - `summary` shows the top-level open milestones with their progress and stays within 40 lines.
+  - `summary` shows the top-level milestones that are open or blocked (not done or dropped) with their
+    progress, and stays within 40 lines.
 - **R-MILE-4 COULD** An entry that has a milestone shows where it belongs. `show`, `next`, `claim`
   and `next --claim` print, after the task, the chain of milestones from the top down, each with ID,
   title and goal; their JSON carries `milestones: [{id, title, goal, status}]` in the same order.
@@ -794,11 +798,14 @@ todo tree T-010
 - **R-VER-2 COULD** A tool refuses a format it doesn't know. When the format line names a version
   the running tool doesn't know, every command that reads or writes tasks exits 4 with the error
   `TOOL_TOO_OLD`; the message names the todo version stamped in the file and the running version,
-  and says to update the todo executable first (`todo help update`). Nothing is written. Only
-  `where`, `help`, `schema`, `completions` and `--version` still work. The per-user commands
-  (`project`, `overview`, `report --html --all`) never open a project's tasks to write them; they
-  show such a project with this problem and carry on with the others. A file in a known format with
-  a higher stamp only warns (R-VER-1). (todo 0.5 and older read a newer format with a warning but
+  and says to update the todo executable first (`todo help update`). Nothing is written. Commands
+  that interpret or change task content refuse; the ones that never read it (`status`, `history`,
+  `diff`, `lock`, `unlock`, `agents`, `skill`, `hooks`, `guard`, `session-end`, `merge-driver`) keep
+  working, and so do `help`, `schema`, `completions` and `--version`. `where` keeps working: it
+  shows the format version, the tool stamp and the running version, and counts no tasks. The
+  per-user commands (`project`, `overview`, `report --html --all`) never open a project's tasks to
+  write them; they show such a project with this problem and carry on with the others. A file in a
+  known format with a higher stamp only warns (R-VER-1). (todo 0.5 and older read a newer format with a warning but
   refuse to write it; this rule starts with 0.6.)
 - **R-MIG-1 COULD** After todo is updated, each `TODO.md` moves to the new format by itself, on the
   first write.

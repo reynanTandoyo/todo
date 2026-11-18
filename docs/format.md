@@ -107,11 +107,15 @@ first line of the file.
 
 - An **older** format is read normally. The first write migrates it to the current format, in the
   same write (§18).
-- A format the tool **doesn't know** (a higher version) stops every command that reads or writes
-  tasks: exit 4, error `TOOL_TOO_OLD`, with a message naming the todo version stamped in the file and
-  the running version, and saying to update the todo executable first (`todo help update`). Nothing
-  is written. Only `where`, `help`, `schema`, `completions` and `--version` still work. This rule
-  starts with todo 0.6; todo 0.5 and older read a newer format with a warning but don't write it.
+- A format the tool **doesn't know** (a higher version) stops every command that interprets or
+  changes task content: exit 4, error `TOOL_TOO_OLD`, with a message naming the todo version stamped
+  in the file and the running version, and saying to update the todo executable first
+  (`todo help update`). Nothing is written. These still work: `where`, which shows the format
+  version, the tool line and the running version but counts no tasks; `help`, `schema`,
+  `completions` and `--version`; and the commands that never read task content: `status`,
+  `history`, `diff`, `lock`, `unlock`, `agents`, `skill`, `hooks`, `guard`, `session-end`, and
+  `merge-driver` (which falls back to a plain text merge, R-GIT-2). This rule starts with todo 0.6;
+  todo 0.5 and older read a newer format with a warning but don't write it.
 
 ## 5. Structure
 

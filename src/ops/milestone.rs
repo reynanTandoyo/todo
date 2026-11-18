@@ -7,7 +7,7 @@
 
 use serde_json::Value;
 
-use crate::doc::{Document, EntryKind, Task, TaskId};
+use crate::doc::{Document, EntryKind, Task};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::config::OpsConfig;
 use crate::ops::query::resolve_task_in_doc;
@@ -81,20 +81,20 @@ pub fn check_parent(
     Ok(parent_id)
 }
 
-/// Resolves the `--milestone` value of `next` to the milestone it names (`R-MILE-6`).
-///
-/// A missing entry is `NOT_FOUND`; an entry that is not a milestone is `BAD_VALUE`.
-pub fn resolve_milestone_filter(doc: &Document, cfg: &OpsConfig, value: &str) -> Result<TaskId> {
-    let milestone = resolve_task_in_doc(doc, value.trim())?;
-    if !milestone.is_milestone() {
-        let id_str = cfg.id_config.format_id(milestone.id);
+/// Resolves a milestone argument (an ID or a title, as elsewhere) to the milestone it names in `doc`
+/// (`R-MILE-3`). A missing task is `NOT_FOUND`; a task that is not a milestone is `BAD_VALUE`,
+/// because only a milestone has entries below it.
+pub fn resolve_milestone<'a>(doc: &'a Document, input: &str) -> Result<&'a Task> {
+    let task = resolve_task_in_doc(doc, input.trim())?;
+    if !task.is_milestone() {
+        let id_str = doc.id_config.format_id(task.id);
         return Err(TodoError::new(
             ErrorCode::BadValue,
-            format!("task {id_str} is not a milestone; --milestone names a milestone"),
+            format!("task {id_str} is not a milestone; only a milestone has entries below it"),
         )
         .with_task(id_str));
     }
-    Ok(milestone.id)
+    Ok(task)
 }
 
 /// The canonical form of a `milestone` value that [`check_parent`] has already accepted.

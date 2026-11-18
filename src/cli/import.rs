@@ -13,7 +13,7 @@ use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::import::{ConvertedTask, ImportEnv, convert_checkbox};
 use crate::lock::current_time;
-use crate::ops::{OpsConfig, file_label};
+use crate::ops::{OpsConfig, file_label, require_known_format_bytes};
 use crate::output::Output;
 
 /// Metadata for the `import` command.
@@ -92,6 +92,10 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         Err(e) if e.code == ErrorCode::NoFile => None,
         Err(e) => return Err(e),
     };
+    // An import would replace a file in a newer format; refuse it (R-VER-2).
+    if let Some(old) = &existing {
+        require_known_format_bytes(&old.bytes, &label, &cfg.id_config)?;
+    }
 
     let write = ctx.yes && !ctx.dry_run;
     let backup = existing.as_ref().map(|_| backup_path(&target));

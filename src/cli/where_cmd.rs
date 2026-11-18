@@ -4,10 +4,10 @@ use clap::Args as ClapArgs;
 use serde::Serialize;
 
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::Status;
+use crate::doc::{Document, Status};
 use crate::error::Result;
 use crate::lock::{LeaseStatus, query_status};
-use crate::ops::load_for_read;
+use crate::ops::{format_is_newer, load_for_where};
 use crate::output::Output;
 use crate::state::{LockHolder, StateDir};
 use crate::version::RUNNING_VERSION;
@@ -17,7 +17,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "where",
     summary: "Show resolved TODO.md, repo root, state folder, lock status, and task counts",
     kind: CommandKind::Read,
-    details: "Prints the active TODO.md file and how it was found, the git repository root (if any), the state folder, the write lock and manual lease status, the format version, the tool stamp in the file and the running todo version, and the number of tasks per status.",
+    details: "Prints the active TODO.md file and how it was found, the git repository root (if any), the state folder, the write lock and manual lease status, the format version, the tool stamp in the file and the running todo version, and the number of tasks per status. When the format version is newer than this todo knows, the tasks are not counted (R-VER-2).",
     examples: &["todo where", "todo where --json"],
 };
 
@@ -56,28 +56,22 @@ struct WhereJson {
     tool_stamp: Option<String>,
     /// The version of the running todo.
     running_version: String,
-    counts: StatusCountsJson,
+    /// Left out when the format version is newer than this todo knows (R-VER-2): its tasks are
+    /// not read, so they are not counted.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    counts: Option<StatusCountsJson>,
 }
 
-/// Runs `todo where`.
-pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let cfg = ctx.load_config()?;
-    let loaded = load_for_read(ctx, &cfg, false, false, out)?;
-    if let Some(warning) = crate::find::synced_folder_warning(&loaded.found.path) {
-        out.warn(warning);
-    }
-    let state = StateDir::from_found(&loaded.found)?;
-    let status = query_status(&state)?;
-
+fn status_counts(doc: &Document) -> StatusCountsJson {
     let mut counts = StatusCountsJson {
         open: 0,
         claimed: 0,
         blocked: 0,
         done: 0,
         dropped: 0,
-        total: loaded.doc.tasks.len(),
+        total: doc.tasks.len(),
     };
-    for task in &loaded.doc.tasks {
+    for task in &doc.tasks {
         match task.status {
             Status::Open => counts.open += 1,
             Status::Claimed => counts.claimed += 1,
@@ -86,6 +80,20 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             Status::Dropped => counts.dropped += 1,
         }
     }
+    counts
+}
+
+/// Runs `todo where`.
+pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
+    let cfg = ctx.load_config()?;
+    let loaded = load_for_where(ctx, &cfg, out)?;
+    if let Some(warning) = crate::find::synced_folder_warning(&loaded.found.path) {
+        out.warn(warning);
+    }
+    let state = StateDir::from_found(&loaded.found)?;
+    let status = query_status(&state)?;
+
+    let counts = (!format_is_newer(&loaded.doc)).then(|| status_counts(&loaded.doc));
 
     let found_by = loaded.found.found_by.as_str();
     let repo_root = loaded
@@ -160,11 +168,16 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             None => out.write_line("Tool stamp: omitted"),
         }
         out.write_line(&format!("Running todo version: {running_version}"));
-        let summary = format!(
-            "Tasks: {} total (open: {}, claimed: {}, blocked: {}, done: {}, dropped: {})",
-            counts.total, counts.open, counts.claimed, counts.blocked, counts.done, counts.dropped
-        );
-        out.write_line(&summary);
+        match &counts {
+            Some(c) => out.write_line(&format!(
+                "Tasks: {} total (open: {}, claimed: {}, blocked: {}, done: {}, dropped: {})",
+                c.total, c.open, c.claimed, c.blocked, c.done, c.dropped
+            )),
+            None => out.write_line(&format!(
+                "Tasks: not counted, the format version {} is newer than this todo supports",
+                format_version.unwrap_or_default()
+            )),
+        }
     }
 
     Ok(())

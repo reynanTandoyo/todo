@@ -109,7 +109,7 @@ pub enum ErrorCode {
     LeaseHeld,
     /// Target file changed on disk between read and write.
     ChangedDuringWrite,
-    /// File is unsafe to write (e.g. invalid UTF-8, conflict markers, unclosed fence/comment, unknown format version).
+    /// File is unsafe to write (e.g. invalid UTF-8, conflict markers, unclosed fence/comment, duplicate ID).
     UnsafeFile,
     /// Target file is read-only.
     ReadOnly,
@@ -117,6 +117,9 @@ pub enum ErrorCode {
     WriteFailed,
     /// git history is not available (git missing, not a repository, shallow clone or no commits).
     NoGitHistory,
+    /// `TODO.md` or the archive names a format version this todo does not know; the todo
+    /// executable must be updated first (R-VER-2, `docs/format.md` §4).
+    ToolTooOld,
 }
 
 impl ErrorCode {
@@ -144,6 +147,7 @@ impl ErrorCode {
             Self::ReadOnly => "READ_ONLY",
             Self::WriteFailed => "WRITE_FAILED",
             Self::NoGitHistory => "NO_GIT_HISTORY",
+            Self::ToolTooOld => "TOOL_TOO_OLD",
         }
     }
 
@@ -170,6 +174,7 @@ impl ErrorCode {
         Self::ReadOnly,
         Self::WriteFailed,
         Self::NoGitHistory,
+        Self::ToolTooOld,
     ];
 
     /// Plain-English meaning of this error code, shown by `todo schema`.
@@ -197,12 +202,15 @@ impl ErrorCode {
                 "TODO.md changed on disk between the read and the write. Try again."
             }
             Self::UnsafeFile => {
-                "The file is unsafe to write: invalid UTF-8, conflict markers, an unclosed fence or comment, or an unknown format version."
+                "The file is unsafe to write: invalid UTF-8, conflict markers, an unclosed fence or comment, or a duplicate task ID."
             }
             Self::ReadOnly => "The target file is read-only.",
             Self::WriteFailed => "Writing or replacing the file failed.",
             Self::NoGitHistory => {
                 "git is not on PATH, or there is no usable history: not a repository, a shallow clone, or no commits."
+            }
+            Self::ToolTooOld => {
+                "TODO.md is in a format version this todo does not know. Update the todo executable first (todo help update)."
             }
         }
     }
@@ -224,9 +232,11 @@ impl ErrorCode {
             | Self::BadValue => ExitCode::Refused,
             Self::Busy | Self::LeaseHeld | Self::ChangedDuringWrite => ExitCode::Busy,
             Self::NoGitHistory => ExitCode::CheckError,
-            Self::NoFile | Self::UnsafeFile | Self::ReadOnly | Self::WriteFailed => {
-                ExitCode::FileError
-            }
+            Self::NoFile
+            | Self::UnsafeFile
+            | Self::ReadOnly
+            | Self::WriteFailed
+            | Self::ToolTooOld => ExitCode::FileError,
         }
     }
 }
