@@ -243,7 +243,7 @@ When no ready task exists, `"found": false, "task": null`.
   "ok": true,
   "data": {
     "file": "TODO.md",
-    "counts": { "open": 2, "claimed": 1, "blocked": 1, "done": 3, "dropped": 0, "total": 7 },
+    "counts": { "open": 2, "claimed": 1, "blocked": 1, "done": 3, "dropped": 0, "total": 7, "questions": 1, "ideas": 1 },
     "open_by_priority": [{ "priority": "P0", "count": 1 }],
     "milestones": [{ "id": "T-010", "title": "Develop the renderer", "priority": "P1", "status": "open", "progress": { "done": 1, "total": 3 } }],
     "claimed": [
@@ -258,6 +258,8 @@ When no ready task exists, `"found": false, "task": null`.
 ```
 
 `ready_to_close` (`R-MILE-6`) lists the milestones that are ready to close, as `{ "id", "title" }`; the key is left out when there are none.
+
+`counts` covers tasks only: `open`, `claimed`, `blocked`, `done`, `dropped` and `total` (their sum) leave out milestones, which are listed under `milestones`. `questions` and `ideas` count the open ones (not done or dropped) apart from the rest (`R-KIND-3`, `R-KIND-1`); the open questions are listed in `open_questions`.
 
 ### `todo tree --json` (`todo.tree.v1`)
 

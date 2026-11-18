@@ -18,7 +18,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "summary",
     summary: "Show a compact session-start overview of TODO.md",
     kind: CommandKind::Read,
-    details: "Prints at most 40 lines summarizing counts by status and open priority, the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, the next 5 ready tasks (in the order `next` uses), milestones ready to close, open questions, and how many ideas are waiting (ideas are not counted as tasks).",
+    details: "Prints at most 40 lines summarizing counts by status and open priority, the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, the next 5 ready tasks (in the order `next` uses), milestones ready to close, open questions, and how many ideas are waiting. The status counts and the total count tasks only: milestones are listed apart, and questions and ideas are counted apart (R-KIND-3).",
     examples: &["todo summary", "todo summary --json"],
 };
 
@@ -33,8 +33,11 @@ struct StatusCounts {
     blocked: usize,
     done: usize,
     dropped: usize,
-    /// Work entries only: `open + claimed + blocked + done + dropped`.
+    /// Tasks only: `open + claimed + blocked + done + dropped`. Milestones are not tasks, and
+    /// questions and ideas are not work, so none of them is left in this total (`R-KIND-3`).
     total: usize,
+    /// Questions that are not done or dropped. They are left out of the other counts (`R-KIND-3`).
+    questions: usize,
     /// Ideas that are not done or dropped. Ideas are not work, so they are left out of the
     /// other counts (`R-KIND-1`).
     ideas: usize,
@@ -124,6 +127,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         done: 0,
         dropped: 0,
         total: 0,
+        questions: 0,
         ideas: 0,
     };
 
@@ -134,11 +138,28 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let mut open_questions = Vec::new();
 
     for task in &doc.tasks {
-        if task.kind() == EntryKind::Idea {
-            if !matches!(task.status, Status::Done | Status::Dropped) {
-                counts.ideas += 1;
+        // Only tasks are counted by status and handed out as work (R-KIND-3). Milestones are
+        // listed apart below; questions and ideas are counted apart and never handed out.
+        match task.kind() {
+            EntryKind::Task => {}
+            EntryKind::Milestone => continue,
+            EntryKind::Question => {
+                if !matches!(task.status, Status::Done | Status::Dropped) {
+                    counts.questions += 1;
+                    open_questions.push(QuestionSummary {
+                        id: doc.id_config.format_id(task.id),
+                        title: task.title.clone(),
+                        status: task.status.as_str(),
+                    });
+                }
+                continue;
             }
-            continue;
+            EntryKind::Idea => {
+                if !matches!(task.status, Status::Done | Status::Dropped) {
+                    counts.ideas += 1;
+                }
+                continue;
+            }
         }
         match task.status {
             Status::Open => {
@@ -187,17 +208,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             Status::Dropped => counts.dropped += 1,
         }
 
-        let is_question = task
-            .task_type
-            .as_deref()
-            .is_some_and(|ty| ty.eq_ignore_ascii_case("question"));
-        if is_question && !matches!(task.status, Status::Done | Status::Dropped) {
-            open_questions.push(QuestionSummary {
-                id: doc.id_config.format_id(task.id),
-                title: task.title.clone(),
-                status: task.status.as_str(),
-            });
-        } else if !is_question && is_task_ready(doc, task, archive, now, &cfg) {
+        if is_task_ready(doc, task, archive, now, &cfg) {
             ready_candidates.push(task);
         }
     }
