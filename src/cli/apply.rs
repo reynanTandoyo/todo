@@ -89,6 +89,7 @@ enum ApplyOp {
         area: Option<String>,
         milestone: Option<String>,
         goal: Option<String>,
+        why: Option<String>,
         depends: Option<DependsValue>,
         files: Option<String>,
         problem: Option<String>,
@@ -135,6 +136,7 @@ enum ApplyOp {
         area: Option<String>,
         milestone: Option<String>,
         goal: Option<String>,
+        why: Option<String>,
         depends: Option<DependsValue>,
         files: Option<String>,
         problem: Option<String>,
@@ -478,6 +480,7 @@ fn apply_one_op(
             area,
             milestone,
             goal,
+            why,
             depends,
             files,
             problem,
@@ -503,6 +506,12 @@ fn apply_one_op(
                 .or_else(|| fields.get("goal").map(String::as_str))
                 .map(str::trim)
                 .filter(|g| !g.is_empty());
+            // `why` may also come from `fields`; left in `extra` it would be dropped (known field).
+            let why_src = why
+                .as_deref()
+                .or_else(|| fields.get("why").map(String::as_str))
+                .map(str::trim)
+                .filter(|w| !w.is_empty());
             let milestone_id = match milestone_src {
                 Some(raw) => {
                     let target = resolve_task_ref(raw, refs)?;
@@ -559,6 +568,7 @@ fn apply_one_op(
                 area: trim(area),
                 milestone: milestone_id.as_deref(),
                 goal: goal_src,
+                why: why_src,
                 depends: dep_str.as_deref(),
                 files: trim(files),
                 problem: trim(problem),
@@ -731,6 +741,7 @@ fn apply_task_op(
             area,
             milestone,
             goal,
+            why,
             depends,
             files,
             problem,
@@ -771,7 +782,13 @@ fn apply_task_op(
                     SetChange::Field("depends", &dep_owned)
                 });
             }
-            let rest = [("files", files), ("problem", problem), ("fix", fix), ("accept", accept)];
+            let rest = [
+                ("why", why),
+                ("files", files),
+                ("problem", problem),
+                ("fix", fix),
+                ("accept", accept),
+            ];
             for (key, value) in rest {
                 if let Some(v) = value {
                     changes.push(SetChange::Field(key, v.trim()));

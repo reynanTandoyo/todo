@@ -3,7 +3,7 @@
 use clap::Args as ClapArgs;
 use serde::Serialize;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, write_milestone_chain};
 use crate::doc::TaskChangeIntent;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::current_time;
@@ -221,6 +221,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             ),
         };
         out.write_line(&line);
+        write_milestone_chain(out, &task.id, &task.milestones);
     } else {
         out.write_line("no ready tasks");
     }
