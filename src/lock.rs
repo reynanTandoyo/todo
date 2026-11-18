@@ -364,6 +364,9 @@ where
             migration,
             archive,
         } => {
+            // A read-only TODO.md is refused before anything is saved or written, so the refusal
+            // leaves no snapshot in the history (R-HIST-2, R-IO-5).
+            atomic::check_writable(todo_path)?;
             let before_sha_hex = read.snapshot.sha256_hex();
             let snap_timer = crate::timing::PhaseTimer::start("lock.record_snapshot");
             crate::history::record_snapshot(
@@ -378,11 +381,8 @@ where
             snap_timer.finish();
             // The archive files (changed by this write, or migrated in it) are written after the
             // snapshot and before TODO.md is replaced, so a snapshot that cannot be recorded leaves
-            // them as they were (R-MIG-1, R-ARCH-1). TODO.md is checked to be replaceable before the
-            // first of them is written, so a read-only file is refused with nothing changed. If the
-            // replace of TODO.md still fails, each archive file is put back as it was, so that a
-            // moved task is never in both files.
-            atomic::check_writable(todo_path)?;
+            // them as they were (R-MIG-1, R-ARCH-1). If the replace of TODO.md still fails, each
+            // archive file is put back as it was, so that a moved task is never in both files.
             let archive_writes = archive
                 .iter()
                 .chain(migration.as_ref().and_then(|m| m.archive.as_ref()));
