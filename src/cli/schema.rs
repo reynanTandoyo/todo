@@ -202,6 +202,7 @@ fn task_fields() -> TaskFieldsJson {
         milestone: None,
         milestones: Vec::new(),
         children: Vec::new(),
+        why: Some("the example shows every task field".to_string()),
         depends: vec!["T-000".to_string()],
         dependencies: Vec::new(),
         dependents: Vec::new(),

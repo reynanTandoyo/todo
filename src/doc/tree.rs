@@ -182,3 +182,20 @@ impl Document {
         progress
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::EntryKind;
+
+    #[test]
+    fn reserved_types_set_the_kind_ignoring_case() {
+        assert_eq!(EntryKind::from_type(None), EntryKind::Task);
+        assert_eq!(EntryKind::from_type(Some("feature")), EntryKind::Task);
+        assert_eq!(
+            EntryKind::from_type(Some("milestone")),
+            EntryKind::Milestone
+        );
+        assert_eq!(EntryKind::from_type(Some("Question")), EntryKind::Question);
+        assert_eq!(EntryKind::from_type(Some("IDEA")), EntryKind::Idea);
+    }
+}

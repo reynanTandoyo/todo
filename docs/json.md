@@ -234,6 +234,8 @@ When no ready task exists, `"found": false, "task": null`.
 top-level tasks come after the top-level milestones. `progress` is `{done, total}` for a milestone
 and `null` for a task; `goal` is set only for a milestone. `questions` and `ideas` list the open
 ones only for the whole tree (no milestone argument and no `--area`); otherwise they are `[]`.
+`archived` is `true` for an entry from `TODO-archive.md`, which is read and shown only with `--all`
+(done and dropped entries are shown only with `--all` too).
 
 ```json
 {
@@ -257,8 +259,9 @@ ones only for the whole tree (no milestone argument and no `--area`); otherwise 
         "area": null,
         "goal": "the test scene renders with lighting at 60 frames per second",
         "progress": { "done": 1, "total": 2 },
+        "archived": false,
         "children": [
-          { "id": "T-012", "title": "C shader", "kind": "task", "status": "open", "priority": "P1", "difficulty": "hard", "area": "cli", "goal": null, "progress": null, "children": [] }
+          { "id": "T-012", "title": "C shader", "kind": "task", "status": "open", "priority": "P1", "difficulty": "hard", "area": "cli", "goal": null, "progress": null, "archived": false, "children": [] }
         ]
       }
     ],
@@ -378,11 +381,18 @@ Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `T
     "count": 2,
     "tasks": [
       { "id": "T-001", "title": "Old task", "status": "done", "section": "Tasks" }
+    ],
+    "kept_back": [
+      { "id": "T-002", "title": "Lighting", "status": "done", "section": "Tasks", "reason": "milestone T-000 is still open" }
     ]
   },
   "warnings": []
 }
 ```
+
+`kept_back` lists the finished entries that stayed in `TODO.md` because of the milestone rules
+(R-ARCH-2), in file order, each with the `reason` in words; `[]` when there are none. `count` and
+`tasks` list only the entries that moved, a whole milestone tree included.
 
 ### `todo lock --json`, `todo unlock --json`, `todo status --json`
 

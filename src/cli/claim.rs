@@ -2,7 +2,9 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context, run_task_op};
+use crate::cli::{
+    CommandKind, CommandMeta, Context, edit_one_task, report_task_ok, write_milestone_chain,
+};
 use crate::error::Result;
 use crate::ops::TaskOp;
 use crate::output::Output;
@@ -29,7 +31,13 @@ pub struct Args {
     pub task: String,
 }
 
-/// Runs `todo claim <task>`.
+/// Runs `todo claim <task>`. The text result also lists the milestones above the task (`R-MILE-4`).
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    run_task_op(ctx, out, META.name, &args.task, &TaskOp::Claim)
+    let cfg = ctx.load_config()?;
+    let res = edit_one_task(ctx, out, META.name, &args.task, &TaskOp::Claim, &cfg, None)?;
+    report_task_ok(out, META.name, &res);
+    if !out.is_json() {
+        write_milestone_chain(out, &res.task_id, &res.task.milestones);
+    }
+    Ok(())
 }

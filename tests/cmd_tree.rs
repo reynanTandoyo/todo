@@ -277,6 +277,72 @@ fn tree_all_also_shows_the_entries_archived_in_todo_archive_md_marked_archived()
 }
 
 #[test]
+fn tree_all_shows_a_finished_milestone_tree_that_todo_archive_moved() {
+    let body = format!(
+        "{FIXTURE}## Now\n\n\
+### T-030 · Finished pipeline\n\
+- status: done\n\
+- owner: —\n\
+- priority: P2 · type: milestone\n\
+- goal: shipped\n\n\
+### T-031 · Step one\n\
+- status: done\n\
+- owner: —\n\
+- priority: P2\n\
+- milestone: T-030\n\n\
+### T-032 · Dropped step\n\
+- status: dropped\n\
+- owner: —\n\
+- priority: P2\n\
+- milestone: T-030\n\n\
+### T-033 · Open task\n\
+- status: open\n\
+- owner: —\n\
+- priority: P2\n"
+    );
+    let p = proj(&body);
+    let archived = run(&p, &["--agent", "t088-test", "archive", "--yes"]);
+    assert_eq!(
+        archived.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&archived.stderr)
+    );
+    assert!(p.work.join("TODO-archive.md").exists());
+
+    let plain = stdout_text(&run(&p, &["tree"]));
+    assert!(!plain.contains("T-030"), "{plain}");
+    assert!(plain.contains("T-033"), "{plain}");
+
+    let all = stdout_text(&run(&p, &["tree", "--all"]));
+    assert!(
+        all.lines()
+            .any(|l| l.starts_with("T-030")
+                && l.ends_with("Finished pipeline  1/1 done  (archived)")),
+        "{all}"
+    );
+    assert!(
+        all.lines()
+            .any(|l| l.trim_start().starts_with("T-031") && l.ends_with("Step one  (archived)")),
+        "{all}"
+    );
+    assert_eq!(
+        listed_ids(&run_json(
+            &p,
+            &[
+                "list",
+                "--archive",
+                "--milestone",
+                "T-030",
+                "--status",
+                "all"
+            ]
+        )),
+        vec!["T-031", "T-032"]
+    );
+}
+
+#[test]
 fn tree_finds_an_archived_milestone_only_with_all_and_list_archive_reads_its_tree() {
     let p = proj(&tree_fixture());
     fs::write(p.work.join("TODO-archive.md"), ARCHIVE).unwrap();

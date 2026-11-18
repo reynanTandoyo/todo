@@ -6,7 +6,7 @@ use clap::Args as ClapArgs;
 use serde::Serialize;
 
 use crate::cli::{CommandKind, CommandMeta, Context, load_read};
-use crate::doc::{Progress, Status};
+use crate::doc::{EntryKind, Progress, Status};
 use crate::error::Result;
 use crate::lock::current_time;
 use crate::ops::is_task_ready;
@@ -17,7 +17,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "summary",
     summary: "Show a compact session-start overview of TODO.md",
     kind: CommandKind::Read,
-    details: "Prints at most 40 lines summarizing counts by status and open priority, the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, the next 5 ready tasks, and open questions.",
+    details: "Prints at most 40 lines summarizing counts by status and open priority, the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, the next 5 ready tasks, open questions, and how many ideas are waiting (ideas are not counted as tasks).",
     examples: &["todo summary", "todo summary --json"],
 };
 
@@ -32,7 +32,11 @@ struct StatusCounts {
     blocked: usize,
     done: usize,
     dropped: usize,
+    /// Work entries only: `open + claimed + blocked + done + dropped`.
     total: usize,
+    /// Ideas that are not done or dropped. Ideas are not work, so they are left out of the
+    /// other counts (`R-KIND-1`).
+    ideas: usize,
 }
 
 #[derive(Serialize)]
@@ -110,7 +114,8 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         blocked: 0,
         done: 0,
         dropped: 0,
-        total: doc.tasks.len(),
+        total: 0,
+        ideas: 0,
     };
 
     let mut prio_map: BTreeMap<String, usize> = BTreeMap::new();
@@ -120,6 +125,12 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let mut open_questions = Vec::new();
 
     for task in &doc.tasks {
+        if task.kind() == EntryKind::Idea {
+            if !matches!(task.status, Status::Done | Status::Dropped) {
+                counts.ideas += 1;
+            }
+            continue;
+        }
         match task.status {
             Status::Open => {
                 counts.open += 1;
@@ -182,6 +193,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         }
     }
 
+    counts.total = counts.open + counts.claimed + counts.blocked + counts.done + counts.dropped;
     ready_candidates.sort_by_key(|t| (cfg.priority_rank(t.priority.as_deref()), t.heading_line));
     let next_ready: Vec<ReadySummary> = ready_candidates
         .into_iter()
@@ -292,6 +304,13 @@ fn format_summary_lines(s: &SummaryJson) -> Vec<String> {
                 s.milestones.len() - 5
             ));
         }
+    }
+
+    if s.counts.ideas > 0 {
+        lines.push(format!(
+            "ideas: {} (not work; `todo promote <ID> --priority P` turns one into a task)",
+            s.counts.ideas
+        ));
     }
 
     if !s.claimed.is_empty() {
