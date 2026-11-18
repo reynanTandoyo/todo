@@ -312,6 +312,7 @@ pub fn select_next_task<'a>(
             .iter()
             .filter(|t| {
                 t.status == Status::Claimed
+                    && !t.is_milestone()
                     && t.owner
                         .as_deref()
                         .is_some_and(|o| agent_names_equal(o, agent))

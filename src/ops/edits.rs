@@ -23,6 +23,8 @@ pub struct TaskEditBuilder<'a> {
     priority_override: Option<Option<String>>,
     type_override: Option<Option<String>>,
     area_override: Option<Option<String>>,
+    /// Planned updates to other parts of the combined priority line (`milestone`, `goal`), by key.
+    combined_part_overrides: BTreeMap<String, Option<String>>,
     seq: usize,
 }
 
@@ -39,6 +41,7 @@ impl<'a> TaskEditBuilder<'a> {
             priority_override: None,
             type_override: None,
             area_override: None,
+            combined_part_overrides: BTreeMap::new(),
             seq: 0,
         }
     }
@@ -140,6 +143,8 @@ impl<'a> TaskEditBuilder<'a> {
             }
             "owner" => self.set_owner(if clean.is_empty() { None } else { Some(&clean) }),
             "claimed" => self.set_claimed(&clean),
+            "milestone" => self.set_part_field("milestone", self.task.milestone_loc, &clean),
+            "goal" => self.set_part_field("goal", self.task.goal_loc, &clean),
             "depends" => self.set_simple_field("depends", self.task.depends_line, &clean),
             "files" => self.set_simple_field("files", self.task.files_line, &clean),
             "problem" => self.set_simple_field("problem", self.task.problem_line, &clean),
@@ -176,6 +181,8 @@ impl<'a> TaskEditBuilder<'a> {
             "priority" => self.priority_override = Some(None),
             "type" => self.type_override = Some(None),
             "area" => self.area_override = Some(None),
+            "milestone" => self.unset_part_field("milestone", self.task.milestone_loc),
+            "goal" => self.unset_part_field("goal", self.task.goal_loc),
             "claimed" => self.remove_claimed(),
             "depends" => self.remove_if_some(self.task.depends_line),
             "files" => self.remove_if_some(self.task.files_line),
@@ -249,6 +256,39 @@ impl<'a> TaskEditBuilder<'a> {
         }
     }
 
+    /// Sets `milestone` or `goal` (`docs/format.md` §8, §17). A value on its own line is replaced
+    /// in place, a value in the combined priority line is rewritten with that line, and a missing
+    /// field is added in canonical order. An empty value removes the field.
+    fn set_part_field(&mut self, key: &str, loc: Option<FieldLocation>, clean_val: &str) {
+        if clean_val.is_empty() {
+            self.unset_part_field(key, loc);
+            return;
+        }
+        match loc {
+            Some(FieldLocation::CombinedPriority(_)) => {
+                self.combined_part_overrides
+                    .insert(key.to_string(), Some(clean_val.to_string()));
+            }
+            Some(FieldLocation::OwnLine(line)) => {
+                self.replace_line_if_changed(line, format!("- {key}: {clean_val}"));
+            }
+            None => self.queue_field_insert(key, format!("- {key}: {clean_val}")),
+        }
+    }
+
+    /// Removes `milestone` or `goal`, from its own line or from the combined priority line.
+    fn unset_part_field(&mut self, key: &str, loc: Option<FieldLocation>) {
+        match loc {
+            Some(FieldLocation::CombinedPriority(_)) => {
+                self.combined_part_overrides.insert(key.to_string(), None);
+            }
+            Some(FieldLocation::OwnLine(line)) => {
+                self.line_changes.insert(line, None);
+            }
+            None => {}
+        }
+    }
+
     fn remove_if_some(&mut self, line: Option<usize>) {
         if let Some(idx) = line {
             self.line_changes.insert(idx, None);
@@ -283,6 +323,7 @@ impl<'a> TaskEditBuilder<'a> {
         if self.priority_override.is_none()
             && self.type_override.is_none()
             && self.area_override.is_none()
+            && self.combined_part_overrides.is_empty()
         {
             return;
         }
@@ -325,7 +366,11 @@ impl<'a> TaskEditBuilder<'a> {
                         Some(None) => {}
                         None => extra_entries.push((k.clone(), v.clone())),
                     },
-                    _ => extra_entries.push((k.clone(), v.clone())),
+                    _ => match self.combined_part_overrides.get(k) {
+                        Some(Some(new_v)) => extra_entries.push((k.clone(), new_v.clone())),
+                        Some(None) => {}
+                        None => extra_entries.push((k.clone(), v.clone())),
+                    },
                 }
             }
 

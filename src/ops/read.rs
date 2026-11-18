@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::atomic::{read_file_with_snapshot, validate_utf8};
 use crate::cli::Context;
-use crate::doc::{Document, IdConfig, Status, Task};
+use crate::doc::{Document, EntryKind, IdConfig, Status, Task};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, fs_path};
 use crate::ops::config::OpsConfig;
@@ -198,11 +198,8 @@ pub fn is_task_ready(
     if !status_eligible {
         return false;
     }
-    if task
-        .task_type
-        .as_deref()
-        .is_some_and(|t| t.eq_ignore_ascii_case("question"))
-    {
+    // Milestones are never handed out (R-MILE-2), nor questions (R-WRITE-11).
+    if matches!(task.kind(), EntryKind::Milestone | EntryKind::Question) {
         return false;
     }
     doc.dependencies_satisfied(task, archive)
@@ -253,6 +250,32 @@ pub struct NoteJson {
     pub line: usize,
 }
 
+/// A milestone above an entry, as `show --json` lists it (`R-MILE-4`).
+#[derive(Debug, Clone, Serialize)]
+pub struct MilestoneRefJson {
+    /// Canonical milestone ID.
+    pub id: String,
+    /// Milestone title.
+    pub title: String,
+    /// Milestone goal, if present.
+    pub goal: Option<String>,
+    /// Current status of the milestone.
+    pub status: String,
+}
+
+/// An entry that names another entry as its milestone (`R-MILE-2`).
+#[derive(Debug, Clone, Serialize)]
+pub struct ChildJson {
+    /// Canonical task ID.
+    pub id: String,
+    /// Task title.
+    pub title: String,
+    /// Kind of entry: `task` or `milestone`.
+    pub kind: String,
+    /// Current status.
+    pub status: String,
+}
+
 /// Full JSON representation of a task (`show`, `next`, and write commands).
 #[derive(Debug, Clone, Serialize)]
 pub struct TaskJson {
@@ -279,6 +302,14 @@ pub struct TaskJson {
     pub task_type: Option<String>,
     /// Task area, if present.
     pub area: Option<String>,
+    /// Goal of a milestone, if present (`R-MILE-1`).
+    pub goal: Option<String>,
+    /// Parent milestone as written in `- milestone:`, if present (`R-MILE-1`).
+    pub milestone: Option<String>,
+    /// The milestones above this entry, from the top down (`R-MILE-4`).
+    pub milestones: Vec<MilestoneRefJson>,
+    /// The entries whose milestone is this entry (`R-MILE-2`).
+    pub children: Vec<ChildJson>,
     /// Canonicalized or raw dependency strings from `- depends:`.
     pub depends: Vec<String>,
     /// Detailed dependency statuses (`R-DEP-2`).
@@ -423,6 +454,28 @@ pub fn build_task_json(
 
     let ready_archive = if archived { None } else { secondary };
 
+    let milestones = primary
+        .milestone_ancestors(task)
+        .into_iter()
+        .rev()
+        .map(|m| MilestoneRefJson {
+            id: cfg.id_config.format_id(m.id),
+            title: m.title.clone(),
+            goal: m.goal.clone(),
+            status: m.status.as_str().to_string(),
+        })
+        .collect();
+    let children = primary
+        .children_of(task.id)
+        .into_iter()
+        .map(|c| ChildJson {
+            id: cfg.id_config.format_id(c.id),
+            title: c.title.clone(),
+            kind: c.kind().as_str().to_string(),
+            status: c.status.as_str().to_string(),
+        })
+        .collect();
+
     TaskJson {
         id: cfg.id_config.format_id(task.id),
         title: task.title.clone(),
@@ -435,6 +488,10 @@ pub fn build_task_json(
         priority: task.priority.clone(),
         task_type: task.task_type.clone(),
         area: task.area.clone(),
+        goal: task.goal.clone(),
+        milestone: task.milestone.clone(),
+        milestones,
+        children,
         depends: task.depends.iter().map(|d| d.raw.clone()).collect(),
         dependencies,
         dependents,

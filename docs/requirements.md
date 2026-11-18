@@ -667,10 +667,13 @@ todo tree T-010
     refer to an entry with `about` instead (R-KIND-1, R-KIND-2).
   - The tree is logical: entries stay where they are in the file, in any section, and only the
     `milestone` field links them (format.md §17).
+  - `<task>` may be an ID or a title, as elsewhere; the file stores the ID. An empty value is
+    refused (`BAD_VALUE`); `set --unset milestone` makes an entry top-level.
   - Refused with exit 1, leaving the file byte-identical: a parent that doesn't exist
     (`NOT_FOUND`); a parent that isn't a milestone (`BAD_VALUE`); a change that would make a
     milestone its own ancestor (`BAD_VALUE`); `set --type` that turns a milestone with entries
-    below it into another kind (`BAD_VALUE`).
+    below it into another kind (`BAD_VALUE`); a question or idea that names a milestone
+    (`BAD_VALUE`).
 - **R-MILE-2 COULD** Milestones in the status rules (R-WRITE-9):
   - A milestone is open, blocked, done or dropped, never claimed. `next` and `list --ready` never
     return one, and `claim` of one is refused (exit 1, `BAD_TRANSITION`).
@@ -679,7 +682,7 @@ todo tree T-010
     (format.md §9). `drop` without `--tree` is refused in the same case and names `drop --tree`.
   - `drop --tree <milestone> --note T` drops the milestone and every entry below it that isn't done
     or dropped, in one locked step; the claim rules (R-CLAIM-3) apply to each entry, so another
-    agent's claim needs `--force`.
+    agent's claim needs `--force`. `--tree` on a task is refused (`BAD_VALUE`).
   - `set --milestone <task>` moves an entry, with everything below it, to another parent; only the
     entry's own `milestone` line changes. `set --unset milestone` makes it top-level.
   - `show --json` returns `goal`, `milestone`, the chain of parents (`milestones`, R-MILE-4) and the

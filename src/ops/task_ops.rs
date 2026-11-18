@@ -9,6 +9,7 @@ use chrono::{DateTime, FixedOffset};
 
 use crate::doc::{Document, LineEdit, Status, Task};
 use crate::error::Result;
+use crate::ops::milestone;
 use crate::ops::pipeline::{build_claim_edits, build_release_edits};
 use crate::ops::rules::{
     OwnershipDecision, StatusCommand, TaskCommand, check_ownership, forced_note_text, plan_claim,
@@ -58,8 +59,22 @@ pub enum TaskOp<'a> {
         /// Optional `by` value: the person behind the work (`R-WRITE-16`).
         by: Option<&'a str>,
     },
-    /// Drop the task with a reason.
+    /// Drop the task with a reason. A milestone with unfinished entries below it is refused
+    /// (R-MILE-2); `drop --tree` drops those entries first.
     Drop {
+        /// Reason text.
+        reason: &'a str,
+    },
+    /// Drop a milestone as part of `drop --tree` (R-MILE-2): as [`TaskOp::Drop`], without the
+    /// check for unfinished entries below it.
+    DropTree {
+        /// Reason text.
+        reason: &'a str,
+    },
+    /// Drop an entry below `milestone` as part of `drop --tree`; the note names the milestone.
+    DropWithin {
+        /// Canonical ID of the milestone being dropped.
+        milestone: &'a str,
         /// Reason text.
         reason: &'a str,
     },
@@ -111,7 +126,7 @@ impl TaskOp<'_> {
             Self::Claim => "claim",
             Self::Release => "release",
             Self::Done { .. } => "done",
-            Self::Drop { .. } => "drop",
+            Self::Drop { .. } | Self::DropTree { .. } | Self::DropWithin { .. } => "drop",
             Self::Block { .. } => "block",
             Self::Unblock { .. } => "unblock",
             Self::Reopen { .. } => "reopen",
@@ -145,6 +160,36 @@ impl TaskOp<'_> {
         let date = OpsConfig::format_note_date(now);
         let mut builder = TaskEditBuilder::new(doc, task);
 
+        // R-MILE-2: a milestone is done or dropped only when nothing below it is unfinished.
+        let mut forced_below: Option<usize> = None;
+        if task.is_milestone() {
+            let unfinished = doc.unfinished_below(task.id);
+            if !unfinished.is_empty() {
+                match self {
+                    Self::Done { .. } if env.force => forced_below = Some(unfinished.len()),
+                    Self::Done { .. } => {
+                        return Err(milestone::refuse_unfinished(
+                            cfg,
+                            task,
+                            &unfinished,
+                            "finish them first, or pass --force to mark the milestone done anyway",
+                        ));
+                    }
+                    Self::Drop { .. } => {
+                        return Err(milestone::refuse_unfinished(
+                            cfg,
+                            task,
+                            &unfinished,
+                            &format!(
+                                "use `todo drop {id_str} --tree --note <TEXT>` to drop them with it"
+                            ),
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         let ownership = match self {
             Self::Note { .. } => {
                 check_ownership(task, TaskCommand::Note, agent, env.force, &id_str)?
@@ -153,7 +198,9 @@ impl TaskOp<'_> {
             _ => {
                 let cmd = match self {
                     Self::Done { .. } | Self::Answer { .. } => StatusCommand::Done,
-                    Self::Drop { .. } => StatusCommand::Drop,
+                    Self::Drop { .. } | Self::DropTree { .. } | Self::DropWithin { .. } => {
+                        StatusCommand::Drop
+                    }
                     Self::Block { .. } => StatusCommand::Block,
                     Self::Unblock { .. } => StatusCommand::Unblock,
                     _ => StatusCommand::Reopen,
@@ -165,7 +212,9 @@ impl TaskOp<'_> {
                         builder.set_owner(Some(agent));
                         builder.remove_claimed();
                     }
-                    Self::Drop { .. } => builder.remove_claimed(),
+                    Self::Drop { .. } | Self::DropTree { .. } | Self::DropWithin { .. } => {
+                        builder.remove_claimed();
+                    }
                     Self::Unblock { .. } if next == Status::Claimed => {
                         builder.set_claimed(&OpsConfig::format_claimed_timestamp(now));
                         builder.set_session(env.session);
@@ -191,9 +240,13 @@ impl TaskOp<'_> {
             }
         }
         if let Self::Set { changes } = self {
+            milestone::check_set_changes(doc, cfg, task, changes)?;
             for change in *changes {
                 match *change {
                     SetChange::Title(t) => builder.set_title(t),
+                    SetChange::Field(k, v) if k.trim().eq_ignore_ascii_case("milestone") => {
+                        builder.set_field(k, &milestone::canonical_parent(doc, cfg, v));
+                    }
                     SetChange::Field(k, v) => builder.set_field(k, v),
                     SetChange::Unset(k) => builder.unset_field(k),
                 }
@@ -207,9 +260,21 @@ impl TaskOp<'_> {
                 &forced_note_text(self.name(), &previous_owner),
             );
         }
+        if let Some(count) = forced_below {
+            builder.add_note(
+                &date,
+                agent,
+                &format!("forced done ({count} entries below unfinished)"),
+            );
+        }
         let note = match *self {
             Self::Done { note, .. } => Some(note_with("done", note)),
-            Self::Drop { reason } => Some(note_with("dropped", Some(reason))),
+            Self::Drop { reason } | Self::DropTree { reason } => {
+                Some(note_with("dropped", Some(reason)))
+            }
+            Self::DropWithin { milestone, reason } => {
+                Some(format!("dropped with {milestone} \u{2014} {reason}"))
+            }
             Self::Block { reason } => Some(note_with("blocked", Some(reason))),
             Self::Unblock { note } => Some(note_with("unblocked", note)),
             Self::Reopen { note } => Some(note_with("reopened", note)),
@@ -244,6 +309,10 @@ pub struct NewTask<'a> {
     pub task_type: Option<&'a str>,
     /// `area` value.
     pub area: Option<&'a str>,
+    /// `milestone` value: the canonical ID of the parent milestone (R-MILE-1).
+    pub milestone: Option<&'a str>,
+    /// `goal` value, for a milestone (R-MILE-1).
+    pub goal: Option<&'a str>,
     /// `depends` value (comma-separated IDs).
     pub depends: Option<&'a str>,
     /// `files` value.
@@ -281,6 +350,8 @@ impl NewTask<'_> {
             lines.push(format!("- {}", combined.join(" \u{00b7} ")));
         }
         for (key, value) in [
+            ("milestone", self.milestone),
+            ("goal", self.goal),
             ("depends", self.depends),
             ("files", self.files),
             ("problem", self.problem),
@@ -292,7 +363,16 @@ impl NewTask<'_> {
             }
         }
         let known = [
-            "priority", "type", "area", "depends", "files", "problem", "fix", "accept",
+            "priority",
+            "type",
+            "area",
+            "milestone",
+            "goal",
+            "depends",
+            "files",
+            "problem",
+            "fix",
+            "accept",
         ];
         for (k, v) in self.extra {
             if !known.contains(&k.as_str()) {

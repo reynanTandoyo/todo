@@ -18,6 +18,7 @@
 pub mod id;
 pub mod lines;
 pub mod parser;
+pub mod tree;
 pub mod verify;
 
 pub use id::{DEFAULT_ID_PREFIX, DEFAULT_ID_WIDTH, IdConfig, TaskId};
@@ -34,4 +35,5 @@ pub use parser::{
     agent_names_equal, canonical_field_rank, inspect_problems, is_nobody_owner,
     is_valid_agent_name, strip_section_number,
 };
+pub use tree::EntryKind;
 pub use verify::{AppliedDocEdits, TaskChangeIntent, verify_task_edits};
