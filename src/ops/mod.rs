@@ -42,8 +42,8 @@ pub mod rules;
 pub mod task_ops;
 
 pub use config::{
-    CONFIG_FILENAME, DEFAULT_ARCHIVE_FILE, DEFAULT_CLAIM_TTL_HOURS, DEFAULT_QUESTION_SECTION,
-    DEFAULT_SNAPSHOTS_KEEP, OpsConfig,
+    CONFIG_FILENAME, DEFAULT_ARCHIVE_FILE, DEFAULT_CLAIM_TTL_HOURS, DEFAULT_IDEA_SECTION,
+    DEFAULT_QUESTION_SECTION, DEFAULT_SNAPSHOTS_KEEP, OpsConfig,
 };
 pub use edits::TaskEditBuilder;
 pub use pipeline::{
@@ -61,13 +61,13 @@ pub use query::{
 };
 pub(crate) use read::load_for_read_with_found;
 pub use read::{
-    DependencyStatusJson, DependentTaskJson, ListTaskJson, LoadedRead, NoteJson, TaskJson,
-    build_list_task_json, build_task_json, file_label, is_task_ready, load_for_read,
-    questions_about, read_optional_archive,
+    DependencyStatusJson, DependentTaskJson, ListTaskJson, LoadedRead, MilestoneRefJson, NoteJson,
+    TaskJson, build_list_task_json, build_task_json, file_label, is_task_ready, load_for_read,
+    milestone_chain_json, questions_about, read_optional_archive,
 };
 pub use rules::{
     ClaimPlan, OwnershipDecision, ReleasePlan, StatusCommand, TaskCommand, allowed_commands_from,
-    bad_transition_error, check_ownership, forced_note_text, plan_claim, plan_release,
-    validate_transition,
+    bad_transition_error, check_ownership, check_promotable, forced_note_text, plan_claim,
+    plan_release, validate_transition,
 };
 pub use task_ops::{NewTask, OpEnv, SetChange, TaskOp, highest_task_number};

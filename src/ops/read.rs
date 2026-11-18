@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::atomic::{read_file_with_snapshot, validate_utf8};
 use crate::cli::Context;
-use crate::doc::{Document, IdConfig, Status, Task, TaskId};
+use crate::doc::{Document, EntryKind, IdConfig, Status, Task, TaskId};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, fs_path};
 use crate::ops::config::OpsConfig;
@@ -185,6 +185,9 @@ fn load_for_read_inner(
 }
 
 /// Returns `true` if `task` is eligible to be handed out by `next` / `list --ready` (`R-READ-3`).
+///
+/// Only entries of kind task are handed out, so questions, ideas and milestones never are
+/// (`R-KIND-3`).
 #[must_use]
 pub fn is_task_ready(
     doc: &Document,
@@ -198,8 +201,9 @@ pub fn is_task_ready(
     if !status_eligible {
         return false;
     }
-    // Milestones are never handed out (R-MILE-2), nor questions (R-WRITE-11).
-    if task.is_milestone() || is_question(task) {
+    // Only entries of kind task are handed out: never a milestone (R-MILE-2), a question
+    // (R-WRITE-11) or an idea (R-KIND-1, R-KIND-3).
+    if task.kind() != EntryKind::Task {
         return false;
     }
     // Work is handed out along the tree (R-MILE-6): no milestone above the task may be blocked,
@@ -337,6 +341,8 @@ pub struct TaskJson {
     pub milestones: Vec<MilestoneRefJson>,
     /// The entries whose milestone is this entry (`R-MILE-2`).
     pub children: Vec<ChildJson>,
+    /// `- why:` value, if present: what the task is for (R-WRITE-17).
+    pub why: Option<String>,
     /// Canonicalized or raw dependency strings from `- depends:`.
     pub depends: Vec<String>,
     /// Detailed dependency statuses (`R-DEP-2`).
@@ -463,6 +469,22 @@ pub fn questions_about(
     found
 }
 
+/// The milestones above `task` in `doc`, from the top down (`R-MILE-4`): each with its ID, title,
+/// goal and status. Empty for an entry without a milestone.
+#[must_use]
+pub fn milestone_chain_json(doc: &Document, task: &Task, cfg: &OpsConfig) -> Vec<MilestoneRefJson> {
+    doc.milestone_ancestors(task)
+        .into_iter()
+        .rev()
+        .map(|m| MilestoneRefJson {
+            id: cfg.id_config.format_id(m.id),
+            title: m.title.clone(),
+            goal: m.goal.clone(),
+            status: m.status.as_str().to_string(),
+        })
+        .collect()
+}
+
 /// Builds a [`TaskJson`] for `task`, resolving dependencies and dependents across `primary` and `secondary`.
 ///
 /// When `archived` is `false`, `primary` is `TODO.md` and `secondary` is `TODO-archive.md`.
@@ -545,17 +567,7 @@ pub fn build_task_json(
 
     let ready_archive = if archived { None } else { secondary };
 
-    let milestones = primary
-        .milestone_ancestors(task)
-        .into_iter()
-        .rev()
-        .map(|m| MilestoneRefJson {
-            id: cfg.id_config.format_id(m.id),
-            title: m.title.clone(),
-            goal: m.goal.clone(),
-            status: m.status.as_str().to_string(),
-        })
-        .collect();
+    let milestones = milestone_chain_json(primary, task, cfg);
     let children = primary
         .children_of(task.id)
         .into_iter()
@@ -584,6 +596,7 @@ pub fn build_task_json(
         milestone: task.milestone.clone(),
         milestones,
         children,
+        why: task.why.clone(),
         depends: task.depends.iter().map(|d| d.raw.clone()).collect(),
         dependencies,
         dependents,

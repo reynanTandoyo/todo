@@ -1,6 +1,7 @@
-//! `todo archive` command: move done and dropped tasks to `TODO-archive.md` (`R-ARCH-1`, `docs/format.md` §14).
+//! `todo archive` command: move done and dropped tasks to `TODO-archive.md` (`R-ARCH-1`,
+//! `R-ARCH-2`, `docs/format.md` §14).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use chrono::{DateTime, FixedOffset};
 use clap::Args as ClapArgs;
@@ -9,7 +10,8 @@ use serde::Serialize;
 use crate::atomic::{atomic_replace, atomic_write_bytes, read_file_with_snapshot, validate_utf8};
 use crate::version::RUNNING_VERSION;
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::{Document, LineEdit, SectionLookup, Status, Task, TaskChangeIntent};
+use crate::doc::id::TaskId;
+use crate::doc::{Document, LineEdit, SectionLookup, Task, TaskChangeIntent};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::lock::{WriteOutcome, current_time, locked_read_modify_write_with_warnings};
@@ -20,12 +22,20 @@ use crate::ops::{
 use crate::output::Output;
 use crate::state::{IdsState, StateDir};
 
+/// Why an entry whose milestone chain does not reach a top-level milestone stays in TODO.md.
+const BROKEN_CHAIN_REASON: &str = "its milestone chain does not reach a top-level milestone (a milestone is missing, is not a milestone, or loops); run todo check";
+
+/// Why a finished entry that is not a milestone stays in TODO.md when entries name it as their
+/// milestone: moving it would leave them pointing at an archived entry.
+const NAMED_NOT_MILESTONE_REASON: &str =
+    "entries below it name it as their milestone, but it is not a milestone; run todo check";
+
 /// Metadata for the `archive` command.
 pub const META: CommandMeta = CommandMeta {
     name: "archive",
     summary: "Move done and dropped tasks to TODO-archive.md",
     kind: CommandKind::Write,
-    details: "Moves done and dropped tasks from TODO.md into TODO-archive.md under the same section names, under the write lock. Requires `--yes` to apply.",
+    details: "Moves done and dropped tasks from TODO.md into TODO-archive.md under the same section names, under the write lock. An entry in a milestone moves only with its whole tree: when the top-level milestone is done or dropped and nothing in the tree is open, claimed or blocked. Finished entries kept back for that reason are listed. Requires `--yes` to apply.",
     examples: &[
         "todo archive --agent coordinator",
         "todo archive --yes --agent coordinator",
@@ -36,7 +46,8 @@ pub const META: CommandMeta = CommandMeta {
 /// Arguments for `todo archive`.
 #[derive(Debug, ClapArgs)]
 pub struct Args {
-    /// Only archive tasks whose latest note (or claim) is at least DAYS days old.
+    /// Only archive tasks whose latest note (or claim) is at least DAYS days old. For an entry in a
+    /// milestone tree, the age of the top-level milestone counts.
     #[arg(long, value_name = "DAYS")]
     pub older_than: Option<u64>,
 }
@@ -49,12 +60,77 @@ struct ArchivedTaskSummary {
     section: String,
 }
 
+/// A finished entry that stays in TODO.md, and why (`R-ARCH-2`).
+#[derive(Serialize)]
+struct KeptBackSummary {
+    #[serde(flatten)]
+    task: ArchivedTaskSummary,
+    reason: String,
+}
+
 #[derive(Serialize)]
 struct ArchiveJson {
     archive_file: String,
     applied: bool,
     count: usize,
     tasks: Vec<ArchivedTaskSummary>,
+    kept_back: Vec<KeptBackSummary>,
+}
+
+/// What `archive` moves and keeps back, as printed and as returned in JSON.
+struct ArchiveOutcome {
+    tasks: Vec<ArchivedTaskSummary>,
+    kept_back: Vec<KeptBackSummary>,
+}
+
+/// The entries one `archive` run moves, and the finished entries it keeps back (`R-ARCH-1`,
+/// `R-ARCH-2`).
+#[derive(Default)]
+struct ArchivePlan<'a> {
+    /// Entries to move, in file order. A milestone tree is listed in full or not at all.
+    selected: Vec<&'a Task>,
+    /// Finished entries that stay in TODO.md, in file order, each with its reason.
+    kept_back: Vec<(&'a Task, String)>,
+}
+
+/// Where an entry sits for `archive` (`R-ARCH-2`).
+enum Home {
+    /// Neither a milestone nor under one: archived on its own, as before.
+    Alone,
+    /// In the tree of the top-level milestone with this ID, the milestone itself included.
+    Tree(TaskId),
+    /// Names a milestone that does not reach a top-level one: it stays in TODO.md.
+    Broken,
+}
+
+/// What `archive` does with one finished entry.
+enum Step {
+    /// Move it to the archive.
+    Move,
+    /// Keep it in TODO.md, for this reason.
+    Keep(String),
+}
+
+/// Whether the tree of one top-level milestone may move (`R-ARCH-2`).
+struct TreeState {
+    /// Whether the top-level milestone is old enough for `--older-than`.
+    aged: bool,
+    /// Why the tree stays in TODO.md, if it does.
+    blocker: Option<String>,
+}
+
+impl TreeState {
+    /// What happens to the finished entries of this tree. `None` when the tree is too young, so
+    /// nothing is moved and nothing is reported as kept back.
+    fn step(&self) -> Option<Step> {
+        if !self.aged {
+            return None;
+        }
+        Some(match &self.blocker {
+            Some(reason) => Step::Keep(reason.clone()),
+            None => Step::Move,
+        })
+    }
 }
 
 /// Runs `todo archive`.
@@ -73,8 +149,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         let snap = read_file_with_snapshot(&found.path)?;
         let doc = parse_doc_for_write(&snap.bytes, &label, &cfg)?;
         let now = current_time();
-        let selected = select_tasks_to_archive(&doc, args.older_than, now);
-        let summaries = summarize_selected(&doc, &selected);
+        let plan = plan_archive(&doc, args.older_than, now);
+        let outcome = summarize(&doc, &plan);
 
         if out.is_json() {
             out.emit_json_ok(
@@ -82,21 +158,22 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 &ArchiveJson {
                     archive_file: cfg.archive_file.clone(),
                     applied: false,
-                    count: summaries.len(),
-                    tasks: summaries,
+                    count: outcome.tasks.len(),
+                    tasks: outcome.tasks,
+                    kept_back: outcome.kept_back,
                 },
             );
             return Ok(());
         }
 
-        let preview = format_preview(&summaries, &cfg.archive_file);
+        let preview = format_preview(&outcome, &cfg.archive_file);
         let _ = require_yes_or_preview(ctx, &preview, out);
         return Ok(());
     }
 
     let mut lock_warnings = Vec::new();
     let mut stamp_warning: Option<String> = None;
-    let summaries = locked_read_modify_write_with_warnings(
+    let outcome = locked_read_modify_write_with_warnings(
         &found.path,
         &state,
         &agent,
@@ -108,19 +185,23 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             stamp_warning = doc.newer_tool_warning(&label);
             let existing_archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
             let now = current_time();
-            let selected = select_tasks_to_archive(&doc, args.older_than, now);
-            if selected.is_empty() {
-                return Ok(WriteOutcome::Unchanged(Vec::new()));
+            let plan = plan_archive(&doc, args.older_than, now);
+            let outcome = summarize(&doc, &plan);
+            if plan.selected.is_empty() {
+                return Ok(WriteOutcome::Unchanged(outcome));
             }
 
-            for &task in &selected {
+            for &task in &plan.selected {
                 check_task_writable(&doc, task, &label, existing_archive.as_ref())?;
             }
 
-            let summaries = summarize_selected(&doc, &selected);
-
             // Ensure highest_id in ids.json never forgets archived IDs.
-            let max_selected_id = selected.iter().map(|t| t.id.number()).max().unwrap_or(0);
+            let max_selected_id = plan
+                .selected
+                .iter()
+                .map(|t| t.id.number())
+                .max()
+                .unwrap_or(0);
             let current_ids = state.read_ids()?.unwrap_or_default();
             if max_selected_id > current_ids.highest_id {
                 state.write_ids(&IdsState {
@@ -129,10 +210,11 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             }
 
             // Build updated archive file bytes and write atomically under TODO.md's lock.
-            write_updated_archive(&doc, &selected, &archive_path, &cfg)?;
+            write_updated_archive(&doc, &plan.selected, &archive_path, &cfg)?;
 
             // Remove archived task blocks from TODO.md (plus one adjacent blank line when safe).
-            let mut edits: Vec<LineEdit> = selected
+            let mut edits: Vec<LineEdit> = plan
+                .selected
                 .iter()
                 .map(|t| {
                     let mut del_end = t.block_range.end;
@@ -146,7 +228,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 .collect();
             edits.sort_by_key(|e| e.range.start);
             let intent = TaskChangeIntent {
-                removed_ids: selected.iter().map(|t| t.id).collect(),
+                removed_ids: plan.selected.iter().map(|t| t.id).collect(),
                 ..TaskChangeIntent::default()
             };
             let applied = doc
@@ -164,7 +246,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
             Ok(WriteOutcome::Changed {
                 new_bytes,
-                value: summaries,
+                value: outcome,
             })
         },
     )?;
@@ -182,38 +264,128 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             &ArchiveJson {
                 archive_file: cfg.archive_file,
                 applied: true,
-                count: summaries.len(),
-                tasks: summaries,
+                count: outcome.tasks.len(),
+                tasks: outcome.tasks,
+                kept_back: outcome.kept_back,
             },
         );
         return Ok(());
     }
 
-    if summaries.is_empty() {
-        out.write_line("no tasks to archive");
-    } else {
-        out.write_line(&format!(
-            "archived {} task(s) to {}",
-            summaries.len(),
-            cfg.archive_file
-        ));
-    }
+    out.write_line(&format_result(&outcome, &cfg.archive_file));
     Ok(())
 }
 
-fn select_tasks_to_archive(
-    doc: &Document,
-    older_than: Option<u64>,
-    now: DateTime<FixedOffset>,
-) -> Vec<&Task> {
-    doc.tasks
-        .iter()
-        .filter(|t| matches!(t.status, Status::Done | Status::Dropped))
-        .filter(|t| match older_than {
-            None => true,
-            Some(days) => task_age_days(t, now).is_some_and(|age| age >= days as i64),
+/// Works out which entries `archive` moves and which finished entries it keeps back (`R-ARCH-1`,
+/// `R-ARCH-2`).
+///
+/// An entry with no milestone is moved when it is finished and old enough, as before, unless other
+/// entries name it as their milestone. A milestone tree is moved only as a whole: its top-level
+/// milestone is finished, nothing in the tree is open, claimed or blocked, and no entry outside the
+/// tree still names one of its entries. Its age is the top-level milestone's age. An entry whose
+/// milestone chain does not reach a top-level one is kept.
+fn plan_archive(doc: &Document, older_than: Option<u64>, now: DateTime<FixedOffset>) -> ArchivePlan<'_> {
+    let aged = |task: &Task| {
+        older_than.is_none_or(|days| {
+            task_age_days(task, now).is_some_and(|age| age >= days as i64)
         })
-        .collect()
+    };
+
+    let trees: HashMap<TaskId, TreeState> = doc
+        .tasks
+        .iter()
+        .filter(|t| t.milestone.is_none() && t.is_milestone())
+        .map(|root| {
+            (
+                root.id,
+                TreeState {
+                    aged: aged(root),
+                    blocker: tree_blocker(doc, root),
+                },
+            )
+        })
+        .collect();
+
+    // Entries that name a parent, whatever it is: a parent that is not a milestone is damage, and
+    // its children must not be left pointing at an archived entry.
+    let named: HashSet<TaskId> = doc
+        .tasks
+        .iter()
+        .filter_map(|t| doc.milestone_parent_id(t))
+        .collect();
+
+    let mut plan = ArchivePlan::default();
+    for task in doc.tasks.iter().filter(|t| t.status.is_finished()) {
+        let step = match home_of(doc, task) {
+            Home::Alone if aged(task) && named.contains(&task.id) => {
+                Some(Step::Keep(NAMED_NOT_MILESTONE_REASON.to_string()))
+            }
+            Home::Alone if aged(task) => Some(Step::Move),
+            Home::Alone => None,
+            Home::Broken if aged(task) => Some(Step::Keep(BROKEN_CHAIN_REASON.to_string())),
+            Home::Broken => None,
+            Home::Tree(root) => trees.get(&root).and_then(TreeState::step),
+        };
+        match step {
+            Some(Step::Move) => plan.selected.push(task),
+            Some(Step::Keep(reason)) => plan.kept_back.push((task, reason)),
+            None => {}
+        }
+    }
+    plan
+}
+
+/// Where `task` sits in the milestone tree (`R-ARCH-2`).
+fn home_of(doc: &Document, task: &Task) -> Home {
+    match task.milestone.as_deref() {
+        None if task.is_milestone() => Home::Tree(task.id),
+        None => Home::Alone,
+        Some(_) => match doc.milestone_ancestors(task).last() {
+            // The walk up ends at a top-level milestone only when that milestone has no
+            // `milestone` field of its own; a missing, non-milestone or cyclic parent leaves one.
+            Some(root) if root.milestone.is_none() => Home::Tree(root.id),
+            _ => Home::Broken,
+        },
+    }
+}
+
+/// Why the tree of top-level milestone `root` stays in TODO.md, or `None` when it may move
+/// (`R-ARCH-2`). The first failing rule is the reason.
+fn tree_blocker(doc: &Document, root: &Task) -> Option<String> {
+    let root_id = doc.id_config.format_id(root.id);
+    if !root.status.is_finished() {
+        return Some(format!(
+            "milestone {root_id} is still {}",
+            root.status.as_str()
+        ));
+    }
+
+    let below = doc.entries_below(root.id);
+    let unfinished = below.iter().filter(|t| !t.status.is_finished()).count();
+    if unfinished > 0 {
+        let noun = if unfinished == 1 { "entry" } else { "entries" };
+        return Some(format!(
+            "milestone {root_id} has {unfinished} unfinished {noun} below it"
+        ));
+    }
+
+    // An entry outside the tree that still names one of its entries would be left pointing at
+    // an archived entry.
+    let members: HashSet<TaskId> = below
+        .iter()
+        .map(|t| t.id)
+        .chain(std::iter::once(root.id))
+        .collect();
+    doc.tasks.iter().find_map(|outside| {
+        let parent = doc.milestone_parent_id(outside)?;
+        (!members.contains(&outside.id) && members.contains(&parent)).then(|| {
+            format!(
+                "{} still names {} as its milestone",
+                doc.id_config.format_id(outside.id),
+                doc.id_config.format_id(parent)
+            )
+        })
+    })
 }
 
 fn task_age_days(task: &Task, now: DateTime<FixedOffset>) -> Option<i64> {
@@ -233,33 +405,77 @@ fn task_section_name(doc: &Document, task: &Task) -> String {
         .map_or_else(|| "Tasks".to_string(), |s| s.name.clone())
 }
 
-fn summarize_selected(doc: &Document, selected: &[&Task]) -> Vec<ArchivedTaskSummary> {
-    selected
-        .iter()
-        .map(|t| ArchivedTaskSummary {
-            id: doc.id_config.format_id(t.id),
-            title: t.title.clone(),
-            status: t.status.as_str(),
-            section: task_section_name(doc, t),
-        })
-        .collect()
+fn summary_of(doc: &Document, task: &Task) -> ArchivedTaskSummary {
+    ArchivedTaskSummary {
+        id: doc.id_config.format_id(task.id),
+        title: task.title.clone(),
+        status: task.status.as_str(),
+        section: task_section_name(doc, task),
+    }
 }
 
-fn format_preview(summaries: &[ArchivedTaskSummary], archive_file: &str) -> String {
-    if summaries.is_empty() {
-        return "no tasks to archive".to_string();
+fn summarize(doc: &Document, plan: &ArchivePlan<'_>) -> ArchiveOutcome {
+    ArchiveOutcome {
+        tasks: plan.selected.iter().map(|t| summary_of(doc, t)).collect(),
+        kept_back: plan
+            .kept_back
+            .iter()
+            .map(|(t, reason)| KeptBackSummary {
+                task: summary_of(doc, t),
+                reason: reason.clone(),
+            })
+            .collect(),
     }
-    let mut out = format!(
-        "would archive {} task(s) to {archive_file}:\n",
-        summaries.len()
-    );
-    for s in summaries {
-        out.push_str(&format!(
-            "  {} [{}] · {} (section: {})\n",
-            s.id, s.status, s.title, s.section
+}
+
+/// The lines that say how many finished entries were kept back, and why (`R-ARCH-2`).
+fn kept_back_lines(kept: &[KeptBackSummary]) -> Vec<String> {
+    if kept.is_empty() {
+        return Vec::new();
+    }
+    let noun = if kept.len() == 1 { "entry" } else { "entries" };
+    let mut lines = vec![format!("kept back {} finished {noun} in TODO.md:", kept.len())];
+    for k in kept {
+        lines.push(format!(
+            "  {} [{}] · {} — {}",
+            k.task.id, k.task.status, k.task.title, k.reason
         ));
     }
-    out.trim_end().to_string()
+    lines
+}
+
+fn format_preview(outcome: &ArchiveOutcome, archive_file: &str) -> String {
+    let mut lines = Vec::new();
+    if outcome.tasks.is_empty() {
+        lines.push("no tasks to archive".to_string());
+    } else {
+        lines.push(format!(
+            "would archive {} task(s) to {archive_file}:",
+            outcome.tasks.len()
+        ));
+        for s in &outcome.tasks {
+            lines.push(format!(
+                "  {} [{}] · {} (section: {})",
+                s.id, s.status, s.title, s.section
+            ));
+        }
+    }
+    lines.extend(kept_back_lines(&outcome.kept_back));
+    lines.join("\n")
+}
+
+fn format_result(outcome: &ArchiveOutcome, archive_file: &str) -> String {
+    let mut lines = Vec::new();
+    if outcome.tasks.is_empty() {
+        lines.push("no tasks to archive".to_string());
+    } else {
+        lines.push(format!(
+            "archived {} task(s) to {archive_file}",
+            outcome.tasks.len()
+        ));
+    }
+    lines.extend(kept_back_lines(&outcome.kept_back));
+    lines.join("\n")
 }
 
 fn write_updated_archive(

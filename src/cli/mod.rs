@@ -26,8 +26,8 @@ use crate::find::{
 };
 use crate::ops::edit_task_with_found_and_write;
 use crate::ops::{
-    NewlyReadyTask, OpEnv, OpsConfig, ReadyToClose, TaskJson, TaskOp, WriteTaskResult,
-    edit_task_and_write,
+    MilestoneRefJson, NewlyReadyTask, OpEnv, OpsConfig, ReadyToClose, TaskJson, TaskOp,
+    WriteTaskResult, edit_task_and_write,
 };
 use crate::output::Output;
 
@@ -453,6 +453,25 @@ struct TaskReadyJson<'a> {
     ready_to_close: &'a [ReadyToClose],
 }
 
+/// Writes the milestones above `task_id` in text, from the top down, each with its ID, title and
+/// goal (`R-MILE-4`). Writes nothing when there are none, so an entry without a milestone prints
+/// exactly what it printed before. The caller writes any blank line before the block.
+pub(crate) fn write_milestone_chain(
+    out: &mut Output,
+    task_id: &str,
+    milestones: &[MilestoneRefJson],
+) {
+    if milestones.is_empty() {
+        return;
+    }
+    out.write_line(&format!("Milestones above {task_id}, from the top down:"));
+    for milestone in milestones {
+        out.write_line(&format!("- {} \u{00B7} {}", milestone.id, milestone.title));
+        let goal = milestone.goal.as_deref().unwrap_or("-");
+        out.write_line(&format!("  goal: {goal}"));
+    }
+}
+
 /// Like [`report_task_ok`], also listing tasks that became ready and milestones that are now ready
 /// to close (`done`, `drop`; `R-DEP-4`, `R-MILE-6`). With `show_accept` the text output includes the
 /// task's `accept` line.
@@ -562,6 +581,7 @@ register_commands! {
     Help => help,
     History => history,
     Hooks => hooks,
+    Idea => idea,
     Import => import,
     Init => init,
     List => list,
@@ -571,6 +591,7 @@ register_commands! {
     Move => move_cmd,
     Next => next,
     Note => note,
+    Promote => promote,
     Release => release,
     Reopen => reopen,
     Restore => restore,

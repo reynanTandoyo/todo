@@ -357,6 +357,39 @@ fn check_reports_dependency_cycles_through_milestones() {
 }
 
 #[test]
+fn check_reports_a_loop_of_milestone_parents_once_even_when_depends_repeats_it() {
+    // T-001 and T-002 are each other's parent (check_milestones reports that loop once), and
+    // T-001 also depends on T-002: the same loop must not be reported a second time as a
+    // dependency cycle.
+    let p = proj(&body(&[
+        entry(
+            "T-001",
+            "Loop A",
+            true,
+            "P1",
+            "open",
+            Some("T-002"),
+            "- goal: loop\n- depends: T-002\n",
+        ),
+        entry(
+            "T-002",
+            "Loop B",
+            true,
+            "P1",
+            "open",
+            Some("T-001"),
+            "- goal: loop\n",
+        ),
+    ]));
+
+    let out = run(&p, &["check"]);
+    assert_eq!(out.status.code(), Some(1));
+    let text = stdout_text(&out);
+    assert_eq!(text.matches("milestone cycle:").count(), 1, "{text}");
+    assert!(!text.contains("dependency cycle:"), "{text}");
+}
+
+#[test]
 fn next_milestone_returns_only_tasks_below_that_milestone_at_any_depth() {
     let p = proj(&body(&[
         entry(

@@ -2,10 +2,12 @@
 
 use clap::Args as ClapArgs;
 
-use crate::cli::{CommandKind, CommandMeta, Context, load_read};
+use crate::cli::{CommandKind, CommandMeta, Context, load_read, write_milestone_chain};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::current_time;
-use crate::ops::{build_task_json, file_label, questions_about, resolve_task_by_title};
+use crate::ops::{
+    build_task_json, file_label, milestone_chain_json, questions_about, resolve_task_by_title,
+};
 use crate::output::Output;
 
 /// Metadata for the `show` command.
@@ -13,7 +15,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "show",
     summary: "Show full details of a task",
     kind: CommandKind::Read,
-    details: "Prints the task block exactly as it appears in TODO.md (or TODO-archive.md if archived), then the questions about it with their status. With `--json`, returns all known and unknown fields, notes, line numbers, dependencies with their statuses, tasks waiting on this task, and the questions about it (`questions`). Works for milestones too.",
+    details: "Prints the task block exactly as it appears in TODO.md (or TODO-archive.md if archived), then the questions about it with their status, then the milestones above it from the top down with their goals. With `--json`, returns all known and unknown fields, notes, line numbers, dependencies with their statuses, tasks waiting on this task, the questions about it (`questions`), and the milestones above it (`milestones`). Works for milestones too.",
     examples: &[
         "todo show T-001",
         "todo show 1",
@@ -83,6 +85,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 question.id, question.status, question.title
             ));
         }
+    }
+
+    let milestones = milestone_chain_json(primary_doc, task, &cfg);
+    if !milestones.is_empty() {
+        out.write_line("");
+        write_milestone_chain(out, &cfg.id_config.format_id(task.id), &milestones);
     }
     Ok(())
 }
