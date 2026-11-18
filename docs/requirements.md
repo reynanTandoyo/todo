@@ -148,7 +148,8 @@ by task commands; only the format and tool lines are kept up to date (R-VER-1, R
   ever creates `TODO.md`.
 - **R-FIND-7 SHOULD** `todo where` prints the file in use and how it was found, the repository root,
   the state folder, the lock and lease status, the format version, the tool version stamped in the
-  file and the running version (R-VER-1), and the number of tasks per status.
+  file and the running version (R-VER-1), and the number of tasks per status; milestones, questions
+  and ideas that are not done or dropped are counted apart from the tasks (R-KIND-3).
 
 ### 5.2 Reading and changing the file — EDIT
 

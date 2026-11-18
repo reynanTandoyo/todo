@@ -144,3 +144,57 @@ fn warns_on_onedrive_and_dropbox_in_where_and_writes() {
         "expected Dropbox warning, got: {warnings:?}"
     );
 }
+
+#[test]
+fn where_counts_tasks_and_counts_milestones_questions_and_ideas_apart() {
+    // R-KIND-3: only tasks are counted per status and in the total; milestones, questions and
+    // ideas are counted apart, as the ones that are not done or dropped (as summary does).
+    let dir = TempDir::new().unwrap();
+    fs::write(
+        dir.path().join("TODO.md"),
+        "<!-- todo-format: 2 -->\n\n## Tasks\n\n\
+         ### T-001 · Renderer\n- status: open\n- owner: —\n- priority: P1 · type: milestone\n- goal: the scene renders\n\n\
+         ### T-002 · Shader\n- status: open\n- owner: —\n- priority: P1 · type: feature\n- milestone: T-001\n\n\
+         ### T-003 · Old shader\n- status: done\n- owner: alice\n- priority: P2 · type: feature\n- milestone: T-001\n\n\
+         ## Questions\n\n\
+         ### T-004 · Shadows?\n- status: open\n- owner: —\n- type: question\n- about: T-002\n\n\
+         ### T-005 · Old question\n- status: done\n- owner: —\n- type: question\n\n\
+         ## Ideas\n\n\
+         ### T-006 · Hot reload\n- status: open\n- owner: —\n- type: idea\n",
+    )
+    .unwrap();
+
+    let text_out = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["where"])
+        .output()
+        .unwrap();
+    assert_eq!(text_out.status.code(), Some(0));
+    let stdout = stdout_text(&text_out);
+    assert!(
+        stdout.contains("Tasks: 2 total (open: 1, claimed: 0, blocked: 0, done: 1, dropped: 0)"),
+        "stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("Not tasks, not done or dropped: milestones 1, questions 1, ideas 1"),
+        "stdout: {stdout}"
+    );
+
+    let json_out = cargo_bin_cmd!("todo")
+        .current_dir(dir.path())
+        .args(["--json", "where"])
+        .output()
+        .unwrap();
+    assert_eq!(json_out.status.code(), Some(0));
+    let json: Value = parse_json(&json_out.stdout);
+    let counts = &json["data"]["counts"];
+    assert_eq!(counts["open"], 1, "{counts}");
+    assert_eq!(counts["claimed"], 0, "{counts}");
+    assert_eq!(counts["blocked"], 0, "{counts}");
+    assert_eq!(counts["done"], 1, "{counts}");
+    assert_eq!(counts["dropped"], 0, "{counts}");
+    assert_eq!(counts["total"], 2, "{counts}");
+    assert_eq!(counts["milestones"], 1, "{counts}");
+    assert_eq!(counts["questions"], 1, "{counts}");
+    assert_eq!(counts["ideas"], 1, "{counts}");
+}
