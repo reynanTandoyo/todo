@@ -136,6 +136,9 @@ pub enum ProblemKind {
     UnknownStatus { id: TaskId, value: String },
     /// A `### ` heading looked like a task ID but violated §6 grammar.
     HeadingProbableMistake,
+    /// A segment of a combined priority line is not `key: value`; it is kept as written and
+    /// reported (`docs/format.md` §8).
+    PartWithoutField { id: TaskId, text: String },
     /// The tool stamp names a todo version newer than the running one (R-VER-1, R-OUT-11).
     NewerToolVersion { stamp: ToolVersion },
     /// The tool stamp value is not `MAJOR.MINOR.PATCH` (`docs/format.md` §4).
@@ -242,6 +245,18 @@ pub struct CombinedPriorityLine {
     pub priority: Option<String>,
     /// Additional `key: value` segments on the same line, in order.
     pub extra_parts: Vec<(String, String)>,
+    /// Every segment after the priority, in order: the `key: value` ones as [`CombinedPart::Field`]
+    /// and the others as [`CombinedPart::Text`]. Rewriting the line keeps all of them (`R-EDIT-1`).
+    pub parts: Vec<CombinedPart>,
+}
+
+/// One segment after the priority on a combined priority line (`docs/format.md` §8).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CombinedPart {
+    /// A `key: value` segment, which counts as that field.
+    Field { key: String, value: String },
+    /// A segment that is not `key: value`: it is kept as written and `check` reports it.
+    Text(String),
 }
 
 /// A parsed dependency reference from `- depends: ...`.
@@ -1328,48 +1343,9 @@ fn parse_task_block(
             }
 
             match key_str {
-                "status" => {
-                    task.status_line = Some(idx);
-                    match Status::parse(value_str) {
-                        Some(s) => {
-                            task.status = s;
-                            task.status_raw = Some(owned_val);
-                        }
-                        None => {
-                            task.status_raw = Some(owned_val.clone());
-                            problems.push(Problem {
-                                line: line_no,
-                                severity: ProblemSeverity::BlockTask(task.id),
-                                kind: ProblemKind::UnknownStatus {
-                                    id: task.id,
-                                    value: owned_val.clone(),
-                                },
-                                message: format!(
-                                    "unknown status '{owned_val}' on {}",
-                                    id_config.format_id(task.id)
-                                ),
-                            });
-                        }
-                    }
-                }
-                "owner" => {
-                    task.owner_line = Some(idx);
-                    if is_nobody_owner(value_str) {
-                        task.owner_raw = Some(owned_val);
-                        task.owner = None;
-                    } else {
-                        task.owner_raw = Some(owned_val.clone());
-                        task.owner = Some(owned_val);
-                    }
-                }
-                "claimed" => {
-                    task.claimed = if owned_val.is_empty() {
-                        None
-                    } else {
-                        Some(owned_val)
-                    };
-                    task.claimed_line = Some(idx);
-                }
+                "status" => apply_status(&mut task, value_str, idx, line_no, id_config, problems),
+                "owner" => apply_owner(&mut task, value_str, idx),
+                "claimed" => apply_claimed(&mut task, value_str, idx),
                 "priority" => {
                     let detail = parse_combined_priority(idx, value_str);
                     task.priority = detail.priority.clone();
@@ -1416,9 +1392,16 @@ fn parse_task_block(
                                 task.goal = non_empty_string(part_val);
                                 task.goal_loc = Some(FieldLocation::CombinedPriority(idx));
                             }
-                            // The fields below are kept as one line each, so their line index is the
-                            // combined priority line's (`docs/format.md` §8: every other part counts as
-                            // its field).
+                            // The fields below are read from a combined line as from their own line
+                            // (`docs/format.md` §8: every other part counts as its field). Their line
+                            // index is the combined priority line's.
+                            "status" => {
+                                apply_status(
+                                    &mut task, part_val, idx, line_no, id_config, problems,
+                                );
+                            }
+                            "owner" => apply_owner(&mut task, part_val, idx),
+                            "claimed" => apply_claimed(&mut task, part_val, idx),
                             "why" => {
                                 task.why = non_empty_string(part_val);
                                 task.why_line = Some(idx);
@@ -1456,6 +1439,22 @@ fn parse_task_block(
                                     line: idx,
                                 });
                             }
+                        }
+                    }
+                    for part in &detail.parts {
+                        if let CombinedPart::Text(text) = part {
+                            problems.push(Problem {
+                                line: line_no,
+                                severity: ProblemSeverity::Warning,
+                                kind: ProblemKind::PartWithoutField {
+                                    id: task.id,
+                                    text: text.clone(),
+                                },
+                                message: format!(
+                                    "part '{text}' on the priority line of {} is not key: value; it is kept as written",
+                                    id_config.format_id(task.id)
+                                ),
+                            });
                         }
                     }
                     task.priority_detail = Some(detail);
@@ -1589,6 +1588,53 @@ const fn known_field_index(key: &str) -> Option<usize> {
     }
 }
 
+/// Reads a `status` value, from its own line or a combined priority line, into `task`
+/// (`docs/format.md` §8). A value outside the five statuses is kept and reported.
+fn apply_status(
+    task: &mut Task,
+    value: &str,
+    idx: usize,
+    line_no: usize,
+    id_config: &IdConfig,
+    problems: &mut Vec<Problem>,
+) {
+    task.status_line = Some(idx);
+    task.status_raw = Some(value.to_string());
+    match Status::parse(value) {
+        Some(s) => task.status = s,
+        None => problems.push(Problem {
+            line: line_no,
+            severity: ProblemSeverity::BlockTask(task.id),
+            kind: ProblemKind::UnknownStatus {
+                id: task.id,
+                value: value.to_string(),
+            },
+            message: format!(
+                "unknown status '{value}' on {}",
+                id_config.format_id(task.id)
+            ),
+        }),
+    }
+}
+
+/// Reads an `owner` value, from its own line or a combined priority line, into `task`
+/// (`docs/format.md` §8, §11). "Nobody" forms read as no owner.
+fn apply_owner(task: &mut Task, value: &str, idx: usize) {
+    task.owner_line = Some(idx);
+    task.owner_raw = Some(value.to_string());
+    task.owner = if is_nobody_owner(value) {
+        None
+    } else {
+        Some(value.to_string())
+    };
+}
+
+/// Reads a `claimed` value, from its own line or a combined priority line, into `task`.
+fn apply_claimed(task: &mut Task, value: &str, idx: usize) {
+    task.claimed = non_empty_string(value);
+    task.claimed_line = Some(idx);
+}
+
 fn non_empty_string(s: &str) -> Option<String> {
     if s.is_empty() {
         None
@@ -1630,19 +1676,27 @@ fn parse_combined_priority(line: usize, raw: &str) -> CombinedPriorityLine {
         Some(first.to_string())
     };
     let mut extra_parts = Vec::new();
+    let mut ordered = Vec::new();
     for part in parts {
         let p = part.trim();
-        if let Some((k, v)) = p.split_once(':') {
-            let key = k.trim();
-            if is_valid_field_key(key) {
-                extra_parts.push((key.to_string(), v.trim().to_string()));
+        if p.is_empty() {
+            continue;
+        }
+        match p.split_once(':') {
+            Some((k, v)) if is_valid_field_key(k.trim()) => {
+                let key = k.trim().to_string();
+                let value = v.trim().to_string();
+                extra_parts.push((key.clone(), value.clone()));
+                ordered.push(CombinedPart::Field { key, value });
             }
+            _ => ordered.push(CombinedPart::Text(p.to_string())),
         }
     }
     CombinedPriorityLine {
         line,
         priority,
         extra_parts,
+        parts: ordered,
     }
 }
 

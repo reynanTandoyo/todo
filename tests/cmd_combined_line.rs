@@ -260,3 +260,201 @@ fn unset_priority_moves_a_combined_part_to_its_own_line() {
         )
     );
 }
+
+// T-133: status, owner and claimed on the combined priority line are their fields (`docs/format.md` §8).
+
+#[test]
+fn status_owner_and_claimed_on_the_combined_line_are_read_and_drive_next() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Claimed on the line\n\
+                - priority: P1 · status: claimed · owner: alice · claimed: 2026-11-15T10:00+01:00\n\
+                ### T-002 · Open\n- status: open\n- owner: —\n- priority: P2\n";
+    let (home, work, _) = setup_proj(&tmp, &doc(body));
+
+    let show = parse_json(&ok(&home, &work, &["--json", "show", "T-001"]).stdout);
+    assert_eq!(show["data"]["status"], "claimed", "{show}");
+    assert_eq!(show["data"]["owner"], "alice", "{show}");
+    assert_eq!(show["data"]["claimed"], "2026-11-15T10:00+01:00", "{show}");
+
+    // A claimed task is not handed out, so the open P2 task is the next one. The claim is half an
+    // hour old at the pinned time, so it is not stale.
+    let out = run_todo(
+        &home,
+        &work,
+        &["--json", "next"],
+        &[("TODO_TEST_NOW", "2026-11-15T10:30:00+01:00")],
+    )
+    .unwrap();
+    assert!(out.status.success(), "{}", stderr_text(&out));
+    let next = parse_json(&out.stdout);
+    assert_eq!(next["data"]["task"]["id"], "T-002", "{next}");
+}
+
+#[test]
+fn check_sees_a_stale_claim_held_on_the_combined_line() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Stale\n\
+                - priority: P1 · status: claimed · owner: bob · claimed: 2020-01-01T00:00+00:00\n";
+    let (home, work, _) = setup_proj(&tmp, &doc(body));
+
+    let out = run_todo(&home, &work, &["check"], &[]).unwrap();
+    let text = format!("{}{}", stdout_text(&out), stderr_text(&out));
+    assert!(text.contains("T-001: stale claim by bob"), "{text}");
+}
+
+#[test]
+fn an_unknown_status_on_the_combined_line_is_reported() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Paused\n- priority: P1 · status: paused\n";
+    let (home, work, _) = setup_proj(&tmp, &doc(body));
+
+    let out = run_todo(&home, &work, &["check"], &[]).unwrap();
+    let text = format!("{}{}", stdout_text(&out), stderr_text(&out));
+    assert!(text.contains("unknown status 'paused' on T-001"), "{text}");
+}
+
+#[test]
+fn a_status_on_the_combined_line_repeated_on_its_own_line_is_a_repeated_field() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Twice\n- priority: P1 · status: open\n- status: done\n";
+    let (home, work, _) = setup_proj(&tmp, &doc(body));
+
+    let out = run_todo(&home, &work, &["check"], &[]).unwrap();
+    let text = format!("{}{}", stdout_text(&out), stderr_text(&out));
+    assert!(text.contains("repeated field 'status'"), "{text}");
+}
+
+#[test]
+fn release_and_done_edit_the_claim_on_the_combined_line_in_place() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Claimed\n\
+                - priority: P1 · status: claimed · owner: alice · claimed: 2026-11-15T10:00+01:00 · area: ui\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+
+    ok(&home, &work, &["--agent", "alice", "release", "T-001"]);
+    assert_eq!(
+        read_text(&file),
+        written("### T-001 · Claimed\n- priority: P1 · status: open · owner: — · area: ui\n"),
+        "release changes the claim where it is and removes the claimed part"
+    );
+
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+    let out = run_todo(
+        &home,
+        &work,
+        &["--agent", "alice", "done", "T-001"],
+        &[("TODO_TEST_NOW", "2026-11-15T10:30:00+01:00")],
+    )
+    .unwrap();
+    assert!(out.status.success(), "{}", stderr_text(&out));
+    assert_eq!(
+        read_text(&file),
+        written(
+            "### T-001 · Claimed\n- priority: P1 · status: done · owner: alice · area: ui\n\
+             - note (2026-11-15, alice): done\n"
+        ),
+        "done changes the status and owner where they are"
+    );
+}
+
+#[test]
+fn claim_writes_the_status_on_the_combined_line_where_it_is() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Open\n- priority: P1 · status: open · area: ui\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+
+    let out = run_todo(
+        &home,
+        &work,
+        &["--agent", "bob", "claim", "T-001"],
+        &[("TODO_TEST_NOW", "2026-11-15T14:00:00+01:00")],
+    )
+    .unwrap();
+    assert!(out.status.success(), "{}", stderr_text(&out));
+    let text = read_text(&file);
+    assert!(
+        text.contains("- priority: P1 · status: claimed · area: ui\n"),
+        "the status is changed in place, with no second status line: {text}"
+    );
+    assert_eq!(text.matches("status:").count(), 1, "{text}");
+}
+
+// T-134: a segment of the combined priority line that is not `key: value` is never dropped: it is kept
+// as written (R-EDIT-1) and `check` reports it (`docs/format.md` §8).
+
+#[test]
+fn a_part_without_key_value_survives_a_change_to_the_priority_or_another_part() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Notes\n- status: open\n- owner: —\n\
+                - priority: P1 · see the design notes · area: ui\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+
+    ok(
+        &home,
+        &work,
+        &["--agent", "t-agent", "set", "T-001", "--priority", "P0"],
+    );
+    assert_eq!(
+        read_text(&file),
+        written(
+            "### T-001 · Notes\n- status: open\n- owner: —\n\
+             - priority: P0 · see the design notes · area: ui\n"
+        ),
+        "a change of priority keeps the part"
+    );
+
+    ok(
+        &home,
+        &work,
+        &["--agent", "t-agent", "set", "T-001", "--area", "ops"],
+    );
+    assert_eq!(
+        read_text(&file),
+        written(
+            "### T-001 · Notes\n- status: open\n- owner: —\n\
+             - priority: P0 · see the design notes · area: ops\n"
+        ),
+        "a change of another part keeps the part"
+    );
+}
+
+#[test]
+fn removing_the_priority_keeps_a_part_without_key_value_on_a_line_of_its_own() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Notes\n- status: open\n- owner: —\n\
+                - priority: P1 · see the design notes · area: ui\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+
+    ok(
+        &home,
+        &work,
+        &["--agent", "t-agent", "set", "T-001", "--unset", "priority"],
+    );
+    assert_eq!(
+        read_text(&file),
+        written(
+            "### T-001 · Notes\n- status: open\n- owner: —\n\
+             - see the design notes\n- area: ui\n"
+        ),
+        "the text stays where the priority was, and the field moves to its own line"
+    );
+}
+
+#[test]
+fn check_reports_a_part_without_key_value_on_its_line_as_a_warning() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Notes\n- status: open\n- owner: —\n\
+                - priority: P1 · see the design notes · area: ui\n";
+    let (home, work, _) = setup_proj(&tmp, &doc(body));
+
+    let out = run_todo(&home, &work, &["check"], &[]).unwrap();
+    let text = format!("{}{}", stdout_text(&out), stderr_text(&out));
+    assert_eq!(out.status.code(), Some(1), "{text}");
+    // The priority line is line 9 of this file.
+    assert!(
+        text.contains(
+            "TODO.md:9: part 'see the design notes' on the priority line of T-001 is not key: value; it is kept as written"
+        ),
+        "{text}"
+    );
+}
