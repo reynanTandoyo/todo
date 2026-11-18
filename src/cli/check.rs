@@ -399,6 +399,7 @@ pub(crate) fn check_dependencies(
     // holds a dependency edge: a loop made of milestone parents alone is a milestone problem.
     let mut adj: BTreeMap<TaskId, (usize, Vec<TaskId>)> = BTreeMap::new();
     let mut dep_edges: BTreeSet<(TaskId, TaskId)> = BTreeSet::new();
+    let index = doc.milestone_index();
     for t in &doc.tasks {
         if adj.contains_key(&t.id) {
             continue;
@@ -412,7 +413,7 @@ pub(crate) fn check_dependencies(
         }
         dep_edges.extend(edges.iter().map(|&dep| (t.id, dep)));
         if t.is_milestone() {
-            edges.extend(doc.children_of(t.id).iter().map(|c| c.id));
+            edges.extend(index.children_of(t.id).iter().map(|c| c.id));
         }
         adj.insert(t.id, (t.heading_line + 1, edges));
     }
@@ -615,12 +616,13 @@ pub(crate) fn check_milestones(
         settled.extend(path.iter().map(|t| t.id));
     }
 
+    let index = doc.milestone_index();
     for milestone in doc
         .tasks
         .iter()
         .filter(|t| t.is_milestone() && matches!(t.status, Status::Done | Status::Dropped))
     {
-        let unfinished = doc.unfinished_below(milestone.id);
+        let unfinished = index.unfinished_below(milestone.id);
         if unfinished.is_empty() {
             continue;
         }
