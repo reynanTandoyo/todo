@@ -702,7 +702,11 @@ todo tree T-010
 - **R-MILE-4 COULD** An entry that has a milestone shows where it belongs. `show`, `next`, `claim`
   and `next --claim` print, after the task, the chain of milestones from the top down, each with ID,
   title and goal; their JSON carries `milestones: [{id, title, goal, status}]` in the same order.
-  Entries without a milestone print exactly what they printed before.
+  In text, `show` prints the chain after the questions about the entry (R-KIND-2), and `next`,
+  `claim` and `next --claim` print it under the task's line (`claim` after `<ID>: claim ok`). The
+  chain starts with `Milestones above <ID>, from the top down:`; each milestone takes two lines,
+  `- <ID> · <title>` and `  goal: <goal>` (`goal: -` when it has none). Entries without a milestone
+  print exactly what they printed before.
 - **R-MILE-5 COULD** `check` reports, each with its line: a `milestone` field naming a missing ID, or
   an entry that isn't a milestone; a cycle of milestones; a done or dropped milestone with an entry
   below it still open, claimed or blocked; a milestone without a goal; an `about` field naming a
