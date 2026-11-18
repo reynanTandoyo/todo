@@ -711,14 +711,21 @@ todo tree T-010
   - A task is ready only when its own dependencies and those of every milestone above it are
     finished (R-DEP-1), and no milestone above it is blocked, done or dropped.
   - `depends` may name a milestone, which counts as finished only when the milestone itself is done
-    or dropped. `check` finds dependency cycles that run through milestones (R-DEP-3).
+    or dropped. `check` finds dependency cycles that run through milestones (R-DEP-3). The waiting
+    edges are: an entry waits for the `depends` of every milestone above it, and a milestone waits
+    for the entries directly below it, since it is finished only when they are. A cycle is reported
+    only when it contains a `depends` edge; a loop made of milestone parents alone is a milestone
+    problem (R-MILE-5).
   - `next --milestone <task>` returns only tasks below that milestone, at any depth.
   - Among ready tasks, `next` orders by priority; then tasks in a milestone where work has already
-    started (something below it is claimed or done) before tasks in untouched milestones; then file
-    order. Parallel `next --claim` still hands out different tasks (TEST-5).
-  - When `done` or `drop` finishes the last unfinished entry below a milestone, the output names
-    the milestone as ready to close, with the command to use (`todo done <milestone>`). `summary`
-    lists milestones that are ready to close. A milestone is never closed automatically.
+    started (something below it at any depth is claimed, a stale claim included, or done) before
+    tasks in untouched milestones and tasks outside any milestone; then file order. Parallel
+    `next --claim` still hands out different tasks (TEST-5).
+  - A milestone is ready to close when it is open or blocked, has entries below it, and every one of
+    them is done or dropped. When `done` or `drop` finishes the last unfinished entry below a
+    milestone, the output names the milestone as ready to close, with the command to use
+    (`todo done <milestone>`); the JSON carries it as `ready_to_close`. `summary` lists milestones
+    that are ready to close. A milestone is never closed automatically.
 
 ### 5.21 Kinds of entry — KIND
 

@@ -14,7 +14,7 @@ use crate::ops::config::OpsConfig;
 use crate::ops::edits::TaskEditBuilder;
 use crate::ops::query::resolve_task_in_doc;
 use crate::ops::read::{
-    TaskJson, build_task_json, file_label, is_task_ready, read_optional_archive,
+    TaskJson, build_task_json, file_label, is_task_ready, read_optional_archive, waits_on_task,
 };
 use crate::ops::rules::{ClaimPlan, ReleasePlan};
 use crate::output::Output;
@@ -63,6 +63,16 @@ pub struct NewlyReadyTask {
     pub title: String,
 }
 
+/// A milestone that a write has just made ready to close: every entry below it is now done or
+/// dropped. Nothing closes it automatically; the output names the command (`R-MILE-6`).
+#[derive(Debug, Clone, Serialize)]
+pub struct ReadyToClose {
+    /// Canonical formatted milestone ID.
+    pub id: String,
+    /// Milestone title.
+    pub title: String,
+}
+
 /// Result returned by [`edit_task_and_write`].
 #[derive(Debug, Clone)]
 pub struct WriteTaskResult<T> {
@@ -74,6 +84,8 @@ pub struct WriteTaskResult<T> {
     pub task: TaskJson,
     /// Tasks that became ready after this edit (`R-DEP-4`).
     pub newly_ready: Vec<NewlyReadyTask>,
+    /// Milestones above the task that this edit has just made ready to close (`R-MILE-6`).
+    pub ready_to_close: Vec<ReadyToClose>,
     /// `true` if `TODO.md` was modified on disk.
     pub changed: bool,
     /// Command-specific payload.
@@ -504,21 +516,26 @@ where
                 return Ok(DocWritePlanInner::Unchanged((
                     task_json,
                     Vec::new(),
+                    Vec::new(),
                     payload,
                 )));
             }
 
-            // Only another task that directly depends on `task_id` can transition from not-ready to
-            // ready when only `task_id` is modified.
+            // Only a task whose readiness names `task_id` (directly, or through a milestone above it)
+            // can transition from not-ready to ready when only `task_id` is modified (`R-DEP-4`).
             let pre_not_ready_dependents: Vec<TaskId> = doc
                 .tasks
                 .iter()
                 .filter(|t| {
-                    t.id != task_id
-                        && t.depends.iter().any(|d| d.id == Some(task_id))
-                        && !is_task_ready(doc, t, archive, now, &label_cfg)
+                    waits_on_task(doc, t, task) && !is_task_ready(doc, t, archive, now, &label_cfg)
                 })
                 .map(|t| t.id)
+                .collect();
+            // Milestones above the task that are ready to close before the edit (`R-MILE-6`).
+            let pre_ready_to_close: Vec<TaskId> = doc
+                .ready_to_close_above(task)
+                .iter()
+                .map(|m| m.id)
                 .collect();
 
             let cfg_owned = label_cfg.clone();
@@ -556,7 +573,16 @@ where
                                 })
                             })
                             .collect();
-                        Ok((task_json, newly_ready, payload))
+                        let ready_to_close = new_doc
+                            .ready_to_close_above(updated_task)
+                            .into_iter()
+                            .filter(|m| !pre_ready_to_close.contains(&m.id))
+                            .map(|m| ReadyToClose {
+                                id: cfg_owned.id_config.format_id(m.id),
+                                title: m.title.clone(),
+                            })
+                            .collect();
+                        Ok((task_json, newly_ready, ready_to_close, payload))
                     },
                 )),
             })
@@ -568,8 +594,9 @@ where
         task_id: res.value.0.id.clone(),
         task: res.value.0,
         newly_ready: res.value.1,
+        ready_to_close: res.value.2,
         changed: res.changed,
-        value: res.value.2,
+        value: res.value.3,
     })
 }
 

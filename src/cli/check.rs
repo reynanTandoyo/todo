@@ -388,15 +388,25 @@ pub(crate) fn check_dependencies(
         }
     }
 
-    // Cycle detection across active tasks in `doc`.
+    // Cycle detection across active tasks in `doc` (R-DEP-3, R-MILE-6). A task waits for its own
+    // `depends` and for those of every milestone above it. A milestone is finished only when the
+    // entries below it are, so it waits for its direct children. A cycle is reported only when it
+    // holds a dependency edge: a loop made of milestone parents alone is a milestone problem.
     let mut adj: BTreeMap<TaskId, (usize, Vec<TaskId>)> = BTreeMap::new();
+    let mut dep_edges: BTreeSet<(TaskId, TaskId)> = BTreeSet::new();
     for t in &doc.tasks {
-        adj.entry(t.id).or_insert_with(|| {
-            (
-                t.heading_line + 1,
-                t.depends.iter().filter_map(|d| d.id).collect(),
-            )
-        });
+        if adj.contains_key(&t.id) {
+            continue;
+        }
+        let mut edges: Vec<TaskId> = t.depends.iter().filter_map(|d| d.id).collect();
+        for milestone in doc.milestone_ancestors(t) {
+            edges.extend(milestone.depends.iter().filter_map(|d| d.id));
+        }
+        dep_edges.extend(edges.iter().map(|&dep| (t.id, dep)));
+        if t.is_milestone() {
+            edges.extend(doc.children_of(t.id).iter().map(|c| c.id));
+        }
+        adj.insert(t.id, (t.heading_line + 1, edges));
     }
 
     #[derive(Clone, Copy, PartialEq, Eq)]
@@ -408,6 +418,7 @@ pub(crate) fn check_dependencies(
 
     struct CycleCtx<'a> {
         adj: &'a BTreeMap<TaskId, (usize, Vec<TaskId>)>,
+        dep_edges: &'a BTreeSet<(TaskId, TaskId)>,
         doc: &'a Document,
         label: &'a str,
         color: BTreeMap<TaskId, Color>,
@@ -426,9 +437,14 @@ pub(crate) fn check_dependencies(
                     Some(Color::Gray) => {
                         if let Some(pos) = cx.stack.iter().position(|&x| x == v) {
                             let cycle = &cx.stack[pos..];
+                            // `u` is on top of the stack, so the closing edge is `u -> v`.
+                            let has_dependency = cx.dep_edges.contains(&(u, v))
+                                || cycle
+                                    .windows(2)
+                                    .any(|w| cx.dep_edges.contains(&(w[0], w[1])));
                             let mut key = cycle.to_vec();
                             key.sort_unstable();
-                            if cx.reported.insert(key) {
+                            if has_dependency && cx.reported.insert(key) {
                                 let mut chain: Vec<String> = cycle
                                     .iter()
                                     .map(|&id| cx.doc.id_config.format_id(id))
@@ -455,6 +471,7 @@ pub(crate) fn check_dependencies(
     let ids: Vec<TaskId> = adj.keys().copied().collect();
     let mut cx = CycleCtx {
         adj: &adj,
+        dep_edges: &dep_edges,
         doc,
         label,
         color: adj.keys().map(|&id| (id, Color::White)).collect(),

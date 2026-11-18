@@ -9,7 +9,7 @@ use crate::cli::{CommandKind, CommandMeta, Context, load_read};
 use crate::doc::Status;
 use crate::error::Result;
 use crate::lock::current_time;
-use crate::ops::is_task_ready;
+use crate::ops::{is_task_ready, ready_sort_key};
 use crate::output::Output;
 
 /// Metadata for the `summary` command.
@@ -17,7 +17,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "summary",
     summary: "Show a compact session-start overview of TODO.md",
     kind: CommandKind::Read,
-    details: "Prints at most 40 lines summarizing counts by status and open priority, active/stale claims, blocked tasks with their latest reason, the next 5 ready tasks, and open questions.",
+    details: "Prints at most 40 lines summarizing counts by status and open priority, active/stale claims, blocked tasks with their latest reason, the next 5 ready tasks (in the order `next` uses), milestones ready to close, and open questions.",
     examples: &["todo summary", "todo summary --json"],
 };
 
@@ -74,6 +74,12 @@ struct QuestionSummary {
 }
 
 #[derive(Serialize)]
+struct MilestoneReadySummary {
+    id: String,
+    title: String,
+}
+
+#[derive(Serialize)]
 struct SummaryJson {
     file: String,
     counts: StatusCounts,
@@ -81,6 +87,8 @@ struct SummaryJson {
     claimed: Vec<ClaimedSummary>,
     blocked: Vec<BlockedSummary>,
     next_ready: Vec<ReadySummary>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    ready_to_close: Vec<MilestoneReadySummary>,
     open_questions: Vec<QuestionSummary>,
 }
 
@@ -171,7 +179,8 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         }
     }
 
-    ready_candidates.sort_by_key(|t| (cfg.priority_rank(t.priority.as_deref()), t.heading_line));
+    let started = doc.started_milestones();
+    ready_candidates.sort_by_key(|t| ready_sort_key(doc, t, &started, &cfg));
     let next_ready: Vec<ReadySummary> = ready_candidates
         .into_iter()
         .take(5)
@@ -201,6 +210,15 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         });
     }
 
+    let ready_to_close = doc
+        .milestones_ready_to_close()
+        .into_iter()
+        .map(|m| MilestoneReadySummary {
+            id: doc.id_config.format_id(m.id),
+            title: m.title.clone(),
+        })
+        .collect();
+
     let payload = SummaryJson {
         file: loaded.file_label.clone(),
         counts,
@@ -208,6 +226,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         claimed,
         blocked,
         next_ready,
+        ready_to_close,
         open_questions,
     };
 
@@ -283,6 +302,19 @@ fn format_summary_lines(s: &SummaryJson) -> Vec<String> {
         for r in &s.next_ready {
             let prio = r.priority.as_deref().unwrap_or("—");
             lines.push(format!("  {} [{}] · {}", r.id, prio, r.title));
+        }
+    }
+
+    if !s.ready_to_close.is_empty() {
+        lines.push(format!("ready to close ({}):", s.ready_to_close.len()));
+        for m in s.ready_to_close.iter().take(5) {
+            lines.push(format!("  {} · {} — todo done {}", m.id, m.title, m.id));
+        }
+        if s.ready_to_close.len() > 5 {
+            lines.push(format!(
+                "  ... and {} more ready to close",
+                s.ready_to_close.len() - 5
+            ));
         }
     }
 

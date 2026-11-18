@@ -7,7 +7,7 @@
 
 use serde_json::Value;
 
-use crate::doc::{Document, EntryKind, Task};
+use crate::doc::{Document, EntryKind, Task, TaskId};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::config::OpsConfig;
 use crate::ops::query::resolve_task_in_doc;
@@ -79,6 +79,22 @@ pub fn check_parent(
         .with_task(entry_id));
     }
     Ok(parent_id)
+}
+
+/// Resolves the `--milestone` value of `next` to the milestone it names (`R-MILE-6`).
+///
+/// A missing entry is `NOT_FOUND`; an entry that is not a milestone is `BAD_VALUE`.
+pub fn resolve_milestone_filter(doc: &Document, cfg: &OpsConfig, value: &str) -> Result<TaskId> {
+    let milestone = resolve_task_in_doc(doc, value.trim())?;
+    if !milestone.is_milestone() {
+        let id_str = cfg.id_config.format_id(milestone.id);
+        return Err(TodoError::new(
+            ErrorCode::BadValue,
+            format!("task {id_str} is not a milestone; --milestone names a milestone"),
+        )
+        .with_task(id_str));
+    }
+    Ok(milestone.id)
 }
 
 /// The canonical form of a `milestone` value that [`check_parent`] has already accepted.

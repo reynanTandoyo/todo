@@ -202,7 +202,32 @@ pub fn is_task_ready(
     if task.is_milestone() || is_question(task) {
         return false;
     }
+    // Work is handed out along the tree (R-MILE-6): no milestone above the task may be blocked,
+    // done or dropped, and the dependencies of every milestone above it must be finished too.
+    let above = doc.milestone_ancestors(task);
+    if above
+        .iter()
+        .any(|m| matches!(m.status, Status::Blocked | Status::Done | Status::Dropped))
+    {
+        return false;
+    }
     doc.dependencies_satisfied(task, archive)
+        && above.iter().all(|m| doc.dependencies_satisfied(m, archive))
+}
+
+/// Returns `true` if the readiness of `waiting` can change when `changed` changes state: it names
+/// `changed` in `depends`, a milestone above it names `changed` in `depends`, or `changed` is a
+/// milestone above `waiting` (`R-DEP-4`, `R-MILE-6`).
+#[must_use]
+pub fn waits_on_task(doc: &Document, waiting: &Task, changed: &Task) -> bool {
+    if waiting.id == changed.id {
+        return false;
+    }
+    let names_changed = |t: &Task| t.depends.iter().any(|d| d.id == Some(changed.id));
+    let above = doc.milestone_ancestors(waiting);
+    names_changed(waiting)
+        || above.iter().any(|m| names_changed(m))
+        || (changed.is_milestone() && above.iter().any(|m| m.id == changed.id))
 }
 
 /// JSON representation of a dependency reference with its resolved status (`R-READ-2`, `R-DEP-2`).

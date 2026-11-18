@@ -26,7 +26,8 @@ use crate::find::{
 };
 use crate::ops::edit_task_with_found_and_write;
 use crate::ops::{
-    NewlyReadyTask, OpEnv, OpsConfig, TaskJson, TaskOp, WriteTaskResult, edit_task_and_write,
+    NewlyReadyTask, OpEnv, OpsConfig, ReadyToClose, TaskJson, TaskOp, WriteTaskResult,
+    edit_task_and_write,
 };
 use crate::output::Output;
 
@@ -448,10 +449,13 @@ struct TaskReadyJson<'a> {
     task: &'a TaskJson,
     #[serde(skip_serializing_if = "<[NewlyReadyTask]>::is_empty")]
     newly_ready: &'a [NewlyReadyTask],
+    #[serde(skip_serializing_if = "<[ReadyToClose]>::is_empty")]
+    ready_to_close: &'a [ReadyToClose],
 }
 
-/// Like [`report_task_ok`], also listing tasks that became ready (`done`, `drop`).
-/// With `show_accept` the text output includes the task's `accept` line.
+/// Like [`report_task_ok`], also listing tasks that became ready and milestones that are now ready
+/// to close (`done`, `drop`; `R-DEP-4`, `R-MILE-6`). With `show_accept` the text output includes the
+/// task's `accept` line.
 pub(crate) fn report_task_with_ready(
     out: &mut Output,
     name: &str,
@@ -462,6 +466,7 @@ pub(crate) fn report_task_with_ready(
         let json = TaskReadyJson {
             task: &res.task,
             newly_ready: &res.newly_ready,
+            ready_to_close: &res.ready_to_close,
         };
         out.emit_json_ok(name, &json);
         return;
@@ -472,6 +477,12 @@ pub(crate) fn report_task_with_ready(
     }
     for ready in &res.newly_ready {
         out.write_line(&format!("now ready: {} {}", ready.id, ready.title));
+    }
+    for milestone in &res.ready_to_close {
+        out.write_line(&format!(
+            "ready to close: {} {} (every entry below it is finished; close it with: todo done {})",
+            milestone.id, milestone.title, milestone.id
+        ));
     }
 }
 
