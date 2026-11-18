@@ -16,3 +16,4 @@ pub mod ops;
 pub mod output;
 pub mod state;
 pub(crate) mod timing;
+pub mod version;

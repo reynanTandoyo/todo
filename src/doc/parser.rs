@@ -6,6 +6,7 @@ use chrono::{DateTime, FixedOffset, NaiveDate};
 
 use crate::doc::id::{FastU64Map, IdConfig, TaskId, strip_prefix_ignore_case};
 use crate::doc::lines::{LineDoc, Utf8DecodeError};
+use crate::version::{RUNNING_VERSION, ToolVersion};
 
 /// Supported format version of `TODO.md`.
 pub const SUPPORTED_FORMAT_VERSION: u32 = 1;
@@ -111,6 +112,21 @@ pub enum ProblemKind {
     UnknownStatus { id: TaskId, value: String },
     /// A `### ` heading looked like a task ID but violated §6 grammar.
     HeadingProbableMistake,
+    /// The tool stamp names a todo version newer than the running one (R-VER-1, R-OUT-11).
+    NewerToolVersion { stamp: ToolVersion },
+    /// The tool stamp value is not `MAJOR.MINOR.PATCH` (`docs/format.md` §4).
+    InvalidToolVersion { raw: String },
+}
+
+/// The tool version stamp `<!-- todo-tool: X -->` in the preamble (`docs/format.md` §4, R-VER-1).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolStamp {
+    /// 0-based line index of the stamp line.
+    pub line: usize,
+    /// The value as written, trimmed.
+    pub value: String,
+    /// The value parsed as `MAJOR.MINOR.PATCH`, or `None` when it does not parse.
+    pub version: Option<ToolVersion>,
 }
 
 /// A problem or warning found in a `TODO.md` document (`R-EDIT-8`, `R-OUT-4`).
@@ -523,6 +539,8 @@ pub struct Document {
     pub declared_format_version: Option<u32>,
     /// 0-based line index of the format line, if present.
     pub format_line: Option<usize>,
+    /// The tool version stamp in the preamble, if present (`docs/format.md` §4).
+    pub tool_stamp: Option<ToolStamp>,
     /// 0-based half-open line range of the preamble (before first `## ` or task `### `).
     pub preamble_range: Range<usize>,
     /// Managed block (`<!-- todo:begin -->` .. `<!-- todo:end -->`), if present.
@@ -740,6 +758,7 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
 
     let mut declared_format_version: Option<u32> = None;
     let mut format_line: Option<usize> = None;
+    let mut tool_stamp: Option<ToolStamp> = None;
     let mut managed_begin: Option<usize> = None;
     let mut managed_end: Option<usize> = None;
     let mut seen_first_section_or_task = false;
@@ -811,6 +830,44 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
                         ),
                     });
                 }
+            }
+            continue;
+        }
+
+        // The tool version stamp: only the first one counts (`docs/format.md` §4, R-VER-1).
+        if !seen_first_section_or_task && let Some(raw) = parse_todo_comment(text, "todo-tool:") {
+            ignored[idx] = true;
+            if tool_stamp.is_none() {
+                let version = ToolVersion::parse(&raw);
+                let problem = match version {
+                    Some(stamp) if stamp > RUNNING_VERSION => Some((
+                        ProblemKind::NewerToolVersion { stamp },
+                        format!(
+                            "this todo ({RUNNING_VERSION}) is behind: the file was last written \
+                             by todo {stamp}; run `todo help update` to update todo"
+                        ),
+                    )),
+                    Some(_) => None,
+                    None => Some((
+                        ProblemKind::InvalidToolVersion { raw: raw.clone() },
+                        format!(
+                            "tool version stamp '{raw}' is not MAJOR.MINOR.PATCH; it is kept as it is"
+                        ),
+                    )),
+                };
+                if let Some((kind, message)) = problem {
+                    problems.push(Problem {
+                        line: line_no,
+                        severity: ProblemSeverity::Warning,
+                        kind,
+                        message,
+                    });
+                }
+                tool_stamp = Some(ToolStamp {
+                    line: idx,
+                    value: raw,
+                    version,
+                });
             }
             continue;
         }
@@ -1037,6 +1094,7 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
         id_config,
         declared_format_version,
         format_line,
+        tool_stamp,
         preamble_range,
         managed_block,
         sections,
@@ -1543,13 +1601,19 @@ fn strip_html_comment_open(line: &str) -> Option<&str> {
 }
 
 fn parse_format_line(line: &str) -> Option<String> {
+    parse_todo_comment(line, "todo-format:")
+}
+
+/// Returns the trimmed value of a one-line `<!-- <key> value -->` comment, such as the format line
+/// (`todo-format:`) or the tool stamp (`todo-tool:`).
+fn parse_todo_comment(line: &str, key: &str) -> Option<String> {
     let rest = strip_up_to_3_spaces(line)?.trim_end_matches(' ');
     let inner = rest.strip_prefix("<!--")?.strip_suffix("-->")?.trim();
     if inner.contains("-->") {
         return None;
     }
-    let version = inner.strip_prefix("todo-format:")?.trim();
-    Some(version.to_string())
+    let value = inner.strip_prefix(key)?.trim();
+    Some(value.to_string())
 }
 
 fn is_conflict_marker(line: &str) -> bool {

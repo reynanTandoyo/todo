@@ -151,6 +151,7 @@ fn run_merge(args: &RunArgs, out: &mut Output) -> Result<()> {
     let base = read(&args.base)?;
     let ours = read(&args.ours)?;
     let theirs = read(&args.theirs)?;
+    let (ours, theirs) = settle_tool_stamps(&base, &ours, &theirs);
 
     let merged = match structured_merge(&base, &ours, &theirs)? {
         Some(m) => m,
@@ -186,6 +187,44 @@ fn run_merge(args: &RunArgs, out: &mut Output) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+/// The tool stamp changed differently on both sides is not a conflict: both sides take the stamp
+/// line with the higher version, so git merges them cleanly (R-GIT-2, R-VER-1). Any other byte is
+/// left as it is, and input that does not parse is returned unchanged.
+fn settle_tool_stamps(base: &[u8], ours: &[u8], theirs: &[u8]) -> (Vec<u8>, Vec<u8>) {
+    let unchanged = || (ours.to_vec(), theirs.to_vec());
+    let (Some(b), Some(o), Some(t)) = (
+        Document::parse_bytes(base).ok(),
+        Document::parse_bytes(ours).ok(),
+        Document::parse_bytes(theirs).ok(),
+    ) else {
+        return unchanged();
+    };
+    let (Some(ours_stamp), Some(theirs_stamp)) = (&o.tool_stamp, &t.tool_stamp) else {
+        return unchanged();
+    };
+    let (Some(ours_version), Some(theirs_version)) = (ours_stamp.version, theirs_stamp.version)
+    else {
+        return unchanged();
+    };
+    let base_value = b.tool_stamp.as_ref().map(|s| s.value.as_str());
+    let ours_changed = Some(ours_stamp.value.as_str()) != base_value;
+    let theirs_changed = Some(theirs_stamp.value.as_str()) != base_value;
+    if !ours_changed || !theirs_changed || ours_stamp.value == theirs_stamp.value {
+        return unchanged();
+    }
+
+    let winner = if theirs_version > ours_version {
+        t.line_doc.lines[theirs_stamp.line].clone()
+    } else {
+        o.line_doc.lines[ours_stamp.line].clone()
+    };
+    let mut ours_lines = o.line_doc;
+    let mut theirs_lines = t.line_doc;
+    ours_lines.lines[ours_stamp.line] = winner.clone();
+    theirs_lines.lines[theirs_stamp.line] = winner;
+    (ours_lines.to_bytes(), theirs_lines.to_bytes())
 }
 
 /// Parses one input; `None` when it cannot be merged task by task.

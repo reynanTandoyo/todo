@@ -6,7 +6,8 @@ use similar::TextDiff;
 
 use crate::atomic::{read_file_with_snapshot, validate_utf8};
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::error::Result;
+use crate::doc::stamp_bytes;
+use crate::error::{ErrorCode, Result, TodoError};
 use crate::history::{parse_snapshot_number, read_snapshot_bytes};
 use crate::lock::{WriteOutcome, locked_read_modify_write};
 use crate::ops::{OpsConfig, file_label, require_yes_or_preview};
@@ -101,11 +102,15 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         "restore",
         &cfg.lock,
         |current_bytes, _snap| {
-            if current_bytes == snap_bytes.as_slice() {
+            // The restored file gets the tool stamp too, so an old snapshot never lowers it (R-VER-1).
+            let restored = stamp_bytes(&snap_bytes, cfg.id_config.clone()).map_err(|e| {
+                TodoError::new(ErrorCode::WriteFailed, e.to_string()).with_file(label.clone())
+            })?;
+            if current_bytes == restored.as_slice() {
                 return Ok(WriteOutcome::Unchanged(false));
             }
             Ok(WriteOutcome::Changed {
-                new_bytes: snap_bytes.clone(),
+                new_bytes: restored,
                 value: true,
             })
         },
