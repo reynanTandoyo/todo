@@ -1,6 +1,7 @@
 mod common;
 
 use std::fs;
+use std::path::Path;
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -133,4 +134,62 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
     assert!(add.status.success());
     let add_json: Value = parse_json(&add.stdout);
     assert_eq!(add_json["data"]["id"], "T-006");
+}
+
+/// Makes the snapshot of TODO.md fail to record: the history folder is a file, so the write takes
+/// the lock and then stops before TODO.md or the archive is replaced.
+fn block_history(dir: &Path) {
+    let state = dir.join(".todo");
+    fs::create_dir_all(&state).expect("create state folder");
+    fs::write(
+        state.join("history"),
+        "a file where the history folder belongs",
+    )
+    .expect("block history");
+}
+
+#[test]
+fn archive_leaves_the_archive_alone_when_the_snapshot_of_todo_md_cannot_be_recorded() {
+    let dir = TempDir::new().expect("tempdir");
+    let archive_before = "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
+<!-- todo-format: 2 -->\n\
+# Archive\n\
+\n\
+## Backend\n\
+\n\
+### T-900 · Archived earlier\n\
+- status: done\n\
+- owner: —\n\
+- priority: P2\n";
+    fs::write(dir.path().join("TODO.md"), ARCHIVE_FIXTURE).expect("write TODO.md");
+    fs::write(dir.path().join("TODO-archive.md"), archive_before).expect("write archive");
+    block_history(dir.path());
+
+    let out = run_in(dir.path(), &["archive", "--yes", "--agent", "coordinator"]);
+    assert!(
+        !out.status.success(),
+        "archive should fail: {}",
+        stdout_text(&out)
+    );
+    assert_eq!(
+        read_text(&dir.path().join("TODO-archive.md")),
+        archive_before
+    );
+    assert_eq!(read_text(&dir.path().join("TODO.md")), ARCHIVE_FIXTURE);
+}
+
+#[test]
+fn archive_creates_no_archive_file_when_the_snapshot_of_todo_md_cannot_be_recorded() {
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(dir.path().join("TODO.md"), ARCHIVE_FIXTURE).expect("write TODO.md");
+    block_history(dir.path());
+
+    let out = run_in(dir.path(), &["archive", "--yes", "--agent", "coordinator"]);
+    assert!(
+        !out.status.success(),
+        "archive should fail: {}",
+        stdout_text(&out)
+    );
+    assert!(!dir.path().join("TODO-archive.md").exists());
+    assert_eq!(read_text(&dir.path().join("TODO.md")), ARCHIVE_FIXTURE);
 }

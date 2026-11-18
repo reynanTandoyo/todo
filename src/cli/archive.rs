@@ -7,7 +7,7 @@ use chrono::{DateTime, FixedOffset};
 use clap::Args as ClapArgs;
 use serde::Serialize;
 
-use crate::atomic::{atomic_replace, atomic_write_bytes, read_file_with_snapshot, validate_utf8};
+use crate::atomic::{read_file_with_snapshot, validate_utf8};
 use crate::version::RUNNING_VERSION;
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::doc::id::TaskId;
@@ -17,7 +17,9 @@ use crate::doc::{
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::fs_path;
-use crate::lock::{MigrationWrite, WriteOutcomeFull, current_time, locked_read_modify_write_full};
+use crate::lock::{
+    ArchiveWrite, MigrationWrite, WriteOutcomeFull, current_time, locked_read_modify_write_full,
+};
 use crate::ops::migrate::{MigratedFile, describe, migrate_for_write};
 use crate::ops::{
     OpsConfig, check_task_writable, file_label, parse_doc_for_write, read_optional_archive,
@@ -219,9 +221,9 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 })?;
             }
 
-            // Build updated archive file bytes and write atomically under TODO.md's lock.
-            let archive_migration =
-                write_updated_archive(doc, &plan.selected, &archive_path, &cfg)?;
+            // The archive file is built now and written by the lock, after TODO.md's snapshot is
+            // recorded and before TODO.md is replaced (R-MIG-1, R-ARCH-1).
+            let archive_update = build_updated_archive(doc, &plan.selected, &archive_path, &cfg)?;
 
             // Remove archived task blocks from TODO.md (plus one adjacent blank line when safe).
             let mut edits: Vec<LineEdit> = plan
@@ -263,7 +265,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                     to: m.to,
                 });
             }
-            if let Some((from, to)) = archive_migration {
+            if let Some((from, to)) = archive_update.migrated {
                 files.push(MigratedFile {
                     file: cfg.archive_file.clone(),
                     from,
@@ -280,6 +282,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 touched_tasks: None,
                 value: outcome,
                 migration,
+                archive: Some(archive_update.write),
             })
         },
     )?;
@@ -514,14 +517,23 @@ fn format_result(outcome: &ArchiveOutcome, archive_file: &str) -> String {
     lines.join("\n")
 }
 
-/// Writes the archive file with the selected tasks added. Returns the format versions the archive
-/// was migrated from and to, when it was in an older format (R-MIG-1).
-fn write_updated_archive(
+/// The archive file as this run leaves it, for the lock to write (R-ARCH-1).
+struct ArchiveUpdate {
+    /// The new archive text, and the snapshot of the file it replaces (`None` when it is created).
+    write: ArchiveWrite,
+    /// The format versions the archive was migrated from and to, when it was in an older format
+    /// (R-MIG-1).
+    migrated: Option<(u32, u32)>,
+}
+
+/// Builds the archive file with the selected tasks added. Nothing is written here: the write
+/// happens under the lock, after the snapshot of TODO.md (R-MIG-1).
+fn build_updated_archive(
     doc: &Document,
     selected: &[&Task],
     archive_path: &std::path::Path,
     cfg: &OpsConfig,
-) -> Result<Option<(u32, u32)>> {
+) -> Result<ArchiveUpdate> {
     let eol = "\n";
     let mut grouped: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut section_order: Vec<String> = Vec::new();
@@ -612,12 +624,14 @@ fn write_updated_archive(
         None => applied.bytes,
     };
 
-    if let Some(snap) = existing_snap {
-        atomic_replace(archive_path, &snap.snapshot, &new_bytes)?;
-    } else {
-        atomic_write_bytes(archive_path, &new_bytes)?;
-    }
-    Ok(archive_migration)
+    Ok(ArchiveUpdate {
+        write: ArchiveWrite {
+            path: archive_path.to_path_buf(),
+            expected: existing_snap.map(|snap| snap.snapshot),
+            new_bytes,
+        },
+        migrated: archive_migration,
+    })
 }
 
 fn extract_task_block_lines(doc: &Document, task: &Task) -> Vec<String> {
