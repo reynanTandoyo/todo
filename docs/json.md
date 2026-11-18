@@ -329,7 +329,7 @@ ones only for the whole tree (no milestone argument and no `--area`); otherwise 
     "format_version": 2,
     "tool_stamp": "0.6.0",
     "running_version": "0.6.0",
-    "counts": { "open": 10, "claimed": 4, "blocked": 0, "done": 27, "dropped": 3, "total": 44 }
+    "counts": { "open": 10, "claimed": 4, "blocked": 0, "done": 27, "dropped": 3, "total": 44, "milestones": 2, "questions": 1, "ideas": 3 }
   },
   "warnings": []
 }
@@ -346,8 +346,11 @@ ones only for the whole tree (no milestone argument and no `--area`); otherwise 
   none. `tool_stamp` is the version in the tool line (`R-VER-1`), or `null` when there is none, and
   `running_version` is the version of the todo that ran. When the stamp is newer than
   `running_version`, a warning says to run `todo help update`.
-- `counts` holds the number of entries per status. When the format version is newer than this todo
-  knows, `where` still succeeds but leaves out `counts`, because the tasks are not read (R-VER-2).
+- `counts` holds the number of tasks per status (`open`, `claimed`, `blocked`, `done`, `dropped`) and
+  `total`, their sum. `milestones`, `questions` and `ideas` count the entries of those kinds that are
+  not done or dropped, apart from the tasks (`R-KIND-3`). When the format version is newer than this
+  todo knows, `where` still succeeds but leaves out `counts`, because the tasks are not read
+  (R-VER-2).
 
 ### `todo check --json` (`todo.check.v1`)
 
