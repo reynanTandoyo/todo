@@ -706,7 +706,12 @@ todo tree T-010
 - **R-MILE-5 COULD** `check` reports, each with its line: a `milestone` field naming a missing ID, or
   an entry that isn't a milestone; a cycle of milestones; a done or dropped milestone with an entry
   below it still open, claimed or blocked; a milestone without a goal; an `about` field naming a
-  missing ID (R-KIND-2).
+  missing ID (R-KIND-2). An ID is missing only when neither `TODO.md` nor `TODO-archive.md` holds it
+  (R-DEP-3). The line is the one that holds the problem: the `milestone` or `about` line for a bad
+  reference; the `milestone` line of the entry that closes a cycle; the heading of a milestone without
+  a goal; the heading of a done or dropped milestone with unfinished entries below it (the message
+  lists them); and the heading of an unfinished entry whose milestone is archived as done or dropped
+  (R-ARCH-2).
 - **R-MILE-6 COULD** Work is handed out along the tree:
   - A task is ready only when its own dependencies and those of every milestone above it are
     finished (R-DEP-1), and no milestone above it is blocked, done or dropped.
