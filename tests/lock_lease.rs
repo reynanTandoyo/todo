@@ -302,12 +302,26 @@ fn status_shows_active_write_lock_holder_without_waiting() {
 
     common::wait_for_file(&ready, Duration::from_secs(5)).unwrap();
 
+    // A status that waited for the write lock would wait the whole lock timeout, here 10 s (the
+    // holder keeps the lock for 20 s). Status takes well under a second when it does not wait, so
+    // the timeout is a bound that does not depend on how fast the machine is.
+    let lock_wait = Duration::from_secs(10);
+    let lock_wait_ms = lock_wait.as_millis().to_string();
     let start = std::time::Instant::now();
-    let status_out = common::run_todo(&home, &work, &["--json", "status"], &[]).unwrap();
+    let status_out = common::run_todo(
+        &home,
+        &work,
+        &["--json", "status"],
+        &[("TODO_TEST_LOCK_WAIT_MS", lock_wait_ms.as_str())],
+    )
+    .unwrap();
     let elapsed = start.elapsed();
 
     assert!(status_out.status.success());
-    assert!(elapsed < Duration::from_millis(500));
+    assert!(
+        elapsed < lock_wait,
+        "status took {elapsed:?}, so it waited for the write lock"
+    );
     let parsed: serde_json::Value = parse_json(&status_out.stdout);
     assert_eq!(parsed["data"]["write_lock"]["held"], true);
     assert_eq!(
