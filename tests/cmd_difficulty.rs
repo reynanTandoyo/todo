@@ -709,3 +709,28 @@ fn show_json_and_schema_list_difficulty() {
         .collect();
     assert!(fields.contains(&"difficulty"), "{fields:?}");
 }
+
+#[test]
+fn check_warns_about_a_difficulty_that_is_not_configured_as_it_does_for_type_and_area() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Combined level\n- status: open\n- owner: —\n- priority: P1 · difficulty: extreme\n\n\
+                ### T-002 · Own line level\n- status: open\n- owner: —\n- priority: P2\n- difficulty: Huge\n\n\
+                ### T-003 · Configured spelling\n- status: open\n- owner: —\n- priority: P2 · difficulty: HARD\n";
+    let (home, work, _) = setup_proj(&tmp, &doc(body));
+
+    let out = run_todo(&home, &work, &["check"], &[]).unwrap();
+    let text = format!("{}{}", stdout_text(&out), stderr_text(&out));
+    assert_eq!(out.status.code(), Some(1), "{text}");
+    assert!(
+        text.contains("T-001: difficulty \"extreme\" is not in configured difficulties"),
+        "{text}"
+    );
+    assert!(
+        text.contains("T-002: difficulty \"Huge\" is not in configured difficulties"),
+        "{text}"
+    );
+    assert!(
+        !text.contains("T-003:"),
+        "a configured difficulty in another case is not reported: {text}"
+    );
+}
