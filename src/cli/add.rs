@@ -48,6 +48,10 @@ pub struct Args {
     #[arg(long, value_name = "VALUE")]
     pub priority: Option<String>,
 
+    /// How hard the task is: one of the configured `difficulties` (default `easy`, `medium`, `hard`).
+    #[arg(long, value_name = "VALUE")]
+    pub difficulty: Option<String>,
+
     /// Task type (e.g. `feature`, `bug`, `chore`).
     #[arg(long = "type", value_name = "VALUE")]
     pub task_type: Option<String>,
@@ -114,6 +118,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     // Validate priority, type, area, and required fields before taking the lock.
     let priority_val = resolve_priority(args.priority.as_deref(), &extra_fields, &cfg)?;
+    let difficulty_val = resolve_allowed(
+        "difficulty",
+        args.difficulty.as_deref(),
+        &extra_fields,
+        &cfg.difficulties,
+    )?;
     let type_val = resolve_allowed(
         "type",
         args.task_type.as_deref(),
@@ -133,6 +143,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     check_required_fields(
         &cfg.required_fields,
         priority_val.as_deref(),
+        difficulty_val.as_deref(),
         type_val.as_deref(),
         area_val.as_deref(),
         depends_val.as_deref(),
@@ -188,6 +199,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             let lines = NewTask {
                 title: &clean_title,
                 priority: priority_val.as_deref(),
+                difficulty: difficulty_val.as_deref(),
                 task_type: type_val.as_deref(),
                 area: area_val.as_deref(),
                 depends: depends_val.as_deref(),
@@ -348,6 +360,7 @@ fn resolve_allowed(
 fn check_required_fields(
     required_fields: &[String],
     priority: Option<&str>,
+    difficulty: Option<&str>,
     task_type: Option<&str>,
     area: Option<&str>,
     depends: Option<&str>,
@@ -360,6 +373,7 @@ fn check_required_fields(
     for req in required_fields {
         let present = match req.to_ascii_lowercase().as_str() {
             "priority" => priority.is_some(),
+            "difficulty" => difficulty.is_some(),
             "type" => task_type.is_some(),
             "area" => area.is_some(),
             "depends" => depends.is_some(),
@@ -464,6 +478,7 @@ struct BatchAddEntry {
     title: String,
     section: Option<String>,
     priority: Option<String>,
+    difficulty: Option<String>,
     #[serde(rename = "type")]
     task_type: Option<String>,
     area: Option<String>,
@@ -481,6 +496,7 @@ struct ValidatedBatchEntry {
     title: String,
     section: Option<String>,
     priority: Option<String>,
+    difficulty: Option<String>,
     task_type: Option<String>,
     area: Option<String>,
     depends_tokens: Vec<String>,
@@ -649,6 +665,12 @@ pub(crate) fn add_batch_text(
         }
 
         let priority = resolve_priority(parsed.priority.as_deref(), &extra, &cfg)?;
+        let difficulty = resolve_allowed(
+            "difficulty",
+            parsed.difficulty.as_deref(),
+            &extra,
+            &cfg.difficulties,
+        )?;
         let task_type = resolve_allowed("type", parsed.task_type.as_deref(), &extra, &cfg.types)?;
         let area = resolve_allowed("area", parsed.area.as_deref(), &extra, &cfg.areas)?;
         let files = parsed
@@ -705,6 +727,7 @@ pub(crate) fn add_batch_text(
         check_required_fields(
             &cfg.required_fields,
             priority.as_deref(),
+            difficulty.as_deref(),
             task_type.as_deref(),
             area.as_deref(),
             depends_summary.as_deref(),
@@ -728,6 +751,7 @@ pub(crate) fn add_batch_text(
             title,
             section,
             priority,
+            difficulty,
             task_type,
             area,
             depends_tokens,
@@ -820,6 +844,7 @@ pub(crate) fn add_batch_text(
                 let lines = NewTask {
                     title: &entry.title,
                     priority: entry.priority.as_deref(),
+                    difficulty: entry.difficulty.as_deref(),
                     task_type: entry.task_type.as_deref(),
                     area: entry.area.as_deref(),
                     depends: depends_val.as_deref(),

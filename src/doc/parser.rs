@@ -13,8 +13,20 @@ pub const SUPPORTED_FORMAT_VERSION: u32 = 1;
 
 /// Canonical field order for inserting missing fields (`docs/format.md` §10).
 pub const CANONICAL_FIELD_ORDER: &[&str] = &[
-    "status", "owner", "claimed", "session", "priority", "type", "area", "depends", "files",
-    "problem", "fix", "accept", "commit",
+    "status",
+    "owner",
+    "claimed",
+    "session",
+    "priority",
+    "difficulty",
+    "type",
+    "area",
+    "depends",
+    "files",
+    "problem",
+    "fix",
+    "accept",
+    "commit",
 ];
 
 /// Accepted heading separators between `<ID>` and `<title>` (`docs/format.md` §6),
@@ -337,6 +349,11 @@ pub struct Task {
     /// Where `area` is defined, if present.
     pub area_loc: Option<FieldLocation>,
 
+    /// Task difficulty (`difficulty` field or combined priority segment; `R-WRITE-18`).
+    pub difficulty: Option<String>,
+    /// Where `difficulty` is defined, if present.
+    pub difficulty_loc: Option<FieldLocation>,
+
     /// Parsed dependency references from `- depends:`.
     pub depends: Vec<DependencyRef>,
     /// Raw `- depends:` value, if present.
@@ -458,6 +475,7 @@ impl Task {
             "owner" => self.owner.as_deref(),
             "claimed" => self.claimed.as_deref(),
             "priority" => self.priority.as_deref(),
+            "difficulty" => self.difficulty.as_deref(),
             "type" => self.task_type.as_deref(),
             "area" => self.area.as_deref(),
             "depends" => self.depends_raw.as_deref(),
@@ -1178,6 +1196,8 @@ fn parse_task_block(
         claimed_line: None,
         priority: None,
         priority_detail: None,
+        difficulty: None,
+        difficulty_loc: None,
         task_type: None,
         task_type_loc: None,
         area: None,
@@ -1201,12 +1221,12 @@ fn parse_task_block(
         notes: Vec::new(),
     };
 
-    let mut seen_known = [0usize; 12];
+    let mut seen_known = [0usize; 13];
     let mut seen_unknown: Vec<(String, usize)> = Vec::new();
 
     let check_and_mark_seen = |key: &str,
                                line_no: usize,
-                               seen_known: &mut [usize; 12],
+                               seen_known: &mut [usize; 13],
                                seen_unknown: &mut Vec<(String, usize)>|
      -> Option<usize> {
         if let Some(slot) = known_field_index(key) {
@@ -1338,6 +1358,10 @@ fn parse_task_block(
                             continue;
                         }
                         match part_key.as_str() {
+                            "difficulty" => {
+                                task.difficulty = non_empty_string(part_val);
+                                task.difficulty_loc = Some(FieldLocation::CombinedPriority(idx));
+                            }
                             "type" => {
                                 task.task_type = non_empty_string(part_val);
                                 task.task_type_loc = Some(FieldLocation::CombinedPriority(idx));
@@ -1356,6 +1380,14 @@ fn parse_task_block(
                         }
                     }
                     task.priority_detail = Some(detail);
+                }
+                "difficulty" => {
+                    task.difficulty = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
+                    task.difficulty_loc = Some(FieldLocation::OwnLine(idx));
                 }
                 "type" => {
                     task.task_type = if owned_val.is_empty() {
@@ -1430,7 +1462,7 @@ fn parse_task_block(
 }
 
 const fn known_field_index(key: &str) -> Option<usize> {
-    if key.len() < 3 || key.len() > 8 {
+    if key.len() < 3 || key.len() > 10 {
         return None;
     }
     match key.as_bytes() {
@@ -1446,6 +1478,7 @@ const fn known_field_index(key: &str) -> Option<usize> {
         b"fix" => Some(9),
         b"accept" => Some(10),
         b"commit" => Some(11),
+        b"difficulty" => Some(12),
         _ => None,
     }
 }

@@ -270,6 +270,8 @@ pub struct TaskJson {
     pub stale: bool,
     /// Task priority, if present.
     pub priority: Option<String>,
+    /// Task difficulty, if present (`R-WRITE-18`).
+    pub difficulty: Option<String>,
     /// Task type, if present.
     #[serde(rename = "type")]
     pub task_type: Option<String>,
@@ -337,6 +339,8 @@ pub struct ListTaskJson {
     pub stale: bool,
     /// Task priority, if present.
     pub priority: Option<String>,
+    /// Task difficulty, if present (`R-WRITE-18`).
+    pub difficulty: Option<String>,
     /// Task type, if present.
     #[serde(rename = "type")]
     pub task_type: Option<String>,
@@ -491,6 +495,7 @@ pub fn build_task_json(
         claimed: task.claimed.clone(),
         stale: cfg.is_claim_stale(task, now),
         priority: task.priority.clone(),
+        difficulty: task.difficulty.clone(),
         task_type: task.task_type.clone(),
         area: task.area.clone(),
         depends: task.depends.iter().map(|d| d.raw.clone()).collect(),
@@ -533,6 +538,7 @@ pub fn build_list_task_json(
         claimed: task.claimed.clone(),
         stale: cfg.is_claim_stale(task, now),
         priority: task.priority.clone(),
+        difficulty: task.difficulty.clone(),
         task_type: task.task_type.clone(),
         area: task.area.clone(),
         depends: task.depends.iter().map(|d| d.raw.clone()).collect(),

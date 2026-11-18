@@ -26,6 +26,7 @@ pub const META: CommandMeta = CommandMeta {
         "todo next --claim --agent agent-1",
         "todo next --claim --new --section Backend --agent agent-1",
         "todo next --type bug --where area=cli",
+        "todo next --claim --max-difficulty medium --agent agent-1",
     ],
 };
 
@@ -52,6 +53,14 @@ pub struct Args {
     #[arg(long, value_name = "AREA")]
     pub area: Option<String>,
 
+    /// Restrict candidates to tasks with one of these difficulties (comma-separated; `R-WRITE-18`).
+    #[arg(long, value_name = "LIST")]
+    pub difficulty: Option<String>,
+
+    /// Restrict candidates to tasks of this difficulty or easier (`R-WRITE-18`).
+    #[arg(long = "max-difficulty", value_name = "VALUE")]
+    pub max_difficulty: Option<String>,
+
     /// Filter by `key=value` predicate (repeatable, ANDed).
     #[arg(long = "where", value_name = "KEY=VALUE")]
     pub where_clauses: Vec<String>,
@@ -73,6 +82,14 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         .iter()
         .map(|raw| WhereClause::parse(raw))
         .collect::<Result<Vec<_>>>()?;
+    let difficulties = match args.difficulty.as_deref() {
+        Some(raw) => Some(cfg.difficulty_list(raw)?),
+        None => None,
+    };
+    let max_difficulty = match args.max_difficulty.as_deref() {
+        Some(raw) => Some(cfg.canonical_difficulty(raw)?),
+        None => None,
+    };
 
     let payload = if args.claim {
         let _ = ctx.require_agent()?;
@@ -87,6 +104,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                     section: args.section.as_deref(),
                     task_type: args.task_type.as_deref(),
                     area: args.area.as_deref(),
+                    difficulties: difficulties.as_deref(),
+                    max_difficulty: max_difficulty.as_deref(),
                     where_clauses: &where_clauses,
                     agent: Some(agent),
                     ignore_own_claim: args.new,
@@ -154,6 +173,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             section: args.section.as_deref(),
             task_type: args.task_type.as_deref(),
             area: args.area.as_deref(),
+            difficulties: difficulties.as_deref(),
+            max_difficulty: max_difficulty.as_deref(),
             where_clauses: &where_clauses,
             agent: ctx.agent.as_deref(),
             ignore_own_claim: args.new,
