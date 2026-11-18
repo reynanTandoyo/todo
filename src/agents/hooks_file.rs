@@ -401,9 +401,144 @@ fn render_value(value: &Value, indent: &str, eol: &str, depth: usize) -> Result<
     Ok(rendered.split('\n').collect::<Vec<_>>().join(&pad))
 }
 
-/// One member of a JSON object: its key, and where its value starts and ends.
+/// The settings text with the managed hook entries removed, for `hooks uninstall` (`R-AGENT-4`).
+///
+/// Only the managed entries go, and every other byte stays, as `hooks install` keeps them: a
+/// managed entry is cut out of its event's array; an event whose entries are all managed is cut out
+/// of `hooks` with its key; and `hooks` itself goes when nothing else is left in it. An event array
+/// the user left empty stays. Text without managed entries comes back as it is, and blank text
+/// stays blank. Errors name what cannot be read; nothing is changed then.
+pub(crate) fn uninstall_hook_text(text: &str) -> Result<String, String> {
+    if text.trim().is_empty() {
+        return Ok(text.to_string());
+    }
+    let root: Value = serde_json::from_str(text).map_err(|e| format!("not valid JSON: {e}"))?;
+    if !root.is_object() {
+        return Ok(text.to_string());
+    }
+    let bytes = text.as_bytes();
+    let layout = || "unexpected layout; hooks not changed".to_string();
+    let root_open = skip_ws(bytes, 0);
+    let root_members = object_members(bytes, root_open).ok_or_else(layout)?;
+    let Some(hooks_index) = last_index(&root_members, "hooks") else {
+        return Ok(text.to_string());
+    };
+    let hooks_open = root_members[hooks_index].start;
+    if bytes.get(hooks_open) != Some(&b'{') {
+        return Ok(text.to_string());
+    }
+    let hook_members = object_members(bytes, hooks_open).ok_or_else(layout)?;
+
+    let mut splices = Vec::new();
+    // Per member of `hooks`: whether the whole event (a member) goes.
+    let mut removed = vec![false; hook_members.len()];
+    for event in HOOK_EVENTS {
+        let Some(index) = last_index(&hook_members, event) else {
+            continue;
+        };
+        let open = hook_members[index].start;
+        if bytes.get(open) != Some(&b'[') {
+            continue;
+        }
+        let elements = array_elements(bytes, open).ok_or_else(layout)?;
+        let managed = managed_flags(text, &elements)?;
+        if !managed.contains(&true) {
+            continue;
+        }
+        if managed.iter().all(|m| *m) {
+            removed[index] = true;
+        } else {
+            splices.extend(remove_items(bytes, open, &elements, &managed).ok_or_else(layout)?);
+        }
+    }
+
+    if removed.contains(&true) && removed.iter().all(|r| *r) {
+        // Nothing else is in `hooks`, so the object goes with the events in it. No entry inside it
+        // is cut on its own in this case, so the splices above are empty.
+        let spans: Vec<(usize, usize)> =
+            root_members.iter().map(|m| (m.key_start, m.end)).collect();
+        let mut root_removed = vec![false; root_members.len()];
+        root_removed[hooks_index] = true;
+        splices = remove_items(bytes, root_open, &spans, &root_removed).ok_or_else(layout)?;
+    } else if removed.contains(&true) {
+        let spans: Vec<(usize, usize)> =
+            hook_members.iter().map(|m| (m.key_start, m.end)).collect();
+        splices.extend(remove_items(bytes, hooks_open, &spans, &removed).ok_or_else(layout)?);
+    }
+    splice_text(text, &splices).ok_or_else(layout)
+}
+
+/// Whether each array element (its byte range in `text`) is a managed hook entry.
+fn managed_flags(text: &str, elements: &[(usize, usize)]) -> Result<Vec<bool>, String> {
+    elements
+        .iter()
+        .map(|&(start, end)| {
+            let slice = text
+                .get(start..end)
+                .ok_or_else(|| "unexpected layout; hooks not changed".to_string())?;
+            let value: Value =
+                serde_json::from_str(slice).map_err(|e| format!("not valid JSON: {e}"))?;
+            Ok(is_managed_hook(&value))
+        })
+        .collect()
+}
+
+/// The splices that remove the items flagged in `remove` from the object or array that opens at
+/// `open`. `spans` are the byte ranges of the items, in order. A run of removed items is cut
+/// together with the comma that joins it to a neighbour that stays, so the items that stay keep
+/// their text. When every item is flagged, the whole contents go. `None` if the layout is unexpected.
+fn remove_items(
+    bytes: &[u8],
+    open: usize,
+    spans: &[(usize, usize)],
+    remove: &[bool],
+) -> Option<Vec<Splice>> {
+    if remove.len() != spans.len() {
+        return None;
+    }
+    if !remove.contains(&true) {
+        return Some(Vec::new());
+    }
+    if remove.iter().all(|r| *r) {
+        let close = value_end(bytes, open)?.checked_sub(1)?;
+        return Some(vec![Splice {
+            range: open + 1..close,
+            text: String::new(),
+        }]);
+    }
+    let mut splices = Vec::new();
+    let mut i = 0;
+    while i < spans.len() {
+        if !remove[i] {
+            i += 1;
+            continue;
+        }
+        let first = i;
+        while i + 1 < spans.len() && remove[i + 1] {
+            i += 1;
+        }
+        let last = i;
+        let range = if last + 1 < spans.len() {
+            // The next item stays: cut up to its start.
+            spans[first].0..spans[last + 1].0
+        } else {
+            // The last item goes: cut from the end of the item before it, which stays.
+            spans[first.checked_sub(1)?].1..spans[last].1
+        };
+        splices.push(Splice {
+            range,
+            text: String::new(),
+        });
+        i += 1;
+    }
+    Some(splices)
+}
+
+/// One member of a JSON object: its key, where the member starts (at its key), and where its value
+/// starts and ends.
 struct Member {
     key: String,
+    key_start: usize,
     start: usize,
     end: usize,
 }
@@ -411,6 +546,11 @@ struct Member {
 /// The last member named `key`, which is the one serde_json keeps when a key repeats.
 fn last_member<'a>(members: &'a [Member], key: &str) -> Option<&'a Member> {
     members.iter().rev().find(|m| m.key == key)
+}
+
+/// The position in `members` of the last member named `key`.
+fn last_index(members: &[Member], key: &str) -> Option<usize> {
+    members.iter().rposition(|m| m.key == key)
 }
 
 fn skip_ws(b: &[u8], mut i: usize) -> usize {
@@ -484,6 +624,7 @@ fn object_members(b: &[u8], start: usize) -> Option<Vec<Member>> {
         if b.get(i) != Some(&b'"') {
             return None;
         }
+        let key_start = i;
         let key_end = string_end(b, i)?;
         let key: String = serde_json::from_slice(b.get(i..key_end)?).ok()?;
         i = skip_ws(b, key_end);
@@ -492,7 +633,12 @@ fn object_members(b: &[u8], start: usize) -> Option<Vec<Member>> {
         }
         i = skip_ws(b, i + 1);
         let end = value_end(b, i)?;
-        members.push(Member { key, start: i, end });
+        members.push(Member {
+            key,
+            key_start,
+            start: i,
+            end,
+        });
         i = skip_ws(b, end);
         match b.get(i)? {
             b',' => i = skip_ws(b, i + 1),
@@ -704,5 +850,62 @@ mod tests {
         assert!(install_hook_text("{\"hooks\": []}").is_err());
         assert!(install_hook_text("{\"hooks\": {\"SessionEnd\": {}}}").is_err());
         assert!(install_hook_text("{\"hooks\": ").is_err());
+    }
+
+    /// `text` with the managed entries installed, then removed again.
+    fn installed_then_removed(text: &str) -> String {
+        let installed = install_hook_text(text).expect("install");
+        uninstall_hook_text(&installed).expect("uninstall")
+    }
+
+    #[test]
+    fn uninstall_undoes_install_byte_for_byte() {
+        for text in [
+            "{\n  \"zeta\": 1,\n  \"alpha\": true\n}\n",
+            "{\r\n    \"env\": {\"A\": 1}\r\n}\r\n",
+            "{\"zeta\": 1,\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"echo \\u00e9\"}]}]},\"alpha\":[1,2]}\n",
+            "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\"matcher\": \"Bash\"}\n    ]\n  }\n}\n",
+        ] {
+            assert_eq!(installed_then_removed(text), text);
+        }
+    }
+
+    #[test]
+    fn uninstall_cuts_only_the_managed_entries_and_keeps_the_rest_as_written() {
+        let text = "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\"matcher\": \"Bash\"},\n      {\"_managed_by\": \"todo\", \"matcher\": \"Edit|Write|MultiEdit\"}\n    ],\n    \"SessionStart\": [\n      {\"_managed_by\": \"todo\"}\n    ]\n  },\n  \"env\": {}\n}\n";
+        let expected = "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\"matcher\": \"Bash\"}\n    ]\n  },\n  \"env\": {}\n}\n";
+        assert_eq!(uninstall_hook_text(text).expect("uninstall"), expected);
+    }
+
+    #[test]
+    fn a_run_of_managed_entries_between_kept_ones_is_cut_with_its_commas() {
+        let text = "{\"hooks\": {\"PreToolUse\": [{\"a\": 1}, {\"_managed_by\": \"todo\"}, {\"_managed_by\": \"todo\", \"b\": 2}, {\"c\": 3}]}}";
+        let expected = "{\"hooks\": {\"PreToolUse\": [{\"a\": 1}, {\"c\": 3}]}}";
+        assert_eq!(uninstall_hook_text(text).expect("uninstall"), expected);
+    }
+
+    #[test]
+    fn an_outdated_managed_entry_goes_and_the_other_events_stay() {
+        let text = "{\"hooks\": {\"SessionEnd\": [{\"_managed_by\": \"todo\", \"hooks\": [{\"command\": \"todo session-end old\"}]}], \"Stop\": [{\"hooks\": []}]}, \"env\": 1}";
+        let expected = "{\"hooks\": {\"Stop\": [{\"hooks\": []}]}, \"env\": 1}";
+        assert_eq!(uninstall_hook_text(text).expect("uninstall"), expected);
+    }
+
+    #[test]
+    fn text_without_managed_entries_comes_back_unchanged() {
+        for text in [
+            "",
+            "  \n",
+            "{\"hooks\": {\"SessionEnd\": [], \"Stop\": [{\"command\": \"x\"}]}}",
+            "{\"env\": {}}",
+            "[1, 2]",
+        ] {
+            assert_eq!(uninstall_hook_text(text).expect("uninstall"), text);
+        }
+    }
+
+    #[test]
+    fn uninstall_refuses_invalid_json() {
+        assert!(uninstall_hook_text("{\"hooks\": ").is_err());
     }
 }

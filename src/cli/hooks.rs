@@ -5,12 +5,10 @@ use std::path::Path;
 
 use clap::{Args as ClapArgs, Subcommand};
 use serde::Serialize;
-use serde_json::{Map, Value};
+use serde_json::Value;
 use similar::TextDiff;
 
-use crate::agents::hooks_file::{
-    HOOK_EVENTS, detect_indent, install_hook_text, is_managed_hook,
-};
+use crate::agents::hooks_file::{install_hook_text, uninstall_hook_text};
 use crate::agents::project::{BACKUP_REL_PATH, SETTINGS_REL_PATH};
 use crate::atomic::atomic_write_bytes;
 use crate::cli::{CommandKind, CommandMeta, Context};
@@ -24,7 +22,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "hooks",
     summary: "Install or uninstall Claude Code hooks in .claude/settings.json",
     kind: CommandKind::Meta,
-    details: "`hooks install --yes` adds a `SessionStart` hook (`todo summary`), a `PreToolUse` hook (`todo guard` for `Edit|Write|MultiEdit`) and a `SessionEnd` hook (`todo session-end`, which releases the ending session's claims) to `.claude/settings.json` in the folder that holds `TODO.md`, keeping a backup and preserving formatting. `hooks uninstall --yes` removes only the entries added by `todo`.",
+    details: "`hooks install --yes` adds a `SessionStart` hook (`todo summary`), a `PreToolUse` hook (`todo guard` for `Edit|Write|MultiEdit`) and a `SessionEnd` hook (`todo session-end`, which releases the ending session's claims) to `.claude/settings.json` in the folder that holds `TODO.md`, keeping a backup and preserving formatting. `hooks uninstall --yes` removes only the entries added by `todo`, keeping every other byte of the file.",
     examples: &[
         "todo hooks install",
         "todo hooks install --yes",
@@ -92,34 +90,30 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         None => "",
     };
 
-    let mut root: Value = if old_text.trim().is_empty() {
-        Value::Object(Map::new())
-    } else {
-        serde_json::from_str(old_text).map_err(|e| {
+    if !old_text.trim().is_empty() {
+        serde_json::from_str::<Value>(old_text).map_err(|e| {
             TodoError::new(
                 ErrorCode::BadValue,
                 format!("{label} is not valid JSON: {e}"),
             )
             .with_file(label.clone())
-        })?
-    };
+        })?;
+    }
 
-    // Install edits the text in place, so every byte outside the managed entries stays (T-126).
-    // Uninstall still rewrites the parsed settings.
-    let (action_name, new_text) = match args.action {
-        HooksAction::Install => {
-            let text = install_hook_text(old_text).map_err(|msg| {
-                TodoError::new(ErrorCode::BadValue, msg).with_file(label.clone())
-            })?;
-            ("install", text)
-        }
-        HooksAction::Uninstall => {
-            uninstall_hooks(&mut root)?;
-            ("uninstall", format_preserving_style(old_text, &root)?)
-        }
+    // Both actions edit the text in place, so every byte outside the managed entries stays
+    // (T-126, T-130).
+    let (action_name, edited) = match args.action {
+        HooksAction::Install => ("install", install_hook_text(old_text)),
+        HooksAction::Uninstall => ("uninstall", uninstall_hook_text(old_text)),
     };
+    let new_text = edited
+        .map_err(|msg| TodoError::new(ErrorCode::BadValue, msg).with_file(label.clone()))?;
     let new_bytes = new_text.as_bytes();
-    let changed = old_bytes.as_deref() != Some(new_bytes);
+    // A missing file has nothing to remove, so uninstall does not create one.
+    let changed = match old_bytes.as_deref() {
+        Some(old) => old != new_bytes,
+        None => !new_bytes.is_empty(),
+    };
 
     if !ctx.yes || ctx.dry_run {
         let diff = TextDiff::from_lines(old_text, &new_text)
@@ -195,72 +189,6 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn uninstall_hooks(root: &mut Value) -> Result<()> {
-    let Some(root_obj) = root.as_object_mut() else {
-        return Ok(());
-    };
-    let Some(hooks_val) = root_obj.get_mut("hooks") else {
-        return Ok(());
-    };
-    let Some(hooks_obj) = hooks_val.as_object_mut() else {
-        return Ok(());
-    };
-
-    for event in HOOK_EVENTS {
-        if let Some(Value::Array(arr)) = hooks_obj.get_mut(event) {
-            arr.retain(|v| !is_managed_hook(v));
-        }
-        if hooks_obj
-            .get(event)
-            .and_then(|v| v.as_array())
-            .is_some_and(Vec::is_empty)
-        {
-            hooks_obj.remove(event);
-        }
-    }
-    if hooks_obj.is_empty() {
-        root_obj.remove("hooks");
-    }
-    Ok(())
-}
-
-fn format_preserving_style(old_text: &str, value: &Value) -> Result<String> {
-    let indent = detect_indent(old_text);
-    let eol = if old_text.contains("\r\n") {
-        "\r\n"
-    } else {
-        "\n"
-    };
-    let trailing_newline = if old_text.is_empty() {
-        true
-    } else {
-        old_text.ends_with('\n')
-    };
-
-    let mut buf = Vec::new();
-    let formatter = serde_json::ser::PrettyFormatter::with_indent(indent.as_bytes());
-    let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-    value.serialize(&mut ser).map_err(|e| {
-        TodoError::new(
-            ErrorCode::WriteFailed,
-            format!("failed serializing {SETTINGS_REL_PATH}: {e}"),
-        )
-    })?;
-    let mut rendered = String::from_utf8(buf).map_err(|e| {
-        TodoError::new(
-            ErrorCode::WriteFailed,
-            format!("serialized JSON is not UTF-8: {e}"),
-        )
-    })?;
-    if eol == "\r\n" {
-        rendered = rendered.replace('\n', "\r\n");
-    }
-    if trailing_newline {
-        rendered.push_str(eol);
-    }
-    Ok(rendered)
 }
 
 /// Ensures unused Path import warning doesn't trigger if refactored.
