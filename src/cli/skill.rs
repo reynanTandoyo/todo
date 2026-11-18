@@ -7,6 +7,7 @@ use clap::{Args as ClapArgs, Subcommand};
 use serde::Serialize;
 use similar::TextDiff;
 
+use crate::agents::project::SKILL_REL_PATH;
 use crate::agents::render_claude_skill;
 use crate::atomic::atomic_write_bytes;
 use crate::cli::{CommandKind, CommandMeta, Context};
@@ -14,8 +15,6 @@ use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::ops::require_yes_or_preview;
 use crate::output::Output;
-
-const SKILL_REL_PATH: &str = ".claude/skills/todo/SKILL.md";
 
 /// Metadata for the `skill` command.
 pub const META: CommandMeta = CommandMeta {

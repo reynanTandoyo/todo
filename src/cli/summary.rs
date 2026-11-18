@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use clap::Args as ClapArgs;
 use serde::Serialize;
 
+use crate::agents::project;
 use crate::cli::{CommandKind, CommandMeta, Context, load_read};
 use crate::doc::{EntryKind, Progress, Status};
 use crate::error::Result;
@@ -277,14 +278,16 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         return Ok(());
     }
 
-    let lines = format_summary_lines(&payload);
+    // Second line, so that the 40-line limit never hides it (R-MIG-2).
+    let project_line = project::out_of_date_line(&loaded.found.path);
+    let lines = format_summary_lines(&payload, project_line.as_deref());
     for line in lines {
         out.write_line(&line);
     }
     Ok(())
 }
 
-fn format_summary_lines(s: &SummaryJson) -> Vec<String> {
+fn format_summary_lines(s: &SummaryJson, project_line: Option<&str>) -> Vec<String> {
     let mut lines = Vec::new();
     lines.push(format!(
         "{}: {} total (open {}, claimed {}, blocked {}, done {}, dropped {})",
@@ -296,6 +299,9 @@ fn format_summary_lines(s: &SummaryJson) -> Vec<String> {
         s.counts.done,
         s.counts.dropped
     ));
+    if let Some(line) = project_line {
+        lines.push(line.to_string());
+    }
 
     if s.open_by_priority.is_empty() {
         lines.push("open by priority: none".to_string());

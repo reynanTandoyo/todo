@@ -1,5 +1,8 @@
 //! The agent rules text and agent setup commands (T-050, T-051, T-052).
 
+pub mod hooks_file;
+pub mod project;
+
 /// Opening marker for a tool-managed agent rules block (`docs/format.md` §12).
 pub const BEGIN_MARKER: &str = "<!-- todo:begin -->";
 
