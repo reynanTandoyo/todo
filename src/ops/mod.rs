@@ -60,9 +60,9 @@ pub use query::{
 };
 pub(crate) use read::load_for_read_with_found;
 pub use read::{
-    DependencyStatusJson, DependentTaskJson, ListTaskJson, LoadedRead, NoteJson, TaskJson,
-    build_list_task_json, build_task_json, file_label, is_task_ready, load_for_read,
-    questions_about, read_optional_archive,
+    DependencyStatusJson, DependentTaskJson, ListTaskJson, LoadedRead, MilestoneRefJson, NoteJson,
+    TaskJson, build_list_task_json, build_task_json, file_label, is_task_ready, load_for_read,
+    milestone_chain_json, questions_about, read_optional_archive,
 };
 pub use rules::{
     ClaimPlan, OwnershipDecision, ReleasePlan, StatusCommand, TaskCommand, allowed_commands_from,

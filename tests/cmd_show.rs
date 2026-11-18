@@ -158,7 +158,7 @@ fn show_lists_questions_about_a_task_or_milestone_in_text_and_json() {
     assert!(task_text.status.success(), "{}", stderr_text(&task_text));
     assert_eq!(
         stdout_text(&task_text),
-        "### T-002 · C shader\n- status: open\n- owner: —\n- priority: P1 · type: feature\n- milestone: T-001\n- note (2026-11-18, planner): added\n\nQuestions about T-002:\n- T-003 · open · Should the C shader support shadows?\n"
+        "### T-002 · C shader\n- status: open\n- owner: —\n- priority: P1 · type: feature\n- milestone: T-001\n- note (2026-11-18, planner): added\n\nQuestions about T-002:\n- T-003 · open · Should the C shader support shadows?\n\nMilestones above T-002, from the top down:\n- T-001 · Develop the renderer\n  goal: the test scene renders with lighting at 60 frames per second\n"
     );
 
     // Text: a milestone lists its own questions too, including a done one.

@@ -26,7 +26,8 @@ use crate::find::{
 };
 use crate::ops::edit_task_with_found_and_write;
 use crate::ops::{
-    NewlyReadyTask, OpEnv, OpsConfig, TaskJson, TaskOp, WriteTaskResult, edit_task_and_write,
+    MilestoneRefJson, NewlyReadyTask, OpEnv, OpsConfig, TaskJson, TaskOp, WriteTaskResult,
+    edit_task_and_write,
 };
 use crate::output::Output;
 
@@ -448,6 +449,25 @@ struct TaskReadyJson<'a> {
     task: &'a TaskJson,
     #[serde(skip_serializing_if = "<[NewlyReadyTask]>::is_empty")]
     newly_ready: &'a [NewlyReadyTask],
+}
+
+/// Writes the milestones above `task_id` in text, from the top down, each with its ID, title and
+/// goal (`R-MILE-4`). Writes nothing when there are none, so an entry without a milestone prints
+/// exactly what it printed before. The caller writes any blank line before the block.
+pub(crate) fn write_milestone_chain(
+    out: &mut Output,
+    task_id: &str,
+    milestones: &[MilestoneRefJson],
+) {
+    if milestones.is_empty() {
+        return;
+    }
+    out.write_line(&format!("Milestones above {task_id}, from the top down:"));
+    for milestone in milestones {
+        out.write_line(&format!("- {} \u{00B7} {}", milestone.id, milestone.title));
+        let goal = milestone.goal.as_deref().unwrap_or("-");
+        out.write_line(&format!("  goal: {goal}"));
+    }
 }
 
 /// Like [`report_task_ok`], also listing tasks that became ready (`done`, `drop`).
