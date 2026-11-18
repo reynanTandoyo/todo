@@ -157,7 +157,7 @@ fn plan_archive(archive_path: &Path, cfg: &OpsConfig) -> Result<Option<(ArchiveW
     let new_bytes = stamped_bytes(&migrated.doc, &cfg.archive_file)?;
     let write = ArchiveWrite {
         path: archive_path.to_path_buf(),
-        expected: snap.snapshot,
+        expected: Some(snap.snapshot),
         new_bytes,
     };
     Ok(Some((write, migrated.from, migrated.to)))

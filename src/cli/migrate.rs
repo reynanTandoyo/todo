@@ -145,6 +145,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 touched_tasks: Some(Vec::new()),
                 value: true,
                 migration,
+                archive: None,
             })
         },
     )?;

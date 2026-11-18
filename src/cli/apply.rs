@@ -328,6 +328,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 touched_tasks: None,
                 value: results,
                 migration,
+                archive: None,
             })
         },
     )?;

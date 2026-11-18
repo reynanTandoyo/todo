@@ -395,6 +395,7 @@ where
                         touched_tasks: Some(touched_tasks),
                         value: (true, val),
                         migration,
+                        archive: None,
                     })
                 }
             }

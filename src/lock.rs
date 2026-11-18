@@ -96,6 +96,8 @@ pub enum WriteOutcome<T> {
 
 /// Internal outcome allowing callers that already parsed both before and after documents
 /// to supply precomputed `touched_tasks` for the write journal (avoiding double re-parse).
+// One value is built and consumed per write, so the size of `Changed` costs nothing.
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum WriteOutcomeFull<T> {
     Unchanged(T),
     Changed {
@@ -104,6 +106,8 @@ pub(crate) enum WriteOutcomeFull<T> {
         value: T,
         /// The migration that this write applies to the file or its archive (R-MIG-1), if any.
         migration: Option<MigrationWrite>,
+        /// A change that this write makes to the archive file (R-ARCH-1), if any.
+        archive: Option<ArchiveWrite>,
     },
 }
 
@@ -117,14 +121,15 @@ pub(crate) struct MigrationWrite {
     pub archive: Option<ArchiveWrite>,
 }
 
-/// A whole-file replacement of the archive file, guarded by the snapshot it was read with.
+/// A whole-file write of the archive file: the file as it was read, with the new text in its place.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ArchiveWrite {
     /// Path of `TODO-archive.md`.
     pub path: PathBuf,
-    /// Snapshot of the archive file when it was read; the write fails if it changed since.
-    pub expected: FileSnapshot,
-    /// The migrated archive text.
+    /// Snapshot of the archive file when it was read; the write fails if it changed since. `None`
+    /// when the file did not exist, so the write creates it.
+    pub expected: Option<FileSnapshot>,
+    /// The archive text after the write.
     pub new_bytes: Vec<u8>,
 }
 
@@ -269,6 +274,7 @@ where
                     touched_tasks: None,
                     value,
                     migration: None,
+                    archive: None,
                 },
             })
         },
@@ -348,6 +354,7 @@ where
             touched_tasks,
             value,
             migration,
+            archive,
         } => {
             let before_sha_hex = read.snapshot.sha256_hex();
             let snap_timer = crate::timing::PhaseTimer::start("lock.record_snapshot");
@@ -361,10 +368,15 @@ where
                 cfg.snapshots_keep,
             )?;
             snap_timer.finish();
-            // A migrated archive is written after the snapshot and before TODO.md is replaced, so
-            // a failed archive write leaves TODO.md as it was (R-MIG-1).
-            if let Some(archive) = migration.as_ref().and_then(|m| m.archive.as_ref()) {
-                atomic::atomic_replace(&archive.path, &archive.expected, &archive.new_bytes)?;
+            // The archive file (changed by this write, or migrated in it) is written after the
+            // snapshot and before TODO.md is replaced, so a failed archive write leaves TODO.md as
+            // it was, and a snapshot that cannot be recorded leaves the archive as it was (R-MIG-1,
+            // R-ARCH-1).
+            let archive_writes = archive
+                .iter()
+                .chain(migration.as_ref().and_then(|m| m.archive.as_ref()));
+            for write in archive_writes {
+                write_archive_file(write)?;
             }
             let replace_timer = crate::timing::PhaseTimer::start("lock.atomic_replace");
             atomic::atomic_replace(todo_path, &read.snapshot, &new_bytes)?;
@@ -406,6 +418,15 @@ where
             drop(guard);
             Ok(value)
         }
+    }
+}
+
+/// Writes one archive file of a write: replaces it when it was read (guarded by its snapshot), or
+/// creates it when it did not exist.
+fn write_archive_file(write: &ArchiveWrite) -> Result<()> {
+    match &write.expected {
+        Some(expected) => atomic::atomic_replace(&write.path, expected, &write.new_bytes),
+        None => atomic::atomic_write_bytes(&write.path, &write.new_bytes),
     }
 }
 
