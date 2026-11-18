@@ -141,6 +141,36 @@ fn ask_about_writes_about_line_after_the_type_line_and_json_names_the_entry() {
 }
 
 #[test]
+fn ask_writes_the_note_added_as_format_section_9_says() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _) = setup_proj(&tmp, ABOUT_BASE);
+
+    let out = run_todo(
+        &home,
+        &work,
+        &["--agent", "agent-1", "ask", "Plain question?"],
+        &[],
+    )
+    .unwrap();
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
+
+    // docs/format.md §9: `add`, `ask` and `idea` write the note `added`.
+    let text = read_todo(&work);
+    let question = text
+        .split("### T-002 ")
+        .nth(1)
+        .expect("the question T-002 is in TODO.md");
+    let note = question
+        .lines()
+        .find(|line| line.starts_with("- note ("))
+        .expect("the question has a note");
+    assert!(
+        note.ends_with(", agent-1): added"),
+        "unexpected note: {note}"
+    );
+}
+
+#[test]
 fn ask_about_refuses_an_unknown_id_and_leaves_the_file_and_ids_alone() {
     let tmp = TempDir::new().unwrap();
     let (home, work, _) = setup_proj(&tmp, ABOUT_BASE);

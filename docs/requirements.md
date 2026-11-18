@@ -782,8 +782,9 @@ todo tree T-010
   `question` a question, `idea` an idea, and any other type, or none, a task (format.md §16).
   Milestones and tasks are work; questions and ideas are not. Commands keep the kinds apart: only
   tasks are handed out by `next` and counted as open work; `summary`, `tree`, `overview` and the HTML
-  report show questions, ideas, done entries and dropped entries apart from open work; and
-  `list --kind <list>` filters by kind.
+  report show questions, ideas, done entries and dropped entries apart from open work; `summary`'s
+  status counts and `total` count tasks only, and its `counts.questions` and `counts.ideas` count the
+  open questions and ideas apart; and `list --kind <list>` filters by kind.
 
 ### 5.22 Versions and migration — VER, MIG
 

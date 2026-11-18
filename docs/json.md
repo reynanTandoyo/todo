@@ -40,34 +40,17 @@ When `--dry-run` is active on a write command, `"dry_run": true` and `"diff": ".
 
 ## Shared `TaskJson` Shape
 
-Returned by `show` (plus `block_lines`), `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, and `next.task`:
+Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, and as `next.task`. The example is the `show` output under "`todo show <task> --json`" below, which lists every key. Every key is always present: a value that is not set is `null`, and a list or an object with nothing in it is `[]` or `{}`.
 
-```json
-{
-  "id": "T-012",
-  "title": "Add retry logic",
-  "status": "claimed",
-  "owner": "agent-1",
-  "priority": "P1",
-  "difficulty": "hard",
-  "type": "feature",
-  "area": "cli",
-  "depends": ["T-003"],
-  "claimed": "2026-11-15T18:00+01:00",
-  "stale": false,
-  "ready": false,
-  "section": "Tasks",
-  "line_start": 42,
-  "line_end": 49,
-  "notes": [
-    {
-      "date": "2026-11-15",
-      "author": "agent-1",
-      "text": "started work"
-    }
-  ]
-}
-```
+- `type` is the `type` field as written; `section` is the `##` section the entry is under, or `null`.
+- `archived` is `true` for an entry read from `TODO-archive.md`.
+- `stale` is `true` when the claim is past its timeout (`R-CLAIM-4`); `ready` is `true` when `next` could hand the entry out now.
+- `milestones` lists the milestones above the entry, from the top down, with `goal` and `status`; `milestone` is the parent as written.
+- `children` lists the entries whose `milestone` is this entry, with `kind` (`task` or `milestone`).
+- `depends` holds the dependency tokens as written. `dependencies` has one entry per token: `raw`, `id`, `exists`, `archived`, `status`, `title` and `satisfied` (`true` when the target is done or dropped; `null` and `false` when it does not exist).
+- `dependents` lists the tasks whose `depends` names this entry; `questions` the questions whose `about` names it (`R-KIND-2`).
+- `fields` holds the unknown `key: value` fields as written.
+- `notes` has `date`, `agent`, `text` and `line`, the 1-based line of the note in the file. `line_start` and `line_end` are the 1-based first and last lines of the block.
 
 ---
 
@@ -186,36 +169,62 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
 
 ### `todo show <task> --json` (`todo.show.v1`)
 
+`data` is the Shared `TaskJson` shape, for the milestone `T-011`. The fixture has a parent milestone (`T-010`), a dependency (`T-003`), a dependent (`T-020`), a question about it (`T-005`) and a task below it (`T-012`):
+
 ```json
 {
   "schema": "todo.show.v1",
   "ok": true,
   "data": {
-    "id": "T-001",
-    "title": "First task",
+    "id": "T-011",
+    "title": "Lighting",
+    "section": "Tasks",
+    "archived": false,
     "status": "open",
     "owner": null,
-    "priority": "P1",
-    "difficulty": null,
-    "type": null,
-    "area": null,
-    "depends": [],
     "claimed": null,
     "stale": false,
-    "ready": true,
-    "section": "Tasks",
-    "line_start": 7,
-    "line_end": 11,
-    "archived": false,
-    "block_lines": ["### T-001 · First task", "- status: open"],
-    "depends_on": [
-      { "id": "T-000", "status": "done", "title": "Setup", "found": true, "archived": false }
+    "priority": "P1",
+    "difficulty": null,
+    "type": "milestone",
+    "area": null,
+    "goal": "point and directional lights match the reference images",
+    "milestone": "T-010",
+    "milestones": [
+      { "id": "T-010", "title": "Develop the renderer", "goal": "the test scene renders with lighting at 60 frames per second", "status": "open" }
     ],
-    "waiting_on_this": []
+    "children": [
+      { "id": "T-012", "title": "C shader", "kind": "task", "status": "open" }
+    ],
+    "why": null,
+    "depends": ["T-003"],
+    "dependencies": [
+      { "raw": "T-003", "id": "T-003", "exists": true, "archived": false, "status": "done", "title": "Setup", "satisfied": true }
+    ],
+    "dependents": [
+      { "id": "T-020", "title": "Ship lighting", "status": "open", "archived": false }
+    ],
+    "questions": [
+      { "id": "T-005", "title": "Are shadows in scope?", "status": "open", "archived": false }
+    ],
+    "ready": false,
+    "files": null,
+    "problem": null,
+    "fix": null,
+    "accept": null,
+    "commit": [],
+    "fields": {},
+    "notes": [
+      { "date": "2026-11-15", "agent": "planner", "text": "added", "line": 27 }
+    ],
+    "line_start": 20,
+    "line_end": 27
   },
   "warnings": []
 }
 ```
+
+`warnings` holds the warnings that the text output prints on standard error.
 
 ### `todo next --json` (`todo.next.v1`)
 
@@ -243,7 +252,7 @@ When no ready task exists, `"found": false, "task": null`.
   "ok": true,
   "data": {
     "file": "TODO.md",
-    "counts": { "open": 2, "claimed": 1, "blocked": 1, "done": 3, "dropped": 0, "total": 7 },
+    "counts": { "open": 2, "claimed": 1, "blocked": 1, "done": 3, "dropped": 0, "total": 7, "questions": 1, "ideas": 1 },
     "open_by_priority": [{ "priority": "P0", "count": 1 }],
     "milestones": [{ "id": "T-010", "title": "Develop the renderer", "priority": "P1", "status": "open", "progress": { "done": 1, "total": 3 } }],
     "claimed": [
@@ -258,6 +267,8 @@ When no ready task exists, `"found": false, "task": null`.
 ```
 
 `ready_to_close` (`R-MILE-6`) lists the milestones that are ready to close, as `{ "id", "title" }`; the key is left out when there are none.
+
+`counts` covers tasks only: `open`, `claimed`, `blocked`, `done`, `dropped` and `total` (their sum) leave out milestones, which are listed under `milestones`. `questions` and `ideas` count the open ones (not done or dropped) apart from the rest (`R-KIND-3`, `R-KIND-1`); the open questions are listed in `open_questions`.
 
 ### `todo tree --json` (`todo.tree.v1`)
 
@@ -310,20 +321,33 @@ ones only for the whole tree (no milestone argument and no `--area`); otherwise 
   "schema": "todo.where.v1",
   "ok": true,
   "data": {
-    "todo_file": "C:\\Project\\todo\\TODO.md",
-    "found_by": "git_worktree_main",
-    "state_dir": "C:\\Project\\todo\\.git\\todo\\TODO.md",
-    "archive_file": "C:\\Project\\todo\\TODO-archive.md",
-    "archive_exists": false,
-    "config_file": "C:\\Project\\todo\\todo.toml",
-    "config_exists": false
+    "file": "C:\\Project\\todo\\TODO.md",
+    "found_by": "worktree-main",
+    "repo_root": "C:\\Project\\todo",
+    "state_dir": "C:\\Project\\todo\\.git\\todo\\todo.md",
+    "write_lock": { "held": false },
+    "format_version": 2,
+    "tool_stamp": "0.6.0",
+    "running_version": "0.6.0",
+    "counts": { "open": 10, "claimed": 4, "blocked": 0, "done": 27, "dropped": 3, "total": 44 }
   },
   "warnings": []
 }
 ```
 
-When the format version is newer than this todo knows, `where` still succeeds but leaves out
-`counts`, because the tasks are not read (R-VER-2).
+- `file` is the `TODO.md` in use and `found_by` says how it was found (`flag`, `env`, `walk`,
+  `worktree-main`, ...). `repo_root` is the git repository root, or `null` outside a repository.
+- `state_dir` is the folder that holds the lock and the state files. `write_lock.held` is `true`
+  while a command holds the write lock; then `write_lock` also has `holder` with `agent`,
+  `command`, `pid` and `started_at`.
+- `lease` is present only while a manual lease (`todo lock`) is active: `agent`, `started_at`,
+  `expires_at` and `remaining_seconds`.
+- `format_version` is the version in the format line (`format.md` §4), or `null` when the file has
+  none. `tool_stamp` is the version in the tool line (`R-VER-1`), or `null` when there is none, and
+  `running_version` is the version of the todo that ran. When the stamp is newer than
+  `running_version`, a warning says to run `todo help update`.
+- `counts` holds the number of entries per status. When the format version is newer than this todo
+  knows, `where` still succeeds but leaves out `counts`, because the tasks are not read (R-VER-2).
 
 ### `todo check --json` (`todo.check.v1`)
 

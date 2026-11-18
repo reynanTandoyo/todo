@@ -113,3 +113,86 @@ fn summary_on_5000_tasks_is_at_most_40_lines() {
     );
     assert!(stdout.contains("5000 total"));
 }
+
+#[test]
+fn summary_counts_only_tasks_and_counts_questions_and_ideas_apart() {
+    // R-KIND-3: milestones and tasks are work, but only tasks are counted as open work and in the
+    // task total; questions and ideas are shown apart from both.
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(
+        dir.path().join("TODO.md"),
+        "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 2 -->
+# Kinds Fixture
+
+## Tasks
+
+### T-001 · Develop the renderer
+- status: open
+- owner: —
+- priority: P1 · type: milestone
+- goal: the test scene renders
+
+### T-002 · Shader task
+- status: open
+- owner: —
+- priority: P1 · type: feature
+- milestone: T-001
+
+### T-003 · Finished task
+- status: done
+- owner: —
+- priority: P2 · type: feature
+- milestone: T-001
+
+## Questions
+
+### T-004 · Should the shader support shadows?
+- status: open
+- owner: —
+- priority: P0 · type: question
+- about: T-002
+
+## Ideas
+
+### T-005 · Hot-reload shaders
+- status: open
+- owner: —
+- type: idea
+",
+    )
+    .expect("write TODO.md");
+
+    let out = run_in(dir.path(), &["summary", "--json"]);
+    assert!(
+        out.status.success(),
+        "summary --json failed: {}",
+        stderr_text(&out)
+    );
+    let json: Value = parse_json(&out.stdout);
+    let data = &json["data"];
+    assert_eq!(data["counts"]["open"], 1, "{data}");
+    assert_eq!(data["counts"]["done"], 1, "{data}");
+    assert_eq!(data["counts"]["total"], 2, "{data}");
+    assert_eq!(data["counts"]["questions"], 1, "{data}");
+    assert_eq!(data["counts"]["ideas"], 1, "{data}");
+    assert_eq!(data["open_by_priority"].as_array().map(Vec::len), Some(1));
+    assert_eq!(data["open_by_priority"][0]["priority"], "P1");
+    assert_eq!(data["open_by_priority"][0]["count"], 1);
+    assert_eq!(data["next_ready"].as_array().map(Vec::len), Some(1));
+    assert_eq!(data["next_ready"][0]["id"], "T-002");
+    assert_eq!(data["open_questions"][0]["id"], "T-004");
+
+    let out = run_in(dir.path(), &["summary"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let stdout = stdout_text(&out);
+    assert!(
+        stdout.starts_with("TODO.md: 2 total (open 1, claimed 0, blocked 0, done 1, dropped 0)\n"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("open by priority: P1=1\n"), "{stdout}");
+    assert!(stdout.contains("ideas: 1 "), "{stdout}");
+    assert!(stdout.contains("open questions (1):"), "{stdout}");
+    assert!(stdout.contains("milestones (1):"), "{stdout}");
+}

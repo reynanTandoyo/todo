@@ -217,7 +217,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             }
 
             let date = OpsConfig::format_note_date(now);
-            lines.push(format!("- note ({date}, {agent}): asked"));
+            lines.push(format!("- note ({date}, {agent}): added"));
 
             let edit = LineEdit::insert(insert_at, lines);
             let intent = TaskChangeIntent::add_one(new_id);
