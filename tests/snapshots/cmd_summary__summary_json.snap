@@ -34,6 +34,7 @@ expression: json
       "claimed": 2,
       "done": 1,
       "dropped": 1,
+      "ideas": 0,
       "open": 2,
       "total": 7
     },

@@ -22,6 +22,9 @@ pub const DEFAULT_ARCHIVE_FILE: &str = "TODO-archive.md";
 /// Default `question_section` name from requirements §5.14 (`R-WRITE-11`).
 pub const DEFAULT_QUESTION_SECTION: &str = "Questions";
 
+/// Default `idea_section` name from requirements §5.14 (`R-KIND-1`).
+pub const DEFAULT_IDEA_SECTION: &str = "Ideas";
+
 /// Default `snapshots_keep` count from requirements §5.14 (`R-HIST-2`).
 pub const DEFAULT_SNAPSHOTS_KEEP: u64 = 200;
 
@@ -47,6 +50,8 @@ pub struct OpsConfig {
     pub default_section: Option<String>,
     /// Section name for `todo ask` (`R-WRITE-11`, default `"Questions"`).
     pub question_section: String,
+    /// Section name for `todo idea` (`R-KIND-1`, default `"Ideas"`).
+    pub idea_section: String,
     /// File name of the archive file next to `TODO.md` (`format.md` §14).
     pub archive_file: String,
     /// Number of hours before a claim becomes stale (`R-CLAIM-4`).
@@ -75,6 +80,7 @@ impl Default for OpsConfig {
             difficulties: vec!["easy".to_string(), "medium".to_string(), "hard".to_string()],
             default_section: None,
             question_section: DEFAULT_QUESTION_SECTION.to_string(),
+            idea_section: DEFAULT_IDEA_SECTION.to_string(),
             archive_file: DEFAULT_ARCHIVE_FILE.to_string(),
             claim_ttl_hours: DEFAULT_CLAIM_TTL_HOURS,
             lock: LockConfig::default(),
@@ -297,6 +303,14 @@ impl OpsConfig {
                         return Err(toml_err(line, "question_section must not be empty"));
                     }
                     cfg.question_section = trimmed.to_string();
+                }
+                "idea_section" => {
+                    let s = expect_string(&key, val, line)?;
+                    let trimmed = s.trim();
+                    if trimmed.is_empty() {
+                        return Err(toml_err(line, "idea_section must not be empty"));
+                    }
+                    cfg.idea_section = trimmed.to_string();
                 }
                 "archive_file" => {
                     let s = expect_string(&key, val, line)?;

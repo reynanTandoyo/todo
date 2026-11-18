@@ -26,6 +26,9 @@ pub const CANONICAL_FIELD_ORDER: &[&str] = &[
     "difficulty",
     "type",
     "area",
+    "milestone",
+    "about",
+    "goal",
     "depends",
     "files",
     "problem",
@@ -33,6 +36,9 @@ pub const CANONICAL_FIELD_ORDER: &[&str] = &[
     "accept",
     "commit",
 ];
+
+/// Number of known fields tracked for repeated-field detection (`known_field_index`).
+const KNOWN_FIELD_SLOTS: usize = 15;
 
 /// Accepted heading separators between `<ID>` and `<title>` (`docs/format.md` §6),
 /// canonical separator first.
@@ -359,6 +365,16 @@ pub struct Task {
     /// Where `difficulty` is defined, if present.
     pub difficulty_loc: Option<FieldLocation>,
 
+    /// Parent milestone as written in `milestone` (`docs/format.md` §17), if present.
+    pub milestone: Option<String>,
+    /// Where `milestone` is defined, if present.
+    pub milestone_loc: Option<FieldLocation>,
+
+    /// Goal of a milestone (`docs/format.md` §8), if present.
+    pub goal: Option<String>,
+    /// Where `goal` is defined, if present.
+    pub goal_loc: Option<FieldLocation>,
+
     /// Parsed dependency references from `- depends:`.
     pub depends: Vec<DependencyRef>,
     /// Raw `- depends:` value, if present.
@@ -483,6 +499,8 @@ impl Task {
             "difficulty" => self.difficulty.as_deref(),
             "type" => self.task_type.as_deref(),
             "area" => self.area.as_deref(),
+            "milestone" => self.milestone.as_deref(),
+            "goal" => self.goal.as_deref(),
             "depends" => self.depends_raw.as_deref(),
             "files" => self.files.as_deref(),
             "problem" => self.problem.as_deref(),
@@ -1210,6 +1228,10 @@ fn parse_task_block(
         task_type_loc: None,
         area: None,
         area_loc: None,
+        milestone: None,
+        milestone_loc: None,
+        goal: None,
+        goal_loc: None,
         depends: Vec::new(),
         depends_raw: None,
         depends_line: None,
@@ -1229,12 +1251,12 @@ fn parse_task_block(
         notes: Vec::new(),
     };
 
-    let mut seen_known = [0usize; 13];
+    let mut seen_known = [0usize; KNOWN_FIELD_SLOTS];
     let mut seen_unknown: Vec<(String, usize)> = Vec::new();
 
     let check_and_mark_seen = |key: &str,
                                line_no: usize,
-                               seen_known: &mut [usize; 13],
+                               seen_known: &mut [usize; KNOWN_FIELD_SLOTS],
                                seen_unknown: &mut Vec<(String, usize)>|
      -> Option<usize> {
         if let Some(slot) = known_field_index(key) {
@@ -1378,6 +1400,14 @@ fn parse_task_block(
                                 task.area = non_empty_string(part_val);
                                 task.area_loc = Some(FieldLocation::CombinedPriority(idx));
                             }
+                            "milestone" => {
+                                task.milestone = non_empty_string(part_val);
+                                task.milestone_loc = Some(FieldLocation::CombinedPriority(idx));
+                            }
+                            "goal" => {
+                                task.goal = non_empty_string(part_val);
+                                task.goal_loc = Some(FieldLocation::CombinedPriority(idx));
+                            }
                             _ => {
                                 task.unknown_fields.push(FieldEntry {
                                     key: part_key.clone(),
@@ -1412,6 +1442,22 @@ fn parse_task_block(
                         Some(owned_val)
                     };
                     task.area_loc = Some(FieldLocation::OwnLine(idx));
+                }
+                "milestone" => {
+                    task.milestone = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
+                    task.milestone_loc = Some(FieldLocation::OwnLine(idx));
+                }
+                "goal" => {
+                    task.goal = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
+                    task.goal_loc = Some(FieldLocation::OwnLine(idx));
                 }
                 "depends" => {
                     task.depends = parse_depends_list(value_str, id_config);
@@ -1487,6 +1533,8 @@ const fn known_field_index(key: &str) -> Option<usize> {
         b"accept" => Some(10),
         b"commit" => Some(11),
         b"difficulty" => Some(12),
+        b"milestone" => Some(13),
+        b"goal" => Some(14),
         _ => None,
     }
 }

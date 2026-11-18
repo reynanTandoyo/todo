@@ -19,7 +19,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "next",
     summary: "Pick the next ready task (optionally claiming it atomically)",
     kind: CommandKind::Read,
-    details: "Selects the highest-priority ready task (open or stale claimed, with all dependencies done or dropped, excluding `type: question`), breaking ties by file order. When `--agent` or `TODO_AGENT` is set, returns the agent's own existing claim first unless `--new` is passed. With `--claim`, picks and claims atomically inside a single write lock.",
+    details: "Selects the highest-priority ready task (open or stale claimed, with all dependencies done or dropped, excluding questions, ideas and milestones), breaking ties by file order. When `--agent` or `TODO_AGENT` is set, returns the agent's own existing claim first unless `--new` is passed. With `--claim`, picks and claims atomically inside a single write lock.",
     examples: &[
         "todo next",
         "todo next --agent agent-1",

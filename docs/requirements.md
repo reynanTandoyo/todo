@@ -667,10 +667,13 @@ todo tree T-010
     refer to an entry with `about` instead (R-KIND-1, R-KIND-2).
   - The tree is logical: entries stay where they are in the file, in any section, and only the
     `milestone` field links them (format.md §17).
+  - `<task>` may be an ID or a title, as elsewhere; the file stores the ID. An empty value is
+    refused (`BAD_VALUE`); `set --unset milestone` makes an entry top-level.
   - Refused with exit 1, leaving the file byte-identical: a parent that doesn't exist
     (`NOT_FOUND`); a parent that isn't a milestone (`BAD_VALUE`); a change that would make a
     milestone its own ancestor (`BAD_VALUE`); `set --type` that turns a milestone with entries
-    below it into another kind (`BAD_VALUE`).
+    below it into another kind (`BAD_VALUE`); a question or idea that names a milestone
+    (`BAD_VALUE`).
 - **R-MILE-2 COULD** Milestones in the status rules (R-WRITE-9):
   - A milestone is open, blocked, done or dropped, never claimed. `next` and `list --ready` never
     return one, and `claim` of one is refused (exit 1, `BAD_TRANSITION`).
@@ -679,7 +682,7 @@ todo tree T-010
     (format.md §9). `drop` without `--tree` is refused in the same case and names `drop --tree`.
   - `drop --tree <milestone> --note T` drops the milestone and every entry below it that isn't done
     or dropped, in one locked step; the claim rules (R-CLAIM-3) apply to each entry, so another
-    agent's claim needs `--force`.
+    agent's claim needs `--force`. `--tree` on a task is refused (`BAD_VALUE`).
   - `set --milestone <task>` moves an entry, with everything below it, to another parent; only the
     entry's own `milestone` line changes. `set --unset milestone` makes it top-level.
   - `show --json` returns `goal`, `milestone`, the chain of parents (`milestones`, R-MILE-4) and the
@@ -703,7 +706,12 @@ todo tree T-010
 - **R-MILE-5 COULD** `check` reports, each with its line: a `milestone` field naming a missing ID, or
   an entry that isn't a milestone; a cycle of milestones; a done or dropped milestone with an entry
   below it still open, claimed or blocked; a milestone without a goal; an `about` field naming a
-  missing ID (R-KIND-2).
+  missing ID (R-KIND-2). An ID is missing only when neither `TODO.md` nor `TODO-archive.md` holds it
+  (R-DEP-3). The line is the one that holds the problem: the `milestone` or `about` line for a bad
+  reference; the `milestone` line of the entry that closes a cycle; the heading of a milestone without
+  a goal; the heading of a done or dropped milestone with unfinished entries below it (the message
+  lists them); and the heading of an unfinished entry whose milestone is archived as done or dropped
+  (R-ARCH-2).
 - **R-MILE-6 COULD** Work is handed out along the tree:
   - A task is ready only when its own dependencies and those of every milestone above it are
     finished (R-DEP-1), and no milestone above it is blocked, done or dropped.
@@ -720,13 +728,22 @@ todo tree T-010
 ### 5.21 Kinds of entry — KIND
 
 - **R-KIND-1 COULD** Ideas are kept without being handed out as work.
-  `todo idea <text> [--about <task>]` adds an entry with `type: idea` to the section named by
-  `idea_section` (default `Ideas`, added at the end of the file if missing); it needs no priority,
-  whatever `required_fields` says. `next` never returns an idea, and `summary` counts ideas apart
-  from open tasks. `promote <idea> --priority P [--milestone <task>] [--section S]` turns an idea
-  into an ordinary task: it removes `type: idea`, sets the priority (and the milestone), moves the
-  entry to the end of section S when given (as `move` does) and adds a note (format.md §9).
-  `promote` of an entry that isn't an idea is refused (exit 1, `BAD_TRANSITION`).
+  `todo idea <text> [--about <task>]` adds an entry with `type: idea` and the note `added` to the
+  section named by `idea_section` (default `Ideas`, added at the end of the file if missing). It
+  needs no priority, whatever `required_fields` says. A title equal to that of an active task is
+  refused (`DUPLICATE_TITLE`, as `add` and `ask` do), and an `--about` ID that doesn't exist is
+  refused (exit 1, `NOT_FOUND`, as `ask --about` is, R-KIND-2); the file is left unchanged.
+  `next` never returns an idea, not even one already claimed by the asking agent. `summary` counts
+  the ideas that are not done or dropped apart from the work: they are left out of `total` and
+  the status and priority counts, shown as `ideas: N` in text and as `counts.ideas` in JSON.
+  `promote <idea> --priority P [--milestone <task>] [--section S]` turns an idea into an ordinary
+  task: `--priority` is required and must be a configured priority; it removes `type: idea`, sets
+  the priority and the milestone (which must name a milestone: `NOT_FOUND` when missing,
+  `BAD_VALUE` when it names another kind of entry), keeps `about`, and adds the note
+  `promoted from idea` (format.md §9). The status and owner don't change, and the ownership rule of
+  `set` applies (R-CLAIM-3). `--section S` moves the entry to the end of section S in the same
+  write, as `move` does; without it the entry stays where it is. `promote` of an entry that isn't
+  an idea is refused (exit 1, `BAD_TRANSITION`) and the file is left unchanged.
 - **R-KIND-2 COULD** Questions can refer to the entry they are about.
   `ask <question> --about <task>` writes `- about: <ID>`, and is refused (exit 1, `NOT_FOUND`) when
   that ID doesn't exist in `TODO.md` or `TODO-archive.md`. `--about` takes an ID (`T-002`, `t2`),

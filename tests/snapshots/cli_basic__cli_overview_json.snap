@@ -102,6 +102,11 @@ expression: ok_json
         "summary": "Install or uninstall Claude Code hooks in .claude/settings.json"
       },
       {
+        "kind": "write",
+        "name": "idea",
+        "summary": "Record an idea, which is not work until promoted"
+      },
+      {
         "kind": "meta",
         "name": "import",
         "summary": "Convert a Markdown checkbox list into a TODO.md"
@@ -150,6 +155,11 @@ expression: ok_json
         "kind": "write",
         "name": "note",
         "summary": "Add a dated note to a task"
+      },
+      {
+        "kind": "write",
+        "name": "promote",
+        "summary": "Turn an idea into a task"
       },
       {
         "kind": "write",

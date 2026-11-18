@@ -19,8 +19,8 @@ use crate::find::{fs_path, synced_folder_warning};
 use crate::lock::{WriteOutcomeFull, current_time, locked_read_modify_write_full};
 use crate::ops::{
     NewTask, OpEnv, OpsConfig, OwnershipDecision, SetChange, TaskCommand, TaskOp, check_ownership,
-    check_task_writable, file_label, forced_note_text, highest_task_number, parse_doc_for_write, read_optional_archive,
-    resolve_task_in_doc,
+    check_task_writable, file_label, forced_note_text, highest_task_number, milestone,
+    parse_doc_for_write, read_optional_archive, resolve_task_in_doc,
 };
 use crate::ops::identity::done_by;
 use crate::ops::migrate::PendingMigration;
@@ -87,6 +87,8 @@ enum ApplyOp {
         #[serde(rename = "type")]
         task_type: Option<String>,
         area: Option<String>,
+        milestone: Option<String>,
+        goal: Option<String>,
         depends: Option<DependsValue>,
         files: Option<String>,
         problem: Option<String>,
@@ -131,6 +133,8 @@ enum ApplyOp {
         #[serde(rename = "type")]
         task_type: Option<String>,
         area: Option<String>,
+        milestone: Option<String>,
+        goal: Option<String>,
         depends: Option<DependsValue>,
         files: Option<String>,
         problem: Option<String>,
@@ -472,6 +476,8 @@ fn apply_one_op(
             difficulty,
             task_type,
             area,
+            milestone,
+            goal,
             depends,
             files,
             problem,
@@ -486,6 +492,33 @@ fn apply_one_op(
                     format!("operation #{op_num} (add): title cannot be empty"),
                 ));
             }
+            // The parent may be an `@ref` to an earlier operation, which is already in `doc`.
+            let milestone_src = milestone
+                .as_deref()
+                .or_else(|| fields.get("milestone").map(String::as_str))
+                .map(str::trim)
+                .filter(|m| !m.is_empty());
+            let goal_src = goal
+                .as_deref()
+                .or_else(|| fields.get("goal").map(String::as_str))
+                .map(str::trim)
+                .filter(|g| !g.is_empty());
+            let milestone_id = match milestone_src {
+                Some(raw) => {
+                    let target = resolve_task_ref(raw, refs)?;
+                    Some(
+                        milestone::check_parent(doc, cfg, None, &target)
+                            .map_err(|e| at_operation(e, op_num, "add"))?,
+                    )
+                }
+                None => None,
+            };
+            milestone::check_new_entry_fields(
+                task_type.as_deref(),
+                milestone_id.as_deref(),
+                goal_src,
+            )
+            .map_err(|e| at_operation(e, op_num, "add"))?;
             let section_idx = resolve_target_section(doc, section.as_deref(), cfg)?;
             let sec = &doc.sections[section_idx];
             *highest_id = highest_id
@@ -524,6 +557,8 @@ fn apply_one_op(
                 difficulty: difficulty.as_deref(),
                 task_type: trim(task_type),
                 area: trim(area),
+                milestone: milestone_id.as_deref(),
+                goal: goal_src,
                 depends: dep_str.as_deref(),
                 files: trim(files),
                 problem: trim(problem),
@@ -599,6 +634,12 @@ fn apply_one_op(
     }
 }
 
+/// Names the operation in a refusal, as the other `apply` errors do (R-WRITE-15).
+fn at_operation(mut err: TodoError, op_num: usize, name: &str) -> TodoError {
+    err.message = format!("operation #{op_num} ({name}): {}", err.message);
+    err
+}
+
 /// A field value trimmed, if present.
 fn trim(v: &Option<String>) -> Option<&str> {
     v.as_deref().map(str::trim)
@@ -642,6 +683,7 @@ fn apply_task_op(
     done_by: Option<&str>,
 ) -> Result<(&'static str, String, Vec<LineEdit>, TaskChangeIntent)> {
     let mut dep_owned = String::new();
+    let mut milestone_owned = String::new();
     let mut changes: Vec<SetChange<'_>> = Vec::new();
     let (raw_task, task_op) = match op {
         ApplyOp::Claim { task } => (task, TaskOp::Claim),
@@ -687,6 +729,8 @@ fn apply_task_op(
             difficulty,
             task_type,
             area,
+            milestone,
+            goal,
             depends,
             files,
             problem,
@@ -696,6 +740,9 @@ fn apply_task_op(
         } => {
             if let Some(dep) = depends {
                 dep_owned = resolve_depends(dep, refs)?;
+            }
+            if let Some(m) = milestone {
+                milestone_owned = resolve_task_ref(m.trim(), refs)?;
             }
             if let Some(t) = title {
                 changes.push(SetChange::Title(t.trim()));
@@ -710,6 +757,12 @@ fn apply_task_op(
                 if let Some(v) = value {
                     changes.push(SetChange::Field(key, v.trim()));
                 }
+            }
+            if milestone.is_some() {
+                changes.push(SetChange::Field("milestone", &milestone_owned));
+            }
+            if let Some(g) = goal {
+                changes.push(SetChange::Field("goal", g.trim()));
             }
             if depends.is_some() {
                 changes.push(if dep_owned.is_empty() {
