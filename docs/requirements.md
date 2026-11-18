@@ -478,7 +478,11 @@ or with `--json` the task as it is after the change.
 
 - **R-ARCH-1 SHOULD** `archive [--older-than DAYS] --yes` moves done and dropped tasks into
   `TODO-archive.md` (format.md §14), under the same lock. `show`, `list --archive`,
-  `search --archive` and dependency checks still find archived tasks.
+  `search --archive` and dependency checks still find archived tasks. A read-only `TODO.md` is
+  refused with exit 4 before the archive is written. If `TODO.md` still cannot be replaced after
+  the archive was written (another program changed it, or the rename fails), the archive is put
+  back as it was (a new archive is removed), so a moved task is never in both files; the error says
+  so if the archive itself cannot be put back.
 - **R-ARCH-2 COULD** `archive` keeps milestone trees whole (R-MILE-1). An entry that has a milestone
   is moved only when its top-level milestone is done or dropped and nothing in that tree is still
   open, claimed or blocked; then the whole tree (the top-level milestone and every entry below it,
@@ -824,7 +828,8 @@ todo tree T-010
     they are (format.md §18).
   - A write command on a file in an older format first applies every pending step, under the same
     lock (R-LOCK-1) and in the same write, after the usual snapshot (R-HIST-2), then makes its own
-    change; the format line and the stamp are raised. The archive file is migrated in the same step.
+    change; the format line and the stamp are raised. The archive file is migrated in the same step,
+    and if `TODO.md` then cannot be replaced, the migrated archive is put back as it was (R-ARCH-1).
   - The migrated text must parse without problems that block writing (format.md §13), the
     file-wide ones; a task problem keeps to the command that changes that task, as for any write.
     Otherwise nothing is written and the command exits 4. One line on standard error and one journal
