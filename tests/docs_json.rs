@@ -196,3 +196,57 @@ fn where_example_in_json_md_has_the_keys_of_where_json() {
     assert_eq!(example["schema"], real["schema"]);
     assert_same_keys(&example["data"], &real["data"], "where --json");
 }
+
+/// Fixture for the `next` example: one open task, which `next` hands out.
+const NEXT_FIXTURE: &str = "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 2 -->
+# Fixture
+
+## Tasks
+
+### T-001 · Write the parser
+- status: open
+- owner: —
+- priority: P1 · difficulty: easy · type: feature · area: cli
+- why: the reader needs it first
+- note (2026-11-15, planner): added
+";
+
+#[test]
+fn next_example_in_json_md_has_the_keys_of_next_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo next --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(dir.path().join("TODO.md"), NEXT_FIXTURE).expect("write TODO.md");
+    let out = run_in(dir.path(), &["next", "--json"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "next --json");
+    assert_same_keys(
+        &example["data"]["task"],
+        &real["data"]["task"],
+        "next --json task",
+    );
+}
+
+#[test]
+fn next_json_has_a_null_task_when_nothing_is_ready() {
+    // The example says so in json.md: with no ready task, `task` is null and both flags are false.
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(
+        dir.path().join("TODO.md"),
+        "<!-- todo-format: 2 -->\n\n## Tasks\n",
+    )
+    .expect("write TODO.md");
+    let out = run_in(dir.path(), &["next", "--json"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert!(real["data"]["task"].is_null(), "{real}");
+    assert_eq!(real["data"]["claimed"], false);
+    assert_eq!(real["data"]["already_claimed"], false);
+}

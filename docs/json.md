@@ -228,21 +228,61 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
 
 ### `todo next --json` (`todo.next.v1`)
 
+`task` is the Shared `TaskJson` shape (see above) of the task that `next` hands out. The example is
+the output for a fixture with one open task:
+
 ```json
 {
   "schema": "todo.next.v1",
   "ok": true,
   "data": {
-    "found": true,
+    "task": {
+      "id": "T-001",
+      "title": "Write the parser",
+      "section": "Tasks",
+      "archived": false,
+      "status": "open",
+      "owner": null,
+      "claimed": null,
+      "stale": false,
+      "priority": "P1",
+      "difficulty": "easy",
+      "type": "feature",
+      "area": "cli",
+      "goal": null,
+      "milestone": null,
+      "milestones": [],
+      "children": [],
+      "why": "the reader needs it first",
+      "depends": [],
+      "dependencies": [],
+      "dependents": [],
+      "questions": [],
+      "ready": true,
+      "files": null,
+      "problem": null,
+      "fix": null,
+      "accept": null,
+      "commit": [],
+      "fields": {},
+      "notes": [
+        { "date": "2026-11-15", "agent": "planner", "text": "added", "line": 12 }
+      ],
+      "line_start": 7,
+      "line_end": 12
+    },
     "claimed": false,
-    "already_theirs": false,
-    "task": { "id": "T-001", "title": "First task", "status": "open" }
+    "already_claimed": false
   },
   "warnings": []
 }
 ```
 
-When no ready task exists, `"found": false, "task": null`.
+- `claimed` is `true` when `--claim` wrote the claim in this run; then `task` shows the claim
+  (`owner` and `claimed`, and a `session` entry in `fields` when a session is known).
+- `already_claimed` is `true` when the task was already the agent's own claim. `next` returns that
+  task first unless `--new` is given.
+- When no ready task exists, `task` is `null` and `claimed` and `already_claimed` are `false`.
 
 ### `todo summary --json` (`todo.summary.v1`)
 
