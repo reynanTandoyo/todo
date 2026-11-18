@@ -2,7 +2,7 @@
 
 use std::fs;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{Args as ClapArgs, Subcommand};
 use serde::Serialize;
@@ -21,7 +21,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "agents",
     summary: "Install or check the managed agent-rules block in AGENTS.md",
     kind: CommandKind::Meta,
-    details: "`agents install [--into FILE] --yes` adds or updates the managed `<!-- todo:begin -->` ... `<!-- todo:end -->` rules block in `AGENTS.md` (or `--into FILE`) without changing any other byte. `agents check [--into FILE]` verifies the block is present and up to date.",
+    details: "`agents install [--into FILE] --yes` adds or updates the managed `<!-- todo:begin -->` ... `<!-- todo:end -->` rules block in `AGENTS.md` (or `--into FILE`) without changing any other byte. `agents check [--into FILE]` verifies the block is present and up to date. Both use the folder that holds `TODO.md`, whatever the current folder; `--into FILE` is relative to it.",
     examples: &[
         "todo agents install",
         "todo agents install --yes",
@@ -76,17 +76,20 @@ struct AgentsCheckJson {
 
 /// Runs `todo agents`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
+    // The file is in the folder of TODO.md, not the current folder (T-127).
+    let dir = ctx.project_dir(out)?;
     match args.action {
-        AgentsAction::Install { into } => run_install(into, ctx, out),
-        AgentsAction::Check { into } => run_check(into, out),
+        AgentsAction::Install { into } => run_install(into, &dir, ctx, out),
+        AgentsAction::Check { into } => run_check(into, &dir, out),
     }
 }
 
-fn run_install(into: PathBuf, ctx: &Context, out: &mut Output) -> Result<()> {
+fn run_install(into: PathBuf, dir: &Path, ctx: &Context, out: &mut Output) -> Result<()> {
     let label = into.display().to_string();
-    let exists = fs_path(&into).exists();
+    let path = dir.join(&into);
+    let exists = fs_path(&path).exists();
     let existing = if exists {
-        Some(read_file_with_snapshot(&into)?)
+        Some(read_file_with_snapshot(&path)?)
     } else {
         None
     };
@@ -131,9 +134,9 @@ fn run_install(into: PathBuf, ctx: &Context, out: &mut Output) -> Result<()> {
 
     if changed {
         if let Some(snap) = existing {
-            atomic_replace(&into, &snap.snapshot, &new_bytes)?;
+            atomic_replace(&path, &snap.snapshot, &new_bytes)?;
         } else {
-            if let Some(parent) = into.parent()
+            if let Some(parent) = path.parent()
                 && !parent.as_os_str().is_empty()
             {
                 fs::create_dir_all(fs_path(parent).as_ref()).map_err(|e| {
@@ -144,7 +147,7 @@ fn run_install(into: PathBuf, ctx: &Context, out: &mut Output) -> Result<()> {
                     .with_file(label.clone())
                 })?;
             }
-            atomic_write_bytes(&into, &new_bytes)?;
+            atomic_write_bytes(&path, &new_bytes)?;
         }
     }
 
@@ -172,9 +175,10 @@ fn run_install(into: PathBuf, ctx: &Context, out: &mut Output) -> Result<()> {
     Ok(())
 }
 
-fn run_check(into: PathBuf, out: &mut Output) -> Result<()> {
+fn run_check(into: PathBuf, dir: &Path, out: &mut Output) -> Result<()> {
     let label = into.display().to_string();
-    let bytes = match fs::read(fs_path(&into).as_ref()) {
+    let path = dir.join(&into);
+    let bytes = match fs::read(fs_path(&path).as_ref()) {
         Ok(b) => b,
         Err(e) if e.kind() == io::ErrorKind::NotFound => {
             if !out.is_json() {

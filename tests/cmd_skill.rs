@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{parse_json, read_text};
+use common::{parse_json, read_text, run_in};
 
 use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
@@ -17,6 +17,10 @@ fn skill_install_writes_claude_skill_from_rules_text() {
         .join("skills")
         .join("todo")
         .join("SKILL.md");
+
+    // The skill is in the folder of TODO.md, so there is a TODO.md (R-AGENT-5).
+    let init = run_in(dir.path(), &["init"]);
+    assert!(init.status.success());
 
     // Without --yes: does not create file.
     let preview = cargo_bin_cmd!("todo")

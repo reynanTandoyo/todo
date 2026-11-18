@@ -146,6 +146,7 @@ fn migrate_yes_updates_exactly_the_listed_files_and_a_second_run_changes_nothing
 
     // The skill is exactly what `skill install` writes.
     let fresh = TempDir::new().expect("tempdir");
+    ok(fresh.path(), &["init"]);
     ok(fresh.path(), &["skill", "install", "--yes"]);
     assert_eq!(
         fs::read(dir.path().join(".claude/skills/todo/SKILL.md")).expect("skill"),

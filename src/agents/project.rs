@@ -99,13 +99,21 @@ pub struct ProjectPlan {
     pub warnings: Vec<String>,
 }
 
+/// The project folder for `todo_path` (`TODO.md`): the folder that holds it. A bare file name is in
+/// the current folder. Every agent file, the skill and the hooks are kept here (`R-AGENT-3`).
+#[must_use]
+pub fn project_dir_of(todo_path: &Path) -> PathBuf {
+    match todo_path.parent() {
+        Some(p) if !p.as_os_str().is_empty() => p.to_path_buf(),
+        _ => PathBuf::from("."),
+    }
+}
+
 /// Plans the updates for the project folder of `todo_path`: the folder that holds `TODO.md`.
 #[must_use]
 pub fn plan(todo_path: &Path) -> ProjectPlan {
-    let dir = match todo_path.parent() {
-        Some(p) if !p.as_os_str().is_empty() => p,
-        _ => Path::new("."),
-    };
+    let dir = project_dir_of(todo_path);
+    let dir = dir.as_path();
     let todo_name = todo_path.file_name().map_or_else(
         || "TODO.md".to_string(),
         |n| n.to_string_lossy().into_owned(),

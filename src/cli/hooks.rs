@@ -1,7 +1,7 @@
 //! `todo hooks` command: install or uninstall Claude Code hooks in `.claude/settings.json` (`T-053`; R-AGENT-4).
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use clap::{Args as ClapArgs, Subcommand};
 use serde::Serialize;
@@ -9,7 +9,7 @@ use serde_json::{Map, Value};
 use similar::TextDiff;
 
 use crate::agents::hooks_file::{
-    HOOK_EVENTS, canonical_entries, detect_indent, is_managed_hook,
+    HOOK_EVENTS, detect_indent, install_hook_text, is_managed_hook,
 };
 use crate::agents::project::{BACKUP_REL_PATH, SETTINGS_REL_PATH};
 use crate::atomic::atomic_write_bytes;
@@ -24,7 +24,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "hooks",
     summary: "Install or uninstall Claude Code hooks in .claude/settings.json",
     kind: CommandKind::Meta,
-    details: "`hooks install --yes` adds a `SessionStart` hook (`todo summary`), a `PreToolUse` hook (`todo guard` for `Edit|Write|MultiEdit`) and a `SessionEnd` hook (`todo session-end`, which releases the ending session's claims) to `.claude/settings.json`, keeping a backup and preserving formatting. `hooks uninstall --yes` removes only the entries added by `todo`.",
+    details: "`hooks install --yes` adds a `SessionStart` hook (`todo summary`), a `PreToolUse` hook (`todo guard` for `Edit|Write|MultiEdit`) and a `SessionEnd` hook (`todo session-end`, which releases the ending session's claims) to `.claude/settings.json` in the folder that holds `TODO.md`, keeping a backup and preserving formatting. `hooks uninstall --yes` removes only the entries added by `todo`.",
     examples: &[
         "todo hooks install",
         "todo hooks install --yes",
@@ -63,8 +63,10 @@ struct HooksJson {
 
 /// Runs `todo hooks`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
-    let settings_path = PathBuf::from(SETTINGS_REL_PATH);
-    let backup_path = PathBuf::from(BACKUP_REL_PATH);
+    // The settings file is in the folder of TODO.md, not the current folder (T-127).
+    let dir = ctx.project_dir(out)?;
+    let settings_path = dir.join(SETTINGS_REL_PATH);
+    let backup_path = dir.join(BACKUP_REL_PATH);
     let label = SETTINGS_REL_PATH.to_string();
 
     let old_bytes = match fs::read(fs_path(&settings_path).as_ref()) {
@@ -102,18 +104,20 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         })?
     };
 
-    let action_name = match args.action {
+    // Install edits the text in place, so every byte outside the managed entries stays (T-126).
+    // Uninstall still rewrites the parsed settings.
+    let (action_name, new_text) = match args.action {
         HooksAction::Install => {
-            install_hooks(&mut root)?;
-            "install"
+            let text = install_hook_text(old_text).map_err(|msg| {
+                TodoError::new(ErrorCode::BadValue, msg).with_file(label.clone())
+            })?;
+            ("install", text)
         }
         HooksAction::Uninstall => {
             uninstall_hooks(&mut root)?;
-            "uninstall"
+            ("uninstall", format_preserving_style(old_text, &root)?)
         }
     };
-
-    let new_text = format_preserving_style(old_text, &root)?;
     let new_bytes = new_text.as_bytes();
     let changed = old_bytes.as_deref() != Some(new_bytes);
 
@@ -190,54 +194,6 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         out.write_line(&format!("{label}: already up to date"));
     }
 
-    Ok(())
-}
-
-fn install_hooks(root: &mut Value) -> Result<()> {
-    let root_obj = root.as_object_mut().ok_or_else(|| {
-        TodoError::new(
-            ErrorCode::BadValue,
-            format!("{SETTINGS_REL_PATH} root must be a JSON object"),
-        )
-    })?;
-    let hooks_val = root_obj
-        .entry("hooks")
-        .or_insert_with(|| Value::Object(Map::new()));
-    let hooks_obj = hooks_val.as_object_mut().ok_or_else(|| {
-        TodoError::new(
-            ErrorCode::BadValue,
-            "`hooks` in settings.json must be a JSON object",
-        )
-    })?;
-
-    // SessionStart -> todo summary; PreToolUse -> todo guard; SessionEnd -> todo session-end
-    // (releases the claims of the ending session; R-CLAIM-7). `migrate` writes the same entries.
-    for (event, entry) in canonical_entries() {
-        upsert_hook_entry(hooks_obj, event, entry)?;
-    }
-
-    Ok(())
-}
-
-fn upsert_hook_entry(
-    hooks_obj: &mut Map<String, Value>,
-    event: &str,
-    entry: Value,
-) -> Result<()> {
-    let arr_val = hooks_obj
-        .entry(event)
-        .or_insert_with(|| Value::Array(Vec::new()));
-    let arr = arr_val.as_array_mut().ok_or_else(|| {
-        TodoError::new(
-            ErrorCode::BadValue,
-            format!("`hooks.{event}` in settings.json must be a JSON array"),
-        )
-    })?;
-    if let Some(existing) = arr.iter_mut().find(|v| is_managed_hook(v)) {
-        *existing = entry;
-    } else {
-        arr.push(entry);
-    }
     Ok(())
 }
 
