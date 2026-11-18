@@ -1,6 +1,5 @@
 ---
 source: tests/cmd_summary.rs
-assertion_line: 78
 expression: json
 ---
 {
@@ -36,8 +35,9 @@ expression: json
       "done": 1,
       "dropped": 1,
       "ideas": 0,
-      "open": 2,
-      "total": 7
+      "open": 1,
+      "questions": 1,
+      "total": 6
     },
     "file": "TODO.md",
     "milestones": [],
@@ -59,10 +59,6 @@ expression: json
       {
         "count": 1,
         "priority": "P0"
-      },
-      {
-        "count": 1,
-        "priority": "P1"
       }
     ],
     "open_questions": [
