@@ -1,5 +1,5 @@
 <!-- TEST FIXTURE: invented data, not a real task list -->
-<!-- todo-format: 1 -->
+<!-- todo-format: 2 -->
 # Lantern Project — tasks
 
 ## Now

@@ -1,5 +1,5 @@
 <!-- TEST FIXTURE: invented data, not a real task list -->
-<!-- todo-format: 2 -->
+<!-- todo-format: 99 -->
 ## Tasks
 ### T-001 · Future format task
 - status: open

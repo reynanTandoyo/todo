@@ -355,6 +355,10 @@ pub struct JournalEntry {
     pub hash_before: String,
     /// Lowercase hex SHA-256 of `TODO.md` after the write.
     pub hash_after: String,
+    /// What the write migrated to the current format, such as `TODO.md: format 1 to 2` (R-MIG-1);
+    /// absent when the write migrated nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub migrated: Option<String>,
 }
 
 /// Appends one [`JournalEntry`] line to `journal.jsonl` (`R-HIST-4`).
@@ -475,6 +479,7 @@ pub fn diff_task_ids(before: &[u8], after: &[u8], id_config: &IdConfig) -> Vec<S
 }
 
 /// Records one journal entry for a completed write (`R-HIST-4`), using precomputed `tasks`.
+/// `migrated` names what the write migrated to the current format (R-MIG-1), if anything.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn record_journal_with_tasks(
     state: &StateDir,
@@ -483,6 +488,7 @@ pub(crate) fn record_journal_with_tasks(
     tasks: Vec<String>,
     hash_before: &str,
     hash_after: &str,
+    migrated: Option<&str>,
 ) -> Result<()> {
     let arguments: Vec<String> = std::env::args_os()
         .skip(1)
@@ -496,6 +502,7 @@ pub(crate) fn record_journal_with_tasks(
         tasks,
         hash_before: hash_before.to_string(),
         hash_after: hash_after.to_string(),
+        migrated: migrated.map(str::to_string),
     };
     append_journal(state, &entry)
 }
@@ -513,5 +520,5 @@ pub fn record_journal_for_write(
     hash_after: &str,
 ) -> Result<()> {
     let tasks = diff_task_ids(before_bytes, after_bytes, id_config);
-    record_journal_with_tasks(state, agent, command, tasks, hash_before, hash_after)
+    record_journal_with_tasks(state, agent, command, tasks, hash_before, hash_after, None)
 }

@@ -17,9 +17,13 @@ use tempfile::TempDir;
 
 const MARKER: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->";
 
-/// A TODO.md with one `## Tasks` section that holds `body`.
+/// A TODO.md in the current format, stamped by the running todo, with one `## Tasks` section that
+/// holds `body`. Writes then change only the lines the test is about.
 fn doc(body: &str) -> String {
-    format!("{MARKER}\n<!-- todo-format: 1 -->\n\n## Tasks\n\n{body}")
+    let version = env!("CARGO_PKG_VERSION");
+    format!(
+        "{MARKER}\n<!-- todo-format: 2 -->\n<!-- todo-tool: {version} -->\n\n## Tasks\n\n{body}"
+    )
 }
 
 /// Runs `todo` with `args` and succeeds, returning its output.

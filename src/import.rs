@@ -1,4 +1,4 @@
-//! Conversion of Markdown checkbox task lists into `TODO.md` format version 1 (`R-IMP-1`).
+//! Conversion of Markdown checkbox task lists into `TODO.md` in the current format version (`R-IMP-1`).
 //!
 //! [`convert_checkbox`] is a pure function: bytes in, bytes out. It never touches the disk; the
 //! command in [`crate::cli::import`] does the reading, the preview and the writing.
@@ -13,8 +13,8 @@ use serde_json::json;
 
 use crate::cli::check::{CheckProblem, check_dependencies, check_tasks};
 use crate::doc::{
-    Document, Line, LineDoc, LineEnding, Problem, Status, TaskId, is_valid_agent_name,
-    sanitize_trimmed_value,
+    CURRENT_FORMAT_VERSION, Document, Line, LineDoc, LineEnding, Problem, Status, TaskId,
+    format_line_text, is_valid_agent_name, sanitize_trimmed_value,
 };
 use crate::error::{ErrorCode, ExitCode, Result, TodoError};
 use crate::ops::OpsConfig;
@@ -80,7 +80,7 @@ struct Builder {
     tail: Vec<Tail>,
 }
 
-/// Converts a Markdown checkbox list to format version 1, then proves the result with the same
+/// Converts a Markdown checkbox list to the current format version, then proves the result with the same
 /// rules as `todo check` and by comparing the task count with the number of converted lines.
 ///
 /// Claimed tasks get the time of the import as their claim time (a claim dated in the past would
@@ -176,7 +176,10 @@ pub fn convert_checkbox(source: &[u8], env: &ImportEnv<'_>) -> Result<Converted>
     }
 
     if src_doc.declared_format_version.is_none() {
-        out.insert(0, Line::new("<!-- todo-format: 1 -->", ending));
+        out.insert(
+            0,
+            Line::new(format_line_text(CURRENT_FORMAT_VERSION), ending),
+        );
     }
     if src
         .lines

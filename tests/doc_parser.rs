@@ -220,15 +220,15 @@ fn reports_all_file_level_refusals_from_format_section_13() {
             .starts_with("TODO.md:4: invalid UTF-8 at byte ")
     );
 
-    // 2. Version 2 format line
-    let v2 = fixture("bad_version_2.md");
-    let v2_doc = Document::parse_bytes(&v2).expect("valid UTF-8");
+    // 2. A format line naming a version this build does not know (a newer format)
+    let v99 = fixture("bad_version_99.md");
+    let v2_doc = Document::parse_bytes(&v99).expect("valid UTF-8");
     assert!(v2_doc.blocks_all_writes());
-    assert_eq!(v2_doc.declared_format_version, Some(2));
+    assert_eq!(v2_doc.declared_format_version, Some(99));
     assert_eq!(v2_doc.tasks.len(), 1); // read commands still work
     assert!(matches!(
         v2_doc.problems[0].kind,
-        ProblemKind::UnknownFormatVersion { ref raw } if raw == "2"
+        ProblemKind::UnknownFormatVersion { ref raw } if raw == "99"
     ));
     assert!(
         v2_doc.problems[0]

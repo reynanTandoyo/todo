@@ -342,6 +342,27 @@ Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `T
 }
 ```
 
+### `todo migrate --json` (`todo.migrate.v1`)
+
+```json
+{
+  "schema": "todo.migrate.v1",
+  "ok": true,
+  "data": {
+    "file": "TODO.md",
+    "current_format": 2,
+    "migrated": [
+      { "file": "TODO.md", "from": 1, "to": 2 },
+      { "file": "TODO-archive.md", "from": 1, "to": 2 }
+    ],
+    "changed": true
+  },
+  "warnings": []
+}
+```
+
+`migrated` is empty when nothing was in an older format; `changed` is `false` when the file was not written (including `--dry-run`, which also sets `dry_run` and `diff`).
+
 ### `todo lock --json`, `todo unlock --json`, `todo status --json`
 
 - `lock`: `{"agent":"alice","started_at":"...","expires_at":"...","minutes":10}`
@@ -451,6 +472,8 @@ printed, ready to pipe into `Invoke-Expression`.
   "warnings": []
 }
 ```
+
+An entry written by a write that migrated the file (R-MIG-1) also has `"migrated": "TODO.md: format 1 to 2"`; the field is absent otherwise.
 
 ### `todo apply --json` (`todo.apply.v1`)
 

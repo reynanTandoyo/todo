@@ -228,6 +228,19 @@ impl Output {
         }
     }
 
+    /// Reports a notice that is not a warning, such as a migration done by a write (R-MIG-1).
+    ///
+    /// In text mode, writes the message as one plain line to stderr. In `--json` mode, adds it to
+    /// the envelope's `warnings` array, so the standard output stays one JSON document.
+    pub fn notice(&mut self, message: impl Into<String>) {
+        let msg = message.into();
+        if self.json {
+            self.warnings.push(msg);
+        } else {
+            self.write_stderr_line(&msg);
+        }
+    }
+
     /// Writes plain text to stdout (no trailing newline added).
     ///
     /// Ignored in `--json` mode or if stdout already hit `BrokenPipe`.

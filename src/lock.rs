@@ -102,7 +102,30 @@ pub(crate) enum WriteOutcomeFull<T> {
         new_bytes: Vec<u8>,
         touched_tasks: Option<Vec<String>>,
         value: T,
+        /// The migration that this write applies to the file or its archive (R-MIG-1), if any.
+        migration: Option<MigrationWrite>,
     },
+}
+
+/// A migration that a write applies in the same step as its own change (R-MIG-1): what the
+/// journal entry and the standard error line say, and the archive file when it is migrated too.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MigrationWrite {
+    /// What was migrated, such as `TODO.md: format 1 to 2`.
+    pub summary: String,
+    /// The archive file, written after the snapshot of `TODO.md` and before `TODO.md` is replaced.
+    pub archive: Option<ArchiveWrite>,
+}
+
+/// A whole-file replacement of the archive file, guarded by the snapshot it was read with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ArchiveWrite {
+    /// Path of `TODO-archive.md`.
+    pub path: PathBuf,
+    /// Snapshot of the archive file when it was read; the write fails if it changed since.
+    pub expected: FileSnapshot,
+    /// The migrated archive text.
+    pub new_bytes: Vec<u8>,
 }
 
 /// RAII guard holding the operating-system exclusive lock on `write.lock`.
@@ -245,6 +268,7 @@ where
                     new_bytes,
                     touched_tasks: None,
                     value,
+                    migration: None,
                 },
             })
         },
@@ -323,6 +347,7 @@ where
             new_bytes,
             touched_tasks,
             value,
+            migration,
         } => {
             let before_sha_hex = read.snapshot.sha256_hex();
             let snap_timer = crate::timing::PhaseTimer::start("lock.record_snapshot");
@@ -336,6 +361,11 @@ where
                 cfg.snapshots_keep,
             )?;
             snap_timer.finish();
+            // A migrated archive is written after the snapshot and before TODO.md is replaced, so
+            // a failed archive write leaves TODO.md as it was (R-MIG-1).
+            if let Some(archive) = migration.as_ref().and_then(|m| m.archive.as_ref()) {
+                atomic::atomic_replace(&archive.path, &archive.expected, &archive.new_bytes)?;
+            }
             let replace_timer = crate::timing::PhaseTimer::start("lock.atomic_replace");
             atomic::atomic_replace(todo_path, &read.snapshot, &new_bytes)?;
             replace_timer.finish();
@@ -370,6 +400,7 @@ where
                 tasks,
                 &before_sha_hex,
                 &after_sha_hex,
+                migration.as_ref().map(|m| m.summary.as_str()),
             )?;
             journal_timer.finish();
             drop(guard);

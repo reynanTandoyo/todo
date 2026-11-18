@@ -58,7 +58,7 @@ fn init_writes_the_stamp_directly_after_the_format_line() {
 
     let created = read_todo(dir.path());
     let lines: Vec<&str> = created.lines().collect();
-    assert_eq!(lines[0], "<!-- todo-format: 1 -->");
+    assert_eq!(lines[0], "<!-- todo-format: 2 -->");
     assert_eq!(lines[1], stamp_line(RUNNING));
     assert_eq!(lines[2], "# Sample Project");
 }
@@ -80,7 +80,7 @@ fn a_write_adds_the_missing_stamp_and_changes_no_other_line() {
     assert_eq!(added[0], stamp_line(RUNNING));
     assert!(added[1].starts_with("- note ("), "added: {:?}", added[1]);
     assert!(after.contains(&format!(
-        "<!-- todo-format: 1 -->\n{}\n",
+        "<!-- todo-format: 2 -->\n{}\n",
         stamp_line(RUNNING)
     )));
 }
@@ -184,7 +184,7 @@ fn a_command_that_changes_nothing_writes_no_stamp() {
 }
 
 #[test]
-fn a_file_without_a_format_line_gets_the_stamp_as_its_first_line() {
+fn a_file_without_a_format_line_gets_the_format_line_first_and_the_stamp_after_it() {
     let dir = TempDir::new().expect("tempdir");
     copy_fixture(dir.path(), "tool_stamp_no_format.md");
 
@@ -193,10 +193,11 @@ fn a_file_without_a_format_line_gets_the_stamp_as_its_first_line() {
         &["note", "T-001", "checked the lanterns", "--agent", "bob"],
     );
 
-    let first = after.lines().next().expect("first line");
-    assert_eq!(first, stamp_line(RUNNING));
-    // The format line is a migration step (format.md §18), not something a stamp write adds.
-    assert!(!after.contains("todo-format"));
+    // The first write migrates a file without a format line (format.md §18): the format line goes
+    // first, and the stamp directly after it.
+    let lines: Vec<&str> = after.lines().collect();
+    assert_eq!(lines[0], "<!-- todo-format: 2 -->");
+    assert_eq!(lines[1], stamp_line(RUNNING));
 }
 
 #[test]
@@ -296,7 +297,7 @@ fn archive_stamps_both_files() {
     let head: Vec<&str> = archive.lines().take(2).collect();
     assert_eq!(
         head,
-        ["<!-- todo-format: 1 -->", stamp_line(RUNNING).as_str()]
+        ["<!-- todo-format: 2 -->", stamp_line(RUNNING).as_str()]
     );
 }
 

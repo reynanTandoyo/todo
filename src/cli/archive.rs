@@ -9,10 +9,14 @@ use serde::Serialize;
 use crate::atomic::{atomic_replace, atomic_write_bytes, read_file_with_snapshot, validate_utf8};
 use crate::version::RUNNING_VERSION;
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::{Document, LineEdit, SectionLookup, Status, Task, TaskChangeIntent};
+use crate::doc::{
+    CURRENT_FORMAT_VERSION, Document, LineEdit, SectionLookup, Status, Task, TaskChangeIntent,
+    format_line_text,
+};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::fs_path;
-use crate::lock::{WriteOutcome, current_time, locked_read_modify_write_with_warnings};
+use crate::lock::{MigrationWrite, WriteOutcomeFull, current_time, locked_read_modify_write_full};
+use crate::ops::migrate::{MigratedFile, describe, migrate_for_write};
 use crate::ops::{
     OpsConfig, check_task_writable, file_label, parse_doc_for_write, read_optional_archive,
     require_yes_or_preview,
@@ -96,28 +100,34 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     let mut lock_warnings = Vec::new();
     let mut stamp_warning: Option<String> = None;
-    let summaries = locked_read_modify_write_with_warnings(
+    let mut migrated_notice: Option<String> = None;
+    let summaries = locked_read_modify_write_full(
         &found.path,
         &state,
         &agent,
         "archive",
         &cfg.lock,
+        Some(&cfg.id_config),
         &mut lock_warnings,
         |bytes, _snap| {
-            let doc = parse_doc_for_write(bytes, &label, &cfg)?;
-            stamp_warning = doc.newer_tool_warning(&label);
+            let parsed = parse_doc_for_write(bytes, &label, &cfg)?;
+            stamp_warning = parsed.newer_tool_warning(&label);
             let existing_archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
+            // TODO.md is migrated in this write when it is in an older format (R-MIG-1). The
+            // archive is migrated where it is written below.
+            let migrated_todo = migrate_for_write(&parsed, &label)?;
+            let doc = migrated_todo.as_ref().map_or(&parsed, |m| &m.doc);
             let now = current_time();
-            let selected = select_tasks_to_archive(&doc, args.older_than, now);
+            let selected = select_tasks_to_archive(doc, args.older_than, now);
             if selected.is_empty() {
-                return Ok(WriteOutcome::Unchanged(Vec::new()));
+                return Ok(WriteOutcomeFull::Unchanged(Vec::new()));
             }
 
             for &task in &selected {
-                check_task_writable(&doc, task, &label, existing_archive.as_ref())?;
+                check_task_writable(doc, task, &label, existing_archive.as_ref())?;
             }
 
-            let summaries = summarize_selected(&doc, &selected);
+            let summaries = summarize_selected(doc, &selected);
 
             // Ensure highest_id in ids.json never forgets archived IDs.
             let max_selected_id = selected.iter().map(|t| t.id.number()).max().unwrap_or(0);
@@ -129,7 +139,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             }
 
             // Build updated archive file bytes and write atomically under TODO.md's lock.
-            write_updated_archive(&doc, &selected, &archive_path, &cfg)?;
+            let archive_migration = write_updated_archive(doc, &selected, &archive_path, &cfg)?;
 
             // Remove archived task blocks from TODO.md (plus one adjacent blank line when safe).
             let mut edits: Vec<LineEdit> = selected
@@ -162,9 +172,31 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 None => applied.bytes,
             };
 
-            Ok(WriteOutcome::Changed {
+            let mut files: Vec<MigratedFile> = Vec::new();
+            if let Some(m) = &migrated_todo {
+                files.push(MigratedFile {
+                    file: label.clone(),
+                    from: m.from,
+                    to: m.to,
+                });
+            }
+            if let Some((from, to)) = archive_migration {
+                files.push(MigratedFile {
+                    file: cfg.archive_file.clone(),
+                    from,
+                    to,
+                });
+            }
+            let migration = (!files.is_empty()).then(|| MigrationWrite {
+                summary: describe(&files),
+                archive: None,
+            });
+            migrated_notice = migration.as_ref().map(|m| m.summary.clone());
+            Ok(WriteOutcomeFull::Changed {
                 new_bytes,
+                touched_tasks: None,
                 value: summaries,
+                migration,
             })
         },
     )?;
@@ -174,6 +206,9 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     }
     if let Some(warn) = stamp_warning {
         out.warn(warn);
+    }
+    if let Some(summary) = migrated_notice {
+        out.notice(format!("migrated {summary}"));
     }
 
     if out.is_json() {
@@ -262,12 +297,14 @@ fn format_preview(summaries: &[ArchivedTaskSummary], archive_file: &str) -> Stri
     out.trim_end().to_string()
 }
 
+/// Writes the archive file with the selected tasks added. Returns the format versions the archive
+/// was migrated from and to, when it was in an older format (R-MIG-1).
 fn write_updated_archive(
     doc: &Document,
     selected: &[&Task],
     archive_path: &std::path::Path,
     cfg: &OpsConfig,
-) -> Result<()> {
+) -> Result<Option<(u32, u32)>> {
     let eol = "\n";
     let mut grouped: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut section_order: Vec<String> = Vec::new();
@@ -286,13 +323,22 @@ fn write_updated_archive(
     }
 
     let archive_exists = fs_path(archive_path).exists();
+    let mut archive_migration = None;
     let (existing_snap, arch_doc) = if archive_exists {
         let snap = read_file_with_snapshot(archive_path)?;
         let _ = validate_utf8(&snap.bytes, &cfg.archive_file)?;
         let parsed = parse_doc_for_write(&snap.bytes, &cfg.archive_file, cfg)?;
-        (Some(snap), parsed)
+        // An archive in an older format is migrated in the same write (R-MIG-1).
+        let arch_doc = match migrate_for_write(&parsed, &cfg.archive_file)? {
+            Some(migrated) => {
+                archive_migration = Some((migrated.from, migrated.to));
+                migrated.doc
+            }
+            None => parsed,
+        };
+        (Some(snap), arch_doc)
     } else {
-        let initial = format!("<!-- todo-format: 1 -->{eol}# Archive{eol}");
+        let initial = format!("{}{eol}# Archive{eol}", format_line_text(CURRENT_FORMAT_VERSION));
         let parsed = Document::parse_bytes_with_config(initial.as_bytes(), cfg.id_config.clone())
             .map_err(|e| TodoError::new(ErrorCode::UnsafeFile, e.to_string()))?;
         (None, parsed)
@@ -350,10 +396,11 @@ fn write_updated_archive(
     };
 
     if let Some(snap) = existing_snap {
-        atomic_replace(archive_path, &snap.snapshot, &new_bytes)
+        atomic_replace(archive_path, &snap.snapshot, &new_bytes)?;
     } else {
-        atomic_write_bytes(archive_path, &new_bytes)
+        atomic_write_bytes(archive_path, &new_bytes)?;
     }
+    Ok(archive_migration)
 }
 
 fn extract_task_block_lines(doc: &Document, task: &Task) -> Vec<String> {

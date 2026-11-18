@@ -1,5 +1,7 @@
 //! Shared write pipeline used by every mutating `todo` command (`R-LOCK-1..6`, `R-EDIT-7`, `R-EDIT-8`, `R-IO-1..5`).
 
+use std::borrow::Cow;
+
 use chrono::{DateTime, FixedOffset};
 use serde::Serialize;
 use similar::TextDiff;
@@ -12,6 +14,7 @@ use crate::find::FoundTodo;
 use crate::lock::{WriteOutcomeFull, current_time, locked_read_modify_write_full};
 use crate::ops::config::OpsConfig;
 use crate::ops::edits::TaskEditBuilder;
+use crate::ops::migrate::PendingMigration;
 use crate::ops::query::resolve_task_in_doc;
 use crate::ops::read::{
     TaskJson, build_task_json, file_label, is_task_ready, read_optional_archive,
@@ -291,6 +294,7 @@ where
     let mut dry_run_diff: Option<String> = None;
     let mut lock_warnings: Vec<String> = Vec::new();
     let mut stamp_warning: Option<String> = None;
+    let mut migrated_notice: Option<String> = None;
     let (changed, value) = locked_read_modify_write_full(
         &found.path,
         &state,
@@ -301,16 +305,25 @@ where
         &mut lock_warnings,
         |bytes, _snap| {
             let parse_timer = crate::timing::PhaseTimer::start("write.parse_doc");
-            let doc = parse_doc_for_write(bytes, &label, cfg)?;
+            let parsed = parse_doc_for_write(bytes, &label, cfg)?;
             parse_timer.finish();
-            stamp_warning = doc.newer_tool_warning(&label);
+            stamp_warning = parsed.newer_tool_warning(&label);
             let arch_timer = crate::timing::PhaseTimer::start("write.read_archive");
             let archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
             arch_timer.finish();
+            // Files in an older format are migrated first, in this same write (R-MIG-1).
+            let (migrated_todo, migration) =
+                PendingMigration::plan(&parsed, &label, archive.as_ref(), &archive_path, cfg)?
+                    .split();
+            let doc = migrated_todo.as_ref().map_or(&parsed, |m| &m.doc);
+            let working: Cow<[u8]> = match &migrated_todo {
+                Some(m) => Cow::Owned(m.doc.to_bytes()),
+                None => Cow::Borrowed(bytes),
+            };
             let now = current_time();
 
             let op_timer = crate::timing::PhaseTimer::start("write.op_plan");
-            let plan = op(&doc, archive.as_ref(), &state, &label, &agent, now)?;
+            let plan = op(doc, archive.as_ref(), &state, &label, &agent, now)?;
             op_timer.finish();
             match plan {
                 DocWritePlanInner::Unchanged(val) => {
@@ -326,7 +339,7 @@ where
                 } => {
                     let apply_timer = crate::timing::PhaseTimer::start("write.apply_and_verify");
                     let applied = doc
-                        .apply_and_verify_with_orig_bytes(bytes, &edits, &intent)
+                        .apply_and_verify_with_orig_bytes(&working, &edits, &intent)
                         .map_err(|e| edit_error_to_todo_error(&e, &label))?;
                     apply_timer.finish();
                     let val_timer = crate::timing::PhaseTimer::start("write.build_value");
@@ -359,11 +372,13 @@ where
                         diff_timer.finish();
                         return Ok(WriteOutcomeFull::Unchanged((false, val)));
                     }
-                    let touched_tasks = crate::history::diff_doc_task_ids(&doc, &applied.doc);
+                    let touched_tasks = crate::history::diff_doc_task_ids(doc, &applied.doc);
+                    migrated_notice = migration.as_ref().map(|m| m.summary.clone());
                     Ok(WriteOutcomeFull::Changed {
                         new_bytes: applied.bytes,
                         touched_tasks: Some(touched_tasks),
                         value: (true, val),
+                        migration,
                     })
                 }
             }
@@ -375,6 +390,9 @@ where
     }
     if let Some(warn) = stamp_warning {
         out.warn(warn);
+    }
+    if let Some(summary) = migrated_notice {
+        out.notice(format!("migrated {summary}"));
     }
 
     if let Some(diff) = dry_run_diff {
