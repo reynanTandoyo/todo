@@ -7,8 +7,12 @@ use std::fs;
 
 use tempfile::TempDir;
 
-use common::{parse_json, read_text, setup_proj, stderr_text, stdout_text};
-use todo::doc::{Document, Status, TaskId};
+#[cfg(feature = "test-hooks")]
+use common::read_text;
+use common::{parse_json, setup_proj, stderr_text, stdout_text};
+#[cfg(feature = "test-hooks")]
+use todo::doc::TaskId;
+use todo::doc::{Document, Status};
 
 #[cfg(feature = "test-hooks")]
 #[test]
