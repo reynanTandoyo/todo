@@ -18,6 +18,7 @@ use crate::ops::migrate::PendingMigration;
 use crate::ops::query::resolve_task_in_doc;
 use crate::ops::read::{
     TaskJson, build_task_json, file_label, is_task_ready, read_optional_archive,
+    require_known_format,
 };
 use crate::ops::rules::{ClaimPlan, ReleasePlan};
 use crate::output::Output;
@@ -84,6 +85,8 @@ pub struct WriteTaskResult<T> {
 }
 
 /// Parses `bytes` for writing and refuses any file-wide unsafe condition (`R-EDIT-8`, `format.md` §13).
+///
+/// A format version newer than this todo is refused first, with `TOOL_TOO_OLD` (R-VER-2).
 pub fn parse_doc_for_write(bytes: &[u8], label: &str, cfg: &OpsConfig) -> Result<Document> {
     let _ = validate_utf8(bytes, label)?;
     let doc = Document::parse_bytes_with_config(bytes, cfg.id_config.clone()).map_err(|e| {
@@ -91,6 +94,7 @@ pub fn parse_doc_for_write(bytes: &[u8], label: &str, cfg: &OpsConfig) -> Result
             .with_file(label)
             .with_line(e.line)
     })?;
+    require_known_format(&doc, label)?;
 
     if let Some(blocker) = doc.problems.iter().find(|p| p.blocks_all_writes()) {
         return Err(problem_to_unsafe_error(blocker, label));

@@ -246,6 +246,9 @@ When no ready task exists, `"found": false, "task": null`.
 }
 ```
 
+When the format version is newer than this todo knows, `where` still succeeds but leaves out
+`counts`, because the tasks are not read (R-VER-2).
+
 ### `todo check --json` (`todo.check.v1`)
 
 Clean (`exit 0`):
@@ -592,3 +595,4 @@ command.
 | `READ_ONLY` | 4 | Target file is read-only | `{"code":"READ_ONLY","message":"TODO.md is read-only"}` |
 | `WRITE_FAILED` | 4 | Atomic write or rename failed | `{"code":"WRITE_FAILED","message":"failed writing temporary file"}` |
 | `NO_GIT_HISTORY` | 5 | `align` without git, outside a repository, in a shallow clone or with no commits | `{"code":"NO_GIT_HISTORY","message":"not inside a git repository"}` |
+| `TOOL_TOO_OLD` | 4 | `TODO.md` or the archive names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 99 is newer than this todo 0.5.0 supports; ...","file":"TODO.md","line":2}` |

@@ -12,6 +12,7 @@ use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::error::{ErrorCode, ExitCode, Result, TodoError};
 use crate::find::synced_folder_warning;
 use crate::lock::{acquire_lease, release_lease_with_file};
+use crate::ops::{file_label, require_known_format_bytes};
 use crate::output::Output;
 use crate::state::{LastWrite, StateDir};
 
@@ -50,6 +51,10 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     if let Some(warning) = synced_folder_warning(&found.path) {
         out.warn(warning);
     }
+    // A file in a newer format is refused before the editor opens (R-VER-2).
+    let before_edit = read_file_with_snapshot(&found.path)?;
+    require_known_format_bytes(&before_edit.bytes, &file_label(&found.path), &ops_cfg.id_config)?;
+
     let state = StateDir::from_found(&found)?;
     let lock_cfg = ops_cfg.lock;
 

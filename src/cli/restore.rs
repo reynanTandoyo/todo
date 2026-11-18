@@ -10,7 +10,7 @@ use crate::doc::stamp_bytes;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::history::{parse_snapshot_number, read_snapshot_bytes};
 use crate::lock::{WriteOutcome, locked_read_modify_write};
-use crate::ops::{OpsConfig, file_label, require_yes_or_preview};
+use crate::ops::{OpsConfig, file_label, require_known_format_bytes, require_yes_or_preview};
 use crate::output::Output;
 use crate::state::StateDir;
 
@@ -57,9 +57,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     let (entry, snap_bytes) = read_snapshot_bytes(&state, num)?;
     let _ = validate_utf8(&snap_bytes, &entry.file)?;
+    // Neither the snapshot nor the file it would replace may be in a newer format (R-VER-2).
+    require_known_format_bytes(&snap_bytes, &label, &cfg.id_config)?;
 
     if !ctx.yes || ctx.dry_run {
         let current = read_file_with_snapshot(&found.path)?;
+        require_known_format_bytes(&current.bytes, &label, &cfg.id_config)?;
         let changed = current.bytes != snap_bytes;
         let old_text = String::from_utf8_lossy(&current.bytes);
         let new_text = String::from_utf8_lossy(&snap_bytes);
@@ -102,6 +105,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         "restore",
         &cfg.lock,
         |current_bytes, _snap| {
+            require_known_format_bytes(current_bytes, &label, &cfg.id_config)?;
             // The restored file gets the tool stamp too, so an old snapshot never lowers it (R-VER-1).
             let restored = stamp_bytes(&snap_bytes, cfg.id_config.clone()).map_err(|e| {
                 TodoError::new(ErrorCode::WriteFailed, e.to_string()).with_file(label.clone())
