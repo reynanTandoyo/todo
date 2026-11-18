@@ -121,6 +121,35 @@ Returned by `show` (plus `block_lines`), `add`, `claim`, `release`, `done`, `dro
 
 For `todo help agents --json`, `data` is `{"topic":"agents","rules":"..."}`.
 
+For `todo help update --json`, `data` has `topic` (always `update`), `version`, `executable` (the full path of the running executable, or `null` when it cannot be read), `repository`, `latest_release`, `assets` (each with `platform`, `file` and `checksum`), `network`, and `windows` and `linux`. Each of those two is an object with `shell` and `steps`, and a step has `text` and `commands`. todo runs none of the commands; the agent does. Example, with the steps shortened:
+
+```json
+{
+  "schema": "todo.help.v1",
+  "ok": true,
+  "data": {
+    "topic": "update",
+    "version": "0.6.0",
+    "executable": "C:\\Users\\alice\\AppData\\Local\\Programs\\todo\\todo.exe",
+    "repository": "https://github.com/reynanTandoyo/todo",
+    "latest_release": "https://github.com/reynanTandoyo/todo/releases/latest",
+    "assets": [
+      { "platform": "windows-x86_64", "file": "todo.exe", "checksum": "todo.exe.sha256" },
+      { "platform": "linux-x86_64", "file": "todo-linux-x86_64", "checksum": "todo-linux-x86_64.sha256" }
+    ],
+    "network": "todo never connects to the network. The agent runs these steps itself, one after another, and stops at the first failure.",
+    "windows": {
+      "shell": "PowerShell",
+      "steps": [
+        { "text": "Read the latest version. ...", "commands": ["gh release view --repo reynanTandoyo/todo --json tagName --jq .tagName"] }
+      ]
+    },
+    "linux": { "shell": "POSIX sh", "steps": [ "..." ] }
+  },
+  "warnings": []
+}
+```
+
 ### `todo list --json` (`todo.list.v1`)
 
 ```json

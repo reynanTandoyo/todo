@@ -11,3 +11,4 @@
 - Use `todo add --title "..." --priority P2` to record problems you find instead of fixing them silently.
 - Use `todo ask "..."` for questions only a person can decide.
 - Start every git commit message with the task ID (for example `T-012: short summary`).
+- When todo says a file needs a newer todo (`TOOL_TOO_OLD`, or a warning that it is behind), update the todo executable first: follow `todo help update`.

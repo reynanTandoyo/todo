@@ -5,6 +5,7 @@ edition = "2024"
 rust-version = "1.89"
 description = "Concurrency-safe command-line editor for TODO.md task files"
 license = "MIT"
+repository = "https://github.com/reynanTandoyo/todo"
 publish = false
 
 [[bin]]

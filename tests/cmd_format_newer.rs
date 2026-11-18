@@ -299,6 +299,7 @@ fn a_newer_format_without_a_tool_line_says_the_file_counts_as_older() {
         message.contains("has no tool line, so it counts as written by todo 0.5.0 or older"),
         "{message}"
     );
+    assert!(message.contains("todo help update"), "{message}");
 }
 
 #[test]
