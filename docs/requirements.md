@@ -257,7 +257,8 @@ by task commands; only the format and tool lines are kept up to date (R-VER-1, R
 - **R-READ-4 MUST** Every read command supports `--json` (R-OUT-1).
 - **R-READ-5 SHOULD** `summary` prints a session-start overview of at most 40 lines: tasks per
   status; open tasks per priority; claimed tasks with owner and age, stale ones marked; blocked
-  tasks with their latest reason; the next five ready tasks; open questions; and a warning if the
+  tasks with the reason of their latest `blocked — <reason>` note (the same reason the HTML report
+  shows, R-REPORT-1; `docs/format.md` §9); the next five ready tasks; open questions; and a warning if the
   file was edited outside the tool. From v0.6 it also shows the top-level milestones that are open or blocked, with
   progress (R-MILE-3), milestones ready to close (R-MILE-6), the number of ideas apart from open
   tasks (R-KIND-1), and a line naming `todo migrate --yes` while project files are out of date

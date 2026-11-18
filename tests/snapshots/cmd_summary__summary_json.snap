@@ -7,7 +7,7 @@ expression: json
     "blocked": [
       {
         "id": "T-004",
-        "reason": "blocked — waiting on API key",
+        "reason": "waiting on API key",
         "title": "Blocked task"
       }
     ],
