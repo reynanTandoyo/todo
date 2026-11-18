@@ -106,6 +106,16 @@ fn every_command_that_interprets_or_changes_tasks_refuses_a_newer_format() {
         ],
         &["archive", "--agent", "bob"],
         &["archive", "--agent", "bob", "--yes"],
+        &[
+            "idea",
+            "Cache parsed files",
+            "--about",
+            "T-001",
+            "--agent",
+            "bob",
+        ],
+        &["promote", "T-002", "--priority", "P2", "--agent", "bob"],
+        &["move", "T-001", "--section", "Later", "--agent", "bob"],
     ];
     for args in commands {
         assert_refused(dir.path(), args);

@@ -3,7 +3,8 @@
 use chrono::{DateTime, FixedOffset};
 
 use crate::doc::{
-    Document, Section, Status, Task, agent_names_equal, is_nobody_owner, strip_section_number,
+    Document, EntryKind, Section, Status, Task, agent_names_equal, is_nobody_owner,
+    strip_section_number,
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::config::OpsConfig;
@@ -283,7 +284,9 @@ pub struct SelectedNext<'a> {
 /// 1. If `filter.agent` is `Some(agent)` and `!filter.ignore_own_claim`, returns the highest-priority
 ///    (then earliest) task already claimed by `agent` that matches the attribute filters.
 /// 2. Otherwise returns the highest-priority (then earliest) ready task (`open` or stale `claimed`,
-///    dependencies satisfied, not `type: question`, matching filters).
+///    dependencies satisfied, matching filters).
+///
+/// Only entries of kind task are returned, never a question, an idea or a milestone (`R-KIND-3`).
 #[must_use]
 pub fn select_next_task<'a>(
     doc: &'a Document,
@@ -297,6 +300,9 @@ pub fn select_next_task<'a>(
         .map(|query| matching_section_indices(&doc.sections, query));
 
     let matches_common_filters = |task: &Task| -> bool {
+        if task.kind() != EntryKind::Task {
+            return false;
+        }
         if let Some(ref allowed_sections) = section_matches {
             match task.section {
                 Some(idx) if allowed_sections.contains(&idx) => {}
@@ -365,13 +371,7 @@ pub fn select_next_task<'a>(
     let candidate = doc
         .tasks
         .iter()
-        .filter(|t| {
-            !t.task_type
-                .as_deref()
-                .is_some_and(|ty| ty.eq_ignore_ascii_case("question"))
-                && is_task_ready(doc, t, archive, now, cfg)
-                && matches_common_filters(t)
-        })
+        .filter(|t| is_task_ready(doc, t, archive, now, cfg) && matches_common_filters(t))
         .min_by_key(|t| (cfg.priority_rank(t.priority.as_deref()), t.heading_line))?;
 
     Some(SelectedNext {

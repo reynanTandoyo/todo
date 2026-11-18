@@ -3,7 +3,7 @@
 use clap::Args as ClapArgs;
 use serde::Serialize;
 
-use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::cli::{CommandKind, CommandMeta, Context, write_milestone_chain};
 use crate::doc::TaskChangeIntent;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::current_time;
@@ -19,7 +19,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "next",
     summary: "Pick the next ready task (optionally claiming it atomically)",
     kind: CommandKind::Read,
-    details: "Selects the highest-priority ready task (open or stale claimed, with all dependencies done or dropped, excluding `type: question`), breaking ties by file order. When `--agent` or `TODO_AGENT` is set, returns the agent's own existing claim first unless `--new` is passed. With `--claim`, picks and claims atomically inside a single write lock.",
+    details: "Selects the highest-priority ready task (open or stale claimed, with all dependencies done or dropped, excluding questions, ideas and milestones), breaking ties by file order. When `--agent` or `TODO_AGENT` is set, returns the agent's own existing claim first unless `--new` is passed. With `--claim`, picks and claims atomically inside a single write lock.",
     examples: &[
         "todo next",
         "todo next --agent agent-1",
@@ -221,6 +221,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             ),
         };
         out.write_line(&line);
+        write_milestone_chain(out, &task.id, &task.milestones);
     } else {
         out.write_line("no ready tasks");
     }

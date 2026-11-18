@@ -1,4 +1,4 @@
-//! `todo check` command: validate `TODO.md`, dependencies, config values, temp files, and rules (`R-CHECK-1`, `R-DEP-3`).
+//! `todo check` command: validate `TODO.md`, dependencies, milestones, config values, temp files, and rules (`R-CHECK-1`, `R-DEP-3`, `R-MILE-5`).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -13,7 +13,7 @@ use crate::agents::{
 };
 use crate::atomic::{atomic_write_bytes, read_file_with_snapshot, validate_utf8};
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::{Document, LineEdit, Status, TaskChangeIntent, TaskId};
+use crate::doc::{Document, FieldLocation, LineEdit, Status, Task, TaskChangeIntent, TaskId};
 use crate::error::{ErrorCode, ExitCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::history::{OutsideEditOutcome, detect_outside_edit};
@@ -180,6 +180,9 @@ pub(crate) fn collect_problems(
 
             // 4. Dependency checks (missing IDs, dropped dependencies, cycles; R-DEP-3).
             check_dependencies(&doc, archive.as_ref(), &label, &mut problems);
+
+            // 4b. Milestone tree and reference checks (R-MILE-5, R-KIND-2).
+            check_milestones(&doc, archive.as_ref(), &label, &mut problems);
 
             // 5. Outdated managed rules block in TODO.md (R-AGENT-3).
             if let ManagedBlockStatus::Outdated { begin_line, .. } =
@@ -469,6 +472,207 @@ pub(crate) fn check_dependencies(
             dfs(id, &mut cx);
         }
     }
+}
+
+/// Milestone and reference checks (`R-MILE-5`, `R-KIND-2`): a `milestone` field naming a missing
+/// ID or an entry that is not a milestone, a cycle of milestones, a milestone without a goal, a
+/// done or dropped milestone with unfinished entries below it, an entry below an archived milestone
+/// that is done or dropped, and an `about` field naming a missing ID.
+///
+/// An ID is missing only when neither `TODO.md` nor `TODO-archive.md` holds it (`R-DEP-3`). Each
+/// problem is reported at the line that holds it: the `milestone` or `about` line for a bad
+/// reference, the `milestone` line of the entry that closes a cycle, and the heading otherwise.
+pub(crate) fn check_milestones(
+    doc: &Document,
+    archive: Option<&Document>,
+    label: &str,
+    problems: &mut Vec<CheckProblem>,
+) {
+    for task in &doc.tasks {
+        let id_str = doc.id_config.format_id(task.id);
+        let heading = task.heading_line + 1;
+
+        if task.is_milestone() && task.goal.is_none() {
+            problems.push(milestone_problem(
+                label,
+                heading,
+                format!("{id_str}: milestone has no goal"),
+            ));
+        }
+
+        if let Some(raw) = task.milestone.as_deref() {
+            let line = task.milestone_loc.map_or(heading, |loc| loc.line() + 1);
+            match lookup_entry(doc, archive, raw) {
+                None => problems.push(milestone_problem(
+                    label,
+                    line,
+                    format!("{id_str}: milestone {} does not exist", shown_ref(doc, raw)),
+                )),
+                Some(parent) if !parent.is_milestone() => problems.push(milestone_problem(
+                    label,
+                    line,
+                    format!("{id_str}: {} is not a milestone", shown_ref(doc, raw)),
+                )),
+                Some(_) => {}
+            }
+        }
+
+        if let Some(field) = task.unknown_fields.iter().find(|f| f.key == "about")
+            && lookup_entry(doc, archive, &field.value).is_none()
+        {
+            problems.push(milestone_problem(
+                label,
+                field.line + 1,
+                format!(
+                    "{id_str}: about {} does not exist",
+                    shown_ref(doc, &field.value)
+                ),
+            ));
+        }
+    }
+
+    // Each entry names one parent, so a walk up the tree either ends or returns to its own path.
+    // Only milestones are parents, so every cycle is made of milestones; each cycle is reported
+    // once, at the `milestone` line of the entry that closes it.
+    let mut settled: BTreeSet<TaskId> = BTreeSet::new();
+    for start in &doc.tasks {
+        let mut path: Vec<&Task> = Vec::new();
+        let mut current = Some(start);
+        while let Some(task) = current {
+            if settled.contains(&task.id) {
+                break;
+            }
+            if let Some(pos) = path.iter().position(|t| t.id == task.id) {
+                let mut chain: Vec<String> = path[pos..]
+                    .iter()
+                    .map(|t| doc.id_config.format_id(t.id))
+                    .collect();
+                chain.push(doc.id_config.format_id(task.id));
+                if let Some(closing) = path.last() {
+                    let line = closing
+                        .milestone_loc
+                        .map_or(closing.heading_line, FieldLocation::line)
+                        + 1;
+                    problems.push(milestone_problem(
+                        label,
+                        line,
+                        format!("milestone cycle: {}", chain.join(" -> ")),
+                    ));
+                }
+                break;
+            }
+            path.push(task);
+            current = doc.milestone_parent(task).filter(|p| p.is_milestone());
+        }
+        settled.extend(path.iter().map(|t| t.id));
+    }
+
+    for milestone in doc
+        .tasks
+        .iter()
+        .filter(|t| t.is_milestone() && matches!(t.status, Status::Done | Status::Dropped))
+    {
+        let unfinished = doc.unfinished_below(milestone.id);
+        if unfinished.is_empty() {
+            continue;
+        }
+        let listed: Vec<String> = unfinished
+            .iter()
+            .map(|t| format!("{} ({})", doc.id_config.format_id(t.id), t.status.as_str()))
+            .collect();
+        problems.push(milestone_problem(
+            label,
+            milestone.heading_line + 1,
+            format!(
+                "{}: {} milestone has unfinished entries below it: {}",
+                doc.id_config.format_id(milestone.id),
+                milestone.status.as_str(),
+                listed.join(", ")
+            ),
+        ));
+    }
+
+    if let Some(arch) = archive {
+        for task in doc
+            .tasks
+            .iter()
+            .filter(|t| matches!(t.status, Status::Open | Status::Claimed | Status::Blocked))
+        {
+            if let Some(closed) = archived_closed_ancestor(doc, arch, task) {
+                problems.push(milestone_problem(
+                    label,
+                    task.heading_line + 1,
+                    format!(
+                        "{}: milestone {} is archived as {}, but this entry is {}",
+                        doc.id_config.format_id(task.id),
+                        arch.id_config.format_id(closed.id),
+                        closed.status.as_str(),
+                        task.status.as_str()
+                    ),
+                ));
+            }
+        }
+    }
+}
+
+fn milestone_problem(label: &str, line: usize, message: String) -> CheckProblem {
+    CheckProblem {
+        file: label.to_string(),
+        line,
+        message,
+    }
+}
+
+/// The entry `raw` names as an ID, looking in `TODO.md` first and then in the archive (`R-DEP-3`).
+fn lookup_entry<'a>(
+    doc: &'a Document,
+    archive: Option<&'a Document>,
+    raw: &str,
+) -> Option<&'a Task> {
+    let id = doc.id_config.parse_user_id(raw)?;
+    doc.task_by_id(id)
+        .or_else(|| archive.and_then(|arch| arch.task_by_id(id)))
+}
+
+/// `raw` as a canonical ID when it parses, otherwise as the quoted text that was written.
+fn shown_ref(doc: &Document, raw: &str) -> String {
+    doc.id_config.parse_user_id(raw).map_or_else(
+        || format!("{:?}", raw.trim()),
+        |id| doc.id_config.format_id(id),
+    )
+}
+
+/// The done or dropped milestone above `task` that lives in the archive, if any. The walk goes up
+/// through `TODO.md` and then through the archive, and stops at a missing entry, a non-milestone
+/// or a cycle.
+fn archived_closed_ancestor<'a>(
+    doc: &'a Document,
+    archive: &'a Document,
+    task: &Task,
+) -> Option<&'a Task> {
+    let mut seen: BTreeSet<TaskId> = BTreeSet::from([task.id]);
+    let mut parent_id = doc.milestone_parent_id(task);
+    while let Some(id) = parent_id {
+        if !seen.insert(id) {
+            return None;
+        }
+        if let Some(parent) = doc.task_by_id(id) {
+            if !parent.is_milestone() {
+                return None;
+            }
+            parent_id = doc.milestone_parent_id(parent);
+        } else {
+            let parent = archive.task_by_id(id)?;
+            if !parent.is_milestone() {
+                return None;
+            }
+            if matches!(parent.status, Status::Done | Status::Dropped) {
+                return Some(parent);
+            }
+            parent_id = archive.milestone_parent_id(parent);
+        }
+    }
+    None
 }
 
 fn check_leftover_temps(

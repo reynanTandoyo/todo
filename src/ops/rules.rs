@@ -3,7 +3,7 @@
 use chrono::{DateTime, FixedOffset};
 use serde_json::Value;
 
-use crate::doc::{Status, Task, agent_names_equal};
+use crate::doc::{EntryKind, Status, Task, agent_names_equal};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::config::OpsConfig;
 
@@ -55,6 +55,8 @@ pub enum TaskCommand {
     Move,
     /// `todo answer` (`R-WRITE-11`).
     Answer,
+    /// `todo promote` (`R-KIND-1`).
+    Promote,
 }
 
 impl TaskCommand {
@@ -67,8 +69,21 @@ impl TaskCommand {
             Self::Set => "set",
             Self::Move => "move",
             Self::Answer => "answer",
+            Self::Promote => "promote",
         }
     }
+}
+
+/// Refuses `promote` of an entry that is not an idea (`R-KIND-1`): `BAD_TRANSITION`, exit 1.
+pub fn check_promotable(task: &Task, id_str: &str) -> Result<()> {
+    if task.kind() == EntryKind::Idea {
+        return Ok(());
+    }
+    Err(TodoError::new(
+        ErrorCode::BadTransition,
+        format!("task {id_str} is not an idea; promote works only on entries with `type: idea`"),
+    )
+    .with_task(id_str))
 }
 
 /// Returns the status commands allowed from `status` without `--force` (`R-WRITE-9`).
