@@ -742,10 +742,12 @@ todo tree T-010
 ### 5.22 Versions and migration — VER, MIG
 
 - **R-VER-1 COULD** `TODO.md` records the highest todo version that has written it, in the tool line
-  `<!-- todo-tool: 0.6.0 -->` directly after the format line (format.md §4).
-  - `init` writes it. A write command adds it, or raises it, in the same write when its own version
-    is higher, and never lowers it; only a command that writes the file changes it (R-EDIT-6).
-    Read commands never write it.
+  `<!-- todo-tool: 0.6.0 -->` directly after the format line, or as the first line when the file has
+  no format line (format.md §4).
+  - `init` writes it. A write command adds it when it is missing, or raises it when its own version
+    is higher, in the same write, and never lowers it; only a command that writes the file changes it
+    (R-EDIT-6). Read commands never write it.
+  - A value that is not `MAJOR.MINOR.PATCH` is kept as it is and reported as a warning.
   - Versions are compared number by number, so `0.10.0` is above `0.9.0`. A file without the line
     counts as written by todo 0.5.0 or older.
   - An older tool on a file stamped newer, in a format it knows, still works, and warns on standard

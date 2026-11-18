@@ -309,5 +309,8 @@ fn last_line_without_ending_stays_without_ending() {
     assert!(out.status.success(), "{out:?}");
     let text = fs::read_to_string(&src).unwrap();
     assert!(text.ends_with("- note (2026-11-01, bob): done"), "{text:?}");
-    assert!(text.starts_with("<!-- todo-format: 1 -->\n# T\n## A\n\n### T-001 · One\n"));
+    let stamp = format!("<!-- todo-tool: {} -->", env!("CARGO_PKG_VERSION"));
+    assert!(text.starts_with(&format!(
+        "<!-- todo-format: 1 -->\n{stamp}\n# T\n## A\n\n### T-001 · One\n"
+    )));
 }

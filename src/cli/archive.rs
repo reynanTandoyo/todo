@@ -7,6 +7,7 @@ use clap::Args as ClapArgs;
 use serde::Serialize;
 
 use crate::atomic::{atomic_replace, atomic_write_bytes, read_file_with_snapshot, validate_utf8};
+use crate::version::RUNNING_VERSION;
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::doc::{Document, LineEdit, SectionLookup, Status, Task, TaskChangeIntent};
 use crate::error::{ErrorCode, Result, TodoError};
@@ -94,6 +95,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     }
 
     let mut lock_warnings = Vec::new();
+    let mut stamp_warning: Option<String> = None;
     let summaries = locked_read_modify_write_with_warnings(
         &found.path,
         &state,
@@ -103,6 +105,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         &mut lock_warnings,
         |bytes, _snap| {
             let doc = parse_doc_for_write(bytes, &label, &cfg)?;
+            stamp_warning = doc.newer_tool_warning(&label);
             let existing_archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
             let now = current_time();
             let selected = select_tasks_to_archive(&doc, args.older_than, now);
@@ -151,9 +154,16 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 .map_err(|e| {
                     TodoError::new(ErrorCode::WriteFailed, e.to_string()).with_file(label.clone())
                 })?;
+            // The same write adds or raises the tool stamp (R-VER-1).
+            let new_bytes = match applied.doc.with_tool_stamp(RUNNING_VERSION).map_err(|e| {
+                TodoError::new(ErrorCode::WriteFailed, e.to_string()).with_file(label.clone())
+            })? {
+                Some(stamped) => stamped.bytes,
+                None => applied.bytes,
+            };
 
             Ok(WriteOutcome::Changed {
-                new_bytes: applied.bytes,
+                new_bytes,
                 value: summaries,
             })
         },
@@ -161,6 +171,9 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     for w in lock_warnings {
         out.warn(w);
+    }
+    if let Some(warn) = stamp_warning {
+        out.warn(warn);
     }
 
     if out.is_json() {
@@ -328,11 +341,18 @@ fn write_updated_archive(
         .map_err(|e| {
             TodoError::new(ErrorCode::WriteFailed, e.to_string()).with_file(&cfg.archive_file)
         })?;
+    // The archive file carries the same tool stamp as TODO.md (R-VER-1).
+    let new_bytes = match applied.doc.with_tool_stamp(RUNNING_VERSION).map_err(|e| {
+        TodoError::new(ErrorCode::WriteFailed, e.to_string()).with_file(&cfg.archive_file)
+    })? {
+        Some(stamped) => stamped.bytes,
+        None => applied.bytes,
+    };
 
     if let Some(snap) = existing_snap {
-        atomic_replace(archive_path, &snap.snapshot, &applied.bytes)
+        atomic_replace(archive_path, &snap.snapshot, &new_bytes)
     } else {
-        atomic_write_bytes(archive_path, &applied.bytes)
+        atomic_write_bytes(archive_path, &new_bytes)
     }
 }
 
