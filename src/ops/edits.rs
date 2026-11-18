@@ -59,11 +59,7 @@ impl<'a> TaskEditBuilder<'a> {
 
     /// Sets `- status: <status>`, updating the existing line or inserting in canonical order (§10).
     pub fn set_status(&mut self, status: Status) {
-        let text = format!("- status: {}", status.as_str());
-        match self.task.status_line {
-            Some(line) => self.replace_line_if_changed(line, text),
-            None => self.queue_field_insert("status", text),
-        }
+        self.set_line_field("status", self.task.status_line, status.as_str());
     }
 
     /// Sets `- owner: <agent>` (or `- owner: —` for nobody), updating or inserting in canonical order.
@@ -72,40 +68,28 @@ impl<'a> TaskEditBuilder<'a> {
             Some(name) => sanitize_trimmed_value(name),
             None => CANONICAL_NOBODY_OWNER.to_string(),
         };
-        let text = format!("- owner: {val}");
-        match self.task.owner_line {
-            Some(line) => self.replace_line_if_changed(line, text),
-            None => self.queue_field_insert("owner", text),
-        }
+        self.set_line_field("owner", self.task.owner_line, &val);
     }
 
     /// Clears an existing owner to `- owner: —` if the task currently has an owner (`R-WRITE-3`).
     ///
     /// Leaves an unowned task's `- owner:` line untouched so no unrelated bytes change (`R-EDIT-9`).
     pub fn clear_owner_if_present(&mut self) {
-        if self.task.owner.is_some()
-            && let Some(line) = self.task.owner_line
-        {
-            self.replace_line_if_changed(line, format!("- owner: {CANONICAL_NOBODY_OWNER}"));
+        if self.task.owner.is_some() && self.task.owner_line.is_some() {
+            self.set_line_field("owner", self.task.owner_line, CANONICAL_NOBODY_OWNER);
         }
     }
 
     /// Sets `- claimed: <timestamp>`, updating the existing line or inserting in canonical order.
     pub fn set_claimed(&mut self, timestamp: &str) {
         let clean = sanitize_trimmed_value(timestamp);
-        let text = format!("- claimed: {clean}");
-        match self.task.claimed_line {
-            Some(line) => self.replace_line_if_changed(line, text),
-            None => self.queue_field_insert("claimed", text),
-        }
+        self.set_line_field("claimed", self.task.claimed_line, &clean);
     }
 
     /// Removes the `- claimed:` line if present (`R-WRITE-9`, `docs/format.md` §10), and with it
     /// the `- session:` line, which only describes a claim (`R-CLAIM-7`).
     pub fn remove_claimed(&mut self) {
-        if let Some(line) = self.task.claimed_line {
-            self.line_changes.insert(line, None);
-        }
+        self.unset_line_field("claimed", self.task.claimed_line);
         self.remove_session();
     }
 
@@ -225,10 +209,10 @@ impl<'a> TaskEditBuilder<'a> {
         (edits, TaskChangeIntent::modify_one(self.task.id))
     }
 
-    /// Sets a field kept as one line (`why`, `depends`, `files`, `problem`, `fix`, `accept`, `commit`,
-    /// or an unknown part): a value on its own line is replaced, a value on the combined priority line
-    /// is edited as a part of that line, and a missing field is added in canonical order (`docs/format.md`
-    /// §8, §10). `existing_line` is where the field is now, if it is present.
+    /// Sets a field kept as one line (`status`, `owner`, `claimed`, `why`, `depends`, `files`, `problem`,
+    /// `fix`, `accept`, `commit`, or an unknown part): a value on its own line is replaced, a value on the
+    /// combined priority line is edited as a part of that line, and a missing field is added in canonical
+    /// order (`docs/format.md` §8, §10). `existing_line` is where the field is now, if it is present.
     fn set_line_field(&mut self, key: &str, existing_line: Option<usize>, clean_val: &str) {
         match existing_line {
             Some(line) if self.on_priority_line(line) => self.set_combined_part(key, clean_val),
