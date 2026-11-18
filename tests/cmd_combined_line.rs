@@ -41,6 +41,55 @@ fn ok(home: &Path, work: &Path, args: &[&str]) -> Output {
 }
 
 #[test]
+fn set_edits_an_unknown_part_of_the_combined_line_in_place() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Parse the config\n- status: open\n- owner: —\n\
+                - priority: P1 · custom_tag: a · area: ui\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+
+    ok(
+        &home,
+        &work,
+        &[
+            "--agent",
+            "t-agent",
+            "set",
+            "T-001",
+            "--field",
+            "custom_tag=b",
+        ],
+    );
+    assert_eq!(
+        read_text(&file),
+        written(
+            "### T-001 · Parse the config\n- status: open\n- owner: —\n\
+             - priority: P1 · custom_tag: b · area: ui\n"
+        ),
+        "the part is changed where it is, with no second copy"
+    );
+
+    ok(
+        &home,
+        &work,
+        &[
+            "--agent",
+            "t-agent",
+            "set",
+            "T-001",
+            "--unset",
+            "custom_tag",
+        ],
+    );
+    assert_eq!(
+        read_text(&file),
+        written(
+            "### T-001 · Parse the config\n- status: open\n- owner: —\n- priority: P1 · area: ui\n"
+        ),
+        "unset removes only that part of the line"
+    );
+}
+
+#[test]
 fn why_problem_fix_accept_files_depends_and_commit_on_the_combined_line_are_read_as_fields() {
     let tmp = TempDir::new().unwrap();
     let body = "### T-001 · Parse the config\n- status: open\n- owner: —\n\

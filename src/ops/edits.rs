@@ -25,7 +25,7 @@ pub struct TaskEditBuilder<'a> {
     type_override: Option<Option<String>>,
     area_override: Option<Option<String>>,
     /// Planned updates to other parts of the combined priority line, by key (`milestone`, `goal`,
-    /// `why`, `depends`, ...); `None` removes the part.
+    /// `why`, `depends`, ... and unknown parts); `None` removes the part.
     combined_part_overrides: BTreeMap<String, Option<String>>,
     seq: usize,
 }
@@ -119,15 +119,8 @@ impl<'a> TaskEditBuilder<'a> {
     }
 
     fn remove_session(&mut self) {
-        if let Some(entry) = self.task.unknown_fields.iter().find(|f| f.key == "session")
-            && self
-                .task
-                .priority_detail
-                .as_ref()
-                .is_none_or(|d| d.line != entry.line)
-        {
-            self.line_changes.insert(entry.line, None);
-        }
+        let existing = self.unknown_line("session");
+        self.unset_line_field("session", existing);
     }
 
     /// Sets a field by key (`priority`, `difficulty`, `type`, `area`, known fields, or unknown fields),
@@ -157,24 +150,8 @@ impl<'a> TaskEditBuilder<'a> {
             "accept" => self.set_line_field("accept", self.task.accept_line, &clean),
             "commit" => self.set_line_field("commit", self.task.commit_line, &clean),
             _ => {
-                let existing = self
-                    .task
-                    .unknown_fields
-                    .iter()
-                    .find(|f| f.key == lower)
-                    .map(|f| f.line);
-                if let Some(line) = existing {
-                    if let Some(ref detail) = self.task.priority_detail
-                        && detail.line == line
-                    {
-                        // Leave combined-priority extra unknown parts untouched unless needed.
-                        self.queue_field_insert_owned(lower.clone(), format!("- {lower}: {clean}"));
-                    } else {
-                        self.replace_line_if_changed(line, format!("- {lower}: {clean}"));
-                    }
-                } else {
-                    self.queue_field_insert_owned(lower.clone(), format!("- {lower}: {clean}"));
-                }
+                let existing = self.unknown_line(&lower);
+                self.set_line_field(&lower, existing, &clean);
             }
         }
     }
@@ -198,15 +175,8 @@ impl<'a> TaskEditBuilder<'a> {
             "accept" => self.unset_line_field("accept", self.task.accept_line),
             "commit" => self.unset_line_field("commit", self.task.commit_line),
             _ => {
-                if let Some(entry) = self.task.unknown_fields.iter().find(|f| f.key == lower)
-                    && self
-                        .task
-                        .priority_detail
-                        .as_ref()
-                        .is_none_or(|d| d.line != entry.line)
-                {
-                    self.line_changes.insert(entry.line, None);
-                }
+                let existing = self.unknown_line(&lower);
+                self.unset_line_field(&lower, existing);
             }
         }
     }
@@ -255,8 +225,8 @@ impl<'a> TaskEditBuilder<'a> {
         (edits, TaskChangeIntent::modify_one(self.task.id))
     }
 
-    /// Sets a field kept as one line (`why`, `depends`, `files`, `problem`, `fix`, `accept`, `commit`):
-    /// a value on its own line is replaced, a value on the combined priority line
+    /// Sets a field kept as one line (`why`, `depends`, `files`, `problem`, `fix`, `accept`, `commit`,
+    /// or an unknown part): a value on its own line is replaced, a value on the combined priority line
     /// is edited as a part of that line, and a missing field is added in canonical order (`docs/format.md`
     /// §8, §10). `existing_line` is where the field is now, if it is present.
     fn set_line_field(&mut self, key: &str, existing_line: Option<usize>, clean_val: &str) {
@@ -291,6 +261,15 @@ impl<'a> TaskEditBuilder<'a> {
             self.combined_part_overrides
                 .insert(key.to_string(), Some(value.to_string()));
         }
+    }
+
+    /// The line of an unknown field or part `key`, if the task has one.
+    fn unknown_line(&self, key: &str) -> Option<usize> {
+        self.task
+            .unknown_fields
+            .iter()
+            .find(|f| f.key == key)
+            .map(|f| f.line)
     }
 
     /// Whether `line` is the task's combined priority line, whose parts are edited in place.
@@ -332,10 +311,6 @@ impl<'a> TaskEditBuilder<'a> {
             }
             None => {}
         }
-    }
-
-    fn queue_field_insert_owned(&mut self, key: String, text: String) {
-        self.queue_field_insert(&key, text);
     }
 
     fn replace_line_if_changed(&mut self, line: usize, new_text: String) {
