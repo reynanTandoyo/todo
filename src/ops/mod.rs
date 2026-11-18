@@ -34,6 +34,7 @@
 pub mod config;
 pub mod edits;
 pub mod identity;
+pub mod milestone;
 pub mod pipeline;
 pub mod query;
 pub mod read;

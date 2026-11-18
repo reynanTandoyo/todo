@@ -15,11 +15,13 @@
 //! - [`verify`]: [`Document::apply_and_verify`] and [`verify_task_edits`] prove both byte
 //!   preservation and parsed-task equivalence outside the intended [`TaskChangeIntent`] (R-EDIT-7).
 //! - [`stamp`]: the tool version stamp that every write adds or raises (R-VER-1).
+//! - [`tree`]: the kinds of entry and the milestone tree (`docs/format.md` §16, §17).
 
 pub mod id;
 pub mod lines;
 pub mod parser;
 pub mod stamp;
+pub mod tree;
 pub mod verify;
 
 pub use id::{DEFAULT_ID_PREFIX, DEFAULT_ID_WIDTH, IdConfig, TaskId};
@@ -37,4 +39,5 @@ pub use parser::{
     is_valid_agent_name, strip_section_number,
 };
 pub use stamp::{stamp_bytes, tool_line_text};
+pub use tree::EntryKind;
 pub use verify::{AppliedDocEdits, TaskChangeIntent, verify_task_edits};

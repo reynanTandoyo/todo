@@ -119,6 +119,72 @@ fn every_command_that_interprets_or_changes_tasks_refuses_a_newer_format() {
 }
 
 #[test]
+fn milestone_commands_refuse_a_newer_format_too() {
+    let dir = newer_project();
+    let before = read_todo(dir.path());
+    fs::write(
+        dir.path().join("batch.jsonl"),
+        concat!(
+            "{\"ref\":\"m\",\"title\":\"Shelves\",\"type\":\"milestone\",\"priority\":\"P1\",",
+            "\"goal\":\"shelves are sorted\"}\n",
+            "{\"title\":\"Shelf pass\",\"priority\":\"P2\",\"milestone\":\"@m\"}\n",
+        ),
+    )
+    .expect("write batch");
+    let commands: &[&[&str]] = &[
+        &[
+            "add",
+            "--title",
+            "Shade the shelves",
+            "--priority",
+            "P2",
+            "--type",
+            "chore",
+            "--area",
+            "shed",
+            "--milestone",
+            "T-001",
+            "--agent",
+            "bob",
+        ],
+        &[
+            "add",
+            "--title",
+            "Shelf milestone",
+            "--priority",
+            "P1",
+            "--type",
+            "milestone",
+            "--goal",
+            "shelves are sorted",
+            "--area",
+            "shed",
+            "--agent",
+            "bob",
+        ],
+        &["set", "T-001", "--milestone", "T-002", "--agent", "bob"],
+        &[
+            "drop",
+            "T-001",
+            "--tree",
+            "--note",
+            "scope cut",
+            "--agent",
+            "bob",
+        ],
+        &["add", "--from", "batch.jsonl", "--agent", "bob"],
+    ];
+    for args in commands {
+        assert_refused(dir.path(), args);
+    }
+    assert_eq!(
+        read_todo(dir.path()),
+        before,
+        "a refused command writes nothing"
+    );
+}
+
+#[test]
 fn the_refusal_text_names_the_file_line_and_both_versions() {
     let dir = newer_project();
     let out = run_in(dir.path(), &["list"]);
