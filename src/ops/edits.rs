@@ -24,7 +24,8 @@ pub struct TaskEditBuilder<'a> {
     difficulty_override: Option<Option<String>>,
     type_override: Option<Option<String>>,
     area_override: Option<Option<String>>,
-    /// Planned updates to other parts of the combined priority line (`milestone`, `goal`), by key.
+    /// Planned updates to other parts of the combined priority line, by key (`milestone`, `goal`,
+    /// `why`, `depends`, ...); `None` removes the part.
     combined_part_overrides: BTreeMap<String, Option<String>>,
     seq: usize,
 }
@@ -148,13 +149,13 @@ impl<'a> TaskEditBuilder<'a> {
             "claimed" => self.set_claimed(&clean),
             "milestone" => self.set_part_field("milestone", self.task.milestone_loc, &clean),
             "goal" => self.set_part_field("goal", self.task.goal_loc, &clean),
-            "why" => self.set_simple_field("why", self.task.why_line, &clean),
-            "depends" => self.set_simple_field("depends", self.task.depends_line, &clean),
-            "files" => self.set_simple_field("files", self.task.files_line, &clean),
-            "problem" => self.set_simple_field("problem", self.task.problem_line, &clean),
-            "fix" => self.set_simple_field("fix", self.task.fix_line, &clean),
-            "accept" => self.set_simple_field("accept", self.task.accept_line, &clean),
-            "commit" => self.set_simple_field("commit", self.task.commit_line, &clean),
+            "why" => self.set_line_field("why", self.task.why_line, &clean),
+            "depends" => self.set_line_field("depends", self.task.depends_line, &clean),
+            "files" => self.set_line_field("files", self.task.files_line, &clean),
+            "problem" => self.set_line_field("problem", self.task.problem_line, &clean),
+            "fix" => self.set_line_field("fix", self.task.fix_line, &clean),
+            "accept" => self.set_line_field("accept", self.task.accept_line, &clean),
+            "commit" => self.set_line_field("commit", self.task.commit_line, &clean),
             _ => {
                 let existing = self
                     .task
@@ -189,13 +190,13 @@ impl<'a> TaskEditBuilder<'a> {
             "milestone" => self.unset_part_field("milestone", self.task.milestone_loc),
             "goal" => self.unset_part_field("goal", self.task.goal_loc),
             "claimed" => self.remove_claimed(),
-            "why" => self.remove_if_some(self.task.why_line),
-            "depends" => self.remove_if_some(self.task.depends_line),
-            "files" => self.remove_if_some(self.task.files_line),
-            "problem" => self.remove_if_some(self.task.problem_line),
-            "fix" => self.remove_if_some(self.task.fix_line),
-            "accept" => self.remove_if_some(self.task.accept_line),
-            "commit" => self.remove_if_some(self.task.commit_line),
+            "why" => self.unset_line_field("why", self.task.why_line),
+            "depends" => self.unset_line_field("depends", self.task.depends_line),
+            "files" => self.unset_line_field("files", self.task.files_line),
+            "problem" => self.unset_line_field("problem", self.task.problem_line),
+            "fix" => self.unset_line_field("fix", self.task.fix_line),
+            "accept" => self.unset_line_field("accept", self.task.accept_line),
+            "commit" => self.unset_line_field("commit", self.task.commit_line),
             _ => {
                 if let Some(entry) = self.task.unknown_fields.iter().find(|f| f.key == lower)
                     && self
@@ -254,12 +255,50 @@ impl<'a> TaskEditBuilder<'a> {
         (edits, TaskChangeIntent::modify_one(self.task.id))
     }
 
-    fn set_simple_field(&mut self, key: &str, existing_line: Option<usize>, clean_val: &str) {
-        let text = format!("- {key}: {clean_val}");
+    /// Sets a field kept as one line (`why`, `depends`, `files`, `problem`, `fix`, `accept`, `commit`):
+    /// a value on its own line is replaced, a value on the combined priority line
+    /// is edited as a part of that line, and a missing field is added in canonical order (`docs/format.md`
+    /// §8, §10). `existing_line` is where the field is now, if it is present.
+    fn set_line_field(&mut self, key: &str, existing_line: Option<usize>, clean_val: &str) {
         match existing_line {
-            Some(line) => self.replace_line_if_changed(line, text),
-            None => self.queue_field_insert_owned(key.to_string(), text),
+            Some(line) if self.on_priority_line(line) => self.set_combined_part(key, clean_val),
+            Some(line) => self.replace_line_if_changed(line, format!("- {key}: {clean_val}")),
+            None => self.queue_field_insert(key, format!("- {key}: {clean_val}")),
         }
+    }
+
+    /// Removes a field kept as one line: its own line, or its part of the combined priority line.
+    fn unset_line_field(&mut self, key: &str, existing_line: Option<usize>) {
+        match existing_line {
+            Some(line) if self.on_priority_line(line) => {
+                self.combined_part_overrides.insert(key.to_string(), None);
+            }
+            Some(line) => {
+                self.line_changes.insert(line, None);
+            }
+            None => {}
+        }
+    }
+
+    /// Sets the part `key` of the combined priority line to `value`. The line is split at ` · ` when it
+    /// is read, so a value that contains the separator cannot stay on it: the part then moves to a line
+    /// of its own, and the rest of the combined line is kept as it was.
+    fn set_combined_part(&mut self, key: &str, value: &str) {
+        if value.contains(" · ") {
+            self.combined_part_overrides.insert(key.to_string(), None);
+            self.queue_field_insert(key, format!("- {key}: {value}"));
+        } else {
+            self.combined_part_overrides
+                .insert(key.to_string(), Some(value.to_string()));
+        }
+    }
+
+    /// Whether `line` is the task's combined priority line, whose parts are edited in place.
+    fn on_priority_line(&self, line: usize) -> bool {
+        self.task
+            .priority_detail
+            .as_ref()
+            .is_some_and(|d| d.line == line)
     }
 
     /// Sets `milestone` or `goal` (`docs/format.md` §8, §17). A value on its own line is replaced
@@ -295,10 +334,8 @@ impl<'a> TaskEditBuilder<'a> {
         }
     }
 
-    fn remove_if_some(&mut self, line: Option<usize>) {
-        if let Some(idx) = line {
-            self.line_changes.insert(idx, None);
-        }
+    fn queue_field_insert_owned(&mut self, key: String, text: String) {
+        self.queue_field_insert(&key, text);
     }
 
     fn replace_line_if_changed(&mut self, line: usize, new_text: String) {
@@ -319,10 +356,6 @@ impl<'a> TaskEditBuilder<'a> {
         let seq = self.seq;
         self.seq += 1;
         self.field_inserts.push((insert_at, rank, seq, text));
-    }
-
-    fn queue_field_insert_owned(&mut self, key: String, text: String) {
-        self.queue_field_insert(&key, text);
     }
 
     /// Inserts a new `difficulty`, `type` or `area` part into the parts that follow the priority

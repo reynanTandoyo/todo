@@ -1416,6 +1416,39 @@ fn parse_task_block(
                                 task.goal = non_empty_string(part_val);
                                 task.goal_loc = Some(FieldLocation::CombinedPriority(idx));
                             }
+                            // The fields below are kept as one line each, so their line index is the
+                            // combined priority line's (`docs/format.md` §8: every other part counts as
+                            // its field).
+                            "why" => {
+                                task.why = non_empty_string(part_val);
+                                task.why_line = Some(idx);
+                            }
+                            "depends" => {
+                                task.depends = parse_depends_list(part_val, id_config);
+                                task.depends_raw = Some(part_val.clone());
+                                task.depends_line = Some(idx);
+                            }
+                            "files" => {
+                                task.files = non_empty_string(part_val);
+                                task.files_line = Some(idx);
+                            }
+                            "problem" => {
+                                task.problem = non_empty_string(part_val);
+                                task.problem_line = Some(idx);
+                            }
+                            "fix" => {
+                                task.fix = non_empty_string(part_val);
+                                task.fix_line = Some(idx);
+                            }
+                            "accept" => {
+                                task.accept = non_empty_string(part_val);
+                                task.accept_line = Some(idx);
+                            }
+                            "commit" => {
+                                task.commit = parse_comma_list(part_val);
+                                task.commit_raw = Some(part_val.clone());
+                                task.commit_line = Some(idx);
+                            }
                             _ => {
                                 task.unknown_fields.push(FieldEntry {
                                     key: part_key.clone(),
