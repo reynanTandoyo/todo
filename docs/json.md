@@ -441,13 +441,19 @@ Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `T
       { "file": "TODO.md", "from": 1, "to": 2 },
       { "file": "TODO-archive.md", "from": 1, "to": 2 }
     ],
-    "changed": true
+    "changed": true,
+    "project": [
+      { "file": "TODO.md", "kind": "rules_block", "updated": true },
+      { "file": "AGENTS.md", "kind": "rules_block", "updated": true },
+      { "file": ".claude/skills/todo/SKILL.md", "kind": "skill", "updated": true },
+      { "file": ".claude/settings.json", "kind": "hooks", "events": ["SessionStart"], "updated": true }
+    ]
   },
   "warnings": []
 }
 ```
 
-`migrated` is empty when nothing was in an older format; `changed` is `false` when the file was not written (including `--dry-run`, which also sets `dry_run` and `diff`).
+`migrated` is empty when nothing was in an older format; `changed` is `false` when the file was not written (including `--dry-run`, which also sets `dry_run` and `diff`). `project` lists each installed project file that is out of date (R-MIG-2): `kind` is `rules_block`, `skill` or `hooks`; `events` names the hook events whose entries are out of date (hooks only); `updated` is `true` when `--yes` changed the file. Without `--yes` every row has `updated: false`.
 
 ### `todo lock --json`, `todo unlock --json`, `todo status --json`
 

@@ -540,11 +540,12 @@ or with `--json` the task as it is after the change.
 - **R-AGENT-3 SHOULD** `agents install [--into FILE] --yes` writes or updates the rules block in
   `AGENTS.md` (default), `CLAUDE.md` or another file, leaving the rest of the file byte for byte;
   `agents check` reports a missing or outdated block.
-- **R-AGENT-4 COULD** `hooks install --yes` adds two Claude Code hooks to the project's
+- **R-AGENT-4 COULD** `hooks install --yes` adds three Claude Code hooks to the project's
   `.claude/settings.json`: at session start, `todo summary` (at most 40 lines, within 2 seconds);
   before Edit, Write or MultiEdit, `todo guard`, which stops direct edits of `TODO.md` and the
   archive file and names the command to use instead (direct edits are allowed while a lease is
-  live). It keeps a backup, preserves the file's formatting, marks its entries so `hooks uninstall`
+  live); at session end, `todo session-end`, which releases the claims of the ending session
+  (R-CLAIM-7). It keeps a backup, preserves the file's formatting, marks its entries so `hooks uninstall`
   removes only those, and works from PowerShell.
 - **R-AGENT-5 COULD** `skill install --yes` writes `.claude/skills/todo/SKILL.md` from the same rules
   text.
@@ -833,8 +834,18 @@ todo tree T-010
     (R-AGENT-3), the Claude Code skill (R-AGENT-5) and the Claude Code hooks (R-AGENT-4). Out of
     date means different from what the running tool would write, as `agents check` decides; it
     doesn't depend on the stamp, which the first write after an update has already raised.
+  - The project files are those in the folder of `TODO.md`: `TODO.md` itself, `AGENTS.md` and
+    `CLAUDE.md` (the files `todo check` reads), `.claude/skills/todo/SKILL.md` and
+    `.claude/settings.json`. Another file named with `agents install --into` is not found.
+  - A rules block counts as installed when its markers are there. The skill is compared with line
+    endings ignored, as `agents check` does. A hook event counts as installed when its managed
+    entry is there, and a missing event is not added (`hooks install` adds it).
   - `todo migrate --yes` updates exactly those that are already installed and never installs one
-    that wasn't (R-WRITE-14). Each file changes only inside the parts todo owns.
+    that wasn't (R-WRITE-14). Each file changes only inside the parts todo owns: the lines between
+    the markers, the whole skill file, and the managed hook entries, with every other byte kept.
+    The settings file is copied to `.claude/settings.json.bak` first, as `hooks install` does.
+  - A file that cannot be read or parsed is a warning on standard error, and is left alone.
+  - `--dry-run` prints the diffs that `--yes` would write, and writes nothing.
   - `summary` shows one line naming `todo migrate --yes` while anything is out of date, within its
     40 lines. Afterwards `todo check` and `agents check` are clean, and a second run changes
     nothing.

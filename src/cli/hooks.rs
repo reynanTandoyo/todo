@@ -5,20 +5,19 @@ use std::path::{Path, PathBuf};
 
 use clap::{Args as ClapArgs, Subcommand};
 use serde::Serialize;
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
 use similar::TextDiff;
 
+use crate::agents::hooks_file::{
+    HOOK_EVENTS, canonical_entries, detect_indent, is_managed_hook,
+};
+use crate::agents::project::{BACKUP_REL_PATH, SETTINGS_REL_PATH};
 use crate::atomic::atomic_write_bytes;
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::ops::require_yes_or_preview;
 use crate::output::Output;
-
-const SETTINGS_REL_PATH: &str = ".claude/settings.json";
-const BACKUP_REL_PATH: &str = ".claude/settings.json.bak";
-const MANAGED_KEY: &str = "_managed_by";
-const MANAGED_VAL: &str = "todo";
 
 /// Metadata for the `hooks` command.
 pub const META: CommandMeta = CommandMeta {
@@ -211,42 +210,11 @@ fn install_hooks(root: &mut Value) -> Result<()> {
         )
     })?;
 
-    // 1. SessionStart -> todo summary
-    let session_entry = json!({
-        MANAGED_KEY: MANAGED_VAL,
-        "hooks": [
-            {
-                "type": "command",
-                "command": "todo summary"
-            }
-        ]
-    });
-    upsert_hook_entry(hooks_obj, "SessionStart", session_entry)?;
-
-    // 2. PreToolUse (Edit|Write|MultiEdit) -> todo guard
-    let guard_entry = json!({
-        MANAGED_KEY: MANAGED_VAL,
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-            {
-                "type": "command",
-                "command": "todo guard"
-            }
-        ]
-    });
-    upsert_hook_entry(hooks_obj, "PreToolUse", guard_entry)?;
-
-    // 3. SessionEnd -> todo session-end (releases the claims of the ending session; R-CLAIM-7)
-    let end_entry = json!({
-        MANAGED_KEY: MANAGED_VAL,
-        "hooks": [
-            {
-                "type": "command",
-                "command": "todo session-end"
-            }
-        ]
-    });
-    upsert_hook_entry(hooks_obj, "SessionEnd", end_entry)?;
+    // SessionStart -> todo summary; PreToolUse -> todo guard; SessionEnd -> todo session-end
+    // (releases the claims of the ending session; R-CLAIM-7). `migrate` writes the same entries.
+    for (event, entry) in canonical_entries() {
+        upsert_hook_entry(hooks_obj, event, entry)?;
+    }
 
     Ok(())
 }
@@ -265,7 +233,7 @@ fn upsert_hook_entry(
             format!("`hooks.{event}` in settings.json must be a JSON array"),
         )
     })?;
-    if let Some(existing) = arr.iter_mut().find(|v| is_managed_entry(v)) {
+    if let Some(existing) = arr.iter_mut().find(|v| is_managed_hook(v)) {
         *existing = entry;
     } else {
         arr.push(entry);
@@ -284,9 +252,9 @@ fn uninstall_hooks(root: &mut Value) -> Result<()> {
         return Ok(());
     };
 
-    for event in ["SessionStart", "PreToolUse", "SessionEnd"] {
+    for event in HOOK_EVENTS {
         if let Some(Value::Array(arr)) = hooks_obj.get_mut(event) {
-            arr.retain(|v| !is_managed_entry(v));
+            arr.retain(|v| !is_managed_hook(v));
         }
         if hooks_obj
             .get(event)
@@ -300,13 +268,6 @@ fn uninstall_hooks(root: &mut Value) -> Result<()> {
         root_obj.remove("hooks");
     }
     Ok(())
-}
-
-fn is_managed_entry(val: &Value) -> bool {
-    val.as_object()
-        .and_then(|m| m.get(MANAGED_KEY))
-        .and_then(|v| v.as_str())
-        == Some(MANAGED_VAL)
 }
 
 fn format_preserving_style(old_text: &str, value: &Value) -> Result<String> {
@@ -344,19 +305,6 @@ fn format_preserving_style(old_text: &str, value: &Value) -> Result<String> {
         rendered.push_str(eol);
     }
     Ok(rendered)
-}
-
-fn detect_indent(text: &str) -> String {
-    for line in text.lines() {
-        let ws: String = line
-            .chars()
-            .take_while(|c| *c == ' ' || *c == '\t')
-            .collect();
-        if !ws.is_empty() {
-            return ws;
-        }
-    }
-    "  ".to_string()
 }
 
 /// Ensures unused Path import warning doesn't trigger if refactored.
