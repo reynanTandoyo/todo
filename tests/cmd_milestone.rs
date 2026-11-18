@@ -98,6 +98,12 @@ fn assert_refused(p: &Proj, args: &[&str], code: &str) -> Output {
     out
 }
 
+/// The file after a successful write: the running tool stamp (R-VER-1) is added as the first line,
+/// because these fixtures have no format line.
+fn stamped(text: &str) -> String {
+    format!("<!-- todo-tool: {} -->\n{text}", env!("CARGO_PKG_VERSION"))
+}
+
 /// Asserts that `args` succeeds in text mode and returns the output.
 fn assert_ok(p: &Proj, args: &[&str]) -> Output {
     let out = run(p, args);
@@ -246,7 +252,7 @@ fn add_milestone_needs_a_goal_and_a_parent_must_be_a_milestone() {
 - milestone: T-003\n\
 - note (2026-11-18, planner): added\n"
     );
-    assert_eq!(read_todo(&p.work), expected);
+    assert_eq!(read_todo(&p.work), stamped(&expected));
 }
 
 #[test]
@@ -335,7 +341,7 @@ fn set_moves_the_subtree_and_unsets_to_top_level() {
 - priority: P2\n\
 - note (2026-11-15, planner): added\n"
     );
-    assert_eq!(read_todo(&p.work), expected);
+    assert_eq!(read_todo(&p.work), stamped(&expected));
 }
 
 #[test]
@@ -490,7 +496,7 @@ fn milestone_in_the_combined_priority_line_is_edited_in_place() {
         "- priority: P1 · type: feature · milestone: T-001 · area: cli\n",
         "- priority: P1 · type: feature · area: cli\n",
     );
-    assert_eq!(read_todo(&p.work), expected);
+    assert_eq!(read_todo(&p.work), stamped(&expected));
 }
 
 #[test]
@@ -577,7 +583,7 @@ fn done_on_a_milestone_waits_for_the_entries_below_unless_forced() {
 - milestone: T-001\n\
 - note (2026-11-15, planner): added\n"
     );
-    assert_eq!(read_todo(&p.work), expected);
+    assert_eq!(read_todo(&p.work), stamped(&expected));
 }
 
 #[test]
@@ -652,7 +658,7 @@ fn drop_of_a_milestone_names_drop_tree_and_drop_tree_drops_the_subtree() {
 - note (2026-11-15, planner): added\n\
 - note (2026-11-18, planner): dropped with T-001 — scope cut\n"
     );
-    assert_eq!(read_todo(&p.work), expected);
+    assert_eq!(read_todo(&p.work), stamped(&expected));
 }
 
 #[test]
@@ -851,7 +857,7 @@ fn apply_takes_milestone_references_and_refuses_a_cycle_whole() {
         "- milestone: T-005\n",
         "- note (2026-11-18, planner): added\n",
     );
-    assert_eq!(read_todo(&p.work), expected);
+    assert_eq!(read_todo(&p.work), stamped(&expected));
 
     // T-001 cannot move under its own descendant: the whole batch is refused.
     fs::write(

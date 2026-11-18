@@ -19,6 +19,7 @@ use crate::ops::read::{
 use crate::ops::rules::{ClaimPlan, ReleasePlan};
 use crate::output::Output;
 use crate::state::StateDir;
+use crate::version::RUNNING_VERSION;
 
 /// Closure that computes a command output payload from a verified post-edit [`Document`].
 pub type DocValueBuilder<T> = Box<dyn FnOnce(&Document) -> Result<T>>;
@@ -289,6 +290,7 @@ where
 
     let mut dry_run_diff: Option<String> = None;
     let mut lock_warnings: Vec<String> = Vec::new();
+    let mut stamp_warning: Option<String> = None;
     let (changed, value) = locked_read_modify_write_full(
         &found.path,
         &state,
@@ -301,6 +303,7 @@ where
             let parse_timer = crate::timing::PhaseTimer::start("write.parse_doc");
             let doc = parse_doc_for_write(bytes, &label, cfg)?;
             parse_timer.finish();
+            stamp_warning = doc.newer_tool_warning(&label);
             let arch_timer = crate::timing::PhaseTimer::start("write.read_archive");
             let archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
             arch_timer.finish();
@@ -335,6 +338,15 @@ where
                         }
                         return Ok(WriteOutcomeFull::Unchanged((false, val)));
                     }
+                    // The same write adds or raises the tool stamp (R-VER-1).
+                    let applied = match applied
+                        .doc
+                        .with_tool_stamp(RUNNING_VERSION)
+                        .map_err(|e| edit_error_to_todo_error(&e, &label))?
+                    {
+                        Some(stamped) => stamped,
+                        None => applied,
+                    };
                     if ctx.dry_run {
                         let diff_timer = crate::timing::PhaseTimer::start("write.dry_run_diff");
                         let old_text = String::from_utf8_lossy(bytes);
@@ -359,6 +371,9 @@ where
     )?;
 
     for warn in lock_warnings {
+        out.warn(warn);
+    }
+    if let Some(warn) = stamp_warning {
         out.warn(warn);
     }
 

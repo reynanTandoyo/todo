@@ -92,12 +92,14 @@ optional), so every version-2 file has it. `todo init` writes it, and a migratio
 (§18).
 
 **Tool line.** `<!-- todo-tool: 0.6.0 -->` on its own line, directly after the format line, records
-the highest todo version that has written the file.
+the highest todo version that has written the file. When the file has no format line, it is the
+first line of the file.
 
-- `init` writes it. A command that writes the file adds it, or raises it in the same write when its
-  own version is higher; it is never lowered. Read commands never write it.
+- `init` writes it. A command that writes the file adds it when it is missing, or raises it in the
+  same write when its own version is higher; it is never lowered. Read commands never write it.
 - Versions are `MAJOR.MINOR.PATCH`, compared number by number: `0.10.0` is above `0.9.0`.
 - A file without the line counts as written by todo 0.5.0 or older.
+- A value that is not `MAJOR.MINOR.PATCH` is kept as it is, and reported as a warning.
 - A tool older than the stamp, on a format it knows, works normally and warns on standard error
   that it is behind, naming `todo help update`.
 

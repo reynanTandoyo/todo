@@ -14,7 +14,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "set",
     summary: "Edit fields or title of a task",
     kind: CommandKind::Write,
-    details: "Updates task fields (`--title`, `--priority`, `--type`, `--area`, `--milestone`, `--goal`, `--depends`, `--files`, `--problem`, `--fix`, `--accept`), arbitrary `--field key=value` pairs, or removes fields with `--unset key`. `--milestone` moves the entry, with everything below it, under another milestone; `--unset milestone` makes it top-level. Edits combined `- priority:` lines in place. Refuses changing or unsetting `status`, `owner`, or `claimed`.",
+    details: "Updates task fields (`--title`, `--priority`, `--difficulty`, `--type`, `--area`, `--milestone`, `--goal`, `--depends`, `--files`, `--problem`, `--fix`, `--accept`), arbitrary `--field key=value` pairs, or removes fields with `--unset key`. `--milestone` moves the entry, with everything below it, under another milestone; `--unset milestone` makes it top-level. Edits combined `- priority:` lines in place. Refuses changing or unsetting `status`, `owner`, or `claimed`.",
     examples: &[
         "todo set T-012 --priority P0 --area cli --agent agent-1",
         "todo set T-012 --milestone T-010 --agent agent-1",
@@ -37,6 +37,10 @@ pub struct Args {
     /// New priority (e.g. `P0`, `P1`).
     #[arg(long, value_name = "VALUE")]
     pub priority: Option<String>,
+
+    /// New difficulty: one of the configured `difficulties` (e.g. `easy`, `hard`).
+    #[arg(long, value_name = "VALUE")]
+    pub difficulty: Option<String>,
 
     /// New task type (e.g. `feature`, `bug`).
     #[arg(long = "type", value_name = "VALUE")]
@@ -90,6 +94,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     let has_any = args.title.is_some()
         || args.priority.is_some()
+        || args.difficulty.is_some()
         || args.task_type.is_some()
         || args.area.is_some()
         || args.milestone.is_some()
@@ -131,6 +136,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     }
     let named = [
         ("priority", args.priority.as_ref()),
+        ("difficulty", args.difficulty.as_ref()),
         ("type", args.task_type.as_ref()),
         ("area", args.area.as_ref()),
         ("milestone", args.milestone.as_ref()),

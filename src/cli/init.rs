@@ -9,9 +9,11 @@ use serde::Serialize;
 
 use crate::agents::render_managed_block;
 use crate::cli::{CommandKind, CommandMeta, Context};
+use crate::doc::tool_line_text;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::output::Output;
+use crate::version::RUNNING_VERSION;
 
 /// Metadata for the `init` command.
 pub const META: CommandMeta = CommandMeta {
@@ -58,7 +60,10 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     }
 
     let managed = render_managed_block("\n");
-    let content = format!("<!-- todo-format: 1 -->\n# {title}\n\n{managed}\n\n## Tasks\n");
+    let stamp = tool_line_text(RUNNING_VERSION);
+    let content = format!(
+        "<!-- todo-format: 1 -->\n{stamp}\n# {title}\n\n{managed}\n\n## Tasks\n"
+    );
 
     if let Some(parent) = target.parent()
         && !parent.as_os_str().is_empty()

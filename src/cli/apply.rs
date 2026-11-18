@@ -25,6 +25,7 @@ use crate::ops::{
 use crate::ops::identity::done_by;
 use crate::output::Output;
 use crate::state::{IdsState, StateDir};
+use crate::version::RUNNING_VERSION;
 
 /// Metadata for the `apply` command.
 pub const META: CommandMeta = CommandMeta {
@@ -81,6 +82,7 @@ enum ApplyOp {
         title: String,
         section: Option<String>,
         priority: String,
+        difficulty: Option<String>,
         #[serde(rename = "type")]
         task_type: Option<String>,
         area: Option<String>,
@@ -126,6 +128,7 @@ enum ApplyOp {
         task: String,
         title: Option<String>,
         priority: Option<String>,
+        difficulty: Option<String>,
         #[serde(rename = "type")]
         task_type: Option<String>,
         area: Option<String>,
@@ -209,6 +212,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         .collect();
 
     let mut lock_warnings = Vec::new();
+    let mut stamp_warning: Option<String> = None;
     let mut dry_run_diff: Option<String> = None;
     let applied = locked_read_modify_write_with_warnings(
         &found.path,
@@ -220,6 +224,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         |bytes, _snap| {
             let mut working_bytes = bytes.to_vec();
             let mut doc = parse_doc_for_write(&working_bytes, &label, &cfg)?;
+            stamp_warning = doc.newer_tool_warning(&label);
             let archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
             let now = current_time();
 
@@ -283,6 +288,13 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 return Ok(WriteOutcome::Unchanged(results));
             }
 
+            // The same write adds or raises the tool stamp (R-VER-1).
+            if let Some(stamped) = doc.with_tool_stamp(RUNNING_VERSION).map_err(|e| {
+                TodoError::new(ErrorCode::WriteFailed, e.to_string()).with_file(&label)
+            })? {
+                working_bytes = stamped.bytes;
+            }
+
             if ctx.dry_run {
                 let before_str = String::from_utf8_lossy(bytes);
                 let after_str = String::from_utf8_lossy(&working_bytes);
@@ -307,6 +319,9 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     for w in lock_warnings {
         out.warn(w);
+    }
+    if let Some(warn) = stamp_warning {
+        out.warn(warn);
     }
 
     if let Some(diff) = dry_run_diff {
@@ -442,6 +457,7 @@ fn apply_one_op(
             title,
             section,
             priority,
+            difficulty,
             task_type,
             area,
             milestone,
@@ -508,6 +524,13 @@ fn apply_one_op(
                 Some(dep) => Some(resolve_depends(dep, refs)?).filter(|d| !d.is_empty()),
                 None => None,
             };
+            let difficulty = match difficulty
+                .as_deref()
+                .or_else(|| fields.get("difficulty").map(String::as_str))
+            {
+                Some(raw) => Some(cfg.canonical_difficulty(raw)?),
+                None => None,
+            };
             let extra: Vec<(String, String)> = fields
                 .iter()
                 .map(|(k, v)| (k.clone(), v.trim().to_string()))
@@ -515,6 +538,7 @@ fn apply_one_op(
             let lines = NewTask {
                 title: clean_title,
                 priority: Some(priority.trim()),
+                difficulty: difficulty.as_deref(),
                 task_type: trim(task_type),
                 area: trim(area),
                 milestone: milestone_id.as_deref(),
@@ -686,6 +710,7 @@ fn apply_task_op(
             task,
             title,
             priority,
+            difficulty,
             task_type,
             area,
             milestone,
@@ -708,6 +733,7 @@ fn apply_task_op(
             }
             let named = [
                 ("priority", priority),
+                ("difficulty", difficulty),
                 ("type", task_type),
                 ("area", area),
             ];

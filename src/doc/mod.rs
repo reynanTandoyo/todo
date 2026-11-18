@@ -14,10 +14,13 @@
 //!   known and unknown fields, notes, managed blocks, and every write-blocking problem or warning.
 //! - [`verify`]: [`Document::apply_and_verify`] and [`verify_task_edits`] prove both byte
 //!   preservation and parsed-task equivalence outside the intended [`TaskChangeIntent`] (R-EDIT-7).
+//! - [`stamp`]: the tool version stamp that every write adds or raises (R-VER-1).
+//! - [`tree`]: the kinds of entry and the milestone tree (`docs/format.md` §16, §17).
 
 pub mod id;
 pub mod lines;
 pub mod parser;
+pub mod stamp;
 pub mod tree;
 pub mod verify;
 
@@ -32,8 +35,9 @@ pub use parser::{
     CombinedPriorityLine, DependencyRef, Document, FieldEntry, FieldLocation, MANAGED_BLOCK_BEGIN,
     MANAGED_BLOCK_END, ManagedBlock, Note, Problem, ProblemKind, ProblemSeverity,
     SUPPORTED_FORMAT_VERSION, Section, SectionLookup, Status, TASK_HEADING_SEPARATORS, Task,
-    agent_names_equal, canonical_field_rank, inspect_problems, is_nobody_owner,
+    ToolStamp, agent_names_equal, canonical_field_rank, inspect_problems, is_nobody_owner,
     is_valid_agent_name, strip_section_number,
 };
+pub use stamp::{stamp_bytes, tool_line_text};
 pub use tree::EntryKind;
 pub use verify::{AppliedDocEdits, TaskChangeIntent, verify_task_edits};

@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::atomic::{read_file_with_snapshot, validate_utf8};
 use crate::cli::Context;
-use crate::doc::{Document, EntryKind, IdConfig, Status, Task};
+use crate::doc::{Document, IdConfig, Status, Task, TaskId};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, fs_path};
 use crate::ops::config::OpsConfig;
@@ -199,7 +199,7 @@ pub fn is_task_ready(
         return false;
     }
     // Milestones are never handed out (R-MILE-2), nor questions (R-WRITE-11).
-    if matches!(task.kind(), EntryKind::Milestone | EntryKind::Question) {
+    if task.is_milestone() || is_question(task) {
         return false;
     }
     doc.dependencies_satisfied(task, archive)
@@ -297,6 +297,8 @@ pub struct TaskJson {
     pub stale: bool,
     /// Task priority, if present.
     pub priority: Option<String>,
+    /// Task difficulty, if present (`R-WRITE-18`).
+    pub difficulty: Option<String>,
     /// Task type, if present.
     #[serde(rename = "type")]
     pub task_type: Option<String>,
@@ -316,6 +318,8 @@ pub struct TaskJson {
     pub dependencies: Vec<DependencyStatusJson>,
     /// Tasks waiting on this task (`R-DEP-2`).
     pub dependents: Vec<DependentTaskJson>,
+    /// Questions whose `about` field names this entry, in file order (`R-KIND-2`).
+    pub questions: Vec<QuestionAboutJson>,
     /// Whether the task is ready for `next`.
     pub ready: bool,
     /// `- files:` value, if present.
@@ -338,6 +342,19 @@ pub struct TaskJson {
     pub line_end: usize,
 }
 
+/// JSON representation of a question whose `about` field names the inspected entry (`R-KIND-2`).
+#[derive(Debug, Clone, Serialize)]
+pub struct QuestionAboutJson {
+    /// Canonical question ID.
+    pub id: String,
+    /// Question text.
+    pub title: String,
+    /// Current status.
+    pub status: String,
+    /// Whether this question lives in `TODO-archive.md`.
+    pub archived: bool,
+}
+
 /// Summary JSON representation of a task used in `list --json`.
 #[derive(Debug, Clone, Serialize)]
 pub struct ListTaskJson {
@@ -357,6 +374,8 @@ pub struct ListTaskJson {
     pub stale: bool,
     /// Task priority, if present.
     pub priority: Option<String>,
+    /// Task difficulty, if present (`R-WRITE-18`).
+    pub difficulty: Option<String>,
     /// Task type, if present.
     #[serde(rename = "type")]
     pub task_type: Option<String>,
@@ -372,6 +391,51 @@ pub struct ListTaskJson {
     pub line_start: usize,
     /// 1-based ending line number of the task block (inclusive).
     pub line_end: usize,
+}
+
+/// Whether `task` is a question (`type: question`, any case; `docs/format.md` §16).
+#[must_use]
+pub fn is_question(task: &Task) -> bool {
+    task.task_type
+        .as_deref()
+        .is_some_and(|t| t.eq_ignore_ascii_case("question"))
+}
+
+/// The entry `task` names in its `about` field, as an ID (`R-KIND-2`). `None` when the field is
+/// absent or does not hold an ID.
+#[must_use]
+pub fn about_id(task: &Task, cfg: &OpsConfig) -> Option<TaskId> {
+    let field = task.unknown_fields.iter().find(|f| f.key == "about")?;
+    cfg.id_config.parse_user_id(&field.value)
+}
+
+/// The questions whose `about` field names `target` (`R-KIND-2`), in file order, looking first in
+/// `primary` and then in `secondary`.
+///
+/// `archived` means `primary` is `TODO-archive.md`, as for [`build_task_json`].
+#[must_use]
+pub fn questions_about(
+    primary: &Document,
+    secondary: Option<&Document>,
+    archived: bool,
+    target: TaskId,
+    cfg: &OpsConfig,
+) -> Vec<QuestionAboutJson> {
+    let mut found = Vec::new();
+    for (doc, is_archive) in [(Some(primary), archived), (secondary, !archived)] {
+        let Some(doc) = doc else { continue };
+        for candidate in &doc.tasks {
+            if is_question(candidate) && about_id(candidate, cfg) == Some(target) {
+                found.push(QuestionAboutJson {
+                    id: cfg.id_config.format_id(candidate.id),
+                    title: candidate.title.clone(),
+                    status: candidate.status.as_str().to_string(),
+                    archived: is_archive,
+                });
+            }
+        }
+    }
+    found
 }
 
 /// Builds a [`TaskJson`] for `task`, resolving dependencies and dependents across `primary` and `secondary`.
@@ -435,6 +499,8 @@ pub fn build_task_json(
         }
     }
 
+    let questions = questions_about(primary, secondary, archived, task.id, cfg);
+
     let fields = task
         .unknown_fields
         .iter()
@@ -486,6 +552,7 @@ pub fn build_task_json(
         claimed: task.claimed.clone(),
         stale: cfg.is_claim_stale(task, now),
         priority: task.priority.clone(),
+        difficulty: task.difficulty.clone(),
         task_type: task.task_type.clone(),
         area: task.area.clone(),
         goal: task.goal.clone(),
@@ -495,6 +562,7 @@ pub fn build_task_json(
         depends: task.depends.iter().map(|d| d.raw.clone()).collect(),
         dependencies,
         dependents,
+        questions,
         ready: is_task_ready(primary, task, ready_archive, now, cfg),
         files: task.files.clone(),
         problem: task.problem.clone(),
@@ -531,6 +599,7 @@ pub fn build_list_task_json(
         claimed: task.claimed.clone(),
         stale: cfg.is_claim_stale(task, now),
         priority: task.priority.clone(),
+        difficulty: task.difficulty.clone(),
         task_type: task.task_type.clone(),
         area: task.area.clone(),
         depends: task.depends.iter().map(|d| d.raw.clone()).collect(),
