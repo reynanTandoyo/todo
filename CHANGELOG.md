@@ -2,6 +2,66 @@
 
 All notable changes to `todo` are documented in this file.
 
+## [0.6.0] - 2026-11-18
+
+### Changed — file format version 2 (read this before updating)
+- `TODO.md` and `TODO-archive.md` are now format version 2: the format line is `<!-- todo-format: 2 -->`,
+  and a tool line `<!-- todo-tool: 0.6.0 -->` records the newest todo that has written the file
+  (`R-VER-1`, format.md §4 and §18). Format 1 files are migrated on the first write, or at once with
+  `todo migrate --yes`; the migration changes only the format and tool lines (`R-MIG-1`).
+- **todo 0.5 and older can no longer write a format 2 file.** They read it with a warning but refuse
+  to write it. Update every todo that writes the same `TODO.md` before the first write by 0.6.
+- A todo that meets a format it does not know stops every command that reads task content with exit 4
+  and the error `TOOL_TOO_OLD`, naming the stamped version and the running one and pointing at
+  `todo help update` (`R-VER-2`). `where`, `help`, `schema`, `status`, `history` and the other commands
+  that never read tasks keep working, and nothing is written.
+- `summary` and `where` count tasks only: `total` and the status counts leave out milestones, questions
+  and ideas, which are counted apart (`R-KIND-3`, `R-MILE-3`).
+- The agent rules text (`todo help agents`, `R-AGENT-1`) now says: put each new task under a milestone
+  with a `why`; read the goals above a task before starting it; close a milestone when its last task is
+  finished; use `idea` for ideas and `ask --about` for questions; run `todo migrate --yes` after updating
+  todo; and follow `todo help update` when todo is too old for a file. `todo migrate --yes` refreshes
+  the rules block, skill and hooks that a project has installed.
+
+### Added
+- Milestones (`R-MILE-1` to `R-MILE-6`): an entry with `type: milestone` and a `goal`, a tree of
+  milestones and tasks linked by the `milestone` field, at any depth. `todo tree [<milestone>]` shows
+  the tree with progress `done/total`; `list --milestone` and `list --kind` filter it; `drop --tree`
+  drops a milestone with everything below it. `show`, `next`, `claim` and `next --claim` print the goals
+  of the milestones above a task. A milestone cannot be done while work below it is open (`--force`
+  overrides), and `done` reports it as ready to close (`ready_to_close` in JSON) when its last task is
+  finished. `next` hands out tasks in milestones that have already started first.
+- Kinds of entry (`R-KIND-1` to `R-KIND-3`): `todo idea` records an idea without a priority, `todo promote`
+  turns it into a task, `ask --about <ID>` and `idea --about <ID>` name the entry they are about, `show`
+  lists the questions about an entry, and `answer` shows the entry a question is about.
+- `why` and `difficulty` fields (`R-WRITE-17`, `R-WRITE-18`): the purpose of a task (`add --why`) and how
+  hard it is (`add --difficulty`, one of the configured `difficulties`); `next --difficulty` and
+  `--max-difficulty` hand out tasks by how hard they are.
+- `todo migrate [--dry-run] [--yes]`: moves `TODO.md` and the archive to format 2 and brings the installed
+  rules block, Claude Code skill and hooks up to date, without installing anything that was not there
+  (`R-MIG-2`).
+- `todo help update` (and `--json`): the steps an agent runs to update todo from the official release;
+  todo itself never connects to the network (`R-OUT-11`).
+- `todo check` reports milestone and reference problems (`R-MILE-5`): a missing or non-milestone parent,
+  a cycle, a finished milestone with open entries below it, a milestone without a goal, an `about` naming
+  a missing ID. It also warns about a difficulty outside the configured ones.
+- `todo archive` keeps milestone trees whole and lists the finished entries it kept back, with the reason
+  (`R-ARCH-2`).
+- `todo where` shows the format version, the tool stamp and the running version (`R-FIND-7`).
+
+### Fixed
+- The combined priority line reads `status`, `owner`, `claimed`, `why`, `problem`, `fix`, `accept`,
+  `files`, `depends` and `commit` as their fields, edits unknown parts in place and keeps a part that is
+  not `key: value` (T-113, T-114, T-117, T-133, T-134).
+- `hooks install` and `hooks uninstall` keep every other byte of `.claude/settings.json` (T-126, T-130);
+  the agent and skill commands use the folder of `TODO.md` (T-127).
+- `archive` writes `TODO-archive.md` after the snapshot of `TODO.md` (T-121).
+- The milestone tree is built in one pass, and a 5,000-task performance test covers it (T-105, T-125).
+- `ask` writes the note `added` as format.md §9 says (T-115); `summary` and `where` counts (T-116, T-128).
+- The JSON examples in `docs/json.md` are checked against the real output of their commands (T-111,
+  T-112, T-128, T-129); the error envelope shows its fields beside `code` and `message`, as the output
+  does, and `TOOL_TOO_OLD` has its own example.
+
 ## [0.5.0] - 2026-11-18
 
 ### Added

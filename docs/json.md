@@ -21,26 +21,27 @@ When `--dry-run` is active on a write command, `"dry_run": true` and `"diff": ".
 
 ```json
 {
-  "schema": "todo.<command>.v1",
+  "schema": "todo.show.v1",
   "ok": false,
   "error": {
     "code": "NOT_FOUND",
     "message": "task T-999 not found",
-    "details": {
-      "task": "T-999"
-    }
+    "task": "T-999"
   },
   "warnings": []
 }
 ```
 
-`error.details` is omitted when empty and may contain `task`, `owner`, `candidates`, `file`, `line`, or command-specific fields such as `problems` (`check`).
+The details of an error sit in the `error` object next to `code` and `message`, not under a
+`details` key. They are left out when empty, and may be `task`, `owner`, `candidates`, `file`,
+`line`, or command-specific fields such as `count` and `problems` (`check`). The exit code of each
+error is in the table under "Error Codes".
 
 ---
 
 ## Shared `TaskJson` Shape
 
-Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, and as `next.task`. The example is the `show` output under "`todo show <task> --json`" below, which lists every key. Every key is always present: a value that is not set is `null`, and a list or an object with nothing in it is `[]` or `{}`.
+Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, `idea`, `promote`, and as `next.task`. The example is the `show` output under "`todo show <task> --json`" below, which lists every key. Every key is always present: a value that is not set is `null`, and a list or an object with nothing in it is `[]` or `{}`.
 
 - `type` is the `type` field as written; `section` is the `##` section the entry is under, or `null`.
 - `archived` is `true` for an entry read from `TODO-archive.md`.
@@ -64,7 +65,7 @@ Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock
   "ok": true,
   "data": {
     "name": "todo",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "about": "Concurrency-safe editor for TODO.md task lists",
     "commands": [
       { "kind": "read", "name": "list", "summary": "List and filter tasks" }
@@ -80,7 +81,7 @@ Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock
 {
   "schema": "todo.version.v1",
   "ok": true,
-  "data": { "version": "0.5.0", "commit": "abc1234" },
+  "data": { "version": "0.6.0", "commit": "abc1234" },
   "warnings": []
 }
 ```
@@ -103,6 +104,8 @@ Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock
 ```
 
 For `todo help agents --json`, `data` is `{"topic":"agents","rules":"..."}`.
+
+### `todo help update --json` (`todo.help.v1`)
 
 For `todo help update --json`, `data` has `topic` (always `update`), `version`, `executable` (the full path of the running executable, or `null` when it cannot be read), `repository`, `latest_release`, `assets` (each with `platform`, `file` and `checksum`), `network`, and `windows` and `linux`. Each of those two is an object with `shell` and `steps`, and a step has `text` and `commands`. todo runs none of the commands; the agent does. Example, with the steps shortened:
 
@@ -127,7 +130,7 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
         { "text": "Read the latest version. ...", "commands": ["gh release view --repo reynanTandoyo/todo --json tagName --jq .tagName"] }
       ]
     },
-    "linux": { "shell": "POSIX sh", "steps": [ "..." ] }
+    "linux": { "shell": "POSIX sh", "steps": [ { "text": "...", "commands": ["..."] } ] }
   },
   "warnings": []
 }
@@ -140,26 +143,26 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
   "schema": "todo.list.v1",
   "ok": true,
   "data": {
-    "file": "TODO.md",
+    "archive": false,
     "count": 1,
     "tasks": [
       {
         "id": "T-001",
         "title": "First task",
+        "section": "Tasks",
         "status": "open",
         "owner": null,
+        "claimed": null,
+        "stale": false,
         "priority": "P1",
         "difficulty": null,
         "type": null,
         "area": null,
         "depends": [],
-        "claimed": null,
-        "stale": false,
         "ready": true,
-        "section": "Tasks",
+        "fields": {},
         "line_start": 7,
-        "line_end": 11,
-        "archived": false
+        "line_end": 11
       }
     ]
   },
@@ -347,8 +350,12 @@ ones only for the whole tree (no milestone argument and no `--area`); otherwise 
         ]
       }
     ],
-    "questions": [],
-    "ideas": []
+    "questions": [
+      { "id": "T-004", "title": "Should the C shader support shadows?", "status": "open", "about": "T-012", "archived": false }
+    ],
+    "ideas": [
+      { "id": "T-005", "title": "Hot-reload shaders while the scene runs", "status": "open", "about": "T-010", "archived": false }
+    ]
   },
   "warnings": []
 }
@@ -405,7 +412,23 @@ Clean (`exit 0`):
 }
 ```
 
-Problems found (`exit 1`): `ok: false`, `error.code: "BAD_VALUE"`, `error.details.count`, and `error.details.problems` (`[{"file":"TODO.md","line":10,"message":"..."}]`).
+Problems found (`exit 1`): `ok: false`, `error.code: "BAD_VALUE"`, `error.count`, and `error.problems` (`[{"file":"TODO.md","line":10,"message":"..."}]`), as in:
+
+```json
+{
+  "schema": "todo.check.v1",
+  "ok": false,
+  "error": {
+    "code": "BAD_VALUE",
+    "message": "1 problem(s) found",
+    "count": 1,
+    "problems": [
+      { "file": "TODO.md", "line": 17, "message": "T-002: stale claim by agent-ui-1" }
+    ]
+  },
+  "warnings": []
+}
+```
 
 ### `todo history --json` (`todo.history.v1`)
 
@@ -446,7 +469,7 @@ Problems found (`exit 1`): `ok: false`, `error.code: "BAD_VALUE"`, `error.detail
 }
 ```
 
-### Single-task write commands (`add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `note`, `set`, `reopen`, `move`, `ask`, `answer`)
+### Single-task write commands (`add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, `idea`, `promote`)
 
 Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `TaskJson`.
 
@@ -526,7 +549,7 @@ Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `T
 
 - `lock`: `{"agent":"alice","started_at":"...","expires_at":"...","minutes":10}`
 - `unlock`: `{"unlocked":true,"forced":false,"previous_holder":"alice"}`
-- `status`: `{"write_lock_held":false,"lease":null}`
+- `status`: `{"file":"TODO.md","state_dir":".git/todo/todo.md","write_lock":{"held":false}}`; while a manual lease is active it also has `lease` with `agent`, `started_at`, `expires_at` and `remaining_seconds`.
 
 ### `todo init --json` (`todo.init.v1`)
 
@@ -560,7 +583,7 @@ Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `T
     "converted": [
       { "id": "T-001", "title": "Add export", "status": "open", "source_line": 11 }
     ],
-    "text": "<!-- todo-format: 1 -->\n..."
+    "text": "<!-- todo-format: 2 -->\n<!-- todo-tool: 0.6.0 -->\n..."
   },
   "warnings": []
 }
@@ -735,21 +758,46 @@ command.
 | `NO_FILE` | 4 | `TODO.md` or `@path` file not found | `{"code":"NO_FILE","message":"no TODO.md found"}` |
 | `NO_AGENT` | 2 | Write command without `--agent` or `TODO_AGENT` | `{"code":"NO_AGENT","message":"missing agent name: pass --agent <name> or set TODO_AGENT"}` |
 | `USAGE` | 2 | Invalid CLI flags, arguments, or agent name | `{"code":"USAGE","message":"invalid agent name \"bad name\""}` |
-| `NOT_FOUND` | 1 | Task, snapshot, or target file not found | `{"code":"NOT_FOUND","message":"task T-999 not found","details":{"task":"T-999"}}` |
-| `AMBIGUOUS` | 1 | Title substring matched multiple tasks | `{"code":"AMBIGUOUS","message":"\"retry\" matched 2 tasks","details":{"candidates":["T-001","T-002"]}}` |
-| `ALREADY_CLAIMED` | 1 | Task is already claimed by another agent | `{"code":"ALREADY_CLAIMED","message":"T-012 is claimed by bob","details":{"owner":"bob","task":"T-012"}}` |
-| `NOT_OWNER` | 1 | Task or lease belongs to another agent without `--force` | `{"code":"NOT_OWNER","message":"T-012 is owned by bob; pass --force","details":{"owner":"bob","task":"T-012"}}` |
+| `NOT_FOUND` | 1 | Task, snapshot, or target file not found | `{"code":"NOT_FOUND","message":"task T-999 not found","task":"T-999"}` |
+| `AMBIGUOUS` | 1 | Title substring matched multiple tasks | `{"code":"AMBIGUOUS","message":"\"retry\" matched 2 tasks","candidates":["T-001","T-002"]}` |
+| `ALREADY_CLAIMED` | 1 | Task is already claimed by another agent | `{"code":"ALREADY_CLAIMED","message":"T-012 is claimed by bob","owner":"bob","task":"T-012"}` |
+| `NOT_OWNER` | 1 | Task or lease belongs to another agent without `--force` | `{"code":"NOT_OWNER","message":"T-012 is owned by bob; pass --force","owner":"bob","task":"T-012"}` |
 | `BAD_TRANSITION` | 1 | Disallowed status transition (e.g. `done` on `open`) | `{"code":"BAD_TRANSITION","message":"cannot mark open task T-012 done without claiming"}` |
 | `DUPLICATE_TITLE` | 1 | `add` title matches an existing task | `{"code":"DUPLICATE_TITLE","message":"task with title \"Setup\" already exists"}` |
 | `UNKNOWN_SECTION` | 1 | Named `--section` does not exist | `{"code":"UNKNOWN_SECTION","message":"section \"Foo\" not found"}` |
 | `AMBIGUOUS_SECTION` | 1 | Multiple sections exist and `--section` was omitted | `{"code":"AMBIGUOUS_SECTION","message":"multiple sections exist; pass --section"}` |
 | `MISSING_FIELD` | 1 | Required field (e.g. `priority`) missing on `add` | `{"code":"MISSING_FIELD","message":"missing required field: priority"}` |
 | `BAD_VALUE` | 2 (1 for `check`) | Invalid field, config, snapshot number, or `check` failure | `{"code":"BAD_VALUE","message":"invalid priority \"P9\""}` |
-| `BUSY` | 3 | Write lock held by another process past wait timeout | `{"code":"BUSY","message":"write lock busy: held by agent bob","details":{"owner":"bob"}}` |
-| `LEASE_HELD` | 3 | Manual editing lease held by another agent | `{"code":"LEASE_HELD","message":"manual lease held by alice until ...","details":{"owner":"alice"}}` |
+| `BUSY` | 3 | Write lock held by another process past wait timeout | `{"code":"BUSY","message":"write lock busy: held by agent bob","owner":"bob"}` |
+| `LEASE_HELD` | 3 | Manual editing lease held by another agent | `{"code":"LEASE_HELD","message":"manual lease held by alice until ...","owner":"alice"}` |
 | `CHANGED_DURING_WRITE` | 3 | Target file changed on disk between read and replace | `{"code":"CHANGED_DURING_WRITE","message":"TODO.md changed on disk during write"}` |
 | `UNSAFE_FILE` | 4 | Invalid UTF-8, conflict markers, unclosed fence/comment, duplicate ID, or `init` target exists | `{"code":"UNSAFE_FILE","message":"TODO.md:4: git conflict marker"}` |
 | `READ_ONLY` | 4 | Target file is read-only | `{"code":"READ_ONLY","message":"TODO.md is read-only"}` |
 | `WRITE_FAILED` | 4 | Atomic write or rename failed | `{"code":"WRITE_FAILED","message":"failed writing temporary file"}` |
 | `NO_GIT_HISTORY` | 5 | `align` without git, outside a repository, in a shallow clone or with no commits | `{"code":"NO_GIT_HISTORY","message":"not inside a git repository"}` |
-| `TOOL_TOO_OLD` | 4 | `TODO.md` or the archive names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 99 is newer than this todo 0.5.0 supports; ...","file":"TODO.md","line":2}` |
+| `TOOL_TOO_OLD` | 4 | `TODO.md` or the archive names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 3 is newer than this todo 0.6.0 supports; ...","line":1,"file":"TODO.md"}` |
+
+### `TOOL_TOO_OLD` (`R-VER-2`)
+
+A `TODO.md` or archive whose format line names a version this todo does not know (for example
+`<!-- todo-format: 3 -->` for todo 0.6) stops every command that reads or changes task content, with
+exit 4 and the error below. The message names the version stamped in the file's tool line and the
+running version. Nothing is written. Run `todo help update --json` for the steps that update todo.
+
+```json
+{
+  "schema": "todo.list.v1",
+  "ok": false,
+  "error": {
+    "code": "TOOL_TOO_OLD",
+    "message": "format version 3 is newer than this todo 0.6.0 supports; the file was last written by todo 0.9.0. Update the todo executable first (`todo help update`).",
+    "line": 1,
+    "file": "TODO.md"
+  },
+  "warnings": []
+}
+```
+
+`where --json` still succeeds for such a file. It shows `format_version` (3), `tool_stamp` (`0.9.0`)
+and `running_version` (`0.6.0`), leaves out `counts` because the tasks are not read, and warns on the
+format line and the tool line.

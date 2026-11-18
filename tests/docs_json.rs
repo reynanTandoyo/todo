@@ -250,3 +250,237 @@ fn next_json_has_a_null_task_when_nothing_is_ready() {
     assert_eq!(real["data"]["claimed"], false);
     assert_eq!(real["data"]["already_claimed"], false);
 }
+
+/// Fixture for the `tree` example: milestone `T-010` with a task below it, a question about the task
+/// and an idea about the milestone, which `tree` lists for the whole file (R-KIND-3).
+const TREE_FIXTURE: &str = "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 2 -->
+# Fixture
+
+## Tasks
+
+### T-010 · Develop the renderer
+- status: open
+- owner: —
+- priority: P1 · type: milestone
+- goal: the test scene renders with lighting at 60 frames per second
+- note (2026-11-15, planner): added
+
+### T-012 · C shader
+- status: open
+- owner: —
+- priority: P1 · difficulty: hard · type: feature · area: cli
+- milestone: T-010
+- why: the renderer has no shading stage yet
+- note (2026-11-15, planner): added
+
+## Questions
+
+### T-004 · Should the shader support shadows?
+- status: open
+- owner: —
+- type: question
+- about: T-012
+- note (2026-11-15, planner): asked
+
+## Ideas
+
+### T-005 · Hot-reload shaders
+- status: open
+- owner: —
+- type: idea
+- about: T-010
+- note (2026-11-15, planner): added
+";
+
+#[test]
+fn tree_example_in_json_md_has_the_keys_of_tree_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo tree --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(dir.path().join("TODO.md"), TREE_FIXTURE).expect("write TODO.md");
+    let out = run_in(dir.path(), &["tree", "--json"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "tree --json");
+}
+
+/// Fixture for the `summary` example: an open milestone with a claimed task below it, a blocked
+/// task, an open task, a question and an idea.
+const SUMMARY_FIXTURE: &str = "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 2 -->
+# Fixture
+
+## Now
+
+### T-001 · Develop the renderer
+- status: open
+- owner: —
+- priority: P1 · type: milestone
+- goal: the test scene renders with lighting at 60 frames per second
+- note (2026-11-15, planner): added
+
+### T-002 · C shader
+- status: claimed
+- owner: alice
+- claimed: 2026-11-15T18:00+01:00
+- priority: P1 · difficulty: hard · type: feature
+- milestone: T-001
+- note (2026-11-15, planner): added
+
+### T-003 · GPU compiler
+- status: open
+- owner: —
+- priority: P2 · type: feature
+- milestone: T-001
+- note (2026-11-15, planner): added
+
+### T-004 · Lighting pass
+- status: blocked
+- owner: —
+- priority: P2 · type: feature
+- note (2026-11-15, planner): added
+- note (2026-11-15, planner): blocked — waiting on key
+
+## Questions
+
+### T-007 · Ship today?
+- status: open
+- owner: —
+- type: question
+- note (2026-11-15, planner): asked
+
+## Ideas
+
+### T-008 · Hot-reload shaders
+- status: open
+- owner: —
+- type: idea
+- note (2026-11-15, planner): added
+";
+
+#[test]
+fn summary_example_in_json_md_has_the_keys_of_summary_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo summary --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(dir.path().join("TODO.md"), SUMMARY_FIXTURE).expect("write TODO.md");
+    let out = run_in(dir.path(), &["summary", "--json"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "summary --json");
+}
+
+/// Fixture for the `list` example: one open task.
+const LIST_FIXTURE: &str = "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 2 -->
+# Fixture
+
+## Tasks
+
+### T-001 · First task
+- status: open
+- owner: —
+- priority: P1
+- note (2026-11-15, planner): added
+";
+
+#[test]
+fn list_example_in_json_md_has_the_keys_of_list_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo list --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(dir.path().join("TODO.md"), LIST_FIXTURE).expect("write TODO.md");
+    let out = run_in(dir.path(), &["list", "--json"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "list --json");
+    assert_same_keys(
+        &example["data"]["tasks"][0],
+        &real["data"]["tasks"][0],
+        "list --json task",
+    );
+}
+
+#[test]
+fn migrate_example_in_json_md_has_the_keys_of_migrate_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo migrate --json`");
+
+    // A format 1 file, and project files that are installed but out of date: the rules block,
+    // the skill and one hook event, so every kind of `project` row appears.
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(
+        dir.path().join("TODO.md"),
+        "<!-- todo-format: 1 -->\n\n## Tasks\n\n### T-001 · First task\n- status: open\n- owner: —\n- priority: P1\n",
+    )
+    .expect("write TODO.md");
+    fs::write(
+        dir.path().join("AGENTS.md"),
+        "<!-- todo:begin -->\nOld rules.\n<!-- todo:end -->\n",
+    )
+    .expect("write AGENTS.md");
+    let install = run_in(dir.path(), &["skill", "install", "--yes"]);
+    assert!(
+        install.status.success(),
+        "stderr: {}",
+        stderr_text(&install)
+    );
+    let skill = dir
+        .path()
+        .join(".claude")
+        .join("skills")
+        .join("todo")
+        .join("SKILL.md");
+    fs::write(&skill, "Old skill.\n").expect("make the skill out of date");
+    let hooks = run_in(dir.path(), &["hooks", "install", "--yes"]);
+    assert!(hooks.status.success(), "stderr: {}", stderr_text(&hooks));
+    let settings = dir.path().join(".claude").join("settings.json");
+    let text = fs::read_to_string(&settings).expect("read settings");
+    fs::write(
+        &settings,
+        text.replacen("todo summary", "todo summary --old", 1),
+    )
+    .expect("make a hook out of date");
+
+    let out = run_in(
+        dir.path(),
+        &["migrate", "--yes", "--agent", "docs-test", "--json"],
+    );
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "migrate --json");
+}
+
+#[test]
+fn help_update_example_in_json_md_has_the_keys_of_help_update_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo help update --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    let out = run_in(dir.path(), &["help", "update", "--json"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "help update --json");
+    assert_same_keys(
+        &example["data"]["windows"]["steps"][0],
+        &real["data"]["windows"]["steps"][0],
+        "help update --json windows step",
+    );
+}
