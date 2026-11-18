@@ -378,3 +378,83 @@ fn claim_writes_the_status_on_the_combined_line_where_it_is() {
     );
     assert_eq!(text.matches("status:").count(), 1, "{text}");
 }
+
+// T-134: a segment of the combined priority line that is not `key: value` is never dropped: it is kept
+// as written (R-EDIT-1) and `check` reports it (`docs/format.md` §8).
+
+#[test]
+fn a_part_without_key_value_survives_a_change_to_the_priority_or_another_part() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Notes\n- status: open\n- owner: —\n\
+                - priority: P1 · see the design notes · area: ui\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+
+    ok(
+        &home,
+        &work,
+        &["--agent", "t-agent", "set", "T-001", "--priority", "P0"],
+    );
+    assert_eq!(
+        read_text(&file),
+        written(
+            "### T-001 · Notes\n- status: open\n- owner: —\n\
+             - priority: P0 · see the design notes · area: ui\n"
+        ),
+        "a change of priority keeps the part"
+    );
+
+    ok(
+        &home,
+        &work,
+        &["--agent", "t-agent", "set", "T-001", "--area", "ops"],
+    );
+    assert_eq!(
+        read_text(&file),
+        written(
+            "### T-001 · Notes\n- status: open\n- owner: —\n\
+             - priority: P0 · see the design notes · area: ops\n"
+        ),
+        "a change of another part keeps the part"
+    );
+}
+
+#[test]
+fn removing_the_priority_keeps_a_part_without_key_value_on_a_line_of_its_own() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Notes\n- status: open\n- owner: —\n\
+                - priority: P1 · see the design notes · area: ui\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+
+    ok(
+        &home,
+        &work,
+        &["--agent", "t-agent", "set", "T-001", "--unset", "priority"],
+    );
+    assert_eq!(
+        read_text(&file),
+        written(
+            "### T-001 · Notes\n- status: open\n- owner: —\n\
+             - see the design notes\n- area: ui\n"
+        ),
+        "the text stays where the priority was, and the field moves to its own line"
+    );
+}
+
+#[test]
+fn check_reports_a_part_without_key_value_on_its_line_as_a_warning() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Notes\n- status: open\n- owner: —\n\
+                - priority: P1 · see the design notes · area: ui\n";
+    let (home, work, _) = setup_proj(&tmp, &doc(body));
+
+    let out = run_todo(&home, &work, &["check"], &[]).unwrap();
+    let text = format!("{}{}", stdout_text(&out), stderr_text(&out));
+    assert_eq!(out.status.code(), Some(1), "{text}");
+    // The priority line is line 9 of this file.
+    assert!(
+        text.contains(
+            "TODO.md:9: part 'see the design notes' on the priority line of T-001 is not key: value; it is kept as written"
+        ),
+        "{text}"
+    );
+}

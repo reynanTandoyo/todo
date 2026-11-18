@@ -3,9 +3,13 @@
 use std::collections::BTreeMap;
 
 use crate::doc::{
-    CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER, Document, FieldLocation, LineEdit, Status,
-    Task, TaskChangeIntent, canonical_field_rank, sanitize_trimmed_value,
+    CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER, CombinedPart, Document, FieldLocation,
+    LineEdit, Status, Task, TaskChangeIntent, canonical_field_rank, sanitize_trimmed_value,
 };
+
+/// A segment of a combined priority line being rebuilt: its key when it is a field, and its text as
+/// it will be written.
+type PartEntry = (Option<String>, String);
 
 /// Builds non-overlapping, canonical [`LineEdit`]s for a single [`Task`] while keeping every
 /// untouched byte identical (`R-EDIT-1`, `R-EDIT-9`, `docs/format.md` §8–§10).
@@ -320,13 +324,29 @@ impl<'a> TaskEditBuilder<'a> {
     /// Inserts a new `difficulty`, `type` or `area` part into the parts that follow the priority
     /// on a combined line: right after the nearest existing part that comes before it in the field
     /// order, or first when there is none (`docs/format.md` §8, §10).
-    fn insert_combined_part(entries: &mut Vec<(String, String)>, key: &str, value: String) {
+    fn insert_combined_part(entries: &mut Vec<PartEntry>, key: &str, value: String) {
         let rank = canonical_field_rank(key);
         let at = entries
             .iter()
-            .rposition(|(k, _)| canonical_field_rank(k) < rank)
+            .rposition(|(k, _)| k.as_deref().is_some_and(|k| canonical_field_rank(k) < rank))
             .map_or(0, |i| i + 1);
-        entries.insert(at, (key.to_string(), value));
+        entries.insert(at, (Some(key.to_string()), format!("{key}: {value}")));
+    }
+
+    /// The value a field on the combined priority line has after this edit, or `None` when the edit
+    /// removes it.
+    fn combined_field_value(&self, key: &str, value: &str) -> Option<String> {
+        let planned = match key {
+            "difficulty" => self.difficulty_override.as_ref(),
+            "type" => self.type_override.as_ref(),
+            "area" => self.area_override.as_ref(),
+            _ => self.combined_part_overrides.get(key),
+        };
+        match planned {
+            Some(Some(new_value)) => Some(new_value.clone()),
+            Some(None) => None,
+            None => Some(value.to_string()),
+        }
     }
 
     fn flush_priority_type_area(&mut self) {
@@ -351,8 +371,7 @@ impl<'a> TaskEditBuilder<'a> {
                 None => detail.priority.clone(),
             };
 
-            let mut parts: Vec<String> = Vec::new();
-            let mut extra_entries: Vec<(String, String)> = Vec::new();
+            let mut entries: Vec<PartEntry> = Vec::new();
 
             let difficulty_in_combined = matches!(
                 self.task.difficulty_loc,
@@ -365,34 +384,16 @@ impl<'a> TaskEditBuilder<'a> {
             let area_in_combined =
                 matches!(self.task.area_loc, Some(FieldLocation::CombinedPriority(_)));
 
-            for (k, v) in &detail.extra_parts {
-                match k.as_str() {
-                    "difficulty" => match &self.difficulty_override {
-                        Some(Some(new_d)) => {
-                            extra_entries.push(("difficulty".to_string(), new_d.clone()))
+            // Every segment stays in its place: a field keeps its position unless an edit removes it,
+            // and a segment that is not a field is kept as written (`docs/format.md` §8, `R-EDIT-1`).
+            for part in &detail.parts {
+                match part {
+                    CombinedPart::Text(text) => entries.push((None, text.clone())),
+                    CombinedPart::Field { key, value } => {
+                        if let Some(new_value) = self.combined_field_value(key, value) {
+                            entries.push((Some(key.clone()), format!("{key}: {new_value}")));
                         }
-                        Some(None) => {}
-                        None => extra_entries.push((k.clone(), v.clone())),
-                    },
-                    "type" => match &self.type_override {
-                        Some(Some(new_t)) => {
-                            extra_entries.push(("type".to_string(), new_t.clone()))
-                        }
-                        Some(None) => {}
-                        None => extra_entries.push((k.clone(), v.clone())),
-                    },
-                    "area" => match &self.area_override {
-                        Some(Some(new_a)) => {
-                            extra_entries.push(("area".to_string(), new_a.clone()))
-                        }
-                        Some(None) => {}
-                        None => extra_entries.push((k.clone(), v.clone())),
-                    },
-                    _ => match self.combined_part_overrides.get(k) {
-                        Some(Some(new_v)) => extra_entries.push((k.clone(), new_v.clone())),
-                        Some(None) => {}
-                        None => extra_entries.push((k.clone(), v.clone())),
-                    },
+                    }
                 }
             }
 
@@ -403,37 +404,47 @@ impl<'a> TaskEditBuilder<'a> {
                     && self.task.difficulty_loc.is_none()
                     && let Some(Some(new_d)) = &self.difficulty_override
                 {
-                    Self::insert_combined_part(&mut extra_entries, "difficulty", new_d.clone());
+                    Self::insert_combined_part(&mut entries, "difficulty", new_d.clone());
                 }
                 if !type_in_combined
                     && self.task.task_type_loc.is_none()
                     && let Some(Some(new_t)) = &self.type_override
                 {
-                    Self::insert_combined_part(&mut extra_entries, "type", new_t.clone());
+                    Self::insert_combined_part(&mut entries, "type", new_t.clone());
                 }
                 if !area_in_combined
                     && self.task.area_loc.is_none()
                     && let Some(Some(new_a)) = &self.area_override
                 {
-                    Self::insert_combined_part(&mut extra_entries, "area", new_a.clone());
+                    Self::insert_combined_part(&mut entries, "area", new_a.clone());
                 }
             }
 
             if let Some(p) = new_priority {
-                parts.push(p);
-                for (k, v) in extra_entries {
-                    parts.push(format!("{k}: {v}"));
-                }
+                let mut segments = vec![p];
+                segments.extend(entries.into_iter().map(|(_, text)| text));
                 self.replace_line_if_changed(
                     detail.line,
-                    format!("- priority: {}", parts.join(" · ")),
+                    format!("- priority: {}", segments.join(" · ")),
                 );
             } else {
-                // Priority was unset: remove priority line and preserve remaining extra parts on
-                // their own lines.
-                self.line_changes.insert(detail.line, None);
-                for (k, v) in extra_entries {
-                    self.queue_field_insert(&k, format!("- {k}: {v}"));
+                // Priority was unset: the priority line goes and its fields move to lines of their own.
+                // Segments that are not fields are kept as written on one line in the same place, so
+                // no text is lost (`R-EDIT-1`).
+                let texts: Vec<&str> = entries
+                    .iter()
+                    .filter(|(key, _)| key.is_none())
+                    .map(|(_, text)| text.as_str())
+                    .collect();
+                if texts.is_empty() {
+                    self.line_changes.insert(detail.line, None);
+                } else {
+                    self.replace_line_if_changed(detail.line, format!("- {}", texts.join(" · ")));
+                }
+                for (key, text) in entries {
+                    if let Some(key) = key {
+                        self.queue_field_insert(&key, format!("- {text}"));
+                    }
                 }
             }
 
