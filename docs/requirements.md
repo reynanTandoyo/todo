@@ -667,10 +667,13 @@ todo tree T-010
     refer to an entry with `about` instead (R-KIND-1, R-KIND-2).
   - The tree is logical: entries stay where they are in the file, in any section, and only the
     `milestone` field links them (format.md §17).
+  - `<task>` may be an ID or a title, as elsewhere; the file stores the ID. An empty value is
+    refused (`BAD_VALUE`); `set --unset milestone` makes an entry top-level.
   - Refused with exit 1, leaving the file byte-identical: a parent that doesn't exist
     (`NOT_FOUND`); a parent that isn't a milestone (`BAD_VALUE`); a change that would make a
     milestone its own ancestor (`BAD_VALUE`); `set --type` that turns a milestone with entries
-    below it into another kind (`BAD_VALUE`).
+    below it into another kind (`BAD_VALUE`); a question or idea that names a milestone
+    (`BAD_VALUE`).
 - **R-MILE-2 COULD** Milestones in the status rules (R-WRITE-9):
   - A milestone is open, blocked, done or dropped, never claimed. `next` and `list --ready` never
     return one, and `claim` of one is refused (exit 1, `BAD_TRANSITION`).
@@ -679,7 +682,7 @@ todo tree T-010
     (format.md §9). `drop` without `--tree` is refused in the same case and names `drop --tree`.
   - `drop --tree <milestone> --note T` drops the milestone and every entry below it that isn't done
     or dropped, in one locked step; the claim rules (R-CLAIM-3) apply to each entry, so another
-    agent's claim needs `--force`.
+    agent's claim needs `--force`. `--tree` on a task is refused (`BAD_VALUE`).
   - `set --milestone <task>` moves an entry, with everything below it, to another parent; only the
     entry's own `milestone` line changes. `set --unset milestone` makes it top-level.
   - `show --json` returns `goal`, `milestone`, the chain of parents (`milestones`, R-MILE-4) and the
@@ -729,9 +732,14 @@ todo tree T-010
   `promote` of an entry that isn't an idea is refused (exit 1, `BAD_TRANSITION`).
 - **R-KIND-2 COULD** Questions can refer to the entry they are about.
   `ask <question> --about <task>` writes `- about: <ID>`, and is refused (exit 1, `NOT_FOUND`) when
-  that ID doesn't exist. `show` of a milestone or task lists the questions about it with their
-  status, in text and JSON. `answer` prints the entry the question was about. `list --where
-  about=<ID>` works. A question without `--about` behaves as before.
+  that ID doesn't exist in `TODO.md` or `TODO-archive.md`. `--about` takes an ID (`T-002`, `t2`),
+  written in canonical form; any other value is refused with `BAD_VALUE`, and the file is left
+  alone. `show` of a milestone or task lists the questions about it, from both files, after the
+  block in text (`Questions about <ID>:`, one line per question with its status, and `(archived)`
+  for one in the archive) and in JSON as `questions`. `answer` prints the entry the question was
+  about, after the result: in text the entry's block under `About <ID>:`; in JSON, under `about`,
+  as its task JSON (only when the question has an `about` field). `list --where about=<ID>` works.
+  A question without `--about` behaves as before.
 - **R-KIND-3 COULD** Every entry has one kind, taken from its `type`: `milestone` is a milestone,
   `question` a question, `idea` an idea, and any other type, or none, a task (format.md §16).
   Milestones and tasks are work; questions and ideas are not. Commands keep the kinds apart: only
@@ -742,10 +750,12 @@ todo tree T-010
 ### 5.22 Versions and migration — VER, MIG
 
 - **R-VER-1 COULD** `TODO.md` records the highest todo version that has written it, in the tool line
-  `<!-- todo-tool: 0.6.0 -->` directly after the format line (format.md §4).
-  - `init` writes it. A write command adds it, or raises it, in the same write when its own version
-    is higher, and never lowers it; only a command that writes the file changes it (R-EDIT-6).
-    Read commands never write it.
+  `<!-- todo-tool: 0.6.0 -->` directly after the format line, or as the first line when the file has
+  no format line (format.md §4).
+  - `init` writes it. A write command adds it when it is missing, or raises it when its own version
+    is higher, in the same write, and never lowers it; only a command that writes the file changes it
+    (R-EDIT-6). Read commands never write it.
+  - A value that is not `MAJOR.MINOR.PATCH` is kept as it is and reported as a warning.
   - Versions are compared number by number, so `0.10.0` is above `0.9.0`. A file without the line
     counts as written by todo 0.5.0 or older.
   - An older tool on a file stamped newer, in a format it knows, still works, and warns on standard

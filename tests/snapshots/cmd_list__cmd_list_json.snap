@@ -11,6 +11,7 @@ expression: parsed
         "area": "greenhouse",
         "claimed": "2026-11-15T09:30+01:00",
         "depends": [],
+        "difficulty": null,
         "fields": {
           "custom_tag": "morning-shift"
         },
@@ -32,6 +33,7 @@ expression: parsed
         "depends": [
           "T-001"
         ],
+        "difficulty": null,
         "fields": {},
         "id": "T-002",
         "line_end": 34,
@@ -49,6 +51,7 @@ expression: parsed
         "area": null,
         "claimed": null,
         "depends": [],
+        "difficulty": null,
         "fields": {},
         "id": "T-003",
         "line_end": 42,
@@ -66,6 +69,7 @@ expression: parsed
         "area": null,
         "claimed": null,
         "depends": [],
+        "difficulty": null,
         "fields": {},
         "id": "T-006",
         "line_end": 62,

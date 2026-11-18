@@ -55,6 +55,12 @@ fn run_at_now(home: &Path, work: &Path, args: &[&str]) -> Output {
     run_todo(home, work, args, &[("TODO_TEST_NOW", NOW)]).expect("run todo")
 }
 
+/// The file after a write: the running tool stamp goes at the top when there is no format line
+/// (R-VER-1), as `stamped` in tests/cmd_milestone.rs does.
+fn stamped(text: &str) -> String {
+    format!("<!-- todo-tool: {} -->\n{text}", env!("CARGO_PKG_VERSION"))
+}
+
 #[test]
 fn add_why_is_written_before_depends_and_problem() {
     let tmp = TempDir::new().unwrap();
@@ -103,7 +109,7 @@ fn add_why_is_written_before_depends_and_problem() {
 - problem: the frame is flat\n\
 - note (2026-11-18, alice): added\n"
     );
-    assert_eq!(read_todo(&work), expected);
+    assert_eq!(read_todo(&work), stamped(&expected));
 }
 
 #[test]
@@ -308,7 +314,7 @@ fn set_why_inserts_after_area_replaces_in_place_and_unsets() {
         "- problem:",
         "- why: a frame must come out first\n- problem:",
     );
-    assert_eq!(read_todo(&work), with_why);
+    assert_eq!(read_todo(&work), stamped(&with_why));
 
     // A second `set` replaces the line where it stands.
     let again = run_at_now(
@@ -331,10 +337,10 @@ fn set_why_inserts_after_area_replaces_in_place_and_unsets() {
     );
     assert_eq!(
         read_todo(&work),
-        with_why.replace(
+        stamped(&with_why.replace(
             "- why: a frame must come out first",
             "- why: the frame is the first goal"
-        )
+        ))
     );
 
     // `--unset why` removes only that line: the file is the original again.
@@ -349,7 +355,7 @@ fn set_why_inserts_after_area_replaces_in_place_and_unsets() {
         "stderr: {}",
         stderr_text(&unset)
     );
-    assert_eq!(read_todo(&work), BASE);
+    assert_eq!(read_todo(&work), stamped(BASE));
 }
 
 #[test]
@@ -420,12 +426,19 @@ fn hand_written_why_line_is_read_as_the_why_field_and_keeps_working() {
         ],
     );
     assert_eq!(set.status.code(), Some(0), "stderr: {}", stderr_text(&set));
+    // The write adds the tool stamp directly after the format line (R-VER-1).
+    let stamp_after_format = format!(
+        "<!-- todo-format: 1 -->\n<!-- todo-tool: {} -->\n",
+        env!("CARGO_PKG_VERSION")
+    );
     assert_eq!(
         read_todo(&work),
-        original.replace(
-            "- why: the renderer must show a frame before shading is added",
-            "- why: the first frame is the goal"
-        )
+        original
+            .replace(
+                "- why: the renderer must show a frame before shading is added",
+                "- why: the first frame is the goal"
+            )
+            .replace("<!-- todo-format: 1 -->\n", &stamp_after_format)
     );
 }
 
@@ -500,7 +513,7 @@ fn add_from_and_apply_write_why_in_the_field_order() {
 - depends: T-001\n\
 - note (2026-11-18, alice): added\n"
     );
-    assert_eq!(read_todo(&work), after_batch);
+    assert_eq!(read_todo(&work), stamped(&after_batch));
 
     // `apply`: an `add` operation with `why`, and a `set` operation that adds `why` to T-001.
     let applied = run_stdin(
@@ -517,15 +530,17 @@ fn add_from_and_apply_write_why_in_the_field_order() {
         stderr_text(&applied)
     );
 
-    let expected = after_batch.replace(
-        "- problem: nothing is drawn yet",
-        "- why: the first frame is the goal\n- problem: nothing is drawn yet",
-    ) + "\n### T-004 · Frame buffer\n\
+    let expected = stamped(
+        &(after_batch.replace(
+            "- problem: nothing is drawn yet",
+            "- why: the first frame is the goal\n- problem: nothing is drawn yet",
+        ) + "\n### T-004 · Frame buffer\n\
 - status: open\n\
 - owner: —\n\
 - priority: P1\n\
 - why: the buffer holds the frame\n\
-- note (2026-11-18, alice): added\n";
+- note (2026-11-18, alice): added\n"),
+    );
     assert_eq!(read_todo(&work), expected);
 }
 
@@ -577,4 +592,31 @@ fn set_why_reads_stdin_and_an_at_file() {
         1,
         "one why line after two sets"
     );
+}
+
+#[test]
+fn apply_add_reads_why_from_fields_too() {
+    // `why` given inside `fields` must be written as the field, not dropped as a known key.
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _) = setup_proj(&tmp, BASE);
+
+    let applied = run_stdin(
+        &home,
+        &work,
+        &["--json", "--agent", "alice", "apply", "-"],
+        "{\"op\":\"add\",\"title\":\"Reason in fields\",\"priority\":\"P2\",\"fields\":{\"why\":\"carried in fields\"}}\n",
+    );
+    assert_eq!(
+        applied.status.code(),
+        Some(0),
+        "stderr: {}",
+        stderr_text(&applied)
+    );
+
+    let shown = run_at_now(&home, &work, &["--json", "show", "T-002"]);
+    assert_eq!(
+        parse_json(&shown.stdout)["data"]["why"],
+        "carried in fields"
+    );
+    assert!(read_todo(&work).contains("- why: carried in fields\n"));
 }

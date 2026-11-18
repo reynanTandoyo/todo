@@ -19,10 +19,13 @@ pub struct TaskEditBuilder<'a> {
     field_inserts: Vec<(usize, usize, usize, String)>,
     /// Notes to append at `task.note_insert_line()`.
     notes_to_append: Vec<String>,
-    /// Planned updates to combined priority line (`priority`, `type`, `area`).
+    /// Planned updates to combined priority line (`priority`, `difficulty`, `type`, `area`).
     priority_override: Option<Option<String>>,
+    difficulty_override: Option<Option<String>>,
     type_override: Option<Option<String>>,
     area_override: Option<Option<String>>,
+    /// Planned updates to other parts of the combined priority line (`milestone`, `goal`), by key.
+    combined_part_overrides: BTreeMap<String, Option<String>>,
     seq: usize,
 }
 
@@ -37,8 +40,10 @@ impl<'a> TaskEditBuilder<'a> {
             field_inserts: Vec::new(),
             notes_to_append: Vec::new(),
             priority_override: None,
+            difficulty_override: None,
             type_override: None,
             area_override: None,
+            combined_part_overrides: BTreeMap::new(),
             seq: 0,
         }
     }
@@ -124,13 +129,14 @@ impl<'a> TaskEditBuilder<'a> {
         }
     }
 
-    /// Sets a field by key (`priority`, `type`, `area`, known fields, or unknown fields),
+    /// Sets a field by key (`priority`, `difficulty`, `type`, `area`, known fields, or unknown fields),
     /// respecting the combined priority line rules of `docs/format.md` §8 and canonical order §10.
     pub fn set_field(&mut self, key: &str, value: &str) {
         let clean = sanitize_trimmed_value(value);
         let lower = key.trim().to_ascii_lowercase();
         match lower.as_str() {
             "priority" => self.priority_override = Some(Some(clean)),
+            "difficulty" => self.difficulty_override = Some(Some(clean)),
             "type" => self.type_override = Some(Some(clean)),
             "area" => self.area_override = Some(Some(clean)),
             "status" => {
@@ -140,6 +146,8 @@ impl<'a> TaskEditBuilder<'a> {
             }
             "owner" => self.set_owner(if clean.is_empty() { None } else { Some(&clean) }),
             "claimed" => self.set_claimed(&clean),
+            "milestone" => self.set_part_field("milestone", self.task.milestone_loc, &clean),
+            "goal" => self.set_part_field("goal", self.task.goal_loc, &clean),
             "why" => self.set_simple_field("why", self.task.why_line, &clean),
             "depends" => self.set_simple_field("depends", self.task.depends_line, &clean),
             "files" => self.set_simple_field("files", self.task.files_line, &clean),
@@ -175,8 +183,11 @@ impl<'a> TaskEditBuilder<'a> {
         let lower = key.trim().to_ascii_lowercase();
         match lower.as_str() {
             "priority" => self.priority_override = Some(None),
+            "difficulty" => self.difficulty_override = Some(None),
             "type" => self.type_override = Some(None),
             "area" => self.area_override = Some(None),
+            "milestone" => self.unset_part_field("milestone", self.task.milestone_loc),
+            "goal" => self.unset_part_field("goal", self.task.goal_loc),
             "claimed" => self.remove_claimed(),
             "why" => self.remove_if_some(self.task.why_line),
             "depends" => self.remove_if_some(self.task.depends_line),
@@ -251,6 +262,39 @@ impl<'a> TaskEditBuilder<'a> {
         }
     }
 
+    /// Sets `milestone` or `goal` (`docs/format.md` §8, §17). A value on its own line is replaced
+    /// in place, a value in the combined priority line is rewritten with that line, and a missing
+    /// field is added in canonical order. An empty value removes the field.
+    fn set_part_field(&mut self, key: &str, loc: Option<FieldLocation>, clean_val: &str) {
+        if clean_val.is_empty() {
+            self.unset_part_field(key, loc);
+            return;
+        }
+        match loc {
+            Some(FieldLocation::CombinedPriority(_)) => {
+                self.combined_part_overrides
+                    .insert(key.to_string(), Some(clean_val.to_string()));
+            }
+            Some(FieldLocation::OwnLine(line)) => {
+                self.replace_line_if_changed(line, format!("- {key}: {clean_val}"));
+            }
+            None => self.queue_field_insert(key, format!("- {key}: {clean_val}")),
+        }
+    }
+
+    /// Removes `milestone` or `goal`, from its own line or from the combined priority line.
+    fn unset_part_field(&mut self, key: &str, loc: Option<FieldLocation>) {
+        match loc {
+            Some(FieldLocation::CombinedPriority(_)) => {
+                self.combined_part_overrides.insert(key.to_string(), None);
+            }
+            Some(FieldLocation::OwnLine(line)) => {
+                self.line_changes.insert(line, None);
+            }
+            None => {}
+        }
+    }
+
     fn remove_if_some(&mut self, line: Option<usize>) {
         if let Some(idx) = line {
             self.line_changes.insert(idx, None);
@@ -281,10 +325,24 @@ impl<'a> TaskEditBuilder<'a> {
         self.queue_field_insert(&key, text);
     }
 
+    /// Inserts a new `difficulty`, `type` or `area` part into the parts that follow the priority
+    /// on a combined line: right after the nearest existing part that comes before it in the field
+    /// order, or first when there is none (`docs/format.md` §8, §10).
+    fn insert_combined_part(entries: &mut Vec<(String, String)>, key: &str, value: String) {
+        let rank = canonical_field_rank(key);
+        let at = entries
+            .iter()
+            .rposition(|(k, _)| canonical_field_rank(k) < rank)
+            .map_or(0, |i| i + 1);
+        entries.insert(at, (key.to_string(), value));
+    }
+
     fn flush_priority_type_area(&mut self) {
         if self.priority_override.is_none()
+            && self.difficulty_override.is_none()
             && self.type_override.is_none()
             && self.area_override.is_none()
+            && self.combined_part_overrides.is_empty()
         {
             return;
         }
@@ -304,6 +362,10 @@ impl<'a> TaskEditBuilder<'a> {
             let mut parts: Vec<String> = Vec::new();
             let mut extra_entries: Vec<(String, String)> = Vec::new();
 
+            let difficulty_in_combined = matches!(
+                self.task.difficulty_loc,
+                Some(FieldLocation::CombinedPriority(_))
+            );
             let type_in_combined = matches!(
                 self.task.task_type_loc,
                 Some(FieldLocation::CombinedPriority(_))
@@ -313,6 +375,13 @@ impl<'a> TaskEditBuilder<'a> {
 
             for (k, v) in &detail.extra_parts {
                 match k.as_str() {
+                    "difficulty" => match &self.difficulty_override {
+                        Some(Some(new_d)) => {
+                            extra_entries.push(("difficulty".to_string(), new_d.clone()))
+                        }
+                        Some(None) => {}
+                        None => extra_entries.push((k.clone(), v.clone())),
+                    },
                     "type" => match &self.type_override {
                         Some(Some(new_t)) => {
                             extra_entries.push(("type".to_string(), new_t.clone()))
@@ -327,24 +396,34 @@ impl<'a> TaskEditBuilder<'a> {
                         Some(None) => {}
                         None => extra_entries.push((k.clone(), v.clone())),
                     },
-                    _ => extra_entries.push((k.clone(), v.clone())),
+                    _ => match self.combined_part_overrides.get(k) {
+                        Some(Some(new_v)) => extra_entries.push((k.clone(), new_v.clone())),
+                        Some(None) => {}
+                        None => extra_entries.push((k.clone(), v.clone())),
+                    },
                 }
             }
 
-            // Per docs/format.md §8: a new `type` or `area` goes into the combined line when the
-            // task has a priority line (unless priority itself is being removed).
+            // Per docs/format.md §8: a new `difficulty`, `type` or `area` goes into the combined line
+            // when the task has a priority line (unless priority itself is being removed).
             if !priority_is_removed {
+                if !difficulty_in_combined
+                    && self.task.difficulty_loc.is_none()
+                    && let Some(Some(new_d)) = &self.difficulty_override
+                {
+                    Self::insert_combined_part(&mut extra_entries, "difficulty", new_d.clone());
+                }
                 if !type_in_combined
                     && self.task.task_type_loc.is_none()
                     && let Some(Some(new_t)) = &self.type_override
                 {
-                    extra_entries.push(("type".to_string(), new_t.clone()));
+                    Self::insert_combined_part(&mut extra_entries, "type", new_t.clone());
                 }
                 if !area_in_combined
                     && self.task.area_loc.is_none()
                     && let Some(Some(new_a)) = &self.area_override
                 {
-                    extra_entries.push(("area".to_string(), new_a.clone()));
+                    Self::insert_combined_part(&mut extra_entries, "area", new_a.clone());
                 }
             }
 
@@ -366,7 +445,18 @@ impl<'a> TaskEditBuilder<'a> {
                 }
             }
 
-            // If `type` or `area` lived on its own line, edit/remove it in place (`docs/format.md` §15).
+            // If `difficulty`, `type` or `area` lived on its own line, edit/remove it in place
+            // (`docs/format.md` §15).
+            if let Some(FieldLocation::OwnLine(line)) = self.task.difficulty_loc
+                && let Some(ref ov) = self.difficulty_override
+            {
+                match ov {
+                    Some(v) => self.replace_line_if_changed(line, format!("- difficulty: {v}")),
+                    None => {
+                        self.line_changes.insert(line, None);
+                    }
+                }
+            }
             if let Some(FieldLocation::OwnLine(line)) = self.task.task_type_loc
                 && let Some(ref ov) = self.type_override
             {
@@ -395,6 +485,26 @@ impl<'a> TaskEditBuilder<'a> {
             }
 
             let adding_priority = matches!(self.priority_override, Some(Some(_)));
+
+            if let Some(ref ov) = self.difficulty_override {
+                match self.task.difficulty_loc {
+                    Some(FieldLocation::OwnLine(line)) => match ov {
+                        Some(v) => self.replace_line_if_changed(line, format!("- difficulty: {v}")),
+                        None => {
+                            self.line_changes.insert(line, None);
+                        }
+                    },
+                    _ => {
+                        if let Some(v) = ov {
+                            if adding_priority {
+                                combined_parts.push(format!("difficulty: {v}"));
+                            } else {
+                                self.queue_field_insert("difficulty", format!("- difficulty: {v}"));
+                            }
+                        }
+                    }
+                }
+            }
 
             if let Some(ref ov) = self.type_override {
                 match self.task.task_type_loc {

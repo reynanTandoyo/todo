@@ -10,13 +10,14 @@ use crate::lock::{LeaseStatus, query_status};
 use crate::ops::load_for_read;
 use crate::output::Output;
 use crate::state::{LockHolder, StateDir};
+use crate::version::RUNNING_VERSION;
 
 /// Metadata for the `where` command.
 pub const META: CommandMeta = CommandMeta {
     name: "where",
     summary: "Show resolved TODO.md, repo root, state folder, lock status, and task counts",
     kind: CommandKind::Read,
-    details: "Prints the active TODO.md file and how it was found, the git repository root (if any), the state folder, the write lock and manual lease status, the format version, and the number of tasks per status.",
+    details: "Prints the active TODO.md file and how it was found, the git repository root (if any), the state folder, the write lock and manual lease status, the format version, the tool stamp in the file and the running todo version, and the number of tasks per status.",
     examples: &["todo where", "todo where --json"],
 };
 
@@ -51,6 +52,10 @@ struct WhereJson {
     #[serde(skip_serializing_if = "Option::is_none")]
     lease: Option<LeaseStatus>,
     format_version: Option<u32>,
+    /// The tool version stamp in the file (R-VER-1), as written; `None` when the file has none.
+    tool_stamp: Option<String>,
+    /// The version of the running todo.
+    running_version: String,
     counts: StatusCountsJson,
 }
 
@@ -89,6 +94,8 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         .as_ref()
         .map(|p| p.display().to_string());
     let format_version = loaded.doc.declared_format_version;
+    let tool_stamp = loaded.doc.tool_stamp.as_ref().map(|s| s.value.clone());
+    let running_version = RUNNING_VERSION.to_string();
 
     if out.is_json() {
         out.emit_json_ok(
@@ -104,6 +111,8 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 },
                 lease: status.lease,
                 format_version,
+                tool_stamp,
+                running_version,
                 counts,
             },
         );
@@ -146,6 +155,11 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             Some(v) => out.write_line(&format!("Format version: {v}")),
             None => out.write_line("Format version: omitted"),
         }
+        match &tool_stamp {
+            Some(v) => out.write_line(&format!("Tool stamp: {v}")),
+            None => out.write_line("Tool stamp: omitted"),
+        }
+        out.write_line(&format!("Running todo version: {running_version}"));
         let summary = format!(
             "Tasks: {} total (open: {}, claimed: {}, blocked: {}, done: {}, dropped: {})",
             counts.total, counts.open, counts.claimed, counts.blocked, counts.done, counts.dropped

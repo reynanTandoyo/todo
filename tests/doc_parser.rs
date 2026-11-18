@@ -359,8 +359,24 @@ fn canonical_field_order_and_insertion_lines_follow_format_section_10() {
     assert_eq!(
         CANONICAL_FIELD_ORDER,
         &[
-            "status", "owner", "claimed", "session", "priority", "type", "area", "why", "depends",
-            "files", "problem", "fix", "accept", "commit"
+            "status",
+            "owner",
+            "claimed",
+            "session",
+            "priority",
+            "difficulty",
+            "type",
+            "area",
+            "milestone",
+            "about",
+            "goal",
+            "why",
+            "depends",
+            "files",
+            "problem",
+            "fix",
+            "accept",
+            "commit"
         ]
     );
 
@@ -372,8 +388,8 @@ fn canonical_field_order_and_insertion_lines_follow_format_section_10() {
     assert_eq!(task.insert_line_for_field("owner"), 3);
     // `area` goes right after combined `priority`/`type` (line 3 -> insert at 4).
     assert_eq!(task.insert_line_for_field("area"), 4);
-    // `why` comes after `area` and before `depends`/`problem`; with no line above it, it also
-    // goes right after the combined `priority`/`type` line (insert at 4).
+    // `why` comes after `goal` (and `area`, `milestone`, `about`) and before `depends`/`problem`;
+    // with none of those lines present, it goes right after the combined `priority`/`type` line.
     assert_eq!(task.insert_line_for_field("why"), 4);
     // `commit` goes right after `accept` (line 4 -> insert at 5).
     assert_eq!(task.insert_line_for_field("commit"), 5);
