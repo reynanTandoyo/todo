@@ -744,6 +744,11 @@ error envelope with `NO_GIT_HISTORY` and exit 5.
 `{"name","value_name","required","repeatable","help"}`. `todo schema <command>` returns just that
 command.
 
+### `todo report --html --json` (`todo.report.v1`, `R-REPORT-1`)
+
+`data` has `path` (the file written, as a full path), `bytes` (its size) and `opened` (`true` only
+when `--open` started the program). The page itself is HTML, not part of the JSON.
+
 ### `by` field (`R-WRITE-16`)
 
 `done` may add `{"fields":{"by":"reyna-gh"}}` to the task: the person who finished it, after

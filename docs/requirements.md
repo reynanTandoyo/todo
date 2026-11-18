@@ -881,8 +881,13 @@ for it, never automatically.
     last; (2) open questions, each with a link to the milestone or task it is about; (3) ideas;
     (4) done; (5) dropped, with the reason.
   - Each task shows its priority, difficulty and area; claimed tasks show owner and age, with stale
-    claims marked; blocked tasks show their latest reason. A task opens to show its fields and
-    notes. The page also gives the number of open tasks per area.
+    claims marked; blocked tasks show the reason of their latest `blocked — <reason>` note
+    (`docs/format.md` §9). A task opens to show its fields and notes. The page also gives the number
+    of open tasks per area: every task that is open, claimed or blocked (that is, not done or
+    dropped), counted by its area.
+  - Done and dropped entries in `TODO-archive.md` are listed too, marked as archived. A done or
+    dropped milestone appears in the work tree only while unfinished work sits below it; otherwise
+    it is listed under done or dropped, so each entry appears once.
   - All text from the file is HTML-escaped (tested with a title containing `<script>`).
   - It is readable in light and dark mode and in a narrow window.
   - With a fixed clock, the output for a fixture matches its snapshot.
