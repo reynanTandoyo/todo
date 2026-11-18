@@ -63,8 +63,14 @@ On Linux, download `todo-linux-x86_64` and install it as `todo`:
 install -m 755 ~/Downloads/todo-linux-x86_64 ~/.local/bin/todo
 ```
 
-Colleagues may run different versions against the same `TODO.md`: the file format is unchanged and
-older versions keep fields they don't know.
+After an update, run `todo migrate --yes` in each project. It moves `TODO.md` and its archive to the
+current file format (version 2 since todo 0.6) and brings the installed rules block, Claude Code skill
+and hooks up to date. `todo help update` prints the steps for updating the executable itself, and
+[Versions, format and migration](#versions-format-and-migration) explains what changes.
+
+Colleagues may run different versions against the same `TODO.md`. Todo 0.5 and older can still read a
+version 2 file, with a warning, but can no longer write it, so everyone who writes the file should update
+before anyone migrates it. A todo that is too old for a file refuses to work on it (`TOOL_TOO_OLD`).
 
 ## Using it
 
@@ -81,6 +87,7 @@ $env:TODO_AGENT = "agent-1"
 todo
 todo help claim
 todo help agents
+todo help update
 todo --version
 ```
 
@@ -98,6 +105,8 @@ todo schema --json
 ### Reading tasks
 
 ```powershell
+todo summary
+todo tree
 todo list
 todo list --ready
 todo list --mine --agent agent-1
@@ -129,6 +138,99 @@ todo drop T-013 --note "superseded by T-012" --agent agent-1
 todo reopen T-013 --note "needed after all" --agent agent-1
 todo move T-012 --section Done --agent agent-1
 ```
+
+### Milestones
+
+A milestone is a piece of work with a goal, divided into tasks: for example "Develop the renderer", with
+the tasks "C shader" and "GPU compiler". A milestone is never a release or version label such as "v0.6".
+Milestones nest to any depth, and every entry names its parent with `milestone`.
+
+```powershell
+todo add --type milestone --title "Develop the renderer" --goal "the test scene renders with lighting at 60 frames per second" --priority P1 --section Now --agent planner
+todo add --title "C shader" --milestone T-001 --why "the renderer has no shading stage yet" --priority P1 --difficulty hard --section Now --agent planner
+todo add --title "GPU compiler" --milestone T-001 --priority P1 --section Now --agent planner
+todo tree T-001
+todo list --milestone T-001
+```
+
+`todo tree` shows each milestone with its goal and its progress (`done/total` over every task below it,
+at any depth). Milestones are never claimed or handed out by `next`. `claim` and `next --claim` print the
+goals of the milestones above a task, so the agent that takes it knows why it matters:
+
+```text
+T-002: claim ok
+Milestones above T-002, from the top down:
+- T-001 · Develop the renderer
+  goal: the test scene renders with lighting at 60 frames per second
+```
+
+- `todo done T-001` is refused while anything below the milestone is open, claimed or blocked, and lists
+  those entries. `--force` marks it done anyway and says so in a note.
+- When the last entry below a milestone is finished, `done` names it as ready to close, with the command
+  to close it. A milestone is never closed automatically.
+- `todo drop --tree T-001 --note "superseded"` drops the milestone and every unfinished entry below it.
+- `todo archive` keeps a milestone's tree together: finished entries under an open milestone stay in
+  `TODO.md`, and the output says so.
+- `next` prefers tasks in a milestone that has already started over tasks in untouched milestones.
+
+### Kinds of entry
+
+Every entry has one kind, taken from its `type`: a milestone (`milestone`), a question (`question`), an
+idea (`idea`), or a task (any other type, or none). Only tasks are handed out by `next` and counted as
+open work; `summary` and `tree` show questions and ideas apart from them.
+
+```powershell
+todo idea "Hot-reload shaders while the scene runs" --about T-001 --agent planner
+todo ask "Should the C shader support shadows in its first version?" --about T-002 --agent agent-ui-1
+todo list --kind question
+todo promote T-004 --priority P2 --milestone T-001 --agent planner
+```
+
+- `idea` needs no priority and is never handed out. `promote` turns an idea into a task with a priority
+  and a milestone, and adds the note `promoted from idea`.
+- `ask --about` names the task or milestone a question is about. `show` lists the questions about an
+  entry, and `answer` shows the entry that a question is about.
+
+### Versions, format and migration
+
+A `TODO.md` written by todo 0.6 starts with two lines:
+
+```markdown
+<!-- todo-format: 2 -->
+<!-- todo-tool: 0.6.0 -->
+```
+
+- The **format line** is the file format version. Version 2 (todo 0.6 and later) adds milestones, the
+  kinds of entry and the `why`, `difficulty`, `milestone`, `about` and `goal` fields; version 1 was
+  written by todo 0.1 to 0.5 (`docs/format.md` §18).
+- The **tool line** is the newest todo that has written the file. A write by a newer todo raises it, and
+  nothing lowers it. `todo where` shows both, and the running version.
+A file in an older format is migrated by the first write of todo 0.6, under the lock and after a snapshot
+(`todo history` and `todo restore` can go back). To migrate at once, look at the change first and then
+write it:
+
+```powershell
+todo where
+todo migrate --dry-run --agent agent-1
+todo migrate --yes --agent agent-1
+```
+
+Migration changes only the format and tool lines; task lines stay as they are, and a second run changes
+nothing. `migrate --yes` also refreshes the rules block, skill and hooks that the project has installed.
+
+A todo that is **behind** a file, one that knows the file's format but was last written by a newer todo,
+still works and warns on standard error, naming `todo help update`.
+
+A todo that is **too old** for a file, because the file's format is newer than any format it knows, stops
+every command that reads or changes tasks with exit 4 and the error `TOOL_TOO_OLD`. Nothing is written:
+
+```text
+error: TODO.md:1: format version 3 is newer than this todo 0.6.0 supports; the file was last written by todo 0.9.0. Update the todo executable first (`todo help update`).
+```
+
+`where`, `help`, `schema`, `status`, `history`, the lock commands and the other commands that never read
+tasks keep working. Run `todo help update` for the steps that update the executable, then run
+`todo migrate --yes` in each project.
 
 ### Who finished a task
 
@@ -293,27 +395,42 @@ output is enabled only on terminals and is disabled when piped or when `NO_COLOR
 ## Configuration (`todo.toml`)
 
 An optional `todo.toml` next to `TODO.md` can configure `id_prefix`, `id_width`, `priorities`,
-`required_fields`, `types`, `areas`, `default_section`, `question_section`, `archive_file`,
+`required_fields`, `types`, `areas`, `difficulties`, `default_section`, `question_section`,
+`idea_section`, `archive_file`,
 `claim_ttl_hours`, `lock_wait_seconds`, `lease_minutes`, `lease_max_minutes`, `snapshots_keep`,
 and `worktree` (`"shared"` or `"local"`). See [`docs/requirements.md`](docs/requirements.md) §5.14
 for defaults.
 
 ## Adding it to a project
 
-1. Create a `TODO.md` at the root of your repository with at least one `## ` section:
+1. Run `todo init` in the repository root. It creates `TODO.md` in the current format, with the format line,
+   the tool line, the rules block and a `## Tasks` section, and prints the lines for `AGENTS.md`. Or write
+   the file yourself, with the format line and at least one `## ` section (the first write adds the tool
+   line):
 
    ```markdown
-   <!-- todo-format: 1 -->
+   <!-- todo-format: 2 -->
 
    ## Now
 
-   ### T-001 · First task
+   ### T-001 · Develop the parser
    - status: open
    - owner: —
-   - priority: P1
+   - priority: P1 · type: milestone
+   - goal: the reader accepts every example in the manual
+   - note (2026-11-18, planner): added
+
+   ### T-002 · Write the tokenizer
+   - status: open
+   - owner: —
+   - priority: P1 · difficulty: easy · type: feature
+   - milestone: T-001
+   - why: the parser needs tokens first
+   - note (2026-11-18, planner): added
    ```
 
-2. Add these rules to your project's `AGENTS.md` (also printed by `todo help agents`):
+2. Add these rules to your project's `AGENTS.md`, or run `todo agents install --yes` to write them between
+   the `<!-- todo:begin -->` and `<!-- todo:end -->` markers. `todo help agents` prints the same text:
 
    ```markdown
    # Working with TODO.md
@@ -322,13 +439,19 @@ for defaults.
    - Use one unique agent name per agent via `--agent <name>` or `TODO_AGENT`.
    - Start by running `todo summary` or `todo next`.
    - Claim a task before working on it (`todo claim <id>`, or `todo next --claim` to pick and claim in one step).
+   - Before you start a task, read the goals of the milestones above it: `todo claim` and `todo show <id>` print them.
    - Exit code `1` means someone else claimed it or the rule refused the change — pick another task.
    - Exit code `3` means the lock or lease is busy — try the command again.
    - Add notes as you learn things (`todo note <id> "..."`).
-   - Finish a task with `todo done <id> --note "..." --commit`.
-   - Use `todo add "..."` to record problems you find instead of fixing them silently.
+   - Finish a task after committing: `todo done <id> --note "..." --commit HEAD`.
+   - Close a milestone with `todo done <milestone-id>` once its last task is finished; `todo done` names a milestone when it is ready to close.
+   - Put each new task under a milestone, with a `why`: `todo add --title "..." --milestone <id> --why "..." --priority P2 --agent <name>`. A milestone is a piece of work with a goal, such as "Develop the renderer", never a release label.
+   - Use `todo add --title "..." --milestone <id> --why "..."` to record problems you find instead of fixing them silently.
+   - Record ideas with `todo idea "..."`, and questions about a task or milestone with `todo ask "..." --about <id>`.
    - Use `todo ask "..."` for questions only a person can decide.
    - Start every git commit message with the task ID (for example `T-012: short summary`).
+   - After todo is updated, run `todo migrate --yes` in each project.
+   - When todo says a file needs a newer todo (`TOOL_TOO_OLD`, or a warning that it is behind), update the todo executable first: follow `todo help update`.
    ```
 
 ## Limits

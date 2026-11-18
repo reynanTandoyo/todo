@@ -191,6 +191,15 @@ mod tests {
             "add",
             "ask",
             "T-012:",
+            // From v0.6 (R-AGENT-1): milestones, kinds, migration and updating todo.
+            "--milestone",
+            "--why",
+            "todo show",
+            "todo done <milestone-id>",
+            "todo idea",
+            "--about",
+            "todo migrate --yes",
+            "todo help update",
         ] {
             assert!(RULES_TEXT.contains(needle), "RULES_TEXT missing `{needle}`");
         }
