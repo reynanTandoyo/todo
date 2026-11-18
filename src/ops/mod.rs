@@ -42,8 +42,8 @@ pub mod rules;
 pub mod task_ops;
 
 pub use config::{
-    CONFIG_FILENAME, DEFAULT_ARCHIVE_FILE, DEFAULT_CLAIM_TTL_HOURS, DEFAULT_QUESTION_SECTION,
-    DEFAULT_SNAPSHOTS_KEEP, OpsConfig,
+    CONFIG_FILENAME, DEFAULT_ARCHIVE_FILE, DEFAULT_CLAIM_TTL_HOURS, DEFAULT_IDEA_SECTION,
+    DEFAULT_QUESTION_SECTION, DEFAULT_SNAPSHOTS_KEEP, OpsConfig,
 };
 pub use edits::TaskEditBuilder;
 pub use pipeline::{
@@ -66,7 +66,7 @@ pub use read::{
 };
 pub use rules::{
     ClaimPlan, OwnershipDecision, ReleasePlan, StatusCommand, TaskCommand, allowed_commands_from,
-    bad_transition_error, check_ownership, forced_note_text, plan_claim, plan_release,
-    validate_transition,
+    bad_transition_error, check_ownership, check_promotable, forced_note_text, plan_claim,
+    plan_release, validate_transition,
 };
 pub use task_ops::{NewTask, OpEnv, SetChange, TaskOp, highest_task_number};

@@ -4,7 +4,7 @@ use clap::Args as ClapArgs;
 
 use crate::cli::add::find_section;
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::{LineEdit, TaskChangeIntent};
+use crate::doc::{Document, LineEdit, Task, TaskChangeIntent};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
     DocWritePlan, OpsConfig, OwnershipDecision, TaskCommand, build_task_json, check_ownership,
@@ -31,6 +31,44 @@ pub struct Args {
     /// Target section name (exact or unique substring match).
     #[arg(long, value_name = "NAME")]
     pub section: String,
+}
+
+/// Whole-line edits that move `task` to the end of section `target_idx`, replacing its block with
+/// `task_lines` (`R-WRITE-10`). `todo move` passes the block as it is; `todo promote --section`
+/// passes the block after its own field edits, so both keep the same layout.
+pub(crate) fn section_move_edits(
+    doc: &Document,
+    task: &Task,
+    target_idx: usize,
+    task_lines: Vec<String>,
+) -> Vec<LineEdit> {
+    let insert_at = doc.sections[target_idx].content_end;
+    let lines = &doc.line_doc.lines;
+
+    let mut inserted = Vec::with_capacity(task_lines.len() + 1);
+    if insert_at > 0 && !lines[insert_at - 1].text.trim().is_empty() {
+        inserted.push(String::new());
+    }
+    inserted.extend(task_lines);
+
+    // Delete the task block plus one adjacent blank line when safe (without overlapping `insert_at`).
+    let mut del_start = task.block_range.start;
+    let mut del_end = task.block_range.end;
+    if del_end < lines.len() && lines[del_end].text.trim().is_empty() && del_end + 1 != insert_at {
+        del_end += 1;
+    } else if del_start > 0
+        && lines[del_start - 1].text.trim().is_empty()
+        && del_start - 1 != insert_at
+    {
+        del_start -= 1;
+    }
+
+    let mut edits = vec![
+        LineEdit::remove(del_start..del_end),
+        LineEdit::insert(insert_at, inserted),
+    ];
+    edits.sort_by_key(|e| e.range.start);
+    edits
 }
 
 /// Runs `todo move <task> --section <name>`.
@@ -63,11 +101,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 return Ok(DocWritePlan::Unchanged((id_str, task_json)));
             }
 
-            let target_section = &doc.sections[target_idx];
-            let insert_at = target_section.content_end;
-
-            let lines = &doc.line_doc.lines;
-            let mut task_lines: Vec<String> = lines[task.block_range.clone()]
+            let mut task_lines: Vec<String> = doc.line_doc.lines[task.block_range.clone()]
                 .iter()
                 .map(|l| l.text.clone())
                 .collect();
@@ -80,31 +114,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 ));
             }
 
-            let mut inserted = Vec::with_capacity(task_lines.len() + 1);
-            if insert_at > 0 && !lines[insert_at - 1].text.trim().is_empty() {
-                inserted.push(String::new());
-            }
-            inserted.extend(task_lines);
-
-            // Delete the task block plus one adjacent blank line when safe (without overlapping `insert_at`).
-            let mut del_start = task.block_range.start;
-            let mut del_end = task.block_range.end;
-            if del_end < lines.len() && lines[del_end].text.trim().is_empty() && del_end + 1 != insert_at
-            {
-                del_end += 1;
-            } else if del_start > 0
-                && lines[del_start - 1].text.trim().is_empty()
-                && del_start - 1 != insert_at
-            {
-                del_start -= 1;
-            }
-
-            let mut edits = vec![
-                LineEdit::remove(del_start..del_end),
-                LineEdit::insert(insert_at, inserted),
-            ];
-            edits.sort_by_key(|e| e.range.start);
-
+            let edits = section_move_edits(doc, task, target_idx, task_lines);
             let task_id = task.id;
             let arch_owned = archive.cloned();
             let cfg_owned = cfg_clone.clone();

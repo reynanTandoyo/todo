@@ -12,8 +12,8 @@ use crate::error::Result;
 use crate::ops::milestone;
 use crate::ops::pipeline::{build_claim_edits, build_release_edits};
 use crate::ops::rules::{
-    OwnershipDecision, StatusCommand, TaskCommand, check_ownership, forced_note_text, plan_claim,
-    plan_release, validate_transition,
+    OwnershipDecision, StatusCommand, TaskCommand, check_ownership, check_promotable,
+    forced_note_text, plan_claim, plan_release, validate_transition,
 };
 use crate::ops::{OpsConfig, TaskEditBuilder};
 
@@ -98,6 +98,15 @@ pub enum TaskOp<'a> {
         /// Answer text.
         text: &'a str,
     },
+    /// Turn an idea into a task (`R-KIND-1`): removes `type: idea`, sets the priority and, when
+    /// given, the milestone, and adds the note `promoted from idea`. The milestone is an ID the
+    /// caller has already checked.
+    Promote {
+        /// Configured priority, canonical spelling.
+        priority: &'a str,
+        /// Canonical ID of the parent milestone, if any.
+        milestone: Option<&'a str>,
+    },
     /// Append a note.
     Note {
         /// Note text.
@@ -131,6 +140,7 @@ impl TaskOp<'_> {
             Self::Unblock { .. } => "unblock",
             Self::Reopen { .. } => "reopen",
             Self::Answer { .. } => "answer",
+            Self::Promote { .. } => "promote",
             Self::Note { .. } => "note",
             Self::Set { .. } => "set",
         }
@@ -195,6 +205,10 @@ impl TaskOp<'_> {
                 check_ownership(task, TaskCommand::Note, agent, env.force, &id_str)?
             }
             Self::Set { .. } => check_ownership(task, TaskCommand::Set, agent, env.force, &id_str)?,
+            Self::Promote { .. } => {
+                check_promotable(task, &id_str)?;
+                check_ownership(task, TaskCommand::Promote, agent, env.force, &id_str)?
+            }
             _ => {
                 let cmd = match self {
                     Self::Done { .. } | Self::Answer { .. } => StatusCommand::Done,
@@ -237,6 +251,17 @@ impl TaskOp<'_> {
             }
             if let Some(b) = by {
                 builder.set_field("by", b);
+            }
+        }
+        if let Self::Promote {
+            priority,
+            milestone,
+        } = self
+        {
+            builder.unset_field("type");
+            builder.set_field("priority", priority);
+            if let Some(m) = milestone {
+                builder.set_field("milestone", m);
             }
         }
         if let Self::Set { changes } = self {
@@ -284,6 +309,7 @@ impl TaskOp<'_> {
             Self::Unblock { note } => Some(note_with("unblocked", note)),
             Self::Reopen { note } => Some(note_with("reopened", note)),
             Self::Answer { text } => Some(note_with("answer", Some(text))),
+            Self::Promote { .. } => Some("promoted from idea".to_string()),
             Self::Note { text } => Some(text.to_string()),
             _ => None,
         };
