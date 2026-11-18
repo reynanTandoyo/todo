@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use crate::agents::project;
 use crate::cli::{CommandKind, CommandMeta, Context, load_read};
-use crate::doc::{EntryKind, Progress, Status};
+use crate::doc::{EntryKind, NO_REASON, Progress, Status};
 use crate::error::Result;
 use crate::lock::current_time;
 use crate::ops::{is_task_ready, ready_sort_key};
@@ -192,12 +192,8 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             }
             Status::Blocked => {
                 counts.blocked += 1;
-                let reason = task
-                    .notes
-                    .iter()
-                    .rev()
-                    .find(|n| !n.text.trim().is_empty())
-                    .map(|n| n.text.trim().to_string());
+                // The same reason the HTML report shows (T-140; `Task::blocked_reason`).
+                let reason = task.blocked_reason().map(str::to_string);
                 blocked.push(BlockedSummary {
                     id: doc.id_config.format_id(task.id),
                     title: task.title.clone(),
@@ -371,7 +367,7 @@ fn format_summary_lines(s: &SummaryJson, project_line: Option<&str>) -> Vec<Stri
     if !s.blocked.is_empty() {
         lines.push(format!("blocked ({}):", s.blocked.len()));
         for b in s.blocked.iter().take(5) {
-            let reason = b.reason.as_deref().unwrap_or("no reason recorded");
+            let reason = b.reason.as_deref().unwrap_or(NO_REASON);
             lines.push(format!("  {} · {} — {}", b.id, b.title, reason));
         }
         if s.blocked.len() > 5 {

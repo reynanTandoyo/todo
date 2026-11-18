@@ -301,7 +301,7 @@ the output for a fixture with one open task:
     "claimed": [
       { "id": "T-002", "title": "Work", "owner": "alice", "claimed": "2026-11-15T18:00+01:00", "age_hours": 2, "stale": false }
     ],
-    "blocked": [{ "id": "T-004", "title": "Wait", "reason": "blocked — waiting on key" }],
+    "blocked": [{ "id": "T-004", "title": "Wait", "reason": "waiting on key" }],
     "next_ready": [{ "id": "T-001", "title": "First", "priority": "P0", "section": "Tasks" }],
     "open_questions": [{ "id": "T-007", "title": "Ship today?", "status": "open" }]
   },

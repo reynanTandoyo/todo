@@ -7,15 +7,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, FixedOffset};
 
-use crate::doc::{Document, EntryKind, Note, Progress, Status, Task, TaskId};
+use crate::doc::{Document, EntryKind, NO_REASON, Note, Progress, Status, Task, TaskId};
 use crate::ops::OpsConfig;
 use crate::ops::read::about_id;
-
-/// The em dash that separates a reason from the words before it (`docs/format.md` §9).
-const DASH: &str = "\u{2014}";
-
-/// Shown when no note records why a task is blocked or dropped.
-pub const NO_REASON: &str = "no reason recorded";
 
 /// Title used when `TODO.md` has no `# ` heading before its first section.
 const DEFAULT_TITLE: &str = "Tasks";
@@ -308,9 +302,10 @@ impl<'a> Builder<'a> {
     fn entry(&self, source: &Document, task: &Task, archived: bool) -> Entry {
         let kind = task.kind();
         let is_milestone = kind == EntryKind::Milestone;
+        // The reasons are the ones `summary` shows too (T-140; `doc::reason`).
         let reason = match task.status {
-            Status::Blocked => Some(reason_for(task, "blocked")),
-            Status::Dropped => Some(reason_for(task, "dropped")),
+            Status::Blocked => Some(task.blocked_reason().unwrap_or(NO_REASON).to_string()),
+            Status::Dropped => Some(task.dropped_reason().unwrap_or(NO_REASON).to_string()),
             Status::Open | Status::Claimed | Status::Done => None,
         };
         let claim = (task.status == Status::Claimed).then(|| Claim {
@@ -363,22 +358,6 @@ fn note_view(note: &Note) -> NoteView {
         agent: note.agent.clone(),
         text: note.text.clone(),
     }
-}
-
-/// The reason in the latest note that starts with `keyword`, such as `blocked — <reason>` or
-/// `dropped with T-002 — <reason>` (`docs/format.md` §9). [`NO_REASON`] when none gives one.
-fn reason_for(task: &Task, keyword: &str) -> String {
-    task.notes
-        .iter()
-        .rev()
-        .find_map(|note| {
-            let (head, reason) = note.text.trim().split_once(DASH)?;
-            let head = head.trim();
-            let names_keyword = head == keyword || head.starts_with(&format!("{keyword} "));
-            let reason = reason.trim();
-            (names_keyword && !reason.is_empty()).then(|| reason.to_string())
-        })
-        .unwrap_or_else(|| NO_REASON.to_string())
 }
 
 /// The first `# ` heading in the preamble of `doc`, or [`DEFAULT_TITLE`].
@@ -488,48 +467,6 @@ fn count(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn reason_comes_from_the_latest_matching_note() {
-        let doc = Document::parse_bytes(
-            "### T-001 · Blocked task\n\
-- status: blocked\n\
-- note (2026-11-17, bob): blocked — waiting for the driver\n\
-- note (2026-11-18, bob): blocked — the driver crashes\n\
-- note (2026-11-19, bob): unblocked — fixed in the driver\n"
-                .as_bytes(),
-        )
-        .unwrap();
-        assert_eq!(reason_for(&doc.tasks[0], "blocked"), "the driver crashes");
-    }
-
-    #[test]
-    fn reason_reads_the_drop_note_that_names_a_milestone() {
-        let doc = Document::parse_bytes(
-            "### T-002 · Dropped below a milestone\n\
-- status: dropped\n\
-- note (2026-11-18, bob): dropped with T-001 — the scene no longer needs it\n"
-                .as_bytes(),
-        )
-        .unwrap();
-        assert_eq!(
-            reason_for(&doc.tasks[0], "dropped"),
-            "the scene no longer needs it"
-        );
-    }
-
-    #[test]
-    fn missing_reason_says_so() {
-        let doc = Document::parse_bytes(
-            "### T-003 · Blocked without a reason\n\
-- status: blocked\n\
-- note (2026-11-18, bob): added\n\
-- note (2026-11-18, bob): blocked\n"
-                .as_bytes(),
-        )
-        .unwrap();
-        assert_eq!(reason_for(&doc.tasks[0], "blocked"), NO_REASON);
-    }
 
     #[test]
     fn title_is_the_first_heading_of_the_preamble() {
