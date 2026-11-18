@@ -22,6 +22,14 @@ fn doc(body: &str) -> String {
     format!("{MARKER}\n<!-- todo-format: 1 -->\n\n## Tasks\n\n{body}")
 }
 
+/// The same file after a write: the running tool stamp goes directly after the format line (R-VER-1).
+fn written(body: &str) -> String {
+    format!(
+        "{MARKER}\n<!-- todo-format: 1 -->\n<!-- todo-tool: {} -->\n\n## Tasks\n\n{body}",
+        env!("CARGO_PKG_VERSION")
+    )
+}
+
 /// Runs `todo` with `args` and succeeds, returning its output.
 fn ok(home: &Path, work: &Path, args: &[&str]) -> Output {
     let out = run_todo(home, work, args, &[]).unwrap();
@@ -183,8 +191,10 @@ fn set_edits_difficulty_in_place_on_the_combined_line_and_unsets_it() {
     );
     assert_eq!(
         read_text(&file),
-        doc("### T-001 · Parse the config\n- status: open\n- owner: —\n\
-             - priority: P1 · difficulty: easy · type: bug · area: ui\n")
+        written(
+            "### T-001 · Parse the config\n- status: open\n- owner: —\n\
+             - priority: P1 · difficulty: easy · type: bug · area: ui\n"
+        )
     );
 
     ok(
@@ -210,7 +220,7 @@ fn set_edits_difficulty_in_place_on_the_combined_line_and_unsets_it() {
     );
     assert_eq!(
         read_text(&file),
-        doc(body),
+        written(body),
         "unsetting restores the original bytes"
     );
 }
@@ -261,8 +271,10 @@ fn difficulty_on_its_own_line_is_read_and_edited_in_place() {
     );
     assert_eq!(
         read_text(&file),
-        doc("### T-001 · Parse the config\n- status: open\n- owner: —\n\
-             - priority: P1\n- difficulty: easy\n")
+        written(
+            "### T-001 · Parse the config\n- status: open\n- owner: —\n\
+             - priority: P1\n- difficulty: easy\n"
+        )
     );
 
     ok(
@@ -279,7 +291,7 @@ fn difficulty_on_its_own_line_is_read_and_edited_in_place() {
     );
     assert_eq!(
         read_text(&file),
-        doc("### T-001 · Parse the config\n- status: open\n- owner: —\n- priority: P1\n")
+        written("### T-001 · Parse the config\n- status: open\n- owner: —\n- priority: P1\n")
     );
 }
 
@@ -661,7 +673,7 @@ fn difficulty_is_kept_when_the_priority_line_is_created_or_removed() {
     );
     assert_eq!(
         read_text(&file),
-        doc(
+        written(
             "### T-001 · Parse the config\n- status: open\n- owner: —\n- priority: P1 · difficulty: hard\n"
         )
     );
@@ -674,7 +686,7 @@ fn difficulty_is_kept_when_the_priority_line_is_created_or_removed() {
     );
     assert_eq!(
         read_text(&file),
-        doc("### T-001 · Parse the config\n- status: open\n- owner: —\n- difficulty: hard\n")
+        written("### T-001 · Parse the config\n- status: open\n- owner: —\n- difficulty: hard\n")
     );
 }
 
