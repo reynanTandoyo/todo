@@ -1,6 +1,5 @@
 ---
 source: tests/cli_basic.rs
-assertion_line: 122
 expression: ok_json
 ---
 {
@@ -155,6 +154,16 @@ expression: ok_json
         "kind": "write",
         "name": "note",
         "summary": "Add a dated note to a task"
+      },
+      {
+        "kind": "meta",
+        "name": "overview",
+        "summary": "Show every registered project on one line: tasks, milestones, stale claims, open questions"
+      },
+      {
+        "kind": "meta",
+        "name": "project",
+        "summary": "Add, remove or list the projects in the per-user project register"
       },
       {
         "kind": "write",

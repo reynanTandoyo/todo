@@ -164,42 +164,50 @@ impl WriteLockGuard {
                 )
             })?;
 
-        let start = Instant::now();
-        loop {
-            match file.try_lock() {
-                Ok(()) => {
-                    let holder = LockHolder {
-                        agent: agent.to_owned(),
-                        command: command.to_owned(),
-                        pid: std::process::id(),
-                        started_at: current_time().to_rfc3339(),
-                    };
-                    if let Err(e) = state.write_holder(&holder) {
-                        let _ = file.unlock();
-                        return Err(e);
-                    }
-                    return Ok(Self {
-                        file,
-                        holder_path: state.holder_path(),
-                    });
+        if !lock_file_waiting(&file, &lock_path, wait_timeout)? {
+            return Err(busy_error(state));
+        }
+        let holder = LockHolder {
+            agent: agent.to_owned(),
+            command: command.to_owned(),
+            pid: std::process::id(),
+            started_at: current_time().to_rfc3339(),
+        };
+        if let Err(e) = state.write_holder(&holder) {
+            let _ = file.unlock();
+            return Err(e);
+        }
+        Ok(Self {
+            file,
+            holder_path: state.holder_path(),
+        })
+    }
+}
+
+/// Waits for the operating-system lock on `file` (R-LOCK-3): tries again every 40–160 ms at random
+/// until `wait` has passed. Returns `Ok(true)` once the lock is held and `Ok(false)` when it is
+/// still held at the end of the wait. The caller releases the lock by unlocking `file` or closing it.
+pub(crate) fn lock_file_waiting(file: &File, lock_path: &Path, wait: Duration) -> Result<bool> {
+    let start = Instant::now();
+    loop {
+        match file.try_lock() {
+            Ok(()) => return Ok(true),
+            Err(TryLockError::WouldBlock) => {
+                let elapsed = start.elapsed();
+                if elapsed >= wait {
+                    return Ok(false);
                 }
-                Err(TryLockError::WouldBlock) => {
-                    let elapsed = start.elapsed();
-                    if elapsed >= wait_timeout {
-                        return Err(busy_error(state));
-                    }
-                    let remaining = wait_timeout.saturating_sub(elapsed);
-                    let jitter = random_retry_delay().min(remaining);
-                    if !jitter.is_zero() {
-                        std::thread::sleep(jitter);
-                    }
+                let remaining = wait.saturating_sub(elapsed);
+                let jitter = random_retry_delay().min(remaining);
+                if !jitter.is_zero() {
+                    std::thread::sleep(jitter);
                 }
-                Err(TryLockError::Error(e)) => {
-                    return Err(TodoError::new(
-                        ErrorCode::WriteFailed,
-                        format!("failed locking {}: {e}", lock_path.display()),
-                    ));
-                }
+            }
+            Err(TryLockError::Error(e)) => {
+                return Err(TodoError::new(
+                    ErrorCode::WriteFailed,
+                    format!("failed locking {}: {e}", lock_path.display()),
+                ));
             }
         }
     }

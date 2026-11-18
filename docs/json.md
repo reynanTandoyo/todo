@@ -75,6 +75,9 @@ Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock
 }
 ```
 
+The list of the projects in the project register is `todo overview --json` (`todo.projects.v1`,
+below), not this command.
+
 ### `todo --version --json` (`todo.version.v1`)
 
 ```json
@@ -749,16 +752,121 @@ command.
 `done` may add `{"fields":{"by":"reyna-gh"}}` to the task: the person who finished it, after
 `.mailmap`. Never an email address.
 
+### `todo project add --json` (`todo.project.v1`, `R-PROJ-1`)
+
+```json
+{
+  "schema": "todo.project.v1",
+  "ok": true,
+  "data": {
+    "project": { "name": "renderer", "path": "C:\\Projekte\\Grafik Engine\\TODO.md", "added": "2026-11-19T10:00+01:00" },
+    "register": "C:\\Users\\Example\\AppData\\Local\\todo\\projects.json"
+  },
+  "warnings": []
+}
+```
+
+`register` is the file that holds the projects: `%LOCALAPPDATA%\todo\projects.json`, or the file
+named by `TODO_REGISTER`. The same file, or the same name, as a project already registered is refused
+with `DUPLICATE_PROJECT`.
+
+### `todo project remove <name|path> --json` (`todo.project.v1`, `R-PROJ-1`)
+
+```json
+{
+  "schema": "todo.project.v1",
+  "ok": true,
+  "data": {
+    "removed": { "name": "renderer", "path": "C:\\Projekte\\Grafik Engine\\TODO.md", "added": "2026-11-19T10:00+01:00" },
+    "register": "C:\\Users\\Example\\AppData\\Local\\todo\\projects.json"
+  },
+  "warnings": []
+}
+```
+
+### `todo project list --json` (`todo.project.v1`, `R-PROJ-1`)
+
+```json
+{
+  "schema": "todo.project.v1",
+  "ok": true,
+  "data": {
+    "projects": [
+      { "name": "renderer", "path": "C:\\Projekte\\Grafik Engine\\TODO.md", "added": "2026-11-19T10:00+01:00" }
+    ],
+    "register": "C:\\Users\\Example\\AppData\\Local\\todo\\projects.json"
+  },
+  "warnings": []
+}
+```
+
+`projects` is empty when the register has no project yet, or does not exist yet.
+
+### `todo overview --json` (`todo.projects.v1`, `R-PROJ-2`)
+
+The schema is `todo.projects.v1`, not `todo.overview.v1`: that name is the one of `todo --json`
+with no command, which lists the commands above. The overview reads only the register and each
+project's `TODO.md`, never searches folders and writes nothing.
+
+```json
+{
+  "schema": "todo.projects.v1",
+  "ok": true,
+  "data": {
+    "projects": [
+      {
+        "name": "renderer",
+        "path": "C:\\Projekte\\Grafik Engine\\TODO.md",
+        "added": "2026-11-19T10:00+01:00",
+        "problem": null,
+        "format_version": 2,
+        "tool_stamp": "0.6.0",
+        "needs_migration": false,
+        "tasks": { "open": 2, "claimed": 1, "blocked": 0, "done": 3, "dropped": 0, "total": 6 },
+        "milestones": { "done": 0, "total": 1 },
+        "stale_claims": 0,
+        "open_questions": 1
+      },
+      {
+        "name": "archiv",
+        "path": "D:\\Archiv\\TODO.md",
+        "added": "2026-11-10T09:00+01:00",
+        "problem": { "code": "NO_FILE", "message": "TODO.md not found" },
+        "format_version": null,
+        "tool_stamp": null,
+        "needs_migration": null,
+        "tasks": null,
+        "milestones": null,
+        "stale_claims": null,
+        "open_questions": null
+      }
+    ],
+    "register": "C:\\Users\\Example\\AppData\\Local\\todo\\projects.json"
+  },
+  "warnings": []
+}
+```
+
+- Each figure comes from the project's `TODO.md` (not its archive). `tasks` counts tasks per status;
+  `milestones` counts the top-level milestones that are done, out of those not dropped; `stale_claims`
+  and `open_questions` are as in `summary`.
+- `problem` is set when the file is gone, cannot be read, has a problem that blocks writes, or is in a
+  format this todo does not know (`TOOL_TOO_OLD`); the figures are then `null`, and the other
+  projects are still shown. The exit code is 0.
+- `needs_migration` is `true` when the format is older than this todo's, or the stamp is missing or
+  older than the running todo: `todo migrate --yes` brings the file up to date.
+- `format_version` is 1 when the file has no format line.
+
 ---
 
 ## Error Codes (`R-OUT-2`, `R-OUT-3`)
 
 | Code | Exit | Meaning | Example |
 |---|---|---|---|
-| `NO_FILE` | 4 | `TODO.md` or `@path` file not found | `{"code":"NO_FILE","message":"no TODO.md found"}` |
+| `NO_FILE` | 4 | `TODO.md` or `@path` file not found; for `project add`, a folder that is not there or has no `TODO.md`; no folder for the project register | `{"code":"NO_FILE","message":"no TODO.md found"}` |
 | `NO_AGENT` | 2 | Write command without `--agent` or `TODO_AGENT` | `{"code":"NO_AGENT","message":"missing agent name: pass --agent <name> or set TODO_AGENT"}` |
 | `USAGE` | 2 | Invalid CLI flags, arguments, or agent name | `{"code":"USAGE","message":"invalid agent name \"bad name\""}` |
-| `NOT_FOUND` | 1 | Task, snapshot, or target file not found | `{"code":"NOT_FOUND","message":"task T-999 not found","task":"T-999"}` |
+| `NOT_FOUND` | 1 | Task, snapshot, target file, or registered project not found | `{"code":"NOT_FOUND","message":"task T-999 not found","task":"T-999"}` |
 | `AMBIGUOUS` | 1 | Title substring matched multiple tasks | `{"code":"AMBIGUOUS","message":"\"retry\" matched 2 tasks","candidates":["T-001","T-002"]}` |
 | `ALREADY_CLAIMED` | 1 | Task is already claimed by another agent | `{"code":"ALREADY_CLAIMED","message":"T-012 is claimed by bob","owner":"bob","task":"T-012"}` |
 | `NOT_OWNER` | 1 | Task or lease belongs to another agent without `--force` | `{"code":"NOT_OWNER","message":"T-012 is owned by bob; pass --force","owner":"bob","task":"T-012"}` |
@@ -771,11 +879,12 @@ command.
 | `BUSY` | 3 | Write lock held by another process past wait timeout | `{"code":"BUSY","message":"write lock busy: held by agent bob","owner":"bob"}` |
 | `LEASE_HELD` | 3 | Manual editing lease held by another agent | `{"code":"LEASE_HELD","message":"manual lease held by alice until ...","owner":"alice"}` |
 | `CHANGED_DURING_WRITE` | 3 | Target file changed on disk between read and replace | `{"code":"CHANGED_DURING_WRITE","message":"TODO.md changed on disk during write"}` |
-| `UNSAFE_FILE` | 4 | Invalid UTF-8, conflict markers, unclosed fence/comment, duplicate ID, or `init` target exists | `{"code":"UNSAFE_FILE","message":"TODO.md:4: git conflict marker"}` |
+| `UNSAFE_FILE` | 4 | Invalid UTF-8, conflict markers, unclosed fence/comment, duplicate ID, `init` target exists, or a project register that is not valid JSON of this format | `{"code":"UNSAFE_FILE","message":"TODO.md:4: git conflict marker"}` |
 | `READ_ONLY` | 4 | Target file is read-only | `{"code":"READ_ONLY","message":"TODO.md is read-only"}` |
 | `WRITE_FAILED` | 4 | Atomic write or rename failed | `{"code":"WRITE_FAILED","message":"failed writing temporary file"}` |
 | `NO_GIT_HISTORY` | 5 | `align` without git, outside a repository, in a shallow clone or with no commits | `{"code":"NO_GIT_HISTORY","message":"not inside a git repository"}` |
-| `TOOL_TOO_OLD` | 4 | `TODO.md` or the archive names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 3 is newer than this todo 0.6.0 supports; ...","line":1,"file":"TODO.md"}` |
+| `TOOL_TOO_OLD` | 4 | `TODO.md`, the archive or the project register names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 3 is newer than this todo 0.6.0 supports; ...","line":1,"file":"TODO.md"}` |
+| `DUPLICATE_PROJECT` | 1 | `project add` for a file, or a name, that the project register already has (R-PROJ-1) | `{"code":"DUPLICATE_PROJECT","message":"C:\\Projekte\\TODO.md is already registered as renderer"}` |
 
 ### `TOOL_TOO_OLD` (`R-VER-2`)
 

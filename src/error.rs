@@ -120,6 +120,8 @@ pub enum ErrorCode {
     /// `TODO.md` or the archive names a format version this todo does not know; the todo
     /// executable must be updated first (R-VER-2, `docs/format.md` §4).
     ToolTooOld,
+    /// The project is already in the project register, by its file or by its name (R-PROJ-1).
+    DuplicateProject,
 }
 
 impl ErrorCode {
@@ -148,6 +150,7 @@ impl ErrorCode {
             Self::WriteFailed => "WRITE_FAILED",
             Self::NoGitHistory => "NO_GIT_HISTORY",
             Self::ToolTooOld => "TOOL_TOO_OLD",
+            Self::DuplicateProject => "DUPLICATE_PROJECT",
         }
     }
 
@@ -175,6 +178,7 @@ impl ErrorCode {
         Self::WriteFailed,
         Self::NoGitHistory,
         Self::ToolTooOld,
+        Self::DuplicateProject,
     ];
 
     /// Plain-English meaning of this error code, shown by `todo schema`.
@@ -212,6 +216,9 @@ impl ErrorCode {
             Self::ToolTooOld => {
                 "TODO.md is in a format version this todo does not know. Update the todo executable first (todo help update)."
             }
+            Self::DuplicateProject => {
+                "The project is already in the project register, with the same file or the same name."
+            }
         }
     }
 
@@ -229,7 +236,8 @@ impl ErrorCode {
             | Self::UnknownSection
             | Self::AmbiguousSection
             | Self::MissingField
-            | Self::BadValue => ExitCode::Refused,
+            | Self::BadValue
+            | Self::DuplicateProject => ExitCode::Refused,
             Self::Busy | Self::LeaseHeld | Self::ChangedDuringWrite => ExitCode::Busy,
             Self::NoGitHistory => ExitCode::CheckError,
             Self::NoFile
