@@ -7,7 +7,6 @@ use common::{parse_json, read_text, read_todo, run_todo, setup_proj, stderr_text
 
 use std::fs;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -18,7 +17,7 @@ fn ask_adds_questions_section_next_skips_questions_and_answer_completes() {
     fs::write(&path, "<!-- todo-format: 1 -->\n\n## Tasks\n").unwrap();
 
     // Ask a question when `Questions` section does not exist yet.
-    let ask_out = cargo_bin_cmd!("todo")
+    let ask_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json",
@@ -45,7 +44,7 @@ fn ask_adds_questions_section_next_skips_questions_and_answer_completes() {
     assert!(content.contains("## Questions\n"));
 
     // `next` never hands out questions, even when it's the only open task.
-    let next_out = cargo_bin_cmd!("todo")
+    let next_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "next"])
         .output()
@@ -55,7 +54,7 @@ fn ask_adds_questions_section_next_skips_questions_and_answer_completes() {
     assert!(next_json["data"]["task"].is_null());
 
     // `answer` records the answer note and marks it done.
-    let ans_out = cargo_bin_cmd!("todo")
+    let ans_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json",
@@ -92,7 +91,7 @@ fn ask_respects_question_section_in_todo_toml() {
     )
     .unwrap();
 
-    let ask_out = cargo_bin_cmd!("todo")
+    let ask_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "--agent", "agent-1", "ask", "Which API version?"])
         .output()

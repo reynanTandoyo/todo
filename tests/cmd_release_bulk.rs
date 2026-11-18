@@ -6,7 +6,6 @@ use common::parse_json;
 
 use std::fs;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use chrono::Local;
 use serde_json::Value;
 use tempfile::TempDir;
@@ -23,7 +22,7 @@ fn release_stale_releases_only_stale_claims_in_one_step() {
     );
     fs::write(dir.path().join("TODO.md"), content).unwrap();
 
-    let out = cargo_bin_cmd!("todo")
+    let out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "--agent", "coordinator", "release", "--stale"])
         .output()
@@ -35,7 +34,7 @@ fn release_stale_releases_only_stale_claims_in_one_step() {
     assert_eq!(json["data"]["released"][0]["status"], "open");
 
     // T-002 must still be claimed by bob.
-    let show = cargo_bin_cmd!("todo")
+    let show = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "show", "T-002"])
         .output()
@@ -58,7 +57,7 @@ fn release_all_releases_own_claims_and_requires_force_for_another_agent() {
     fs::write(dir.path().join("TODO.md"), content).unwrap();
 
     // Alice releases all of her own claims without --force.
-    let own = cargo_bin_cmd!("todo")
+    let own = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "--agent", "alice", "release", "--all"])
         .output()
@@ -68,7 +67,7 @@ fn release_all_releases_own_claims_and_requires_force_for_another_agent() {
     assert_eq!(own_json["data"]["count"], 2);
 
     // Coordinator trying to release Bob's claims without --force is refused with NOT_OWNER.
-    let denied = cargo_bin_cmd!("todo")
+    let denied = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json",
@@ -86,7 +85,7 @@ fn release_all_releases_own_claims_and_requires_force_for_another_agent() {
     assert_eq!(denied_json["error"]["code"], "NOT_OWNER");
 
     // With --force, coordinator releases Bob's claims.
-    let forced = cargo_bin_cmd!("todo")
+    let forced = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json",

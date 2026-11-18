@@ -6,9 +6,8 @@ use common::{parse_json, read_text, stderr_text, stdout_text};
 
 use std::fs;
 use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -35,7 +34,7 @@ fn apply_runs_multiple_ops_with_one_snapshot_and_is_atomic_on_error() {
     let bad_file = dir.path().join("bad.jsonl");
     fs::write(&bad_file, bad_ops).unwrap();
 
-    let bad_out = cargo_bin_cmd!("todo")
+    let bad_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .env("TODO_TEST_NOW", "2026-11-15T12:00:00+01:00")
         .args([
@@ -49,7 +48,7 @@ fn apply_runs_multiple_ops_with_one_snapshot_and_is_atomic_on_error() {
         .unwrap();
     assert_eq!(bad_out.status.code(), Some(1));
     assert_eq!(read_text(&path), initial);
-    let hist_out = cargo_bin_cmd!("todo")
+    let hist_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .env("TODO_TEST_NOW", "2026-11-15T12:00:00+01:00")
         .args(["--json", "history"])
@@ -65,8 +64,7 @@ fn apply_runs_multiple_ops_with_one_snapshot_and_is_atomic_on_error() {
                     {\"op\":\"done\",\"task\":\"T-001\",\"note\":\"fixed\"}\n\
                     {\"op\":\"claim\",\"task\":\"@new\"}\n";
 
-    let bin = assert_cmd::cargo::cargo_bin!("todo");
-    let mut child = Command::new(bin)
+    let mut child = common::todo_bin()
         .current_dir(dir.path())
         .env("TODO_TEST_NOW", "2026-11-15T12:00:00+01:00")
         .args(["--json", "--agent", "alice", "apply", "-"])
@@ -96,7 +94,7 @@ fn apply_runs_multiple_ops_with_one_snapshot_and_is_atomic_on_error() {
     assert_eq!(json["data"]["applied"][4]["task"], "T-003");
 
     // Exactly one snapshot was recorded.
-    let hist_out2 = cargo_bin_cmd!("todo")
+    let hist_out2 = common::assert_todo_bin()
         .current_dir(dir.path())
         .env("TODO_TEST_NOW", "2026-11-15T12:00:00+01:00")
         .args(["--json", "history"])

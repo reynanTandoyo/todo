@@ -6,7 +6,6 @@ use common::{parse_json, stderr_text, stdout_text};
 
 use std::fs;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 use todo::cli::Context;
@@ -83,7 +82,7 @@ fn dry_run_prints_diff_and_leaves_file_byte_identical_across_all_write_commands(
         let mut full_args = vec!["--dry-run", "--agent", "alice"];
         full_args.extend_from_slice(cmd_args);
 
-        let out = cargo_bin_cmd!("todo")
+        let out = common::assert_todo_bin()
             .current_dir(dir.path())
             .args(&full_args)
             .output()
@@ -107,7 +106,7 @@ fn dry_run_prints_diff_and_leaves_file_byte_identical_across_all_write_commands(
     }
 
     // Also check JSON mode with --dry-run on `add` (and verify ids.json was not created).
-    let json_out = cargo_bin_cmd!("todo")
+    let json_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json",

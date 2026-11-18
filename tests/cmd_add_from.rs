@@ -6,9 +6,8 @@ use common::{parse_json, read_text, stderr_text};
 
 use std::fs;
 use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -38,8 +37,7 @@ fn add_from_adds_30_tasks_with_at_refs_in_one_step() {
     }
     let payload = lines.join("\n");
 
-    let bin = assert_cmd::cargo::cargo_bin!("todo");
-    let mut child = Command::new(bin)
+    let mut child = common::todo_bin()
         .current_dir(dir.path())
         .args(["--json", "--agent", "coordinator", "add", "--from", "-"])
         .stdin(Stdio::piped())
@@ -83,7 +81,7 @@ fn add_from_rejects_whole_batch_on_one_bad_entry() {
     )
     .unwrap();
 
-    let out = cargo_bin_cmd!("todo")
+    let out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json",
@@ -99,7 +97,7 @@ fn add_from_rejects_whole_batch_on_one_bad_entry() {
     assert_eq!(read_text(&path), initial);
 
     // Next real `add` still gets T-001 (ids.json was not bumped).
-    let next_add = cargo_bin_cmd!("todo")
+    let next_add = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json",

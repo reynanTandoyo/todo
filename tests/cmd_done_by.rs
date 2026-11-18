@@ -5,7 +5,6 @@ mod common;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use tempfile::TempDir;
 
@@ -34,7 +33,7 @@ Ada Lovelace <ada@example.org> Ada L <ada@work.invalid>\n";
 
 /// Runs git in `dir` with the developer's own git configuration out of the way.
 fn git_as(dir: &Path, name_email: Option<(&str, &str)>, args: &[&str]) -> String {
-    let mut cmd = Command::new("git");
+    let mut cmd = common::git_command();
     cmd.current_dir(dir)
         .env("GIT_CONFIG_GLOBAL", dir.join("no-such-gitconfig"))
         .env("GIT_CONFIG_NOSYSTEM", "1")

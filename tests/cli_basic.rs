@@ -4,7 +4,7 @@ mod common;
 
 use common::{assert_todo, parse_json};
 
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use predicates::prelude::*;
 use tempfile::TempDir;
@@ -134,11 +134,8 @@ fn json_overview_and_error_envelopes_match_snapshots() {
 #[test]
 fn closed_pipe_exits_zero() {
     let home = TempDir::new().unwrap();
-    let bin = assert_cmd::cargo::cargo_bin!("todo");
-    let mut child = Command::new(bin)
+    let mut child = common::todo_bin()
         .arg("--help")
-        .env_remove("TODO_FILE")
-        .env_remove("TODO_AGENT")
         .env("HOME", home.path())
         .env("APPDATA", home.path())
         .stdout(Stdio::piped())

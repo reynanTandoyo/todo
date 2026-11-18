@@ -6,9 +6,8 @@ use common::{parse_json, read_text};
 
 use std::fs;
 use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -29,7 +28,7 @@ fn hooks_install_and_uninstall_preserve_other_entries_and_formatting() {
     fs::write(&settings_path, initial).unwrap();
 
     // Without --yes: nothing changes.
-    let preview = cargo_bin_cmd!("todo")
+    let preview = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["hooks", "install"])
         .output()
@@ -38,7 +37,7 @@ fn hooks_install_and_uninstall_preserve_other_entries_and_formatting() {
     assert_eq!(read_text(&settings_path), initial);
 
     // With --yes: installs hooks, creates backup, preserves 4-space indentation & custom hook.
-    let install = cargo_bin_cmd!("todo")
+    let install = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["hooks", "install", "--yes"])
         .output()
@@ -54,7 +53,7 @@ fn hooks_install_and_uninstall_preserve_other_entries_and_formatting() {
     assert!(after.contains("\"command\": \"echo custom\""), "{after}");
 
     // Uninstall without --yes: nothing changes.
-    let un_prev = cargo_bin_cmd!("todo")
+    let un_prev = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["hooks", "uninstall"])
         .output()
@@ -63,7 +62,7 @@ fn hooks_install_and_uninstall_preserve_other_entries_and_formatting() {
     assert_eq!(read_text(&settings_path), after);
 
     // Uninstall with --yes: removes only todo entries, keeps custom hook.
-    let uninstall = cargo_bin_cmd!("todo")
+    let uninstall = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["hooks", "uninstall", "--yes"])
         .output()
@@ -91,7 +90,7 @@ fn hooks_install_keeps_key_order_and_every_other_byte_of_the_settings() {
     let initial = "{\n  \"zeta\": {\"caf\\u00e9\": [1, 2]},\n  \"permissions\": {\"allow\": [\"Bash(git status)\"]},\n  \"env\": {\"B\": \"2\"},\n  \"alpha\": true\n}\n";
     fs::write(&settings_path, initial).unwrap();
 
-    let install = cargo_bin_cmd!("todo")
+    let install = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["hooks", "install", "--yes"])
         .output()
@@ -109,7 +108,7 @@ fn hooks_install_keeps_key_order_and_every_other_byte_of_the_settings() {
     assert_eq!(value["zeta"]["café"], serde_json::json!([1, 2]));
 
     // A second install changes nothing.
-    let again = cargo_bin_cmd!("todo")
+    let again = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["hooks", "install", "--yes"])
         .output()
@@ -127,10 +126,8 @@ fn guard_blocks_todo_and_archive_unless_leased_and_allows_other_files() {
     )
     .unwrap();
 
-    let bin = assert_cmd::cargo::cargo_bin!("todo");
-
     // 1. Edit of TODO.md via stdin JSON -> blocked (exit 2) with command suggestion.
-    let mut child = Command::new(bin)
+    let mut child = common::todo_bin()
         .current_dir(dir.path())
         .arg("guard")
         .stdin(Stdio::piped())
@@ -150,7 +147,7 @@ fn guard_blocks_todo_and_archive_unless_leased_and_allows_other_files() {
     assert!(stderr.contains("todo "), "{stderr}");
 
     // 2. Edit of src/main.rs -> allowed (exit 0).
-    let mut child2 = Command::new(bin)
+    let mut child2 = common::todo_bin()
         .current_dir(dir.path())
         .arg("guard")
         .stdin(Stdio::piped())
@@ -168,14 +165,14 @@ fn guard_blocks_todo_and_archive_unless_leased_and_allows_other_files() {
     assert_eq!(other.status.code(), Some(0));
 
     // 3. With a live lease -> TODO.md edit is allowed (exit 0).
-    let lock_out = cargo_bin_cmd!("todo")
+    let lock_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["lock", "--agent", "alice"])
         .output()
         .unwrap();
     assert!(lock_out.status.success());
 
-    let leased = cargo_bin_cmd!("todo")
+    let leased = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "guard", "--path", "TODO.md"])
         .output()

@@ -4,7 +4,6 @@ mod common;
 
 use common::{parse_json, read_text, run_in};
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -23,7 +22,7 @@ fn skill_install_writes_claude_skill_from_rules_text() {
     assert!(init.status.success());
 
     // Without --yes: does not create file.
-    let preview = cargo_bin_cmd!("todo")
+    let preview = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["skill", "install"])
         .output()
@@ -32,7 +31,7 @@ fn skill_install_writes_claude_skill_from_rules_text() {
     assert!(!skill_path.exists());
 
     // With --yes: creates SKILL.md containing the same RULES_TEXT as `help agents`.
-    let install = cargo_bin_cmd!("todo")
+    let install = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "skill", "install", "--yes"])
         .output()

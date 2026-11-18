@@ -6,7 +6,6 @@ use common::{parse_json, stderr_text, stdout_text};
 
 use std::fs;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -66,7 +65,7 @@ fn edit_takes_lease_runs_editor_checks_snapshots_and_unlocks() {
         p
     };
 
-    let out = cargo_bin_cmd!("todo")
+    let out = common::assert_todo_bin()
         .current_dir(dir.path())
         .env("EDITOR", format!("\"{}\"", editor_path.display()))
         .env_remove("VISUAL")
@@ -93,7 +92,7 @@ fn edit_takes_lease_runs_editor_checks_snapshots_and_unlocks() {
     assert!(!lease_file.exists(), "lease.json should be removed");
 
     // Snapshot was recorded.
-    let hist = cargo_bin_cmd!("todo")
+    let hist = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "history"])
         .output()

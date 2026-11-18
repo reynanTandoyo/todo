@@ -6,7 +6,6 @@ use common::parse_json;
 
 use std::fs;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -42,7 +41,7 @@ fn title_matching_unique_ambiguous_none_and_skips_done_dropped() {
     fs::write(dir.path().join("TODO.md"), FIXTURE).unwrap();
 
     // Unique match ignoring case ("LOGIN" matches only T-001 because T-003 is done and T-004 is dropped).
-    let show_out = cargo_bin_cmd!("todo")
+    let show_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "show", "LOGIN"])
         .output()
@@ -52,7 +51,7 @@ fn title_matching_unique_ambiguous_none_and_skips_done_dropped() {
     assert_eq!(show_json["data"]["id"], "T-001");
 
     // Write command by title ("login timeout") claims T-001.
-    let claim_out = cargo_bin_cmd!("todo")
+    let claim_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "--agent", "alice", "claim", "login timeout"])
         .output()
@@ -63,7 +62,7 @@ fn title_matching_unique_ambiguous_none_and_skips_done_dropped() {
     assert_eq!(claim_json["data"]["status"], "claimed");
 
     // Ambiguous match ("timeout" matches T-001 and T-002) exits 1 and lists candidates.
-    let ambig_out = cargo_bin_cmd!("todo")
+    let ambig_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--json", "show", "timeout"])
         .output()
@@ -77,14 +76,14 @@ fn title_matching_unique_ambiguous_none_and_skips_done_dropped() {
     assert_eq!(candidates[1], "T-002");
 
     // Done/dropped-only title ("old login" / "experiment") is never matched.
-    let done_only = cargo_bin_cmd!("todo")
+    let done_only = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["show", "old login"])
         .output()
         .unwrap();
     assert_eq!(done_only.status.code(), Some(1));
 
-    let dropped_only = cargo_bin_cmd!("todo")
+    let dropped_only = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--agent", "alice", "note", "experiment", "--text", "hi"])
         .output()
@@ -92,7 +91,7 @@ fn title_matching_unique_ambiguous_none_and_skips_done_dropped() {
     assert_eq!(dropped_only.status.code(), Some(1));
 
     // No matches exits 1.
-    let none_out = cargo_bin_cmd!("todo")
+    let none_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["show", "nonexistent"])
         .output()

@@ -6,7 +6,6 @@ use common::{parse_json, run_with_stdin, stderr_text};
 
 use std::fs;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -38,7 +37,7 @@ fn text_with_quotes_backticks_and_dollar_arrives_intact_via_stdin_and_at_file() 
     fs::write(&msg_file, format!("\u{feff}{TRICKY}\n")).unwrap();
     let at_arg = format!("@{}", msg_file.display());
 
-    let add_out = cargo_bin_cmd!("todo")
+    let add_out = common::assert_todo_bin()
         .current_dir(dir.path())
         .args([
             "--json",
@@ -80,7 +79,7 @@ fn text_with_quotes_backticks_and_dollar_arrives_intact_via_stdin_and_at_file() 
     );
 
     // 4. Missing `@path` returns exit 4 (`NO_FILE`).
-    let missing = cargo_bin_cmd!("todo")
+    let missing = common::assert_todo_bin()
         .current_dir(dir.path())
         .args(["--agent", "alice", "note", "T-002", "@does-not-exist.txt"])
         .output()

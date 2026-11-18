@@ -6,7 +6,6 @@ use common::{parse_json, read_text};
 
 use std::fs;
 
-use assert_cmd::cargo::cargo_bin_cmd;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -33,7 +32,7 @@ fn writes_append_journal_and_log_shows_task_entries() {
     .unwrap();
 
     // 1. Claim T-001
-    let c1 = cargo_bin_cmd!("todo")
+    let c1 = common::assert_todo_bin()
         .current_dir(&work)
         .env("HOME", &home)
         .env("APPDATA", &home)
@@ -43,7 +42,7 @@ fn writes_append_journal_and_log_shows_task_entries() {
     assert!(c1.status.success());
 
     // 2. Claim T-002
-    let c2 = cargo_bin_cmd!("todo")
+    let c2 = common::assert_todo_bin()
         .current_dir(&work)
         .env("HOME", &home)
         .env("APPDATA", &home)
@@ -53,7 +52,7 @@ fn writes_append_journal_and_log_shows_task_entries() {
     assert!(c2.status.success());
 
     // 3. Done T-001
-    let d1 = cargo_bin_cmd!("todo")
+    let d1 = common::assert_todo_bin()
         .current_dir(&work)
         .env("HOME", &home)
         .env("APPDATA", &home)
@@ -76,7 +75,7 @@ fn writes_append_journal_and_log_shows_task_entries() {
     assert_ne!(first["hash_before"], first["hash_after"]);
 
     // `todo log T-001 --json` shows only the 2 entries touching T-001
-    let log_json = cargo_bin_cmd!("todo")
+    let log_json = common::assert_todo_bin()
         .current_dir(&work)
         .env("HOME", &home)
         .env("APPDATA", &home)
@@ -92,7 +91,7 @@ fn writes_append_journal_and_log_shows_task_entries() {
     assert_eq!(parsed["data"]["entries"][1]["command"], "done");
 
     // Text mode
-    let log_txt = cargo_bin_cmd!("todo")
+    let log_txt = common::assert_todo_bin()
         .current_dir(&work)
         .env("HOME", &home)
         .env("APPDATA", &home)
