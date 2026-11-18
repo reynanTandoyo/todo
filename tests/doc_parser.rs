@@ -359,7 +359,7 @@ fn canonical_field_order_and_insertion_lines_follow_format_section_10() {
     assert_eq!(
         CANONICAL_FIELD_ORDER,
         &[
-            "status", "owner", "claimed", "session", "priority", "type", "area", "depends",
+            "status", "owner", "claimed", "session", "priority", "type", "area", "why", "depends",
             "files", "problem", "fix", "accept", "commit"
         ]
     );
@@ -372,12 +372,64 @@ fn canonical_field_order_and_insertion_lines_follow_format_section_10() {
     assert_eq!(task.insert_line_for_field("owner"), 3);
     // `area` goes right after combined `priority`/`type` (line 3 -> insert at 4).
     assert_eq!(task.insert_line_for_field("area"), 4);
+    // `why` comes after `area` and before `depends`/`problem`; with no line above it, it also
+    // goes right after the combined `priority`/`type` line (insert at 4).
+    assert_eq!(task.insert_line_for_field("why"), 4);
     // `commit` goes right after `accept` (line 4 -> insert at 5).
     assert_eq!(task.insert_line_for_field("commit"), 5);
     // Another unknown field goes after `custom_a` (line 5 -> insert at 6).
     assert_eq!(task.insert_line_for_field("custom_b"), 6);
     // Notes append at end of block.
     assert_eq!(task.note_insert_line(), 6);
+}
+
+#[test]
+fn why_is_read_as_its_own_field_from_a_hand_written_line() {
+    // A `why` line written by hand before v0.6 was an unknown field; it is now read as `why`
+    // (R-WRITE-17), and an empty `- why:` means no value (line kept, value absent).
+    let sample = b"## Tasks\n### T-001 \xC2\xB7 Example\n- status: open\n- priority: P1\n- why: the renderer has no shading stage yet\n- depends: T-002\n- problem: none\n- custom_a: 1\n### T-002 \xC2\xB7 Empty why\n- status: open\n- why:\n";
+    let doc = Document::parse_bytes(sample).expect("parse");
+    assert!(
+        doc.problems.is_empty(),
+        "unexpected problems: {:?}",
+        doc.problems
+    );
+
+    let t1 = doc.task_by_id(TaskId(1)).expect("T-001");
+    assert_eq!(
+        t1.why.as_deref(),
+        Some("the renderer has no shading stage yet")
+    );
+    assert_eq!(t1.why_line, Some(4));
+    assert_eq!(
+        t1.field_value("why"),
+        Some("the renderer has no shading stage yet")
+    );
+    assert!(t1.unknown_fields.iter().all(|f| f.key != "why"));
+    // Unrelated unknown fields are still kept as written.
+    assert_eq!(t1.unknown_fields.len(), 1);
+    assert_eq!(t1.unknown_fields[0].key, "custom_a");
+    // A new `depends` line would go after `why`, which comes before `depends` in §10.
+    assert_eq!(t1.insert_line_for_field("depends"), 5);
+
+    let t2 = doc.task_by_id(TaskId(2)).expect("T-002");
+    assert_eq!(t2.why, None);
+    assert_eq!(t2.why_line, Some(10));
+    assert_eq!(t2.field_value("why"), None);
+}
+
+#[test]
+fn repeated_why_line_is_a_repeated_field_problem() {
+    let doc = Document::parse_bytes(b"## Tasks\n### T-001 \xC2\xB7 Twice\n- why: a\n- why: b\n")
+        .expect("parse");
+    assert!(
+        doc.problems.iter().any(|p| matches!(
+            &p.kind,
+            ProblemKind::RepeatedField { field, .. } if field == "why"
+        )),
+        "expected a repeated `why` problem, got {:?}",
+        doc.problems
+    );
 }
 
 #[test]

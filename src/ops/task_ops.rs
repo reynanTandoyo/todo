@@ -244,6 +244,8 @@ pub struct NewTask<'a> {
     pub task_type: Option<&'a str>,
     /// `area` value.
     pub area: Option<&'a str>,
+    /// `why` value: what the task is for.
+    pub why: Option<&'a str>,
     /// `depends` value (comma-separated IDs).
     pub depends: Option<&'a str>,
     /// `files` value.
@@ -281,6 +283,7 @@ impl NewTask<'_> {
             lines.push(format!("- {}", combined.join(" \u{00b7} ")));
         }
         for (key, value) in [
+            ("why", self.why),
             ("depends", self.depends),
             ("files", self.files),
             ("problem", self.problem),
@@ -292,7 +295,7 @@ impl NewTask<'_> {
             }
         }
         let known = [
-            "priority", "type", "area", "depends", "files", "problem", "fix", "accept",
+            "priority", "type", "area", "why", "depends", "files", "problem", "fix", "accept",
         ];
         for (k, v) in self.extra {
             if !known.contains(&k.as_str()) {

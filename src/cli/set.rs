@@ -14,7 +14,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "set",
     summary: "Edit fields or title of a task",
     kind: CommandKind::Write,
-    details: "Updates task fields (`--title`, `--priority`, `--type`, `--area`, `--depends`, `--files`, `--problem`, `--fix`, `--accept`), arbitrary `--field key=value` pairs, or removes fields with `--unset key`. Edits combined `- priority:` lines in place. Refuses changing or unsetting `status`, `owner`, or `claimed`.",
+    details: "Updates task fields (`--title`, `--priority`, `--type`, `--area`, `--why`, `--depends`, `--files`, `--problem`, `--fix`, `--accept`), arbitrary `--field key=value` pairs, or removes fields with `--unset key`. Edits combined `- priority:` lines in place. Refuses changing or unsetting `status`, `owner`, or `claimed`.",
     examples: &[
         "todo set T-012 --priority P0 --area cli --agent agent-1",
         "todo set T-012 --field reqs=R-WRITE-8 --unset fix --agent agent-1",
@@ -44,6 +44,10 @@ pub struct Args {
     /// New area (e.g. `cli`, `docs`).
     #[arg(long, value_name = "VALUE")]
     pub area: Option<String>,
+
+    /// New `why` field value: what the task is for.
+    #[arg(long, value_name = "TEXT")]
+    pub why: Option<String>,
 
     /// New dependencies (comma-separated task IDs).
     #[arg(long, value_name = "IDS")]
@@ -83,6 +87,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         || args.priority.is_some()
         || args.task_type.is_some()
         || args.area.is_some()
+        || args.why.is_some()
         || args.depends.is_some()
         || args.files.is_some()
         || args.problem.is_some()
@@ -98,6 +103,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     }
 
     let resolved_title = resolve_opt_text_arg(args.title.as_deref())?;
+    let resolved_why = resolve_opt_text_arg(args.why.as_deref())?;
     let resolved_files = resolve_opt_text_arg(args.files.as_deref())?;
     let resolved_problem = resolve_opt_text_arg(args.problem.as_deref())?;
     let resolved_fix = resolve_opt_text_arg(args.fix.as_deref())?;
@@ -121,6 +127,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         ("priority", args.priority.as_ref()),
         ("type", args.task_type.as_ref()),
         ("area", args.area.as_ref()),
+        ("why", resolved_why.as_ref()),
         ("depends", args.depends.as_ref()),
         ("files", resolved_files.as_ref()),
         ("problem", resolved_problem.as_ref()),

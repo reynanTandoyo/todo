@@ -279,6 +279,8 @@ pub struct TaskJson {
     pub task_type: Option<String>,
     /// Task area, if present.
     pub area: Option<String>,
+    /// `- why:` value, if present: what the task is for (R-WRITE-17).
+    pub why: Option<String>,
     /// Canonicalized or raw dependency strings from `- depends:`.
     pub depends: Vec<String>,
     /// Detailed dependency statuses (`R-DEP-2`).
@@ -435,6 +437,7 @@ pub fn build_task_json(
         priority: task.priority.clone(),
         task_type: task.task_type.clone(),
         area: task.area.clone(),
+        why: task.why.clone(),
         depends: task.depends.iter().map(|d| d.raw.clone()).collect(),
         dependencies,
         dependents,

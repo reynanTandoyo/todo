@@ -12,9 +12,12 @@ pub const SUPPORTED_FORMAT_VERSION: u32 = 1;
 
 /// Canonical field order for inserting missing fields (`docs/format.md` §10).
 pub const CANONICAL_FIELD_ORDER: &[&str] = &[
-    "status", "owner", "claimed", "session", "priority", "type", "area", "depends", "files",
+    "status", "owner", "claimed", "session", "priority", "type", "area", "why", "depends", "files",
     "problem", "fix", "accept", "commit",
 ];
+
+/// Number of known fields that can be seen at most once per task (`known_field_index`).
+const KNOWN_FIELD_SLOTS: usize = 13;
 
 /// Accepted heading separators between `<ID>` and `<title>` (`docs/format.md` §6),
 /// canonical separator first.
@@ -321,6 +324,10 @@ pub struct Task {
     /// Where `area` is defined, if present.
     pub area_loc: Option<FieldLocation>,
 
+    /// `- why:` value and line index: what the task is for (`docs/format.md` §8).
+    pub why: Option<String>,
+    pub why_line: Option<usize>,
+
     /// Parsed dependency references from `- depends:`.
     pub depends: Vec<DependencyRef>,
     /// Raw `- depends:` value, if present.
@@ -444,6 +451,7 @@ impl Task {
             "priority" => self.priority.as_deref(),
             "type" => self.task_type.as_deref(),
             "area" => self.area.as_deref(),
+            "why" => self.why.as_deref(),
             "depends" => self.depends_raw.as_deref(),
             "files" => self.files.as_deref(),
             "problem" => self.problem.as_deref(),
@@ -1124,6 +1132,8 @@ fn parse_task_block(
         task_type_loc: None,
         area: None,
         area_loc: None,
+        why: None,
+        why_line: None,
         depends: Vec::new(),
         depends_raw: None,
         depends_line: None,
@@ -1143,12 +1153,12 @@ fn parse_task_block(
         notes: Vec::new(),
     };
 
-    let mut seen_known = [0usize; 12];
+    let mut seen_known = [0usize; KNOWN_FIELD_SLOTS];
     let mut seen_unknown: Vec<(String, usize)> = Vec::new();
 
     let check_and_mark_seen = |key: &str,
                                line_no: usize,
-                               seen_known: &mut [usize; 12],
+                               seen_known: &mut [usize; KNOWN_FIELD_SLOTS],
                                seen_unknown: &mut Vec<(String, usize)>|
      -> Option<usize> {
         if let Some(slot) = known_field_index(key) {
@@ -1315,6 +1325,14 @@ fn parse_task_block(
                     };
                     task.area_loc = Some(FieldLocation::OwnLine(idx));
                 }
+                "why" => {
+                    task.why = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
+                    task.why_line = Some(idx);
+                }
                 "depends" => {
                     task.depends = parse_depends_list(value_str, id_config);
                     task.depends_raw = Some(owned_val);
@@ -1388,6 +1406,7 @@ const fn known_field_index(key: &str) -> Option<usize> {
         b"fix" => Some(9),
         b"accept" => Some(10),
         b"commit" => Some(11),
+        b"why" => Some(12),
         _ => None,
     }
 }

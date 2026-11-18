@@ -272,6 +272,7 @@ fn tasks_semantically_equal(
         && a.priority == b.priority
         && a.task_type == b.task_type
         && a.area == b.area
+        && a.why == b.why
         && a.files == b.files
         && a.problem == b.problem
         && a.fix == b.fix

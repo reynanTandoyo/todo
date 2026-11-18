@@ -84,6 +84,7 @@ enum ApplyOp {
         #[serde(rename = "type")]
         task_type: Option<String>,
         area: Option<String>,
+        why: Option<String>,
         depends: Option<DependsValue>,
         files: Option<String>,
         problem: Option<String>,
@@ -127,6 +128,7 @@ enum ApplyOp {
         #[serde(rename = "type")]
         task_type: Option<String>,
         area: Option<String>,
+        why: Option<String>,
         depends: Option<DependsValue>,
         files: Option<String>,
         problem: Option<String>,
@@ -440,6 +442,7 @@ fn apply_one_op(
             priority,
             task_type,
             area,
+            why,
             depends,
             files,
             problem,
@@ -484,6 +487,7 @@ fn apply_one_op(
                 priority: Some(priority.trim()),
                 task_type: trim(task_type),
                 area: trim(area),
+                why: trim(why),
                 depends: dep_str.as_deref(),
                 files: trim(files),
                 problem: trim(problem),
@@ -646,6 +650,7 @@ fn apply_task_op(
             priority,
             task_type,
             area,
+            why,
             depends,
             files,
             problem,
@@ -676,7 +681,13 @@ fn apply_task_op(
                     SetChange::Field("depends", &dep_owned)
                 });
             }
-            let rest = [("files", files), ("problem", problem), ("fix", fix), ("accept", accept)];
+            let rest = [
+                ("why", why),
+                ("files", files),
+                ("problem", problem),
+                ("fix", fix),
+                ("accept", accept),
+            ];
             for (key, value) in rest {
                 if let Some(v) = value {
                     changes.push(SetChange::Field(key, v.trim()));

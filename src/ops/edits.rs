@@ -140,6 +140,7 @@ impl<'a> TaskEditBuilder<'a> {
             }
             "owner" => self.set_owner(if clean.is_empty() { None } else { Some(&clean) }),
             "claimed" => self.set_claimed(&clean),
+            "why" => self.set_simple_field("why", self.task.why_line, &clean),
             "depends" => self.set_simple_field("depends", self.task.depends_line, &clean),
             "files" => self.set_simple_field("files", self.task.files_line, &clean),
             "problem" => self.set_simple_field("problem", self.task.problem_line, &clean),
@@ -177,6 +178,7 @@ impl<'a> TaskEditBuilder<'a> {
             "type" => self.type_override = Some(None),
             "area" => self.area_override = Some(None),
             "claimed" => self.remove_claimed(),
+            "why" => self.remove_if_some(self.task.why_line),
             "depends" => self.remove_if_some(self.task.depends_line),
             "files" => self.remove_if_some(self.task.files_line),
             "problem" => self.remove_if_some(self.task.problem_line),
