@@ -216,12 +216,57 @@ When no ready task exists, `"found": false, "task": null`.
     "file": "TODO.md",
     "counts": { "open": 2, "claimed": 1, "blocked": 1, "done": 3, "dropped": 0, "total": 7 },
     "open_by_priority": [{ "priority": "P0", "count": 1 }],
+    "milestones": [{ "id": "T-010", "title": "Develop the renderer", "priority": "P1", "status": "open", "progress": { "done": 1, "total": 3 } }],
     "claimed": [
       { "id": "T-002", "title": "Work", "owner": "alice", "claimed": "2026-11-15T18:00+01:00", "age_hours": 2, "stale": false }
     ],
     "blocked": [{ "id": "T-004", "title": "Wait", "reason": "blocked — waiting on key" }],
     "next_ready": [{ "id": "T-001", "title": "First", "priority": "P0", "section": "Tasks" }],
     "open_questions": [{ "id": "T-007", "title": "Ship today?", "status": "open" }]
+  },
+  "warnings": []
+}
+```
+
+### `todo tree --json` (`todo.tree.v1`)
+
+`nodes` is nested: each milestone lists its `children` (milestones and tasks, in file order), and
+top-level tasks come after the top-level milestones. `progress` is `{done, total}` for a milestone
+and `null` for a task; `goal` is set only for a milestone. `questions` and `ideas` list the open
+ones only for the whole tree (no milestone argument and no `--area`); otherwise they are `[]`.
+`archived` is `true` for an entry from `TODO-archive.md`, which is read and shown only with `--all`
+(done and dropped entries are shown only with `--all` too).
+
+```json
+{
+  "schema": "todo.tree.v1",
+  "ok": true,
+  "data": {
+    "file": "TODO.md",
+    "all": false,
+    "milestone": null,
+    "area": null,
+    "milestones": 1,
+    "tasks": 1,
+    "nodes": [
+      {
+        "id": "T-010",
+        "title": "Develop the renderer",
+        "kind": "milestone",
+        "status": "open",
+        "priority": "P1",
+        "difficulty": null,
+        "area": null,
+        "goal": "the test scene renders with lighting at 60 frames per second",
+        "progress": { "done": 1, "total": 2 },
+        "archived": false,
+        "children": [
+          { "id": "T-012", "title": "C shader", "kind": "task", "status": "open", "priority": "P1", "difficulty": "hard", "area": "cli", "goal": null, "progress": null, "archived": false, "children": [] }
+        ]
+      }
+    ],
+    "questions": [],
+    "ideas": []
   },
   "warnings": []
 }
