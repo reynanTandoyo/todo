@@ -1,5 +1,7 @@
 //! Task filtering and `next` task selection (`R-READ-1`, `R-READ-3`).
 
+use std::collections::BTreeSet;
+
 use chrono::{DateTime, FixedOffset};
 
 use crate::doc::{
@@ -285,6 +287,25 @@ pub struct NextFilter<'a> {
     pub agent: Option<&'a str>,
     /// Skip returning `agent`'s existing claimed task first (`--new`).
     pub ignore_own_claim: bool,
+    /// Only tasks below this milestone, at any depth (`--milestone`, `R-MILE-6`).
+    pub milestone: Option<TaskId>,
+}
+
+/// The order `next` hands out ready tasks in (`R-READ-3`, `R-MILE-6`): priority first; then tasks
+/// in a milestone where work has started (`started` from [`Document::started_milestones`]); then
+/// file order. `summary` sorts its ready list with the same key.
+#[must_use]
+pub fn ready_sort_key(
+    doc: &Document,
+    task: &Task,
+    started: &BTreeSet<TaskId>,
+    cfg: &OpsConfig,
+) -> (usize, bool, usize) {
+    (
+        cfg.priority_rank(task.priority.as_deref()),
+        !doc.above_started_milestone(task, started),
+        task.heading_line,
+    )
 }
 
 /// Result of selecting the next task (`R-READ-3`).
@@ -359,6 +380,14 @@ pub fn select_next_task<'a>(
                 return false;
             }
         }
+        if let Some(milestone) = filter.milestone
+            && !doc
+                .milestone_ancestors(task)
+                .iter()
+                .any(|m| m.id == milestone)
+        {
+            return false;
+        }
         filter.where_clauses.iter().all(|w| w.matches(task))
     };
 
@@ -385,11 +414,12 @@ pub fn select_next_task<'a>(
         }
     }
 
+    let started = doc.started_milestones();
     let candidate = doc
         .tasks
         .iter()
         .filter(|t| is_task_ready(doc, t, archive, now, cfg) && matches_common_filters(t))
-        .min_by_key(|t| (cfg.priority_rank(t.priority.as_deref()), t.heading_line))?;
+        .min_by_key(|t| ready_sort_key(doc, t, &started, cfg))?;
 
     Some(SelectedNext {
         task: candidate,

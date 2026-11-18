@@ -228,6 +228,8 @@ When no ready task exists, `"found": false, "task": null`.
 }
 ```
 
+`ready_to_close` (`R-MILE-6`) lists the milestones that are ready to close, as `{ "id", "title" }`; the key is left out when there are none.
+
 ### `todo tree --json` (`todo.tree.v1`)
 
 `nodes` is nested: each milestone lists its `children` (milestones and tasks, in file order), and
@@ -531,6 +533,14 @@ When finishing or dropping a task makes other tasks ready, their summaries appea
 ```json
 "newly_ready": [
   { "id": "T-003", "priority": "P1", "title": "Follow-up task" }
+]
+```
+
+When it finishes the last unfinished entry below a milestone, the milestone appears in `"ready_to_close"` (`R-MILE-6`). Nothing closes it; `todo done <id>` does. The key is left out when it is empty.
+
+```json
+"ready_to_close": [
+  { "id": "T-010", "title": "Renderer" }
 ]
 ```
 

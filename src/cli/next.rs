@@ -7,6 +7,7 @@ use crate::cli::{CommandKind, CommandMeta, Context, write_milestone_chain};
 use crate::doc::TaskChangeIntent;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::current_time;
+use crate::ops::milestone::resolve_milestone;
 use crate::ops::{
     DocWritePlan, NextFilter, TaskJson, WhereClause, build_claim_edits, build_task_json,
     check_task_writable, edit_doc_with_found_and_state_and_write, load_for_read_with_found,
@@ -19,7 +20,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "next",
     summary: "Pick the next ready task (optionally claiming it atomically)",
     kind: CommandKind::Read,
-    details: "Selects the highest-priority ready task (open or stale claimed, with all dependencies done or dropped, excluding questions, ideas and milestones), breaking ties by file order. When `--agent` or `TODO_AGENT` is set, returns the agent's own existing claim first unless `--new` is passed. With `--claim`, picks and claims atomically inside a single write lock.",
+    details: "Selects the highest-priority ready task (open or stale claimed, with all dependencies done or dropped, the dependencies of every milestone above it too, and no milestone above it blocked, done or dropped; excluding questions, ideas and milestones). Ties go to tasks in a milestone where work has started, then to file order. `--milestone <task>` keeps only the tasks below that milestone, at any depth. When `--agent` or `TODO_AGENT` is set, returns the agent's own existing claim first unless `--new` is passed. With `--claim`, picks and claims atomically inside a single write lock.",
     examples: &[
         "todo next",
         "todo next --agent agent-1",
@@ -27,6 +28,7 @@ pub const META: CommandMeta = CommandMeta {
         "todo next --claim --new --section Backend --agent agent-1",
         "todo next --type bug --where area=cli",
         "todo next --claim --max-difficulty medium --agent agent-1",
+        "todo next --milestone T-010 --claim --agent agent-1",
     ],
 };
 
@@ -64,6 +66,10 @@ pub struct Args {
     /// Filter by `key=value` predicate (repeatable, ANDed).
     #[arg(long = "where", value_name = "KEY=VALUE")]
     pub where_clauses: Vec<String>,
+
+    /// Only tasks below this milestone, at any depth (an ID or a title; `R-MILE-6`).
+    #[arg(long, value_name = "TASK")]
+    pub milestone: Option<String>,
 }
 
 /// JSON payload emitted by `todo next`.
@@ -100,6 +106,10 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             META.name,
             out,
             |doc, archive, _state, label, agent, now| {
+                let milestone = match args.milestone.as_deref() {
+                    Some(raw) => Some(resolve_milestone(doc, raw)?.id),
+                    None => None,
+                };
                 let filter = NextFilter {
                     section: args.section.as_deref(),
                     task_type: args.task_type.as_deref(),
@@ -109,6 +119,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                     where_clauses: &where_clauses,
                     agent: Some(agent),
                     ignore_own_claim: args.new,
+                    milestone,
                 };
                 let Some(sel) = select_next_task(doc, archive, &filter, now, &cfg) else {
                     return Ok(DocWritePlan::Unchanged(NextJson {
@@ -169,6 +180,10 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     } else {
         let loaded = load_for_read_with_found(found, &cfg, false, true, out)?;
         let now = current_time();
+        let milestone = match args.milestone.as_deref() {
+            Some(raw) => Some(resolve_milestone(&loaded.doc, raw)?.id),
+            None => None,
+        };
         let filter = NextFilter {
             section: args.section.as_deref(),
             task_type: args.task_type.as_deref(),
@@ -178,6 +193,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             where_clauses: &where_clauses,
             agent: ctx.agent.as_deref(),
             ignore_own_claim: args.new,
+            milestone,
         };
         match select_next_task(&loaded.doc, loaded.archive.as_ref(), &filter, now, &cfg) {
             Some(sel) => NextJson {

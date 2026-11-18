@@ -47,7 +47,7 @@ pub use config::{
 };
 pub use edits::TaskEditBuilder;
 pub use pipeline::{
-    DocWritePlan, NewlyReadyTask, WriteDocResult, WriteTaskResult, build_claim_edits,
+    DocWritePlan, NewlyReadyTask, ReadyToClose, WriteDocResult, WriteTaskResult, build_claim_edits,
     build_release_edits, check_task_writable, edit_doc_and_write, edit_doc_with_state_and_write,
     edit_task_and_write, parse_doc_for_write, require_yes_or_preview,
 };
@@ -56,7 +56,8 @@ pub(crate) use pipeline::{
 };
 pub use query::{
     ListFilter, NextFilter, SelectedNext, StatusFilter, WhereClause, filter_tasks,
-    matching_section_indices, resolve_task_by_title, resolve_task_in_doc, select_next_task,
+    matching_section_indices, ready_sort_key, resolve_task_by_title, resolve_task_in_doc,
+    select_next_task,
 };
 pub(crate) use read::load_for_read_with_found;
 pub use read::{

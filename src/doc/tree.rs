@@ -4,6 +4,8 @@
 //! entries. Walks up the tree stop at a missing parent, at an entry that is not a milestone, and at
 //! a cycle, so a damaged file never makes them loop.
 
+use std::collections::BTreeSet;
+
 use serde::Serialize;
 
 use crate::doc::id::TaskId;
@@ -157,6 +159,56 @@ impl Document {
         self.entries_below(id)
             .into_iter()
             .filter(|t| matches!(t.status, Status::Open | Status::Claimed | Status::Blocked))
+            .collect()
+    }
+
+    /// The milestones with work started below them: something below at any depth is claimed or
+    /// done (`R-MILE-6`). A milestone is never claimed, so a claimed entry here is a task.
+    #[must_use]
+    pub fn started_milestones(&self) -> BTreeSet<TaskId> {
+        let mut started = BTreeSet::new();
+        for entry in &self.tasks {
+            if matches!(entry.status, Status::Claimed | Status::Done) {
+                started.extend(self.milestone_ancestors(entry).iter().map(|m| m.id));
+            }
+        }
+        started
+    }
+
+    /// Whether a milestone above `task` is one of `started` (`R-MILE-6`).
+    #[must_use]
+    pub fn above_started_milestone(&self, task: &Task, started: &BTreeSet<TaskId>) -> bool {
+        self.milestone_ancestors(task)
+            .iter()
+            .any(|m| started.contains(&m.id))
+    }
+
+    /// Whether milestone `milestone` is ready to close (`R-MILE-6`): it is open or blocked, it has
+    /// entries below it, and every one of them is done or dropped. Only `done` closes it; nothing
+    /// closes it automatically.
+    #[must_use]
+    pub fn is_ready_to_close(&self, milestone: &Task) -> bool {
+        milestone.is_milestone()
+            && matches!(milestone.status, Status::Open | Status::Blocked)
+            && !self.entries_below(milestone.id).is_empty()
+            && self.unfinished_below(milestone.id).is_empty()
+    }
+
+    /// The milestones above `task` that are ready to close, nearest first (`R-MILE-6`).
+    #[must_use]
+    pub fn ready_to_close_above(&self, task: &Task) -> Vec<&Task> {
+        self.milestone_ancestors(task)
+            .into_iter()
+            .filter(|m| self.is_ready_to_close(m))
+            .collect()
+    }
+
+    /// Every milestone that is ready to close, in file order (`summary`, `R-MILE-6`).
+    #[must_use]
+    pub fn milestones_ready_to_close(&self) -> Vec<&Task> {
+        self.tasks
+            .iter()
+            .filter(|t| self.is_ready_to_close(t))
             .collect()
     }
 
