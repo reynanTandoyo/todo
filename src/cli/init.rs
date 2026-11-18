@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::agents::render_managed_block;
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::tool_line_text;
+use crate::doc::{CURRENT_FORMAT_VERSION, format_line_text, tool_line_text};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::output::Output;
@@ -61,9 +61,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     let managed = render_managed_block("\n");
     let stamp = tool_line_text(RUNNING_VERSION);
-    let content = format!(
-        "<!-- todo-format: 1 -->\n{stamp}\n# {title}\n\n{managed}\n\n## Tasks\n"
-    );
+    let format = format_line_text(CURRENT_FORMAT_VERSION);
+    let content = format!("{format}\n{stamp}\n# {title}\n\n{managed}\n\n## Tasks\n");
 
     if let Some(parent) = target.parent()
         && !parent.as_os_str().is_empty()

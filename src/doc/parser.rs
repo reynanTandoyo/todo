@@ -1,4 +1,4 @@
-//! Parser and domain model for `TODO.md` format version 1 (`docs/format.md`).
+//! Parser and domain model for `TODO.md` format versions 1 and 2 (`docs/format.md`).
 
 use std::ops::Range;
 
@@ -8,8 +8,13 @@ use crate::doc::id::{FastU64Map, IdConfig, TaskId, strip_prefix_ignore_case};
 use crate::doc::lines::{LineDoc, Utf8DecodeError};
 use crate::version::{RUNNING_VERSION, ToolVersion};
 
-/// Supported format version of `TODO.md`.
-pub const SUPPORTED_FORMAT_VERSION: u32 = 1;
+/// The format version this build writes (`docs/format.md` §18). Older versions are read, and
+/// migrated on the first write (R-MIG-1).
+pub const CURRENT_FORMAT_VERSION: u32 = 2;
+
+/// The oldest format version. A file without a format line is in this version (`docs/format.md`
+/// §4).
+pub const OLDEST_FORMAT_VERSION: u32 = 1;
 
 /// Canonical field order for inserting missing fields (`docs/format.md` §10).
 pub const CANONICAL_FIELD_ORDER: &[&str] = &[
@@ -624,11 +629,12 @@ impl Document {
         self.line_doc.to_bytes()
     }
 
-    /// Returns the effective format version (`1` when the format line is omitted).
+    /// Returns the effective format version: [`OLDEST_FORMAT_VERSION`] when the format line is
+    /// omitted.
     #[must_use]
     pub fn effective_format_version(&self) -> u32 {
         self.declared_format_version
-            .unwrap_or(SUPPORTED_FORMAT_VERSION)
+            .unwrap_or(OLDEST_FORMAT_VERSION)
     }
 
     /// Returns `true` if any file-wide problem blocks all writes (`UNSAFE_FILE`).
@@ -844,7 +850,9 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
                 format_line = Some(idx);
             }
             match raw_ver.parse::<u32>() {
-                Ok(v) if v == SUPPORTED_FORMAT_VERSION => {
+                // Older versions are read and migrated on the first write (R-MIG-1); newer ones
+                // are unknown and block writes (R-VER-2).
+                Ok(v) if (OLDEST_FORMAT_VERSION..=CURRENT_FORMAT_VERSION).contains(&v) => {
                     if declared_format_version.is_none() {
                         declared_format_version = Some(v);
                     }
@@ -858,7 +866,7 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
                         severity: ProblemSeverity::BlockAllWrites,
                         kind: ProblemKind::UnknownFormatVersion { raw: raw_ver },
                         message: format!(
-                            "unsupported format version {v} (supported: {SUPPORTED_FORMAT_VERSION})"
+                            "unsupported format version {v} (supported: {OLDEST_FORMAT_VERSION} to {CURRENT_FORMAT_VERSION})"
                         ),
                     });
                 }
@@ -868,7 +876,7 @@ fn parse_line_doc(line_doc: LineDoc, id_config: IdConfig) -> Document {
                         severity: ProblemSeverity::BlockAllWrites,
                         kind: ProblemKind::UnknownFormatVersion { raw: raw_ver.clone() },
                         message: format!(
-                            "invalid format version '{raw_ver}' (supported: {SUPPORTED_FORMAT_VERSION})"
+                            "invalid format version '{raw_ver}' (supported: {OLDEST_FORMAT_VERSION} to {CURRENT_FORMAT_VERSION})"
                         ),
                     });
                 }

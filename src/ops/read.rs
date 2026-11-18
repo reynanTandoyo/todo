@@ -10,7 +10,7 @@ use serde::Serialize;
 use crate::atomic::{read_file_with_snapshot, validate_utf8};
 use crate::cli::Context;
 use crate::doc::{
-    Document, EntryKind, IdConfig, SUPPORTED_FORMAT_VERSION, Status, Task, TaskId, ToolStamp,
+    CURRENT_FORMAT_VERSION, Document, EntryKind, IdConfig, Status, Task, TaskId, ToolStamp,
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, fs_path};
@@ -46,7 +46,7 @@ pub fn file_label(path: &Path) -> String {
 #[must_use]
 pub fn format_is_newer(doc: &Document) -> bool {
     doc.declared_format_version
-        .is_some_and(|v| v > SUPPORTED_FORMAT_VERSION)
+        .is_some_and(|v| v > CURRENT_FORMAT_VERSION)
 }
 
 /// Refuses a document whose format line names a version newer than this todo knows (R-VER-2,

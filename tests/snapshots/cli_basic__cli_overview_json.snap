@@ -138,6 +138,11 @@ expression: ok_json
       },
       {
         "kind": "write",
+        "name": "migrate",
+        "summary": "Bring TODO.md and its archive up to the current format version"
+      },
+      {
+        "kind": "write",
         "name": "move",
         "summary": "Move a task to the end of another section"
       },

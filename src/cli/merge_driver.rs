@@ -40,7 +40,7 @@ use serde::Serialize;
 use crate::atomic::atomic_write_bytes;
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::doc::{
-    Document, Line, LineDoc, LineEnding, ProblemSeverity, SUPPORTED_FORMAT_VERSION, Task, TaskId,
+    CURRENT_FORMAT_VERSION, Document, Line, LineDoc, LineEnding, ProblemSeverity, Task, TaskId,
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::output::Output;
@@ -241,7 +241,11 @@ fn parse_side(bytes: &[u8]) -> Option<Document> {
     if !doc.tasks.iter().all(|t| seen.insert(t.id)) {
         return None;
     }
-    if doc.declared_format_version.is_some_and(|v| v != SUPPORTED_FORMAT_VERSION) {
+    // Older formats merge task by task too; a newer format is not merged here (R-VER-2).
+    if doc
+        .declared_format_version
+        .is_some_and(|v| v > CURRENT_FORMAT_VERSION)
+    {
         return None;
     }
     Some(doc)

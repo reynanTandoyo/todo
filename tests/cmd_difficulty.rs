@@ -22,10 +22,11 @@ fn doc(body: &str) -> String {
     format!("{MARKER}\n<!-- todo-format: 1 -->\n\n## Tasks\n\n{body}")
 }
 
-/// The same file after a write: the running tool stamp goes directly after the format line (R-VER-1).
+/// The same file after a write: migrated to the current format (R-MIG-1), with the running tool stamp
+/// directly after the format line (R-VER-1).
 fn written(body: &str) -> String {
     format!(
-        "{MARKER}\n<!-- todo-format: 1 -->\n<!-- todo-tool: {} -->\n\n## Tasks\n\n{body}",
+        "{MARKER}\n<!-- todo-format: 2 -->\n<!-- todo-tool: {} -->\n\n## Tasks\n\n{body}",
         env!("CARGO_PKG_VERSION")
     )
 }

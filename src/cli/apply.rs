@@ -16,13 +16,14 @@ use crate::doc::{
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{fs_path, synced_folder_warning};
-use crate::lock::{WriteOutcome, current_time, locked_read_modify_write_with_warnings};
+use crate::lock::{WriteOutcomeFull, current_time, locked_read_modify_write_full};
 use crate::ops::{
     NewTask, OpEnv, OpsConfig, OwnershipDecision, SetChange, TaskCommand, TaskOp, check_ownership,
     check_task_writable, file_label, forced_note_text, highest_task_number, milestone,
     parse_doc_for_write, read_optional_archive, resolve_task_in_doc,
 };
 use crate::ops::identity::done_by;
+use crate::ops::migrate::PendingMigration;
 use crate::output::Output;
 use crate::state::{IdsState, StateDir};
 use crate::version::RUNNING_VERSION;
@@ -215,19 +216,28 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     let mut lock_warnings = Vec::new();
     let mut stamp_warning: Option<String> = None;
+    let mut migrated_notice: Option<String> = None;
     let mut dry_run_diff: Option<String> = None;
-    let applied = locked_read_modify_write_with_warnings(
+    let applied = locked_read_modify_write_full(
         &found.path,
         &state,
         &agent,
         META.name,
         &cfg.lock,
+        Some(&cfg.id_config),
         &mut lock_warnings,
         |bytes, _snap| {
-            let mut working_bytes = bytes.to_vec();
-            let mut doc = parse_doc_for_write(&working_bytes, &label, &cfg)?;
-            stamp_warning = doc.newer_tool_warning(&label);
+            let parsed = parse_doc_for_write(bytes, &label, &cfg)?;
+            stamp_warning = parsed.newer_tool_warning(&label);
             let archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
+            // Files in an older format are migrated first, in this same write (R-MIG-1).
+            let (migrated_todo, migration) =
+                PendingMigration::plan(&parsed, &label, archive.as_ref(), &archive_path, &cfg)?
+                    .split();
+            let mut doc = migrated_todo.map_or(parsed, |m| m.doc);
+            let mut working_bytes = doc.to_bytes();
+            // Changes are judged against the migrated text: a migration alone writes nothing here.
+            let start_bytes = working_bytes.clone();
             let now = current_time();
 
             let initial_state = state.read_ids()?.map_or(0, |s| s.highest_id);
@@ -286,8 +296,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 });
             }
 
-            if working_bytes == bytes {
-                return Ok(WriteOutcome::Unchanged(results));
+            if working_bytes == start_bytes {
+                return Ok(WriteOutcomeFull::Unchanged(results));
             }
 
             // The same write adds or raises the tool stamp (R-VER-1).
@@ -305,16 +315,19 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                     .header(&format!("a/{label}"), &format!("b/{label}"))
                     .to_string();
                 dry_run_diff = Some(diff);
-                return Ok(WriteOutcome::Unchanged(results));
+                return Ok(WriteOutcomeFull::Unchanged(results));
             }
 
             if highest_id > initial_state {
                 state.write_ids(&IdsState { highest_id })?;
             }
 
-            Ok(WriteOutcome::Changed {
+            migrated_notice = migration.as_ref().map(|m| m.summary.clone());
+            Ok(WriteOutcomeFull::Changed {
                 new_bytes: working_bytes,
+                touched_tasks: None,
                 value: results,
+                migration,
             })
         },
     )?;
@@ -324,6 +337,9 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     }
     if let Some(warn) = stamp_warning {
         out.warn(warn);
+    }
+    if let Some(summary) = migrated_notice {
+        out.notice(format!("migrated {summary}"));
     }
 
     if let Some(diff) = dry_run_diff {

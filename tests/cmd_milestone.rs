@@ -98,10 +98,13 @@ fn assert_refused(p: &Proj, args: &[&str], code: &str) -> Output {
     out
 }
 
-/// The file after a successful write: the running tool stamp (R-VER-1) is added as the first line,
-/// because these fixtures have no format line.
+/// The file after a successful write. These fixtures have no format line, so the first write migrates
+/// them (format.md §18): the format line goes first, then the running tool stamp (R-VER-1).
 fn stamped(text: &str) -> String {
-    format!("<!-- todo-tool: {} -->\n{text}", env!("CARGO_PKG_VERSION"))
+    format!(
+        "<!-- todo-format: 2 -->\n<!-- todo-tool: {} -->\n{text}",
+        env!("CARGO_PKG_VERSION")
+    )
 }
 
 /// Asserts that `args` succeeds in text mode and returns the output.

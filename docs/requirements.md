@@ -552,7 +552,7 @@ or with `--json` the task as it is after the change.
 ### 5.16 Import — IMP
 
 - **R-IMP-1 COULD** `todo import --from checkbox <source> [--out <path>] [--yes]` converts a Markdown
-  checkbox task list into format version 1. Without `--yes` it prints the converted text (or a diff
+  checkbox task list into the current format version (2, format.md §18). Without `--yes` it prints the converted text (or a diff
   when the target exists) and writes nothing.
   - Only top-level checkbox lines (`- [ ]`, `- [~]`, `- [!]`, `- [x]`) under `##` sections become
     tasks. Checkboxes in the preamble, in code fences, or indented stay as text.
@@ -816,11 +816,14 @@ todo tree T-010
   - A write command on a file in an older format first applies every pending step, under the same
     lock (R-LOCK-1) and in the same write, after the usual snapshot (R-HIST-2), then makes its own
     change; the format line and the stamp are raised. The archive file is migrated in the same step.
-  - The migrated text must parse without problems that block writing (format.md §13); otherwise
-    nothing is written and the command exits 4. One line on standard error and one journal entry
-    (R-HIST-4) say what was migrated.
-  - `todo migrate` does the same without another change, and `--dry-run` prints the diff. A second
-    run changes nothing.
+  - The migrated text must parse without problems that block writing (format.md §13), the
+    file-wide ones; a task problem keeps to the command that changes that task, as for any write.
+    Otherwise nothing is written and the command exits 4. One line on standard error and one journal
+    entry (R-HIST-4, with a `migrated` field such as `TODO.md: format 1 to 2`) say what was migrated.
+  - A write that changes nothing writes nothing, so it migrates nothing (R-EDIT-6). New files (`init`,
+    `import`, a new archive) are written in the current format.
+  - `todo migrate` does the same without another change, prints one line (or, with `--dry-run`, the
+    diff of `TODO.md` and of the archive), and a second run changes nothing.
   - Read commands read every older format and never write.
   - `restore` of a snapshot from before the migration works; the next write migrates it again.
   - Tests use LF, CRLF and byte-order-mark fixtures, with every byte outside the changed lines

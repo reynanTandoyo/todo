@@ -127,7 +127,7 @@ fn a_newer_stamp_is_a_warning_that_does_not_block_writes() {
 
 #[test]
 fn a_document_with_a_format_line_it_cannot_write_is_never_stamped() {
-    let text = "<!-- todo-format: 2 -->\n# Title\n";
+    let text = "<!-- todo-format: 99 -->\n# Title\n";
     let doc = parse(text);
     assert!(doc.blocks_all_writes());
     assert_eq!(
