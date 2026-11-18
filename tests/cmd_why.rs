@@ -55,10 +55,14 @@ fn run_at_now(home: &Path, work: &Path, args: &[&str]) -> Output {
     run_todo(home, work, args, &[("TODO_TEST_NOW", NOW)]).expect("run todo")
 }
 
-/// The file after a write: the running tool stamp goes at the top when there is no format line
-/// (R-VER-1), as `stamped` in tests/cmd_milestone.rs does.
+/// The file after a write. These fixtures have no format line, so the first write migrates them
+/// (format.md §18): the format line goes first, then the running tool stamp (R-VER-1), as
+/// `stamped` in tests/cmd_milestone.rs does.
 fn stamped(text: &str) -> String {
-    format!("<!-- todo-tool: {} -->\n{text}", env!("CARGO_PKG_VERSION"))
+    format!(
+        "<!-- todo-format: 2 -->\n<!-- todo-tool: {} -->\n{text}",
+        env!("CARGO_PKG_VERSION")
+    )
 }
 
 #[test]
@@ -426,9 +430,9 @@ fn hand_written_why_line_is_read_as_the_why_field_and_keeps_working() {
         ],
     );
     assert_eq!(set.status.code(), Some(0), "stderr: {}", stderr_text(&set));
-    // The write adds the tool stamp directly after the format line (R-VER-1).
+    // The write migrates the format line and adds the tool stamp directly after it (R-MIG-1, R-VER-1).
     let stamp_after_format = format!(
-        "<!-- todo-format: 1 -->\n<!-- todo-tool: {} -->\n",
+        "<!-- todo-format: 2 -->\n<!-- todo-tool: {} -->\n",
         env!("CARGO_PKG_VERSION")
     );
     assert_eq!(
