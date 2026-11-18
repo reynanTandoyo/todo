@@ -455,6 +455,7 @@ or with `--json` the task as it is after the change.
   committed; outside git, `.todo/` next to `TODO.md`, containing a `.gitignore` with `*`.
 - **R-HIST-2 SHOULD** Before each write, the old file is saved as a numbered snapshot, with an index
   line giving number, time, agent, command and hash. The newest 200 are kept (`snapshots_keep`).
+  A write refused because `TODO.md` is read-only (R-IO-5) saves no snapshot.
   `history` lists them, `diff <n> [<m>]` shows what changed, and `restore <n> --yes` puts one back
   under the lock; the restore takes its own snapshot first, so it can be undone too.
 - **R-HIST-3 SHOULD** After each write, the tool records the file's hash. If the next command finds
