@@ -143,3 +143,86 @@ fn show_missing_task_returns_not_found_and_unsafe_file_still_warns() {
     assert!(stdout_text(&unsafe_show).contains("Readable despite marker"));
     assert!(stderr_text(&unsafe_show).contains("warning: TODO.md:"));
 }
+
+/// A milestone (T-001) with a task (T-002) below it, and two questions about them: T-003 about
+/// the task is open, T-004 about the milestone is done.
+const QUESTIONS_BODY: &str = "<!-- todo-format: 1 -->\n\n## Tasks\n\n### T-001 · Develop the renderer\n- status: open\n- owner: —\n- priority: P1 · type: milestone\n- goal: the test scene renders with lighting at 60 frames per second\n- note (2026-11-18, planner): added\n\n### T-002 · C shader\n- status: open\n- owner: —\n- priority: P1 · type: feature\n- milestone: T-001\n- note (2026-11-18, planner): added\n\n## Questions\n\n### T-003 · Should the C shader support shadows?\n- status: open\n- owner: —\n- type: question\n- about: T-002\n- note (2026-11-18, agent-1): asked\n\n### T-004 · Is the goal reachable on the test PC?\n- status: done\n- owner: human\n- type: question\n- about: T-001\n- note (2026-11-18, human): answer — yes\n";
+
+#[test]
+fn show_lists_questions_about_a_task_or_milestone_in_text_and_json() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _) = common::setup_proj(&tmp, QUESTIONS_BODY);
+
+    // Text: the block as in the file, then the questions about the task with their status.
+    let task_text = common::run_todo(&home, &work, &["show", "T-002"], &[]).unwrap();
+    assert!(task_text.status.success(), "{}", stderr_text(&task_text));
+    assert_eq!(
+        stdout_text(&task_text),
+        "### T-002 · C shader\n- status: open\n- owner: —\n- priority: P1 · type: feature\n- milestone: T-001\n- note (2026-11-18, planner): added\n\nQuestions about T-002:\n- T-003 · open · Should the C shader support shadows?\n"
+    );
+
+    // Text: a milestone lists its own questions too, including a done one.
+    let milestone_text = common::run_todo(&home, &work, &["show", "T-001"], &[]).unwrap();
+    assert!(
+        stdout_text(&milestone_text).ends_with(
+            "\nQuestions about T-001:\n- T-004 · done · Is the goal reachable on the test PC?\n"
+        ),
+        "unexpected output:\n{}",
+        stdout_text(&milestone_text)
+    );
+
+    // JSON: the same questions under `questions`, with ID, title, status and archived.
+    let task_json = common::run_todo(&home, &work, &["--json", "show", "T-002"], &[]).unwrap();
+    let tj = parse_json(&task_json.stdout);
+    assert_eq!(tj["data"]["questions"].as_array().unwrap().len(), 1);
+    assert_eq!(tj["data"]["questions"][0]["id"], "T-003");
+    assert_eq!(tj["data"]["questions"][0]["status"], "open");
+    assert_eq!(
+        tj["data"]["questions"][0]["title"],
+        "Should the C shader support shadows?"
+    );
+    assert_eq!(tj["data"]["questions"][0]["archived"], false);
+
+    let milestone_json = common::run_todo(&home, &work, &["--json", "show", "T-001"], &[]).unwrap();
+    let mj = parse_json(&milestone_json.stdout);
+    assert_eq!(mj["data"]["questions"][0]["id"], "T-004");
+    assert_eq!(mj["data"]["questions"][0]["status"], "done");
+
+    // A question itself, and an entry with no questions, get an empty list and no extra text.
+    let question_json = common::run_todo(&home, &work, &["--json", "show", "T-003"], &[]).unwrap();
+    assert_eq!(
+        parse_json(&question_json.stdout)["data"]["questions"],
+        serde_json::json!([])
+    );
+    let plain = common::run_todo(&home, &work, &["show", "T-003"], &[]).unwrap();
+    assert!(!stdout_text(&plain).contains("Questions about"));
+}
+
+#[test]
+fn show_lists_archived_questions_marked_as_archived() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _) = common::setup_proj(
+        &tmp,
+        "<!-- todo-format: 1 -->\n\n## Tasks\n\n### T-002 · C shader\n- status: open\n- owner: —\n- priority: P1 · type: feature\n",
+    );
+    fs::write(
+        work.join("TODO-archive.md"),
+        "<!-- todo-format: 1 -->\n\n## Questions\n\n### T-009 · Old shadow question\n- status: done\n- owner: human\n- type: question\n- about: T-002\n- note (2026-11-01, human): answer — no\n",
+    )
+    .unwrap();
+
+    let out = common::run_todo(&home, &work, &["show", "T-002"], &[]).unwrap();
+    assert!(out.status.success(), "{}", stderr_text(&out));
+    assert!(
+        stdout_text(&out).ends_with(
+            "\nQuestions about T-002:\n- T-009 · done · Old shadow question (archived)\n"
+        ),
+        "unexpected output:\n{}",
+        stdout_text(&out)
+    );
+
+    let json = common::run_todo(&home, &work, &["--json", "show", "T-002"], &[]).unwrap();
+    let j = parse_json(&json.stdout);
+    assert_eq!(j["data"]["questions"][0]["id"], "T-009");
+    assert_eq!(j["data"]["questions"][0]["archived"], true);
+}

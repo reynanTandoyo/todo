@@ -729,9 +729,14 @@ todo tree T-010
   `promote` of an entry that isn't an idea is refused (exit 1, `BAD_TRANSITION`).
 - **R-KIND-2 COULD** Questions can refer to the entry they are about.
   `ask <question> --about <task>` writes `- about: <ID>`, and is refused (exit 1, `NOT_FOUND`) when
-  that ID doesn't exist. `show` of a milestone or task lists the questions about it with their
-  status, in text and JSON. `answer` prints the entry the question was about. `list --where
-  about=<ID>` works. A question without `--about` behaves as before.
+  that ID doesn't exist in `TODO.md` or `TODO-archive.md`. `--about` takes an ID (`T-002`, `t2`),
+  written in canonical form; any other value is refused with `BAD_VALUE`, and the file is left
+  alone. `show` of a milestone or task lists the questions about it, from both files, after the
+  block in text (`Questions about <ID>:`, one line per question with its status, and `(archived)`
+  for one in the archive) and in JSON as `questions`. `answer` prints the entry the question was
+  about, after the result: in text the entry's block under `About <ID>:`; in JSON, under `about`,
+  as its task JSON (only when the question has an `about` field). `list --where about=<ID>` works.
+  A question without `--about` behaves as before.
 - **R-KIND-3 COULD** Every entry has one kind, taken from its `type`: `milestone` is a milestone,
   `question` a question, `idea` an idea, and any other type, or none, a task (format.md §16).
   Milestones and tasks are work; questions and ideas are not. Commands keep the kinds apart: only

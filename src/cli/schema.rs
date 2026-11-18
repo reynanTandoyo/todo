@@ -200,6 +200,7 @@ fn task_fields() -> TaskFieldsJson {
         depends: vec!["T-000".to_string()],
         dependencies: Vec::new(),
         dependents: Vec::new(),
+        questions: Vec::new(),
         ready: false,
         files: None,
         problem: None,

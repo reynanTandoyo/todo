@@ -20,9 +20,10 @@ pub const META: CommandMeta = CommandMeta {
     name: "ask",
     summary: "Ask a question for a person to answer",
     kind: CommandKind::Write,
-    details: "Adds a task of `type: question` to the section named by `question_section` (default `Questions`, created at the end of `TODO.md` if missing). `next` never hands out questions.",
+    details: "Adds a task of `type: question` to the section named by `question_section` (default `Questions`, created at the end of `TODO.md` if missing). `next` never hands out questions. `--about <ID>` names the task or milestone the question is about (`about: <ID>`); the command is refused with NOT_FOUND when that ID does not exist in `TODO.md` or `TODO-archive.md`.",
     examples: &[
         "todo ask \"Should retries use exponential backoff?\" --agent agent-1",
+        "todo ask \"Should the shader support shadows?\" --about T-002 --agent agent-1",
     ],
 };
 
@@ -40,6 +41,10 @@ pub struct Args {
     /// Optional area (e.g. `cli`).
     #[arg(long, value_name = "VALUE")]
     pub area: Option<String>,
+
+    /// Task or milestone the question is about, by ID (e.g. `T-002`); written as `about`.
+    #[arg(long, value_name = "ID")]
+    pub about: Option<String>,
 }
 
 /// Runs `todo ask <question>`.
@@ -97,6 +102,15 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         }
         None => None,
     };
+    let about_val = match args.about.as_deref() {
+        Some(raw) => Some(cfg.id_config.parse_user_id(raw).ok_or_else(|| {
+            TodoError::new(
+                ErrorCode::BadValue,
+                format!("--about expects a task ID such as T-002, not {raw:?}"),
+            )
+        })?),
+        None => None,
+    };
 
     let cfg_clone = cfg.clone();
     let res = edit_doc_with_state_and_write(
@@ -105,6 +119,19 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         META.name,
         out,
         |doc, archive, state, _label, agent, now| {
+            if let Some(target) = about_val {
+                let exists = doc.task_by_id(target).is_some()
+                    || archive.is_some_and(|a| a.task_by_id(target).is_some());
+                if !exists {
+                    let id_str = cfg.id_config.format_id(target);
+                    return Err(TodoError::new(
+                        ErrorCode::NotFound,
+                        format!("task {id_str} not found"),
+                    )
+                    .with_task(id_str));
+                }
+            }
+
             if let Some(existing) = doc.tasks.iter().find(|t| {
                 !matches!(t.status, Status::Done | Status::Dropped)
                     && t.title.trim().eq_ignore_ascii_case(&clean_question)
@@ -185,6 +212,9 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 combined_parts.push(format!("area: {a}"));
             }
             lines.push(format!("- {}", combined_parts.join(" \u{00b7} ")));
+            if let Some(target) = about_val {
+                lines.push(format!("- about: {}", cfg.id_config.format_id(target)));
+            }
 
             let date = OpsConfig::format_note_date(now);
             lines.push(format!("- note ({date}, {agent}): asked"));
