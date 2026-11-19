@@ -272,9 +272,9 @@ pub(crate) fn check_tasks(
             });
         }
 
-        if task.status == Status::Blocked
-            && !task.notes.iter().any(|n| !n.text.trim().is_empty())
-        {
+        // A problem like the other task state problems above: the reason is the one summary and
+        // the HTML report show (T-142; `Task::blocked_reason`).
+        if task.status == Status::Blocked && task.blocked_reason().is_none() {
             problems.push(CheckProblem {
                 file: label.to_string(),
                 line,

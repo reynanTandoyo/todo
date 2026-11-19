@@ -12,6 +12,7 @@ use serde::Serialize;
 use serde_json::json;
 
 use crate::cli::check::{CheckProblem, check_dependencies, check_tasks};
+use crate::doc::reason::reason_in_text;
 use crate::doc::{
     CURRENT_FORMAT_VERSION, Document, Line, LineDoc, LineEnding, Problem, Status, TaskId,
     format_line_text, is_valid_agent_name, sanitize_trimmed_value,
@@ -418,6 +419,11 @@ fn parse_sub_note(line: &str) -> Option<String> {
     Some(format!("- note ({date}, {agent}): {text}"))
 }
 
+/// The text of a `- note (date, agent): text` line, which is what `Note::text` holds (T-142).
+fn note_line_text(line: &str) -> &str {
+    line.split_once("): ").map_or("", |(_, text)| text)
+}
+
 /// Writes the task being built (heading, fields, notes, kept indented lines) and records it.
 fn flush(
     current: &mut Option<Builder>,
@@ -479,13 +485,26 @@ fn flush(
     if let Some(d) = &b.description {
         lines.push(format!("- description: {d}"));
     }
-    let has_sub_notes = b.tail.iter().any(|t| matches!(t, Tail::Note(_)));
-    if status == Status::Blocked && notes.is_empty() && !has_sub_notes {
-        notes.push(format!(
-            "- note ({}, {}): blocked — imported from a checkbox list",
-            env.now.format("%Y-%m-%d"),
-            env.agent
-        ));
+    // A blocked task needs a block-reason note (`docs/format.md` §9; T-142). Without one, say where
+    // the block comes from: the checkbox list. Other notes, such as `added`, are not reasons.
+    if status == Status::Blocked {
+        let given = notes
+            .iter()
+            .map(String::as_str)
+            .chain(b.tail.iter().filter_map(|t| match t {
+                Tail::Note(n) => Some(n.as_str()),
+                Tail::Text(_) => None,
+            }));
+        let reason_given = given
+            .clone()
+            .any(|line| reason_in_text(note_line_text(line), "blocked").is_some());
+        if !reason_given {
+            notes.push(format!(
+                "- note ({}, {}): blocked — imported from a checkbox list",
+                env.now.format("%Y-%m-%d"),
+                env.agent
+            ));
+        }
     }
 
     if out.last().is_some_and(|l| !l.text.trim().is_empty()) {

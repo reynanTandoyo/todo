@@ -343,6 +343,7 @@ todo import --from checkbox TODO.md --yes                                # conve
 |---|---|
 | `- [ ]`, `- [~]`, `- [!]`, `- [x]` | status `open`, `claimed`, `blocked`, `done` |
 | `**Title** — rest` or `Title — rest` | title `Title`, field `description: rest` |
+| `- [!]` with no `blocked — <reason>` sub-bullet | status `blocked`, with the note `blocked — imported from a checkbox list` |
 | `(added: agent, 2026-11-01)` | note `added` |
 | `(claimed: agent, 2026-11-01)` | owner `agent`, claim time = time of the import (an old claim would be stale), the old date in a note |
 | `(done: agent, 2026-11-05, abc1234)` | note `done` and `commit: abc1234` |
