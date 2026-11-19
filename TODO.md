@@ -1,5 +1,5 @@
 <!-- todo-format: 2 -->
-<!-- todo-tool: 0.6.0 -->
+<!-- todo-tool: 0.7.0 -->
 # todo — task list
 
 The work plan for building `todo`. What each task must achieve is in
@@ -464,11 +464,15 @@ A milestone is a piece of work with a goal, divided into tasks or further milest
 - note (2026-11-18, p2-tests-haiku): Follow-up commit 0860bfc on the same branch routes two raw todo calls that came in with the newer dev merge (cmd_hooks, cmd_where); the done record above is 5438fe8.
 
 ### T-132 · archive and migration: a failed TODO.md replace after the archive write leaves moved tasks in both files
-- status: open
-- owner: —
+- status: done
+- owner: t132-haiku
 - priority: P3
+- commit: 05a8438e1e812568914332d2b2d0782a07ce8443
+- by: Reynan Henry Tandoyo
 - note (2026-11-18, p2-tests-haiku): added
 - note (2026-11-18, p2-tests-haiku): Window left open by T-121: archive writes TODO-archive.md after the TODO.md snapshot and before TODO.md is replaced (the migration order). If the replace of TODO.md then fails, the moved tasks stay in TODO.md and are also in TODO-archive.md. Reproduced with a read-only TODO.md in a scratch folder: archive exited 4 (READ_ONLY) after creating the archive with the task, and TODO.md still held the task. A CHANGED_DURING_WRITE failure of the replace takes the same path (not reproduced). Not fixed: a fix would check that TODO.md can be replaced before the archive is written, or undo the archive write; the next archive run after such a failure was not tested.
+- note (2026-11-19, t132-haiku): R-ARCH-1, R-MIG-1 and format.md section 14 now say what a write does when TODO.md cannot be replaced after the archive was written: the archive is put back as it was (a new archive is removed), and a read-only TODO.md is refused before the archive is written. Requirement IDs are unchanged.
+- note (2026-11-19, t132-haiku): done — A write that moves tasks to the archive (archive, or migrating the archive) now checks that TODO.md can be replaced before it writes the archive, so a read-only TODO.md is refused with exit 4 and nothing changes. If the replace of TODO.md then fails, the archive files are put back as they were (a new archive is removed). If an archive cannot be put back, the error says it still holds the moved tasks. Tests cover read-only and changed-during-write for archive and migration paths; checks pass (fmt, clippy Windows and Linux with all features, cargo test --all-features: 512 passed).
 
 ### T-133 · Combined priority line: status, owner and claimed there are read as unknown parts
 - status: done
@@ -508,56 +512,178 @@ The HTML report is the one view meant for people: read-only and built only when 
 output is written for agents.
 
 ### T-092 · report --html: one page for people
-- status: open
-- owner: —
+- status: done
+- owner: t092-haiku
 - priority: P1 · type: feature · area: report
+- milestone: T-136
 - depends: T-088, T-091, T-097, T-098, T-096
 - accept: `todo report --html [--out <path>] [--open]` writes one self-contained HTML file (inline CSS, nothing loaded from the network, no new dependency; default path in the state folder so it is never committed); it keeps the kinds apart in separate lists: (1) work, as a tree of milestones with goal and progress, nested milestones and tasks indented below, top-level tasks last, with owner and age on claimed tasks (stale marked) and the latest reason on blocked ones; (2) open questions, each with a link to the milestone or task it is about; (3) ideas; (4) done; (5) dropped with the reason; a task opens to show its fields and notes; all text is HTML-escaped (test: a title containing `<script>`); it takes no lock and never changes TODO.md; with a fixed clock the output for a fixture matches its snapshot; readable in light and dark mode and on a narrow window
+- commit: 2a73c4ac2db2a817b80213559281f567218d65a0
 - reqs: R-REPORT-1, R-LOCK-5, NFR-4
+- by: Reynan Henry Tandoyo
 - why: the HTML page is the one view meant for people; every other output is written for agents
 - note (2026-11-18, claude-main): added
 - note (2026-11-18, claude-main): Owner 2026-11-18: show milestones as a tree, the milestone with its goal on top and its tasks indented below it, like 'Develop the renderer' > 'C shader', 'GPU compiler'.
 - note (2026-11-18, claude-main): Owner 2026-11-18: the page is an overview only. No buttons, no forms, no copy-ready commands; a person who wants a change asks an agent. It is built only when asked, never automatically.
 - note (2026-11-18, claude-main): Show priority and difficulty on each task (T-108).
 - note (2026-11-18, claude-main): Owner 2026-11-18: show the category of each entry (the existing `area` field, for example ui, numerics, math) and give the page a per-area count of open tasks.
+- note (2026-11-19, t092-haiku): Decisions for the owner to confirm (docs/requirements.md R-REPORT-1 now says them): 'open tasks per area' counts open, claimed and blocked tasks; done and dropped entries in TODO-archive.md are listed and marked archived; a done or dropped milestone is shown in the work tree only while unfinished work sits below it, otherwise under done or dropped. --html is required; without it report is a usage error. The default file is report.html in the state folder.
+- note (2026-11-19, t092-haiku): done — Added todo report --html (src/report for the page model and HTML, src/cli/report.rs for the command): one read-only page with the work tree, unfinished tasks per area, open questions linked to their entries, ideas, done and dropped entries with the reason of each drop, all text escaped, inline CSS for light and dark mode and narrow windows, default file report.html in the state folder, --out and --open, --json. 22 tests added; cargo fmt, clippy (Windows and Linux) and cargo test --all-features pass (527 passed, 0 failed). Not checked: --open on a real Windows desktop.
+- note (2026-11-19, claude-main): Coordinator 2026-11-19: the R-REPORT-1 clarifications are accepted (open per area = open, claimed or blocked; archived done/dropped listed; a finished milestone shows only above unfinished work).
 
 ### T-093 · Project register: todo project add, remove, list; overview of registered projects
-- status: open
-- owner: —
+- status: done
+- owner: t093-haiku
 - priority: P1 · type: feature · area: cli
+- milestone: T-137
 - depends: T-088, T-096
 - accept: `todo project add [<path>] [--name N]` registers the TODO.md found from that folder (default: the current one), `project remove <name|path>` and `project list` manage the register; it is one JSON file per user, `%LOCALAPPDATA%\todo\projects.json` on Windows and `$XDG_DATA_HOME/todo/projects.json` (else `~/.local/share/todo/projects.json`) on Linux, with `TODO_REGISTER` naming another file; it is written under its own lock by replacing the file, so parallel adds lose nothing; the same file registered twice is refused; `todo overview` reads only the register, never searches folders, and prints one line per project: name, path, tasks per status, top-level milestones done/total, stale claims, open questions; a registered path that is gone or cannot be parsed is listed with its problem and does not stop the others; `--json`; paths with spaces and non-ASCII characters work; tests point the register at a temporary folder
+- commit: 9d00a9310f4446a5f4357b323b9d70b603d17dd3
 - reqs: R-PROJ-1, R-PROJ-2, NFR-7
+- by: Reynan Henry Tandoyo
 - why: the owner wants one place to see all projects (idea I-2, revived 2026-11-18) without todo searching the PC
 - note (2026-11-18, claude-main): added
 - note (2026-11-18, claude-main): Owner 2026-11-18: todo must not scan the PC for TODO.md files. Projects are registered with a command and noted in the user app-data folder (and the Linux equivalent); the all-projects view is built only from that register. `init` may print a hint to run `todo project add` but does not register by itself.
 - note (2026-11-18, claude-main): With T-099 in place, `overview` also shows the todo version stamped in each project, so projects that still need a migration stand out.
+- note (2026-11-19, t093-haiku): Decisions (t093-haiku): the register is {"format": 1, "projects": [{name, path, added}]} at TODO_REGISTER or the user data folder; project add takes a folder and finds its TODO.md as other commands do (--file and TODO_FILE do not apply); add does not parse the file. The same file (compared as R-LOCK-7) or the same name (ignoring case) is DUPLICATE_PROJECT. An invalid name is USAGE (exit 2). remove matches a name first, then a path to a TODO.md or its folder; a missing register is NOT_FOUND without creating anything. JSON: todo.project.v1 for add, remove and list; todo.projects.v1 for overview, since todo.overview.v1 is todo --json with no command. overview reads only the register and each TODO.md (no lock, no state folder, no write); figures count TODO.md only; a project with a problem keeps its line and its figures are null; exit 0. needs_migration is true when the format is older than 2 or the stamp is missing or older than the running version. A busy register waits 30 s, then BUSY exit 3, and names no holder (the register has no holder file). The init hint was not added (R-AGENT-2 says may).
+- note (2026-11-19, t093-haiku): Clarified R-PROJ-1 and R-PROJ-2 in docs/requirements.md (file layout, remove selector order, lock message, schema names, overview figures, needs_migration, exit code) and docs/json.md (three project shapes, the overview shape, DUPLICATE_PROJECT, error rows for the register). No requirement ID changed.
+- note (2026-11-19, t093-haiku): done — Added todo project add, remove and list (per-user JSON register: TODO_REGISTER or the user data folder; locked, replaced in one step; same file or name refused as DUPLICATE_PROJECT) and todo overview (one line per registered project: tasks, top-level milestones, stale claims, open questions, stamp, problems; reads only the register and each TODO.md). New error code DUPLICATE_PROJECT; docs/json.md has todo.project.v1 and todo.projects.v1 shapes; R-PROJ-1/2 clarified. Tests: 537 passed in full suite, fmt, clippy Windows and Linux clean.
 
 ### T-094 · report --html --all: every registered project on one page
-- status: open
-- owner: —
+- status: done
+- owner: t094-haiku
 - priority: P1 · type: feature · area: report
+- milestone: T-136
 - depends: T-092, T-093
 - accept: `todo report --html --all [--out <path>] [--open]` builds one self-contained page from the project register only: a card per project (tasks per status, top-level milestones with progress, blocked tasks, open questions) followed by each project's lists as in the single-project report; the default path is next to the register; a project that is gone or cannot be parsed shows its problem instead of its lists; an empty register gives a page that says how to register a project; snapshot test with two invented projects
+- commit: 3bfa4a1b4e32bd966943f4a7eba92062ad8a96d9
 - reqs: R-REPORT-2
+- by: Reynan Henry Tandoyo
 - note (2026-11-18, claude-main): added
 - note (2026-11-18, claude-main): Owner 2026-11-18: built only when asked (`report --html --all`); overview only, no buttons or commands on the page.
 - note (2026-11-18, t086-opus): T-086: conflict between accept ('an empty register gives a page that says how to register a project') and the owner note (no commands on the page). Followed the owner: R-REPORT-2 says the empty page explains in words that a project is registered by asking an agent, without a copy-ready command.
+- note (2026-11-19, t094-haiku): R-REPORT-2 clarified (docs/requirements.md): the card counts as todo overview counts (TODO.md only, top-level milestones not nested and not dropped); a project that overview refuses for a problem that blocks all writes shows its problem here too, other problems are warnings; reads take no state folder and write nothing in a project.
+- note (2026-11-19, t094-haiku): done — report --html --all: one page with a card per registered project (tasks per status, top-level milestones with progress, blocked tasks, open questions), then each project's lists with per-project anchors; problems of unreadable projects instead of lists; default report-all.html next to the register; empty register explains registration in words; 19 integration tests and 2 unit tests, snapshot of two invented projects
 
 ### T-106 · Performance test for the HTML report
-- status: open
-- owner: —
+- status: done
+- owner: t094-haiku
 - priority: P1 · type: test · area: report
+- milestone: T-136
 - depends: T-094
 - accept: on the generated 5,000-task file with a milestone tree, `report --html` finishes in under 500 ms in a release build and the page is under 5 MB; `report --html --all` with ten such projects finishes in under 5 s; the test runs in CI with the other performance tests
+- commit: 04cbfce8f02802a5c2bb079ec48f09f460b6a7ce
 - reqs: NFR-3, TEST-9
+- by: Reynan Henry Tandoyo
 - note (2026-11-18, claude-main): added
+- note (2026-11-19, t094-haiku): done — Added two ignored release perf tests in tests/perf.rs for the HTML report on the 5,000-entry milestone tree: report --html (median 51 ms, page 3,086,950 bytes, budget 500 ms and 5 MB) and report --html --all over ten projects in a temp register (median 429 ms, page 30,990,183 bytes, budget 5 s). Budgets pass, so the report code needed no change; all four perf tests pass in release.
 
 ### T-107 · v0.7 documentation and release 0.7.0
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P1 · type: docs · area: release
 - depends: T-094, T-106
 - accept: the README has a short part for people: register a project, ask an agent for the report, open the page, and that every change goes through an agent; docs/json.md documents `project`, `overview` and `report`; CHANGELOG.md has the 0.7.0 entry; Cargo.toml is 0.7.0; `todo check` is clean
+- commit: 2c2fdd9f0db8c5a0daaebc2ffc92c98d52b61497
 - reqs: REL-2, REL-5
+- by: Reynan Henry Tandoyo
 - note (2026-11-18, claude-main): added
+- note (2026-11-19, t094-haiku): Local part finished in commit 0bbe49e on reynanTandoyo/t094: version 0.7.0 in Cargo.toml and Cargo.lock, README part for people, CHANGELOG 0.7.0 entry, docs/json.md checked (report example added and tested). Checks pass; todo check with the new release binary reports no problems. Tagging, pushing and installing are left to the coordinator, who marks T-107 done after the release.
+- note (2026-11-19, session-end): released — session 79d7d817-2673-48b1-aecd-b31d881f709e ended
+- note (2026-11-19, claude-main): Released 2026-11-19: tag v0.7.0 on 2c2fdd9, GitHub release published by the Release workflow. Installed on this PC with todo help update: SHA-256 matched, todo --version prints 'todo 0.7.0 (2c2fdd9)'; todo migrate --yes raised the stamp to 0.7.0.
+- note (2026-11-19, claude-main): done — v0.7 docs and 0.7.0 released and installed.
+
+### T-136 · HTML view for people
+- status: done
+- owner: claude-main
+- priority: P1 · type: milestone
+- goal: A person can see the state of one project, or of every registered project, on a single read-only page built on request
+- why: People read the task list without running commands; every change still goes through an agent
+- by: Reynan Henry Tandoyo
+- note (2026-11-19, claude-main): added
+- note (2026-11-19, claude-main): done — report --html (T-092), report --html --all (T-094) and their performance tests (T-106) merged into dev. Release medians: 51 ms for a 5,000-entry tree (3.1 MB page), 429 ms for ten projects (31 MB page).
+
+### T-137 · Overview of all projects
+- status: done
+- owner: claude-main
+- priority: P1 · type: milestone
+- goal: Projects are registered by command and their state can be listed together, without scanning the PC
+- why: One place to see which projects have stale claims, open questions or need a migration
+- by: Reynan Henry Tandoyo
+- note (2026-11-19, claude-main): added
+- note (2026-11-19, claude-main): done — Project register and overview (T-093) merged into dev; T-141 and T-143 fixed the exit-code docs found on the way.
+
+### T-138 · A write refused for a read-only TODO.md still saves a history snapshot
+- status: done
+- owner: t132-haiku
+- priority: P3
+- why: The snapshot (R-HIST-2) is recorded before TODO.md is replaced, so a write that the read-only check then refuses leaves a snapshot of the unchanged file in .todo/history. Seen with todo archive on a read-only TODO.md (T-132). The check could run before the snapshot is recorded.
+- commit: da287a53931cfa09a3eba92bdeb79689965e1e2a
+- by: Reynan Henry Tandoyo
+- note (2026-11-19, t132-haiku): added
+- note (2026-11-19, t132-haiku): done — A write refused because TODO.md is read-only now checks replaceability before the history snapshot is recorded, so it saves no snapshot (R-HIST-2 now says so). Tests: a refused note adds no snapshot to an existing history, and refused note and migrate on a fresh folder leave no history; both fail on the previous lock.rs. Checks pass: fmt, clippy Windows and Linux with all features, clippy without features, cargo test --all-features.
+
+### T-139 · Tests without test-hooks: unused imports in cmd_next.rs and lock_write.rs fail cargo clippy --all-targets
+- status: done
+- owner: t132-haiku
+- priority: P3
+- why: Without the test-hooks feature, tests/cmd_next.rs (read_text, TaskId) and tests/lock_write.rs (parse_json, read_text, stderr_text) have unused imports, so cargo clippy --all-targets -D warnings fails. CI runs --all-features, so it passes there. Found while doing T-132.
+- commit: 8ac7c0bde8c5197e30760935d75ab508a543e33e
+- by: Reynan Henry Tandoyo
+- note (2026-11-19, t132-haiku): added
+- note (2026-11-19, t132-haiku): done — Imports used only by test-hooks tests are gated with cfg(feature = test-hooks) in tests/cmd_next.rs, tests/lock_write.rs and tests/lock_lease.rs. cargo clippy --all-targets -- -D warnings now passes without features (it failed before on these three files), and the all-features clippy and cargo test --all-features still pass.
+
+### T-140 · summary and report give different reasons for a blocked task
+- status: done
+- owner: t092-haiku
+- priority: P2
+- milestone: T-136
+- why: summary shows the latest non-empty note of a blocked task as its reason, so an unrelated later note replaces the reason; report shows the reason of the latest 'blocked — <reason>' note (docs/format.md §9). One rule should serve both pages and the other reason readers.
+- commit: f666e868dbef2b8f8f34f8989f13bef2bd06c158
+- by: Reynan Henry Tandoyo
+- note (2026-11-19, t092-haiku): added
+- note (2026-11-19, t092-haiku): done — summary and report now read the blocked reason from one function, Task::blocked_reason (src/doc/reason.rs): the text after the dash of the latest 'blocked — <reason>' note. summary used to show the latest non-empty note; a test with several block notes and an unrelated later note fails on the old code and passes now, and summary --json, the text overview and the report agree. Behaviour change: summary's blocked reason is the reason alone, without the 'blocked — ' prefix; docs/json.md, R-READ-5 and the summary snapshot are updated.
+
+### T-141 · docs/json.md gives exit 2 for BAD_VALUE (1 for check), but the program exits 1 for every BAD_VALUE, such as an unknown setting in todo.toml
+- status: done
+- owner: t093-haiku
+- priority: P2 · type: bug · area: docs
+- milestone: T-137
+- why: the JSON reference and R-OUT-2 must say what the program does; found while documenting the project commands, not changed by T-093
+- commit: 976a9ad6c0d762dd7054135659e08ccf2253a150
+- by: Reynan Henry Tandoyo
+- note (2026-11-19, t093-haiku): added
+- note (2026-11-19, t093-haiku): Decided (t093-haiku): the requirements win, so BAD_VALUE exits 1 (R-WRITE-18 and R-MILE-1 both refuse an invalid value with exit 1); the program already does, so only docs/json.md changed. The other 21 codes match the requirements and the program (R-OUT-2 categories, R-CLAIM-2/5, R-IO-2/3/5, R-LOCK-3/6, R-VER-2, R-PROJ-1, R-FIND-6, R-EDIT-7, I-8). Added tests/docs_exit_codes.rs: the table must match todo schema, and 21 of 22 codes are produced by real commands with the table's exit; CHANGED_DURING_WRITE is covered by tests/lock_lease.rs. Also corrected two json.md rows: AMBIGUOUS_SECTION now describes a --section name matching several sections (its test is tests/cmd_add.rs), and BAD_TRANSITION no longer says done on open is refused (R-WRITE-9 allows it). R-OUT-3 now says each code has one fixed exit.
+- note (2026-11-19, t093-haiku): done — BAD_VALUE exits 1 in docs/json.md (R-WRITE-18, R-MILE-1; the program already did). Two more rows corrected: AMBIGUOUS_SECTION now describes a name matching several sections, BAD_TRANSITION no longer refuses done on open (R-WRITE-9). New tests/docs_exit_codes.rs: the table equals todo schema, and 21 of 22 codes exit with the table's code from real commands (CHANGED_DURING_WRITE is in lock_lease.rs). R-OUT-3 says each code has one fixed exit. fmt, clippy (Windows and Linux) and cargo test --all-features (568 passed) pass. Recorded T-143: a no-section add gives UNKNOWN_SECTION, owner to decide the code.
+
+### T-142 · check accepts a blocked task whose only note is not a block reason
+- status: done
+- owner: t092-haiku
+- priority: P3
+- milestone: T-136
+- why: check warns about a blocked task only when it has no non-empty note, so a task whose only note is 'added' passes, while summary and the HTML report now show no reason for it. check should use Task::blocked_reason (src/doc/reason.rs) so that all three readers agree.
+- commit: b2848b02ab624cad709f25d8e59d31d2e9e87ca8
+- by: Reynan Henry Tandoyo
+- note (2026-11-19, t092-haiku): added
+- note (2026-11-19, t092-haiku): done — check reports a blocked task without a block-reason note (Task::blocked_reason, the reason summary and the report show) at its heading line, as a problem with exit 1 like the other task state problems (R-CHECK-1). The import of a checkbox list now gives a blocked task without a reason the note 'blocked — imported from a checkbox list', as it already did for a task with no notes, so its output passes check. Invented fixture check_blocked_reason.md: the old rule missed three of four blocked tasks; the import test checks the reason line; milestone_check_unfinished.md's blocked task now has a block note. cargo fmt, clippy -D warnings (Windows and Linux, with and without features), and cargo test --all-features (574 passed, 0 failed, 2 ignored) pass.
+
+### T-143 · add with several sections and no --section fails with UNKNOWN_SECTION; docs/json.md first gave AMBIGUOUS_SECTION for that case, and R-OUT-3 does not say which
+- status: done
+- owner: t093-haiku
+- priority: P3 · type: bug · area: cli
+- milestone: T-137
+- why: the error code of a refused add is part of the JSON contract (R-OUT-3); the owner decides which code it is, found while checking the error table against the program (T-141)
+- commit: a2aa3a64d1fc3e22bf3700ef55e42892f10f63fa
+- by: Reynan Henry Tandoyo
+- note (2026-11-19, t093-haiku): added
+- note (2026-11-19, t093-haiku): Decided with the owner: UNKNOWN_SECTION stays for add without --section in a file with several sections (returned since v0.1; existing codes never change meaning). R-WRITE-1 now names UNKNOWN_SECTION for that case and AMBIGUOUS_SECTION for an ambiguous name; the UNKNOWN_SECTION row of docs/json.md covers it with the message the program prints. tests/docs_exit_codes.rs has a case for it.
+- note (2026-11-19, t093-haiku): done — Docs only: R-WRITE-1 names UNKNOWN_SECTION for add without --section in a file with several sections (kept, per owner) and AMBIGUOUS_SECTION for an ambiguous name; docs/json.md's UNKNOWN_SECTION row covers that case; tests/docs_exit_codes.rs checks it. fmt, clippy (Windows and Linux) and cargo test --all-features (574 passed, 0 failed) pass.
+
+### T-144 · report --html and report --html --all have no timing test for NFR-3 (ten projects under 5 s)
+- status: dropped
+- owner: —
+- priority: P2
+- milestone: T-136
+- why: NFR-3 sets a time budget for report --html (under 500 ms) and report --html --all (ten projects under 5 s, release build), but tests/perf.rs measures only list, show, write and tree; the report commands have no timing check.
+- note (2026-11-19, t094-haiku): added
+- note (2026-11-19, t094-haiku): dropped — duplicate of T-106, which already tests report --html and report --html --all against NFR-3
