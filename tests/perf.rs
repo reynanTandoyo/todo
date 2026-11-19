@@ -1,8 +1,9 @@
-//! Performance tests on a generated 5,000-entry `TODO.md` (T-065, T-105; NFR-3, TEST-9).
+//! Performance tests on a generated 5,000-entry `TODO.md` (T-065, T-105, T-106; NFR-3, TEST-9).
 //!
 //! Two files are generated: the flat 5,000-task file (T-065) and a variant of it whose entries
-//! form a milestone tree four levels deep (T-105). Both run in CI, and not in a normal local
-//! `cargo test`. Run them in release mode with:
+//! form a milestone tree four levels deep (T-105). The HTML report is timed on the milestone tree
+//! (T-106): one page, and the page for every project of a register that holds ten such projects.
+//! All of them run in CI, and not in a normal local `cargo test`. Run them in release mode with:
 //! `cargo test --release --test perf -- --ignored`
 
 mod common;
@@ -144,15 +145,28 @@ fn generate_milestone_tree_file() -> String {
 /// Runs `todo` with `args` in `work`, with `HOME` and `APPDATA` in `home` (TEST-8), and returns
 /// its output and how long it took. The command must succeed.
 fn run_todo(home: &Path, work: &Path, args: &[&str]) -> (Output, Duration) {
+    run_todo_env(home, work, args, &[])
+}
+
+/// [`run_todo`] with more environment variables, such as `TODO_REGISTER` for the project register.
+fn run_todo_env(
+    home: &Path,
+    work: &Path,
+    args: &[&str],
+    env: &[(&str, &Path)],
+) -> (Output, Duration) {
     let start = Instant::now();
-    let output = common::todo_bin()
+    let mut command = common::todo_bin();
+    command
         .args(args)
         .current_dir(work)
         .env("HOME", home)
         .env("USERPROFILE", home)
-        .env("APPDATA", home)
-        .output()
-        .unwrap();
+        .env("APPDATA", home);
+    for (key, value) in env {
+        command.env(key, value);
+    }
+    let output = command.output().unwrap();
     let elapsed = start.elapsed();
     assert!(
         output.status.success(),
@@ -381,5 +395,104 @@ fn perf_5000_entry_milestone_tree_meets_nfr3_budgets() {
         write_time < Duration::from_millis(200),
         "write (add --milestone) took {:?} (budget < 200 ms)",
         write_time
+    );
+}
+
+/// The HTML report budgets (T-106; NFR-3): one page of the milestone-tree file in under 500 ms and
+/// under 5 MB.
+const REPORT_BUDGET: Duration = Duration::from_millis(500);
+/// The all-projects page of [`REPORT_ALL_PROJECTS`] such projects, in under 5 s.
+const REPORT_ALL_BUDGET: Duration = Duration::from_secs(5);
+const PAGE_LIMIT_BYTES: u64 = 5 * 1024 * 1024;
+/// Projects in the register of the all-projects test: "ten such projects" in NFR-3.
+const REPORT_ALL_PROJECTS: usize = 10;
+
+#[test]
+#[ignore = "Performance benchmark (NFR-3, TEST-9, T-106); run with: cargo test --release --test perf -- --ignored"]
+fn perf_5000_entry_milestone_tree_report_html_meets_nfr3_budget() {
+    let body = generate_milestone_tree_file();
+    let (_tmp, home, work) = project_with(&body);
+
+    // Untimed warm-up: the first report also creates the state folder and the first history snapshot.
+    let _ = run_todo(&home, &work, &["report", "--html"]);
+    let report_time = median(
+        (0..5)
+            .map(|_| run_todo(&home, &work, &["report", "--html"]).1)
+            .collect(),
+    );
+    let page_bytes = fs::metadata(work.join(".todo").join("report.html"))
+        .unwrap()
+        .len();
+
+    eprintln!(
+        "NFR-3 report timing (5,000 entries, four levels, {} bytes of TODO.md): report --html={:?}, page={} bytes",
+        body.len(),
+        report_time,
+        page_bytes
+    );
+    assert!(
+        report_time < REPORT_BUDGET,
+        "report --html took {report_time:?} (budget < 500 ms)"
+    );
+    assert!(
+        page_bytes < PAGE_LIMIT_BYTES,
+        "the page is {page_bytes} bytes (budget < 5 MB)"
+    );
+}
+
+#[test]
+#[ignore = "Performance benchmark (NFR-3, TEST-9, T-106); run with: cargo test --release --test perf -- --ignored"]
+fn perf_ten_milestone_tree_projects_report_html_all_meets_nfr3_budget() {
+    let body = generate_milestone_tree_file();
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let register = tmp.path().join("per user").join("projects.json");
+    fs::create_dir_all(&home).unwrap();
+
+    // Ten projects, each a copy of the milestone-tree file, registered in a temporary register.
+    for i in 1..=REPORT_ALL_PROJECTS {
+        let name = format!("project {i:02}");
+        let work = tmp.path().join(&name);
+        fs::create_dir_all(&work).unwrap();
+        fs::write(work.join("TODO.md"), body.as_bytes()).unwrap();
+        let (added, _) = run_todo_env(
+            &home,
+            &work,
+            &["project", "add", "--name", &name],
+            &[("TODO_REGISTER", register.as_path())],
+        );
+        assert!(added.status.success(), "{}", stderr_text(&added));
+    }
+
+    let run_all = || {
+        run_todo_env(
+            &home,
+            tmp.path(),
+            &["report", "--html", "--all"],
+            &[("TODO_REGISTER", register.as_path())],
+        )
+        .1
+    };
+    // Untimed warm-up, as for the single page.
+    let _ = run_all();
+    let all_time = median((0..5).map(|_| run_all()).collect());
+
+    let page = register.with_file_name("report-all.html");
+    let page_bytes = fs::metadata(&page).unwrap().len();
+    let html = fs::read_to_string(&page).unwrap();
+    assert_eq!(
+        html.matches("<section class=\"project\"").count(),
+        REPORT_ALL_PROJECTS,
+        "every project must have its section on the page"
+    );
+
+    eprintln!(
+        "NFR-3 all-projects report timing ({REPORT_ALL_PROJECTS} projects of 5,000 entries, four levels): \
+         report --html --all={:?}, page={} bytes",
+        all_time, page_bytes
+    );
+    assert!(
+        all_time < REPORT_ALL_BUDGET,
+        "report --html --all took {all_time:?} (budget < 5 s)"
     );
 }
