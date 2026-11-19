@@ -240,7 +240,7 @@ pub fn build_page(
         title: page_title(doc),
         file_label: file_label.to_string(),
         archive_label: archive.map(|_| cfg.archive_file.clone()),
-        generated: now.format("%Y-%m-%d %H:%M %:z").to_string(),
+        generated: generated_text(now),
         counts,
         areas,
         work,
@@ -250,6 +250,12 @@ pub fn build_page(
         dropped,
         no_area,
     }
+}
+
+/// The clock at the build, as the pages show it (`2026-11-19 10:00 +01:00`).
+#[must_use]
+pub fn generated_text(now: DateTime<FixedOffset>) -> String {
+    now.format("%Y-%m-%d %H:%M %:z").to_string()
 }
 
 /// Shared state for turning tasks into entries and work nodes.

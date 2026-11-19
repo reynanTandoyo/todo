@@ -1,6 +1,8 @@
-//! `todo report --html` command: one read-only HTML page for people (T-092; R-REPORT-1, R-LOCK-5).
+//! `todo report --html` command: one read-only HTML page for people, for the current project or for
+//! every registered project with `--all` (T-092, T-094; R-REPORT-1, R-REPORT-2, R-LOCK-5).
 
 use std::ffi::OsString;
+use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -11,24 +13,31 @@ use serde::Serialize;
 use crate::atomic::atomic_write_bytes;
 use crate::cli::{CommandKind, CommandMeta, Context, load_read};
 use crate::error::{ErrorCode, Result, TodoError};
+use crate::find::fs_path;
 use crate::lock::current_time;
 use crate::output::Output;
-use crate::report::{build_page, render_page};
+use crate::register::{read_register, register_path};
+use crate::report::{build_all_page, build_page, render_all_page, render_page};
 use crate::state::StateDir;
 
 /// The file the page is written to by default, in the state folder (`docs/requirements.md` §7).
 const DEFAULT_FILE: &str = "report.html";
+
+/// The file `--all` writes by default, next to the project register (R-REPORT-2).
+const DEFAULT_ALL_FILE: &str = "report-all.html";
 
 /// Metadata for the `report` command.
 pub const META: CommandMeta = CommandMeta {
     name: "report",
     summary: "Write one HTML page for people: the work, questions, ideas, done and dropped",
     kind: CommandKind::Read,
-    details: "Writes one self-contained HTML page for people; `--html` is required, as the page is the only report so far. The page shows the work as a tree of milestones, each with its goal and progress, and the tasks indented below it, with top-level tasks last; the unfinished tasks per area; open questions, each linked to the milestone or task it is about; ideas; and the done and dropped entries, the dropped ones with the reason. Each task opens to show its fields and notes. The page has inline CSS and no script, loads nothing from the network, and has no buttons or forms. It takes no lock, never changes TODO.md, and is written only when asked. Done and dropped entries in TODO-archive.md are listed too, marked archived. The default file is report.html in the state folder, so git never sees it; `--out <path>` writes elsewhere. `--open` opens the page with the system's default program for HTML files. Text output is the path; `--json` returns the path, the size in bytes and whether the page was opened.",
+    details: "Writes one self-contained HTML page for people; `--html` is required, as the page is the only report so far. The page shows the work as a tree of milestones, each with its goal and progress, and the tasks indented below it, with top-level tasks last; the unfinished tasks per area; open questions, each linked to the milestone or task it is about; ideas; and the done and dropped entries, the dropped ones with the reason. Each task opens to show its fields and notes. The page has inline CSS and no script, loads nothing from the network, and has no buttons or forms. It takes no lock, never changes TODO.md, and is written only when asked. Done and dropped entries in TODO-archive.md are listed too, marked archived. The default file is report.html in the state folder, so git never sees it; `--out <path>` writes elsewhere. `--all` writes one page for every project in the project register instead of the current one: a card per project (tasks per status, top-level milestones with progress, blocked tasks, open questions), then each project's lists. It reads the register and each registered TODO.md and archive, never searches folders, works from any folder and writes nothing in the projects; a project that is gone, cannot be parsed or needs a newer todo shows its problem instead of its lists. Its default file is report-all.html next to the register. `--open` opens the page with the system's default program for HTML files. Text output is the path; `--json` returns the path, the size in bytes and whether the page was opened.",
     examples: &[
         "todo report --html",
         "todo report --html --open",
         "todo report --html --out \"$env:USERPROFILE\\Desktop\\tasks.html\"",
+        "todo report --html --all",
+        "todo report --html --all --out \"$env:USERPROFILE\\Desktop\\Alle Projekte.html\"",
         "todo report --html --json",
     ],
 };
@@ -40,7 +49,12 @@ pub struct Args {
     #[arg(long)]
     pub html: bool,
 
-    /// Write the page to this file instead of `report.html` in the state folder.
+    /// Write one page for every registered project (`todo project list`) instead of the current one.
+    #[arg(long)]
+    pub all: bool,
+
+    /// Write the page to this file instead of `report.html` in the state folder (with `--all`,
+    /// `report-all.html` next to the project register).
     #[arg(long, value_name = "PATH")]
     pub out: Option<PathBuf>,
 
@@ -56,7 +70,7 @@ struct ReportJson {
     opened: bool,
 }
 
-/// Runs `todo report --html`.
+/// Runs `todo report --html`, or `todo report --html --all`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     run_with_opener(args, ctx, out, &open_with_default_program)
 }
@@ -74,6 +88,10 @@ fn run_with_opener(
             ErrorCode::Usage,
             "report needs --html: the HTML page is the only report so far",
         ));
+    }
+    if args.all {
+        let register = register_path()?;
+        return run_all_with_opener(&register, args, out, opener);
     }
 
     let (cfg, loaded) = load_read(ctx, out, false, true)?;
@@ -94,10 +112,63 @@ fn run_with_opener(
             state.path().join(DEFAULT_FILE)
         }
     };
-    atomic_write_bytes(&path, html.as_bytes())?;
+    write_and_finish(&path, &html, args.open, out, opener)
+}
 
-    let opened = if args.open {
-        match opener(&path) {
+/// `todo report --html --all`: one page for the projects in the register at `register` (R-REPORT-2).
+/// It reads the register and each project's files, and writes only the page. Without `--out` the
+/// page goes to `report-all.html` next to the register.
+fn run_all_with_opener(
+    register: &Path,
+    args: Args,
+    out: &mut Output,
+    opener: &dyn Fn(&Path) -> io::Result<()>,
+) -> Result<()> {
+    let projects = read_register(register)?
+        .map(|reg| reg.projects)
+        .unwrap_or_default();
+    let page = build_all_page(&projects, current_time());
+    for warning in page.projects.iter().flat_map(|project| &project.warnings) {
+        out.warn(warning.clone());
+    }
+    let html = render_all_page(&page);
+
+    let path = match args.out {
+        Some(path) => path,
+        None => default_all_path(register)?,
+    };
+    write_and_finish(&path, &html, args.open, out, opener)
+}
+
+/// The file `--all` writes by default: `report-all.html` next to the register. Its folder is made
+/// when it is missing, as the folder of the register is made when a project is first added.
+fn default_all_path(register: &Path) -> Result<PathBuf> {
+    let path = register.with_file_name(DEFAULT_ALL_FILE);
+    if let Some(folder) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        fs::create_dir_all(fs_path(folder).as_ref()).map_err(|e| {
+            TodoError::new(
+                ErrorCode::WriteFailed,
+                format!("failed creating {}: {e}", folder.display()),
+            )
+            .with_file(folder.display().to_string())
+        })?;
+    }
+    Ok(path)
+}
+
+/// Writes `html` to `path`, opens it when `open` is set, and reports the path (or, with `--json`,
+/// the path, the size and whether it was opened).
+fn write_and_finish(
+    path: &Path,
+    html: &str,
+    open: bool,
+    out: &mut Output,
+    opener: &dyn Fn(&Path) -> io::Result<()>,
+) -> Result<()> {
+    atomic_write_bytes(path, html.as_bytes())?;
+
+    let opened = if open {
+        match opener(path) {
             Ok(()) => true,
             Err(err) => {
                 out.warn(format!("could not open {}: {err}", path.display()));
@@ -197,7 +268,21 @@ mod tests {
     }
 
     fn args(html: bool, out: Option<PathBuf>, open: bool) -> Args {
-        Args { html, out, open }
+        Args {
+            html,
+            all: false,
+            out,
+            open,
+        }
+    }
+
+    fn all_args(out: Option<PathBuf>, open: bool) -> Args {
+        Args {
+            html: true,
+            all: true,
+            out,
+            open,
+        }
     }
 
     /// A project folder with `TODO.md` holding [`BODY`]; returns the folder and the file.
@@ -296,5 +381,65 @@ mod tests {
             "{:?}",
             out.warnings()
         );
+    }
+
+    #[test]
+    fn all_writes_next_to_the_register_and_hands_the_page_to_the_opener() {
+        let tmp = TempDir::new().unwrap();
+        // The folder of the register does not exist yet: the default page makes it.
+        let register = tmp.path().join("per user").join("projects.json");
+        let opened: RefCell<Vec<PathBuf>> = RefCell::new(Vec::new());
+        let stdout = Captured::default();
+        let mut out = Output::with_writers(
+            false,
+            Box::new(stdout.clone()),
+            Box::new(Captured::default()),
+        );
+        run_all_with_opener(&register, all_args(None, true), &mut out, &|path| {
+            opened.borrow_mut().push(path.to_path_buf());
+            Ok(())
+        })
+        .unwrap();
+
+        let expected = tmp.path().join("per user").join(DEFAULT_ALL_FILE);
+        assert_eq!(opened.into_inner(), vec![expected.clone()]);
+        let html = fs::read_to_string(&expected).unwrap();
+        assert!(html.contains("No project is registered yet."), "{html}");
+        let printed = String::from_utf8(stdout.0.borrow().clone()).unwrap();
+        assert_eq!(printed, format!("{}\n", expected.display()));
+        assert!(!register.exists(), "the report must not create the register");
+    }
+
+    #[test]
+    fn all_with_out_writes_only_to_the_given_file_and_makes_no_folder() {
+        let tmp = TempDir::new().unwrap();
+        let register = tmp.path().join("per user").join("projects.json");
+        let target = tmp.path().join("no such folder").join("all.html");
+        let mut out = Output::with_writers(
+            true,
+            Box::new(Captured::default()),
+            Box::new(Captured::default()),
+        );
+        let err = run_all_with_opener(
+            &register,
+            all_args(Some(target.clone()), false),
+            &mut out,
+            &|_| Ok(()),
+        )
+        .unwrap_err();
+        assert_eq!(err.code, ErrorCode::WriteFailed);
+        assert!(!target.exists());
+        assert!(!tmp.path().join("per user").exists());
+
+        let target = tmp.path().join("all projects.html");
+        run_all_with_opener(
+            &register,
+            all_args(Some(target.clone()), false),
+            &mut out,
+            &|_| Ok(()),
+        )
+        .unwrap();
+        assert!(target.is_file());
+        assert!(!tmp.path().join("per user").join(DEFAULT_ALL_FILE).exists());
     }
 }

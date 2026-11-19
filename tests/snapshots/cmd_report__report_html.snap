@@ -302,6 +302,60 @@ ol.children > .node details {
   font-size: 0.85rem;
 }
 
+/* The all-projects page: a card per project, then each project's lists. */
+h3 {
+  font-size: 1.1rem;
+  margin: 1.5rem 0 0.4rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
+  gap: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.card {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.card h4 {
+  margin: 0.8rem 0 0.25rem;
+}
+
+.card .counts {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+}
+
+.card-list li {
+  padding: 0.15rem 0;
+}
+
+.path {
+  margin: 0.15rem 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.problem {
+  color: var(--stale);
+  font-weight: 600;
+}
+
+section.project > h2 {
+  margin-top: 2.75rem;
+}
+
 @media (max-width: 600px) {
   body {
     padding: 16px 16px 40px;

@@ -1,0 +1,767 @@
+---
+source: tests/cmd_report_all.rs
+expression: html
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task overview: all projects</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --fg: #1d1d1a;
+  --muted: #5d5c57;
+  --line: #d8d5cb;
+  --accent: #1f5aa6;
+  --chip: #ebe9e2;
+  --chip-fg: #2f2e29;
+  --blocked: #8a4a00;
+  --stale: #a3252a;
+  --done: #2b6a38;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161613;
+    --surface: #1e1e1a;
+    --fg: #ebeae4;
+    --muted: #a7a59c;
+    --line: #3b3a34;
+    --accent: #8ab6ee;
+    --chip: #2b2b26;
+    --chip-fg: #dcdbd3;
+    --blocked: #f2b45e;
+    --stale: #ff8c84;
+    --done: #8fd39f;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 24px 16px 48px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+header,
+main,
+footer {
+  max-width: 60rem;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 2rem;
+  line-height: 1.2;
+  margin: 0.25rem 0;
+}
+
+h2 {
+  font-size: 1.25rem;
+  margin: 2.25rem 0 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+h4 {
+  font-size: 0.95rem;
+  margin: 1rem 0 0.4rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+.kicker,
+.source,
+.hint,
+.muted,
+.empty {
+  color: var(--muted);
+}
+
+.kicker {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.source {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+}
+
+ol,
+ul,
+dl,
+dd,
+p {
+  margin: 0;
+}
+
+ol,
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+.counts,
+.jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+}
+
+.counts {
+  margin-bottom: 0.75rem;
+}
+
+.counts .n {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.jump {
+  font-size: 0.95rem;
+}
+
+.chip {
+  display: inline-block;
+  margin: 0.1rem 0.25rem 0.1rem 0;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--chip-fg);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.chip.stale {
+  color: var(--stale);
+  font-weight: 600;
+}
+
+.reason {
+  color: var(--blocked);
+}
+
+.reason.dropped {
+  color: var(--muted);
+}
+
+.id {
+  margin-right: 0.4rem;
+  color: var(--muted);
+  font-family: ui-monospace, Consolas, "Cascadia Mono", monospace;
+  font-size: 0.9rem;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.done-mark {
+  color: var(--done);
+  font-weight: 600;
+}
+
+.areas li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.areas .count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+details {
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line);
+}
+
+summary {
+  cursor: pointer;
+}
+
+.more {
+  margin: 0.5rem 0 0.25rem 0.25rem;
+}
+
+dl.fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.2rem 0.9rem;
+  font-size: 0.95rem;
+}
+
+dl.fields dt {
+  color: var(--muted);
+}
+
+dl.fields dd {
+  margin: 0;
+}
+
+ul.notes li {
+  margin: 0.25rem 0;
+  font-size: 0.95rem;
+}
+
+.when {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.who {
+  font-weight: 600;
+}
+
+/* The work tree: a milestone with its goal, and what is below it indented. */
+.tree > .node {
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.tree > .node:first-child {
+  border-top: 0;
+}
+
+.milestone-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+}
+
+.goal {
+  margin: 0.25rem 0 0.2rem;
+}
+
+.progress-text {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+progress {
+  width: 7rem;
+  height: 0.6rem;
+  vertical-align: middle;
+  accent-color: var(--done);
+}
+
+ol.children {
+  margin: 0.35rem 0 0 1.1rem;
+  padding: 0 0 0 0.85rem;
+  border-left: 2px solid var(--line);
+}
+
+ol.children > .node {
+  padding: 0.35rem 0;
+}
+
+ol.children > .node details {
+  border-top: 0;
+  padding: 0.2rem 0;
+}
+
+.item {
+  padding: 0.15rem 0;
+}
+
+.item + .item {
+  border-top: 1px solid var(--line);
+}
+
+.item details {
+  border-top: 0;
+}
+
+.kind-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* The all-projects page: a card per project, then each project's lists. */
+h3 {
+  font-size: 1.1rem;
+  margin: 1.5rem 0 0.4rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
+  gap: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.card {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.card h4 {
+  margin: 0.8rem 0 0.25rem;
+}
+
+.card .counts {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+}
+
+.card-list li {
+  padding: 0.15rem 0;
+}
+
+.path {
+  margin: 0.15rem 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.problem {
+  color: var(--stale);
+  font-weight: 600;
+}
+
+section.project > h2 {
+  margin-top: 2.75rem;
+}
+
+@media (max-width: 600px) {
+  body {
+    padding: 16px 16px 40px;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+  }
+
+  ol.children {
+    margin-left: 0.4rem;
+    padding-left: 0.6rem;
+  }
+
+  dl.fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0 0;
+  }
+
+  dl.fields dt {
+    margin-top: 0.4rem;
+  }
+
+  progress {
+    width: 5rem;
+  }
+}
+</style>
+</head>
+<body>
+<header>
+<p class="kicker">Task overview</p>
+<h1>All registered projects</h1>
+<p class="source">2 projects · as of 2026-11-19 10:00 +01:00</p>
+</header>
+<main>
+<section id="projects">
+<h2>Projects (2)</h2>
+<p class="hint">One card per project. A card links to the project's lists further down the page.</p>
+<ul class="cards">
+<li class="card">
+<h3><a href="#p1">renderer</a></h3>
+<p class="path"><renderer>/TODO.md</p>
+<ul class="counts">
+<li><span class="n">1</span> open</li>
+<li><span class="n">1</span> claimed</li>
+<li><span class="n">1</span> blocked</li>
+<li><span class="n">2</span> done</li>
+<li><span class="n">1</span> dropped</li>
+</ul>
+<h4>Top-level milestones</h4>
+<ul class="card-list">
+<li><a href="#p1-e-T-010">T-010 · Develop the renderer</a> <progress value="1" max="2">1 of 2 done</progress><span class="progress-text">1 of 2 done</span></li>
+<li><a href="#p1-e-T-020">T-020 · Audio</a> <span class="chip">done</span> <progress value="1" max="1">1 of 1 done</progress><span class="progress-text">1 of 1 done</span></li>
+</ul>
+<h4>Blocked tasks</h4>
+<ul class="card-list">
+<li><a href="#p1-e-T-013">T-013 · Compute pass</a> <span class="reason">blocked: waiting for the vendor driver</span></li>
+</ul>
+<h4>Open questions</h4>
+<ul class="card-list">
+<li><a href="#p1-e-T-040">T-040 · Which format for the scene files?</a></li>
+</ul>
+</li>
+<li class="card">
+<h3><a href="#p2">lamp room</a></h3>
+<p class="path"><lamp room>/TODO.md</p>
+<ul class="counts">
+<li><span class="n">1</span> open</li>
+<li><span class="n">0</span> claimed</li>
+<li><span class="n">1</span> blocked</li>
+<li><span class="n">0</span> done</li>
+<li><span class="n">0</span> dropped</li>
+</ul>
+<h4>Top-level milestones</h4>
+<ul class="card-list">
+<li><a href="#p2-e-T-010">T-010 · Light the room</a> <progress value="0" max="1">0 of 1 done</progress><span class="progress-text">0 of 1 done</span></li>
+<li><a href="#p2-e-T-020">T-020 · Brass base</a> <span class="progress-text">no tasks below yet</span></li>
+</ul>
+<h4>Blocked tasks</h4>
+<ul class="card-list">
+<li><a href="#p2-e-T-002">T-002 · Polish the glass</a> <span class="reason">blocked: waiting for the glass supplier</span></li>
+</ul>
+<h4>Open questions</h4>
+<p class="muted">No open questions.</p>
+</li>
+</ul>
+</section>
+<section class="project" id="p1">
+<h2>renderer</h2>
+<p class="path"><renderer>/TODO.md</p>
+<section id="p1-work">
+<h3>Work</h3>
+<p class="hint">Milestones with their goal and progress. The tasks below a milestone are indented under it. Open a task to see its fields and notes.</p>
+<ol class="tree">
+<li class="node milestone status-open" id="p1-e-T-010">
+<div class="milestone-head"><span class="id">T-010</span><span class="title">Develop the renderer</span><span class="chip" title="priority">P1</span><progress value="1" max="2">1 of 2 done</progress><span class="progress-text">1 of 2 done</span></div>
+<p class="goal">the test scene renders</p>
+<details>
+<summary>Fields and notes</summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>open</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P1 · type: milestone</dd>
+<dt>goal</dt><dd>the test scene renders</dd>
+</dl>
+<h4>Notes</h4>
+<p class="muted">No notes.</p>
+</div>
+</details>
+<ol class="children">
+<li class="node milestone status-open" id="p1-e-T-011">
+<div class="milestone-head"><span class="id">T-011</span><span class="title">Lighting</span><span class="chip" title="priority">P1</span><progress value="0" max="1">0 of 1 done</progress><span class="progress-text">0 of 1 done</span></div>
+<p class="goal">point lights match the reference images</p>
+<details>
+<summary>Fields and notes</summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>open</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P1 · type: milestone</dd>
+<dt>milestone</dt><dd>T-010</dd>
+<dt>goal</dt><dd>point lights match the reference images</dd>
+</dl>
+<h4>Notes</h4>
+<p class="muted">No notes.</p>
+</div>
+</details>
+<ol class="children">
+<li class="node task status-claimed" id="p1-e-T-012">
+<details>
+<summary><span class="id">T-012</span><span class="title">C shader</span><span class="chip" title="priority">P1</span><span class="chip" title="area">gpu</span><span class="chip">claimed by alice, 60345 h</span><span class="chip stale">stale</span></summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>claimed</dd>
+<dt>owner</dt><dd>alice</dd>
+<dt>claimed</dt><dd>2020-01-01T00:00+00:00</dd>
+<dt>priority</dt><dd>P1 · area: gpu</dd>
+<dt>milestone</dt><dd>T-011</dd>
+</dl>
+<h4>Notes</h4>
+<p class="muted">No notes.</p>
+</div>
+</details>
+</li>
+</ol>
+</li>
+</ol>
+</li>
+<li class="node task status-blocked" id="p1-e-T-013">
+<details>
+<summary><span class="id">T-013</span><span class="title">Compute pass</span><span class="chip" title="priority">P2</span><span class="chip" title="area">gpu</span><span class="reason">blocked: waiting for the vendor driver</span></summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>blocked</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P2 · area: gpu</dd>
+</dl>
+<h4>Notes</h4>
+<ul class="notes">
+<li><span class="when">2026-11-15</span> <span class="who">planner</span>: blocked — waiting for the key</li>
+<li><span class="when">2026-11-16</span> <span class="who">planner</span>: blocked — waiting for the vendor driver</li>
+</ul>
+</div>
+</details>
+</li>
+<li class="node task status-open" id="p1-e-T-014">
+<details>
+<summary><span class="id">T-014</span><span class="title">Ship lighting</span><span class="chip" title="priority">P2</span><span class="chip" title="area">docs</span></summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>open</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P2 · area: docs</dd>
+</dl>
+<h4>Notes</h4>
+<p class="muted">No notes.</p>
+</div>
+</details>
+</li>
+</ol>
+</section>
+<section id="p1-areas">
+<h3>Unfinished tasks per area</h3>
+<p class="hint">Open, claimed or blocked tasks, counted by their area.</p>
+<ul class="areas">
+<li><span>docs</span><span class="count">1</span></li>
+<li><span>gpu</span><span class="count">2</span></li>
+</ul>
+</section>
+<section id="p1-questions">
+<h3>Open questions (1)</h3>
+<p class="hint">Each question links to the milestone or task it is about.</p>
+<ul class="list">
+<li class="item" id="p1-e-T-040">
+<details>
+<summary><span class="id">T-040</span><span class="title">Which format for the scene files?</span><span class="chip" title="priority">P2</span><span class="chip">about <a href="#p1-e-T-011">T-011 · Lighting</a></span></summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>open</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P2 · type: question</dd>
+<dt>about</dt><dd>T-011</dd>
+</dl>
+<h4>Notes</h4>
+<p class="muted">No notes.</p>
+</div>
+</details>
+</li>
+</ul>
+</section>
+<section id="p1-ideas">
+<h3>Ideas (0)</h3>
+<p class="empty">No ideas waiting.</p>
+</section>
+<section id="p1-done">
+<h3>Done (3)</h3>
+<p class="hint">Finished entries of every kind that the work above does not show. Entries from the archive are marked archived.</p>
+<ul class="list">
+<li class="item" id="p1-e-T-001">
+<details>
+<summary><span class="kind-label">task</span> <span class="id">T-001</span><span class="title">Setup</span><span class="chip" title="priority">P1</span><span class="chip" title="area">docs</span></summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>done</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P1 · area: docs</dd>
+<dt>milestone</dt><dd>T-010</dd>
+</dl>
+<h4>Notes</h4>
+<p class="muted">No notes.</p>
+</div>
+</details>
+</li>
+<li class="item" id="p1-e-T-020">
+<details>
+<summary><span class="kind-label">milestone</span> <span class="id">T-020</span><span class="title">Audio</span><span class="chip" title="priority">P2</span></summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>done</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P2 · type: milestone</dd>
+<dt>goal</dt><dd>sound plays with the scene</dd>
+</dl>
+<h4>Notes</h4>
+<p class="muted">No notes.</p>
+</div>
+</details>
+</li>
+<li class="item" id="p1-e-T-021">
+<details>
+<summary><span class="kind-label">task</span> <span class="id">T-021</span><span class="title">Mix the sound</span><span class="chip" title="priority">P2</span></summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>done</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P2</dd>
+<dt>milestone</dt><dd>T-020</dd>
+</dl>
+<h4>Notes</h4>
+<p class="muted">No notes.</p>
+</div>
+</details>
+</li>
+</ul>
+</section>
+<section id="p1-dropped">
+<h3>Dropped (2)</h3>
+<p class="hint">Each entry shows the reason it was dropped.</p>
+<ul class="list">
+<li class="item" id="p1-e-T-015">
+<details>
+<summary><span class="kind-label">task</span> <span class="id">T-015</span><span class="title">Old idea</span><span class="chip" title="priority">P3</span><span class="reason dropped">dropped: superseded by T-012</span></summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>dropped</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P3</dd>
+</dl>
+<h4>Notes</h4>
+<ul class="notes">
+<li><span class="when">2026-11-16</span> <span class="who">planner</span>: dropped — superseded by T-012</li>
+</ul>
+</div>
+</details>
+</li>
+<li class="item" id="p1-e-T-030">
+<details>
+<summary><span class="kind-label">milestone</span> <span class="id">T-030</span><span class="title">Old plan</span><span class="chip" title="priority">P3</span><span class="reason dropped">dropped: no reason recorded</span></summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>dropped</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P3 · type: milestone</dd>
+<dt>goal</dt><dd>abandoned</dd>
+</dl>
+<h4>Notes</h4>
+<p class="muted">No notes.</p>
+</div>
+</details>
+</li>
+</ul>
+</section>
+</section>
+<section class="project" id="p2">
+<h2>lamp room</h2>
+<p class="path"><lamp room>/TODO.md</p>
+<section id="p2-work">
+<h3>Work</h3>
+<p class="hint">Milestones with their goal and progress. The tasks below a milestone are indented under it. Open a task to see its fields and notes.</p>
+<ol class="tree">
+<li class="node milestone status-open" id="p2-e-T-010">
+<div class="milestone-head"><span class="id">T-010</span><span class="title">Light the room</span><span class="chip" title="priority">P1</span><progress value="0" max="1">0 of 1 done</progress><span class="progress-text">0 of 1 done</span></div>
+<p class="goal">the lamp lights the room</p>
+<details>
+<summary>Fields and notes</summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>open</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P1 · type: milestone</dd>
+<dt>goal</dt><dd>the lamp lights the room</dd>
+</dl>
+<h4>Notes</h4>
+<p class="muted">No notes.</p>
+</div>
+</details>
+<ol class="children">
+<li class="node task status-open" id="p2-e-T-001">
+<details>
+<summary><span class="id">T-001</span><span class="title">Trim the wick</span><span class="chip" title="priority">P1</span><span class="chip" title="area">ui</span></summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>open</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P1 · area: ui</dd>
+<dt>milestone</dt><dd>T-010</dd>
+</dl>
+<h4>Notes</h4>
+<p class="muted">No notes.</p>
+</div>
+</details>
+</li>
+</ol>
+</li>
+<li class="node milestone status-open" id="p2-e-T-020">
+<div class="milestone-head"><span class="id">T-020</span><span class="title">Brass base</span><span class="chip" title="priority">P2</span><span class="progress-text">no tasks below yet</span></div>
+<p class="goal">the base is polished</p>
+<details>
+<summary>Fields and notes</summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>open</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P2 · type: milestone</dd>
+<dt>goal</dt><dd>the base is polished</dd>
+</dl>
+<h4>Notes</h4>
+<p class="muted">No notes.</p>
+</div>
+</details>
+</li>
+<li class="node task status-blocked" id="p2-e-T-002">
+<details>
+<summary><span class="id">T-002</span><span class="title">Polish the glass</span><span class="chip" title="priority">P2</span><span class="chip" title="area">ui</span><span class="reason">blocked: waiting for the glass supplier</span></summary>
+<div class="more">
+<dl class="fields">
+<dt>status</dt><dd>blocked</dd>
+<dt>owner</dt><dd>—</dd>
+<dt>priority</dt><dd>P2 · area: ui</dd>
+</dl>
+<h4>Notes</h4>
+<ul class="notes">
+<li><span class="when">2026-11-17</span> <span class="who">bob</span>: blocked — waiting for the glass supplier</li>
+</ul>
+</div>
+</details>
+</li>
+</ol>
+</section>
+<section id="p2-areas">
+<h3>Unfinished tasks per area</h3>
+<p class="hint">Open, claimed or blocked tasks, counted by their area.</p>
+<ul class="areas">
+<li><span>ui</span><span class="count">2</span></li>
+</ul>
+</section>
+<section id="p2-questions">
+<h3>Open questions (0)</h3>
+<p class="empty">No open questions.</p>
+</section>
+<section id="p2-ideas">
+<h3>Ideas (0)</h3>
+<p class="empty">No ideas waiting.</p>
+</section>
+<section id="p2-done">
+<h3>Done (0)</h3>
+<p class="empty">Nothing done yet.</p>
+</section>
+<section id="p2-dropped">
+<h3>Dropped (0)</h3>
+<p class="empty">Nothing dropped.</p>
+</section>
+</section>
+</main>
+<footer><p class="muted">Read-only overview of the registered projects. It changes nothing; to change a task, ask an agent.</p></footer>
+</body>
+</html>

@@ -909,10 +909,13 @@ for it, never automatically.
   project on one page, built from the project register only (R-PROJ-1); it never searches folders
   and works from any folder.
   - A card per project (tasks per status, top-level milestones with progress, blocked tasks, open
-    questions), followed by each project's lists as in R-REPORT-1.
+    questions), followed by each project's lists as in R-REPORT-1. The card counts as `overview`
+    does (R-PROJ-2): tasks per status from `TODO.md` only, and top-level milestones (not nested under
+    a milestone) that are not dropped, with the tasks below them done out of those not dropped.
   - The default path is `report-all.html` next to the register.
   - A project that is gone, can't be parsed or needs a newer todo shows its problem instead of its
-    lists.
+    lists, decided as `overview` decides it (R-PROJ-2). The other problems of its files are printed
+    as warnings with the path of the file, as in R-REPORT-1.
   - An empty register gives a page that says in words how a project is registered (by asking an
     agent to register it), without a copy-ready command.
   - A snapshot test uses two invented projects.
