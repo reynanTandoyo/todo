@@ -614,3 +614,18 @@ fn overview_example_in_json_md_has_the_keys_of_overview_json() {
         "overview --json problem project",
     );
 }
+
+#[test]
+fn report_example_in_json_md_has_the_keys_of_report_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo report --html --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(dir.path().join("TODO.md"), SHOW_FIXTURE).expect("write TODO.md");
+    let out = run_in(dir.path(), &["--json", "report", "--html"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "report --html --json");
+}

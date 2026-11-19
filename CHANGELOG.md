@@ -4,8 +4,40 @@ All notable changes to `todo` are documented in this file.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-19
+
+The file format stays version 2: todo 0.7 reads and writes the same `TODO.md` as 0.6, and no
+migration is needed. Each command's JSON and exit codes are unchanged except where the fixes below say so.
+
+### Added
+- `todo report --html` writes one read-only, self-contained HTML page for people: the work as a tree
+  of milestones with goals and progress, the unfinished tasks per area, open questions linked to the
+  entry they are about, ideas, and the done and dropped entries with the reason of each drop. It has
+  inline CSS, works in light and dark mode and in a narrow window, and loads nothing from the network.
+  It is written only when asked, to `report.html` in the state folder, or to `--out <path>`; `--open`
+  opens it (`R-REPORT-1`).
+- `todo report --html --all` puts every registered project on one page: a card per project (tasks per
+  status, top-level milestones with progress, blocked tasks, open questions) and then each project's
+  lists. It is built from the project register only and writes `report-all.html` next to the register.
+  A project that is gone, cannot be parsed or needs a newer todo shows its problem instead of its lists
+  (`R-REPORT-2`).
+- The per-user project register: `todo project add [<path>] [--name N]`, `todo project remove
+  <name|path>` and `todo project list` keep one JSON file per user, `%LOCALAPPDATA%\todo\projects.json`
+  (or `TODO_REGISTER`). Changes wait for the register's own lock, and the same file or name twice is
+  refused with `DUPLICATE_PROJECT` (`R-PROJ-1`).
+- `todo overview` reads only the register and prints one line per registered project: its tasks per
+  status, top-level milestones done out of those not dropped, stale claims, open questions and the todo
+  version stamped in the file, with a marker for a file that needs `todo migrate --yes`. A project with a
+  problem is listed with it, and the others are still shown (`R-PROJ-2`).
+
 ### Fixed
-- A failed replace of `TODO.md` after `archive` or a migration no longer leaves the moved tasks in both files: a read-only `TODO.md` is refused before `TODO-archive.md` is written, and a replace that fails afterwards puts the archive back as it was (`R-ARCH-1`, `R-MIG-1`).
+- A failed replace of `TODO.md` after `archive` or a migration no longer leaves the moved tasks in both files: a read-only `TODO.md` is refused before `TODO-archive.md` is written, and a replace that fails afterwards puts the archive back as it was (`R-ARCH-1`, `R-MIG-1`; T-132).
+- A write refused for a read-only `TODO.md` no longer saves a history snapshot (T-138).
+- Tests built without the `test-hooks` feature compile without unused imports, so `cargo clippy --all-targets` passes without `--all-features` (T-139).
+- `summary` and the HTML report give the same reason for a blocked task: the latest `blocked — <reason>` note, shown without the prefix (T-140).
+- `docs/json.md` exit codes match the program and the requirements: `BAD_VALUE` exits 1, such as for an unknown setting in `todo.toml` (`R-OUT-3`; T-141).
+- `check` reports a blocked task whose only note is not a block reason (T-142).
+- `add` with several sections and no `--section` fails with `UNKNOWN_SECTION`, as `docs/json.md` now says (`R-OUT-3`; T-143).
 
 ## [0.6.0] - 2026-11-18
 
