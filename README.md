@@ -72,6 +72,28 @@ Colleagues may run different versions against the same `TODO.md`. Todo 0.5 and o
 version 2 file, with a warning, but can no longer write it, so everyone who writes the file should update
 before anyone migrates it. A todo that is too old for a file refuses to work on it (`TOOL_TOO_OLD`).
 
+## For people
+
+You do not need to read `TODO.md` to see where the work stands. Agents keep the list, and you read
+the page they build from it.
+
+1. **Register each project once**, from its folder: `todo project add --name renderer` (or ask an
+   agent to do it). The register is one file per user, `%LOCALAPPDATA%\todo\projects.json`.
+2. **Ask an agent for the report.** It runs `todo report --html --all`, which writes one page for
+   every registered project to `report-all.html` next to the register.
+3. **Open the page** in your browser, or ask the agent to open it: `todo report --html --all --open`.
+   The page has a card per project, then each project's lists. A project that cannot be read shows
+   its problem instead of its lists.
+4. **Every change goes through an agent.** The page is read-only: it has no buttons, forms or
+   commands. To change a task, ask an agent.
+
+```powershell
+todo project add --name renderer
+todo project list
+todo overview
+todo report --html --all --open
+```
+
 ## Using it
 
 Every write command needs an agent name via `--agent <name>` or the `TODO_AGENT` environment
@@ -245,7 +267,7 @@ A todo that is **too old** for a file, because the file's format is newer than a
 every command that reads or changes tasks with exit 4 and the error `TOOL_TOO_OLD`. Nothing is written:
 
 ```text
-error: TODO.md:1: format version 3 is newer than this todo 0.6.0 supports; the file was last written by todo 0.9.0. Update the todo executable first (`todo help update`).
+error: TODO.md:1: format version 3 is newer than this todo 0.7.0 supports; the file was last written by todo 0.9.0. Update the todo executable first (`todo help update`).
 ```
 
 `where`, `help`, `schema`, `status`, `history`, the lock commands and the other commands that never read

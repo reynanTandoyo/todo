@@ -65,7 +65,7 @@ Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock
   "ok": true,
   "data": {
     "name": "todo",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "about": "Concurrency-safe editor for TODO.md task lists",
     "commands": [
       { "kind": "read", "name": "list", "summary": "List and filter tasks" }
@@ -84,7 +84,7 @@ below), not this command.
 {
   "schema": "todo.version.v1",
   "ok": true,
-  "data": { "version": "0.6.0", "commit": "abc1234" },
+  "data": { "version": "0.7.0", "commit": "abc1234" },
   "warnings": []
 }
 ```
@@ -118,7 +118,7 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
   "ok": true,
   "data": {
     "topic": "update",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "executable": "C:\\Users\\alice\\AppData\\Local\\Programs\\todo\\todo.exe",
     "repository": "https://github.com/reynanTandoyo/todo",
     "latest_release": "https://github.com/reynanTandoyo/todo/releases/latest",
@@ -378,7 +378,7 @@ ones only for the whole tree (no milestone argument and no `--area`); otherwise 
     "write_lock": { "held": false },
     "format_version": 2,
     "tool_stamp": "0.6.0",
-    "running_version": "0.6.0",
+    "running_version": "0.7.0",
     "counts": { "open": 10, "claimed": 4, "blocked": 0, "done": 27, "dropped": 3, "total": 44, "milestones": 2, "questions": 1, "ideas": 3 }
   },
   "warnings": []
@@ -753,6 +753,19 @@ command.
 when `--open` started the program). The page itself is HTML, not part of the JSON. The `--all` page
 (R-REPORT-2), written with `todo report --html --all --json`, has the same `data`.
 
+```json
+{
+  "schema": "todo.report.v1",
+  "ok": true,
+  "data": {
+    "path": "C:\\Project\\todo\\.todo\\report.html",
+    "bytes": 48213,
+    "opened": false
+  },
+  "warnings": []
+}
+```
+
 ### `by` field (`R-WRITE-16`)
 
 `done` may add `{"fields":{"by":"reyna-gh"}}` to the task: the person who finished it, after
@@ -889,7 +902,7 @@ project's `TODO.md`, never searches folders and writes nothing.
 | `READ_ONLY` | 4 | Target file is read-only | `{"code":"READ_ONLY","message":"TODO.md is read-only"}` |
 | `WRITE_FAILED` | 4 | Atomic write or rename failed | `{"code":"WRITE_FAILED","message":"failed writing temporary file"}` |
 | `NO_GIT_HISTORY` | 5 | `align` without git, outside a repository, in a shallow clone or with no commits | `{"code":"NO_GIT_HISTORY","message":"not inside a git repository"}` |
-| `TOOL_TOO_OLD` | 4 | `TODO.md`, the archive or the project register names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 3 is newer than this todo 0.6.0 supports; ...","line":1,"file":"TODO.md"}` |
+| `TOOL_TOO_OLD` | 4 | `TODO.md`, the archive or the project register names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 3 is newer than this todo 0.7.0 supports; ...","line":1,"file":"TODO.md"}` |
 | `DUPLICATE_PROJECT` | 1 | `project add` for a file, or a name, that the project register already has (R-PROJ-1) | `{"code":"DUPLICATE_PROJECT","message":"C:\\Projekte\\TODO.md is already registered as renderer"}` |
 
 ### `TOOL_TOO_OLD` (`R-VER-2`)
@@ -905,7 +918,7 @@ running version. Nothing is written. Run `todo help update --json` for the steps
   "ok": false,
   "error": {
     "code": "TOOL_TOO_OLD",
-    "message": "format version 3 is newer than this todo 0.6.0 supports; the file was last written by todo 0.9.0. Update the todo executable first (`todo help update`).",
+    "message": "format version 3 is newer than this todo 0.7.0 supports; the file was last written by todo 0.9.0. Update the todo executable first (`todo help update`).",
     "line": 1,
     "file": "TODO.md"
   },
@@ -914,5 +927,5 @@ running version. Nothing is written. Run `todo help update --json` for the steps
 ```
 
 `where --json` still succeeds for such a file. It shows `format_version` (3), `tool_stamp` (`0.9.0`)
-and `running_version` (`0.6.0`), leaves out `counts` because the tasks are not read, and warns on the
+and `running_version` (`0.7.0`), leaves out `counts` because the tasks are not read, and warns on the
 format line and the tool line.
