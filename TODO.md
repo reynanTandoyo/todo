@@ -39,6 +39,7 @@ without a mistake. Workers then take those tasks at the same time, in one checko
 - reqs: REL-4, NFR-8
 - note (2026-11-19, claude-main): added
 - note (2026-11-19, claude-main): Also specify `verify_when` (`done` or `wave`, T-158), the `verified` field and `todo verify --wave`.
+- note (2026-11-19, claude-main): R-AGENT-1 changes: the one rules text becomes a short common block (at most 15 lines) plus `todo help worker` and `todo help planner` (T-166).
 
 ### T-147 · Difficulty levels 1 to 5 and the planner's list
 - status: open
@@ -240,15 +241,16 @@ without a mistake. Workers then take those tasks at the same time, in one checko
 - reqs: NFR-3, TEST-9
 - note (2026-11-19, claude-main): added
 
-### T-166 · v0.8 agent rules for planner and worker, documentation and release 0.8.0
+### T-166 · v0.8 agent rules by role, documentation and release 0.8.0
 - status: open
 - owner: —
 - priority: P1 · difficulty: medium · type: docs · area: release
 - milestone: T-145
 - why: the new commands only help when every agent knows which role it has and what to run
 - depends: T-150, T-154, T-156, T-160, T-164, T-165
-- accept: the rules text has a part for the planner (give every task a level; split with `todo split` until `todo plan` is empty; write files, steps and verify for level-1 tasks; keep a higher level only with `--final`; read `todo waves` and break long chains; run the full test suite when a wave is finished) and a part for the worker (`next --claim --max-difficulty 1 --brief`; change only the listed files; commit only those files; `todo done --commit HEAD`; `todo stuck --note` when it cannot finish); the README explains the roles, the levels, file scopes in one checkout and what the verify command is trusted to do; docs/json.md documents every new JSON shape and the codes `VERIFY_FAILED`, `OUT_OF_SCOPE` and `FILES_BUSY`; CHANGELOG.md has the 0.8.0 entry including the format change and the changed defaults; Cargo.toml is 0.8.0; `todo migrate --yes` was run in this repository and `todo check` is clean
+- accept: the rules are split by role so that no agent carries rules it does not need. The common rules block (AGENTS.md, TODO.md, the skill) is at most 15 lines and ends with one line per role naming its help text. `todo help worker` is at most 10 lines: take work with `todo next --claim --max-difficulty 1 --brief`, change only the listed files, commit only those files, `todo done <id> --commit HEAD`, `todo stuck <id> --note` when it cannot finish; `todo brief` repeats the last three with the task's ID filled in, so a worker needs no other text. `todo help planner` holds the planner's rules: give every task a level; split with `todo split` until `todo plan` is empty; write files, steps and verify for level-1 tasks; keep a higher level only with `--final`; read `todo waves` and break long chains; in wave mode run `todo verify --wave` when a wave is finished, otherwise the full test suite. A test fails when the common block grows past 15 lines or the worker text past 10. The README explains the roles, the levels, file scopes in one checkout and what the verify command is trusted to do; docs/json.md documents every new JSON shape and the codes `VERIFY_FAILED`, `OUT_OF_SCOPE` and `FILES_BUSY`; CHANGELOG.md has the 0.8.0 entry including the format change and the changed defaults; Cargo.toml is 0.8.0; `todo migrate --yes` was run in this repository and `todo check` is clean
 - reqs: R-AGENT-1, REL-2, REL-5
 - note (2026-11-19, claude-main): added
 - note (2026-11-19, claude-main): Rules text for the planner: in wave mode run `todo verify --wave` when every worker of the wave has finished, before starting the next wave.
+- note (2026-11-19, claude-main): Owner 2026-11-19: commands cost no context (nothing is loaded until `todo help <command>` is run), but the rules text does and it grew from 11 to 20 lines by v0.7. Keep the common rules short and move role rules into `todo help worker` and `todo help planner`. Lines moved out of the common block today (milestones, ideas, questions, migrate, update) go to the planner text or stay only where a refusal message already names the command.
 
