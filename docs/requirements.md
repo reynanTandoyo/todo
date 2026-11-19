@@ -275,9 +275,11 @@ or with `--json` the task as it is after the change.
 - **R-WRITE-1 MUST** `add --title T [--section S] [--priority P] [--type X] [--area X]
   [--depends IDs] [--files T] [--problem T] [--fix T] [--accept T] [--field key=value]…` adds a task
   at the end of a section (format.md §10) and prints its ID. The section is found by its exact name,
-  ignoring case and a leading number, or else by a unique part of the name; an unknown or ambiguous
-  section is refused (exit 1) with the list of sections. Without `--section` the tool uses
-  `default_section`, or the only section if there is just one, and refuses otherwise. Fields in
+  ignoring case and a leading number, or else by a unique part of the name. An unknown section is
+  refused (exit 1, `UNKNOWN_SECTION`) and an ambiguous one (a name that matches several) is refused
+  (exit 1, `AMBIGUOUS_SECTION`), both with the list of sections. Without `--section` the tool uses
+  `default_section`, or the only section if there is just one; with several sections and no
+  `default_section` it is refused (exit 1, `UNKNOWN_SECTION`) with the list of sections. Fields in
   `required_fields` (default `priority`) must be given; values must be in the configured lists. A
   title equal to that of a task that isn't done or dropped is refused.
 - **R-WRITE-2 MUST** `claim <task>` claims a task (R-CLAIM-1 to R-CLAIM-4).
