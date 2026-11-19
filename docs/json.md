@@ -750,7 +750,8 @@ command.
 ### `todo report --html --json` (`todo.report.v1`, `R-REPORT-1`)
 
 `data` has `path` (the file written, as a full path), `bytes` (its size) and `opened` (`true` only
-when `--open` started the program). The page itself is HTML, not part of the JSON.
+when `--open` started the program). The page itself is HTML, not part of the JSON. The `--all` page
+(R-REPORT-2), written with `todo report --html --all --json`, has the same `data`.
 
 ### `by` field (`R-WRITE-16`)
 

@@ -38,6 +38,16 @@ pub struct TaskCounts {
 }
 
 impl TaskCounts {
+    /// The tasks of `doc` per status (R-KIND-3); milestones, questions and ideas are left out.
+    #[must_use]
+    pub fn of(doc: &Document) -> Self {
+        let mut counts = Self::default();
+        for task in doc.tasks.iter().filter(|t| t.kind() == EntryKind::Task) {
+            counts.count(task.status);
+        }
+        counts
+    }
+
     fn count(&mut self, status: Status) {
         match status {
             Status::Open => self.open += 1,
@@ -145,9 +155,12 @@ pub fn overview_of(project: &Project, now: DateTime<FixedOffset>) -> ProjectOver
     }
 }
 
-/// Reads and counts the `TODO.md` at `todo_path`, refusing what the other read commands refuse:
-/// a file that is not UTF-8, has a problem that blocks all writes, or is in a newer format.
-fn measure(todo_path: &Path, now: DateTime<FixedOffset>) -> Result<Figures> {
+/// Reads and parses the `TODO.md` at `todo_path` with its `todo.toml`, and refuses what the other
+/// read commands refuse: a file that is missing, is not UTF-8 or cannot be parsed, is in a format
+/// newer than this todo, or has a problem that blocks all writes. Shared by `overview` and the
+/// all-projects report, so both decide a project's problem the same way (R-PROJ-2, R-REPORT-2).
+/// Nothing is written, and no lock is taken.
+pub(crate) fn load_todo_doc(todo_path: &Path) -> Result<(OpsConfig, Document)> {
     let label = file_label(todo_path);
     let cfg = OpsConfig::load_next_to(todo_path)?;
     let bytes = match fs::read(fs_path(todo_path).as_ref()) {
@@ -179,6 +192,12 @@ fn measure(todo_path: &Path, now: DateTime<FixedOffset>) -> Result<Figures> {
                 .with_line(problem.line),
         );
     }
+    Ok((cfg, doc))
+}
+
+/// Counts the figures of the `TODO.md` at `todo_path` (see [`load_todo_doc`] for what is refused).
+fn measure(todo_path: &Path, now: DateTime<FixedOffset>) -> Result<Figures> {
+    let (cfg, doc) = load_todo_doc(todo_path)?;
 
     let mut tasks = TaskCounts::default();
     let mut milestones = MilestoneCount::default();
