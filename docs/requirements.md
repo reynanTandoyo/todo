@@ -257,7 +257,8 @@ by task commands; only the format and tool lines are kept up to date (R-VER-1, R
 - **R-READ-4 MUST** Every read command supports `--json` (R-OUT-1).
 - **R-READ-5 SHOULD** `summary` prints a session-start overview of at most 40 lines: tasks per
   status; open tasks per priority; claimed tasks with owner and age, stale ones marked; blocked
-  tasks with their latest reason; the next five ready tasks; open questions; and a warning if the
+  tasks with the reason of their latest `blocked — <reason>` note (the same reason the HTML report
+  shows, R-REPORT-1; `docs/format.md` §9); the next five ready tasks; open questions; and a warning if the
   file was edited outside the tool. From v0.6 it also shows the top-level milestones that are open or blocked, with
   progress (R-MILE-3), milestones ready to close (R-MILE-6), the number of ideas apart from open
   tasks (R-KIND-1), and a line naming `todo migrate --yes` while project files are out of date
@@ -416,7 +417,9 @@ or with `--json` the task as it is after the change.
   `UNKNOWN_SECTION`, `AMBIGUOUS_SECTION`, `MISSING_FIELD`, `BAD_VALUE`, `BUSY`, `LEASE_HELD`,
   `CHANGED_DURING_WRITE`, `UNSAFE_FILE`, `READ_ONLY`, `WRITE_FAILED`, `NO_GIT_HISTORY`,
   `TOOL_TOO_OLD` (R-VER-2), `DUPLICATE_PROJECT` (R-PROJ-1). New codes may be added; existing ones
-  never change meaning.
+  never change meaning. Each code always exits with the same code: the table in `docs/json.md`
+  gives it, `todo schema` reports it, and a test checks both. `BAD_VALUE` exits 1, as R-WRITE-18 and
+  R-MILE-1 say for an invalid value.
 - **R-OUT-4 MUST** Problems in the file are reported as `TODO.md:123: message`.
 - **R-OUT-5 MUST** Results go to standard output, warnings and errors to standard error (with
   `--json`, see R-OUT-1). Messages are plain English.
@@ -455,6 +458,7 @@ or with `--json` the task as it is after the change.
   committed; outside git, `.todo/` next to `TODO.md`, containing a `.gitignore` with `*`.
 - **R-HIST-2 SHOULD** Before each write, the old file is saved as a numbered snapshot, with an index
   line giving number, time, agent, command and hash. The newest 200 are kept (`snapshots_keep`).
+  A write refused because `TODO.md` is read-only (R-IO-5) saves no snapshot.
   `history` lists them, `diff <n> [<m>]` shows what changed, and `restore <n> --yes` puts one back
   under the lock; the restore takes its own snapshot first, so it can be undone too.
 - **R-HIST-3 SHOULD** After each write, the tool records the file's hash. If the next command finds

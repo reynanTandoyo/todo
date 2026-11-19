@@ -8,7 +8,9 @@ use std::time::Duration;
 
 use tempfile::TempDir;
 
-use common::{git, parse_json, read_text, setup_proj, stderr_text, stdout_text};
+#[cfg(feature = "test-hooks")]
+use common::read_text;
+use common::{git, parse_json, setup_proj, stderr_text, stdout_text};
 
 const LEASE_BODY: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->
 # Lease tests

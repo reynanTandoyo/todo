@@ -304,7 +304,7 @@ the output for a fixture with one open task:
     "claimed": [
       { "id": "T-002", "title": "Work", "owner": "alice", "claimed": "2026-11-15T18:00+01:00", "age_hours": 2, "stale": false }
     ],
-    "blocked": [{ "id": "T-004", "title": "Wait", "reason": "blocked — waiting on key" }],
+    "blocked": [{ "id": "T-004", "title": "Wait", "reason": "waiting on key" }],
     "next_ready": [{ "id": "T-001", "title": "First", "priority": "P0", "section": "Tasks" }],
     "open_questions": [{ "id": "T-007", "title": "Ship today?", "status": "open" }]
   },
@@ -876,12 +876,12 @@ project's `TODO.md`, never searches folders and writes nothing.
 | `AMBIGUOUS` | 1 | Title substring matched multiple tasks | `{"code":"AMBIGUOUS","message":"\"retry\" matched 2 tasks","candidates":["T-001","T-002"]}` |
 | `ALREADY_CLAIMED` | 1 | Task is already claimed by another agent | `{"code":"ALREADY_CLAIMED","message":"T-012 is claimed by bob","owner":"bob","task":"T-012"}` |
 | `NOT_OWNER` | 1 | Task or lease belongs to another agent without `--force` | `{"code":"NOT_OWNER","message":"T-012 is owned by bob; pass --force","owner":"bob","task":"T-012"}` |
-| `BAD_TRANSITION` | 1 | Disallowed status transition (e.g. `done` on `open`) | `{"code":"BAD_TRANSITION","message":"cannot mark open task T-012 done without claiming"}` |
+| `BAD_TRANSITION` | 1 | Disallowed status transition (R-WRITE-9; e.g. `unblock` on an open task) | `{"code":"BAD_TRANSITION","message":"cannot unblock task T-012 while status is open; allowed from open: claim, block, done, drop","task":"T-012"}` |
 | `DUPLICATE_TITLE` | 1 | `add` title matches an existing task | `{"code":"DUPLICATE_TITLE","message":"task with title \"Setup\" already exists"}` |
 | `UNKNOWN_SECTION` | 1 | Named `--section` does not exist | `{"code":"UNKNOWN_SECTION","message":"section \"Foo\" not found"}` |
-| `AMBIGUOUS_SECTION` | 1 | Multiple sections exist and `--section` was omitted | `{"code":"AMBIGUOUS_SECTION","message":"multiple sections exist; pass --section"}` |
+| `AMBIGUOUS_SECTION` | 1 | A `--section` name matches more than one section | `{"code":"AMBIGUOUS_SECTION","message":"section 'Next' is ambiguous (matches: Next steps, Next release); available sections: Next steps, Next release"}` |
 | `MISSING_FIELD` | 1 | Required field (e.g. `priority`) missing on `add` | `{"code":"MISSING_FIELD","message":"missing required field: priority"}` |
-| `BAD_VALUE` | 2 (1 for `check`) | Invalid field, config, snapshot number, or `check` failure | `{"code":"BAD_VALUE","message":"invalid priority \"P9\""}` |
+| `BAD_VALUE` | 1 | Invalid field, config, snapshot number, or `check` failure (refused by a rule: R-WRITE-18, R-MILE-1) | `{"code":"BAD_VALUE","message":"invalid priority \"P9\""}` |
 | `BUSY` | 3 | Write lock held by another process past wait timeout | `{"code":"BUSY","message":"write lock busy: held by agent bob","owner":"bob"}` |
 | `LEASE_HELD` | 3 | Manual editing lease held by another agent | `{"code":"LEASE_HELD","message":"manual lease held by alice until ...","owner":"alice"}` |
 | `CHANGED_DURING_WRITE` | 3 | Target file changed on disk between read and replace | `{"code":"CHANGED_DURING_WRITE","message":"TODO.md changed on disk during write"}` |

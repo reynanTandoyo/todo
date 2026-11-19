@@ -2,6 +2,7 @@
 
 mod common;
 
+#[cfg(feature = "test-hooks")]
 use common::{parse_json, read_text, stderr_text};
 
 use std::time::Duration;

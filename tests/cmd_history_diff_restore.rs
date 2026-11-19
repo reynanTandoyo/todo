@@ -1,11 +1,12 @@
 mod common;
 
 use std::fs;
+use std::path::Path;
 
 use serde_json::Value;
 use tempfile::TempDir;
 
-use common::{parse_json, read_todo, run_in, stderr_text, stdout_text, write_todo};
+use common::{parse_json, read_todo, run_in, set_read_only, stderr_text, stdout_text, write_todo};
 
 const SAMPLE_TODO: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
@@ -118,4 +119,52 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
     assert!(undo_out.status.success());
     let after_undo = read_todo(dir.path());
     assert_eq!(after_undo, before_preview);
+}
+
+/// The number of snapshots `todo history` lists for `dir` (`R-HIST-2`).
+fn snapshot_count(dir: &Path) -> u64 {
+    let out = run_in(dir, &["history", "--json", "--agent", "bob"]);
+    assert!(out.status.success(), "{}", stderr_text(&out));
+    parse_json(&out.stdout)["data"]["count"]
+        .as_u64()
+        .expect("snapshot count")
+}
+
+#[test]
+fn a_write_refused_for_a_read_only_todo_md_saves_no_snapshot() {
+    let dir = TempDir::new().expect("tempdir");
+    write_todo(dir.path(), SAMPLE_TODO);
+    // A first write, so that the history already holds a snapshot to compare against.
+    let first = run_in(dir.path(), &["note", "T-001", "first", "--agent", "bob"]);
+    assert!(first.status.success(), "{}", stderr_text(&first));
+    let before = snapshot_count(dir.path());
+    assert!(before >= 1);
+
+    let todo = dir.path().join("TODO.md");
+    let todo_before = read_todo(dir.path());
+    set_read_only(&todo, true);
+    let refused = run_in(dir.path(), &["note", "T-001", "refused", "--agent", "bob"]);
+    set_read_only(&todo, false);
+
+    assert_eq!(refused.status.code(), Some(4), "{}", stderr_text(&refused));
+    assert!(stderr_text(&refused).contains("read-only"));
+    assert_eq!(snapshot_count(dir.path()), before);
+    assert_eq!(read_todo(dir.path()), todo_before);
+}
+
+#[test]
+fn writes_refused_for_a_read_only_todo_md_save_no_snapshot_when_there_is_no_history_yet() {
+    let dir = TempDir::new().expect("tempdir");
+    write_todo(dir.path(), SAMPLE_TODO);
+    let todo = dir.path().join("TODO.md");
+    set_read_only(&todo, true);
+    // A write that changes text, and a migration of the format 1 file, are both refused.
+    let note = run_in(dir.path(), &["note", "T-001", "refused", "--agent", "bob"]);
+    let migrate = run_in(dir.path(), &["migrate", "--yes", "--agent", "bob"]);
+    set_read_only(&todo, false);
+
+    for out in [&note, &migrate] {
+        assert_eq!(out.status.code(), Some(4), "{}", stderr_text(out));
+    }
+    assert_eq!(snapshot_count(dir.path()), 0);
 }

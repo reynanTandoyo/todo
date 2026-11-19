@@ -18,11 +18,13 @@
 //! - [`migrate`]: the ordered format migrations that a write applies to a file in an older format
 //!   (R-MIG-1).
 //! - [`tree`]: the kinds of entry and the milestone tree (`docs/format.md` §16, §17).
+//! - [`reason`]: the reason a task is blocked or dropped, read from its notes (T-140).
 
 pub mod id;
 pub mod lines;
 pub mod migrate;
 pub mod parser;
+pub mod reason;
 pub mod stamp;
 pub mod tree;
 pub mod verify;
@@ -44,6 +46,7 @@ pub use parser::{
     TASK_HEADING_SEPARATORS, Task, ToolStamp, agent_names_equal, canonical_field_rank,
     inspect_problems, is_nobody_owner, is_valid_agent_name, strip_section_number,
 };
+pub use reason::NO_REASON;
 pub use stamp::{stamp_bytes, tool_line_text};
 pub use tree::{EntryKind, MilestoneIndex, Progress};
 pub use verify::{AppliedDocEdits, TaskChangeIntent, verify_task_edits};

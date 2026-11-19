@@ -11,12 +11,12 @@ use std::path::Path;
 
 use chrono::{DateTime, FixedOffset};
 
-use crate::doc::{Document, EntryKind, Progress, Status};
+use crate::doc::{Document, EntryKind, NO_REASON, Progress, Status};
 use crate::error::Result;
 use crate::ops::{file_label, read_optional_archive};
 use crate::register::Project;
 use crate::register::overview::{ProblemJson, TaskCounts, load_todo_doc};
-use crate::report::model::{Page, build_page, generated_text, reason_for};
+use crate::report::model::{Page, build_page, generated_text};
 
 /// The page for every registered project, in the order they were added.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -189,7 +189,8 @@ fn card_of(doc: &Document, page: &Page) -> Card {
         .map(|t| BlockedRow {
             id: doc.id_config.format_id(t.id),
             title: t.title.clone(),
-            reason: reason_for(t, "blocked"),
+            // The reason the single-project page and `summary` show (T-140; `Task::blocked_reason`).
+            reason: t.blocked_reason().unwrap_or(NO_REASON).to_string(),
         })
         .collect();
     let questions = page
