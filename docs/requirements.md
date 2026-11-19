@@ -470,7 +470,8 @@ or with `--json` the task as it is after the change.
 - **R-CHECK-1 SHOULD** `check` reports, as `file:line: message`: everything that blocks writing
   (format.md §13); duplicate IDs; unknown statuses; repeated fields; a claimed task without owner or
   claim time; an open task with an owner; headings that look like tasks but don't parse; the
-  dependency problems of R-DEP-3; stale claims; blocked tasks without a reason note; values outside
+  dependency problems of R-DEP-3; stale claims; blocked tasks without a `blocked — <reason>` note
+  (the reason R-READ-5 and R-REPORT-1 show; T-142); values outside
   the configured lists; leftover temporary files; an outdated rules block (R-AGENT-3). Exit 0 if
   clean, 1 if anything was found.
 - **R-CHECK-2 COULD** `check --fix` makes mechanical repairs only — canonical IDs and separators, a
@@ -570,7 +571,9 @@ or with `--json` the task as it is after the change.
   when the target exists) and writes nothing.
   - Only top-level checkbox lines (`- [ ]`, `- [~]`, `- [!]`, `- [x]`) under `##` sections become
     tasks. Checkboxes in the preamble, in code fences, or indented stay as text.
-  - Mark to status: space = open, `~` = claimed, `!` = blocked, `x` = done.
+  - Mark to status: space = open, `~` = claimed, `!` = blocked, `x` = done. A blocked task without a
+    block-reason note (`blocked — <reason>`, `docs/format.md` §9) gets the note
+    `blocked — imported from a checkbox list`, so `check` finds a reason (T-142).
   - Title: the bold part (`**…**`) if present, otherwise the text before ` — `. The rest of the line
     goes into a `description` field. Trailing `(added: agent, date)`, `(claimed: agent, date)` and
     `(done: agent, date[, commit])` become the added note; owner and claim time; and the done note

@@ -171,6 +171,19 @@ fn converted_fields_follow_the_rules() {
     assert!(text.contains("  - see also the notes in the old tracker\n"));
     // Added note; done note with and without commit.
     assert!(text.contains("- note (2026-11-01, coordinator): added\n"));
+    // Blocked: `added` is not a block reason, so the import puts the checkbox list's reason on the
+    // line after it (T-142). The first `added` note of 2026-11-01 is the blocked task's.
+    let added = text
+        .find("- note (2026-11-01, coordinator): added\n")
+        .expect("the blocked task's added note");
+    let next_line = text[added..]
+        .lines()
+        .nth(1)
+        .expect("a line after the added note");
+    assert!(
+        next_line.ends_with("): blocked — imported from a checkbox list"),
+        "{next_line}"
+    );
     assert!(text.contains("- commit: abc1234\n"));
     assert!(text.contains("- note (2026-11-05, agent-doc-1): done\n"));
     assert!(text.contains("### T-005 · Tidy the build scripts\n- status: done\n- owner: —\n- description: no commit known\n- note (2026-11-06, agent-build): done\n"));

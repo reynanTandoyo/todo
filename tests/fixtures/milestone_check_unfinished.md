@@ -34,7 +34,7 @@
 - owner: —
 - priority: P2
 - milestone: T-004
-- note (2026-11-18, planner): waiting for the other piece of work
+- note (2026-11-18, planner): blocked — waiting for the other piece of work
 
 ### T-006 · Finished task under a dropped milestone
 - status: done

@@ -39,12 +39,14 @@ impl Task {
         self.notes
             .iter()
             .rev()
-            .find_map(|note| reason_in_note(&note.text, keyword))
+            .find_map(|note| reason_in_text(&note.text, keyword))
     }
 }
 
-/// The reason in one note's text, when its state word is `keyword` and it gives a non-empty reason.
-fn reason_in_note<'a>(text: &'a str, keyword: &str) -> Option<&'a str> {
+/// The reason in the text of one note (the words after `- note (date, agent): `), when its state
+/// word is `keyword` and it gives a non-empty reason. The state word is the first word of the text
+/// before the dash.
+pub fn reason_in_text<'a>(text: &'a str, keyword: &str) -> Option<&'a str> {
     let (words, reason) = text.trim().split_once(DASH)?;
     let words = words.trim();
     let names_state = words == keyword
