@@ -416,7 +416,9 @@ or with `--json` the task as it is after the change.
   `UNKNOWN_SECTION`, `AMBIGUOUS_SECTION`, `MISSING_FIELD`, `BAD_VALUE`, `BUSY`, `LEASE_HELD`,
   `CHANGED_DURING_WRITE`, `UNSAFE_FILE`, `READ_ONLY`, `WRITE_FAILED`, `NO_GIT_HISTORY`,
   `TOOL_TOO_OLD` (R-VER-2), `DUPLICATE_PROJECT` (R-PROJ-1). New codes may be added; existing ones
-  never change meaning.
+  never change meaning. Each code always exits with the same code: the table in `docs/json.md`
+  gives it, `todo schema` reports it, and a test checks both. `BAD_VALUE` exits 1, as R-WRITE-18 and
+  R-MILE-1 say for an invalid value.
 - **R-OUT-4 MUST** Problems in the file are reported as `TODO.md:123: message`.
 - **R-OUT-5 MUST** Results go to standard output, warnings and errors to standard error (with
   `--json`, see R-OUT-1). Messages are plain English.
