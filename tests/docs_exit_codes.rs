@@ -134,6 +134,17 @@ const AMBIGUOUS_BODY: &str = "\
 - priority: P2
 ";
 
+/// Two sections, `Now` and `Later`, with no `default_section` in `todo.toml`.
+const TWO_SECTIONS_BODY: &str = "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 2 -->
+# Fixture
+
+## Now
+
+## Later
+";
+
 /// Two sections that the name `Next` matches, so `--section Next` is ambiguous (`AMBIGUOUS_SECTION`).
 const TWO_NEXT_BODY: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
@@ -300,6 +311,24 @@ const ERROR_CASES: &[ErrorCase] = &[
             "P2",
             "--section",
             "Nowhere",
+        ],
+    },
+    // Without --section, in a file with several sections and no default_section, add refuses with
+    // UNKNOWN_SECTION too (R-WRITE-1).
+    ErrorCase {
+        code: "UNKNOWN_SECTION",
+        todo: Some(TWO_SECTIONS_BODY),
+        config: None,
+        setup: Setup::Plain,
+        before: &[],
+        args: &[
+            "--agent",
+            "alice",
+            "add",
+            "--title",
+            "Second task",
+            "--priority",
+            "P2",
         ],
     },
     ErrorCase {

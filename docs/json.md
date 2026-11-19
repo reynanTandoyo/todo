@@ -877,7 +877,7 @@ project's `TODO.md`, never searches folders and writes nothing.
 | `NOT_OWNER` | 1 | Task or lease belongs to another agent without `--force` | `{"code":"NOT_OWNER","message":"T-012 is owned by bob; pass --force","owner":"bob","task":"T-012"}` |
 | `BAD_TRANSITION` | 1 | Disallowed status transition (R-WRITE-9; e.g. `unblock` on an open task) | `{"code":"BAD_TRANSITION","message":"cannot unblock task T-012 while status is open; allowed from open: claim, block, done, drop","task":"T-012"}` |
 | `DUPLICATE_TITLE` | 1 | `add` title matches an existing task | `{"code":"DUPLICATE_TITLE","message":"task with title \"Setup\" already exists"}` |
-| `UNKNOWN_SECTION` | 1 | Named `--section` does not exist | `{"code":"UNKNOWN_SECTION","message":"section \"Foo\" not found"}` |
+| `UNKNOWN_SECTION` | 1 | Named `--section` does not exist, or `add` has no `--section` while the file has several sections and no `default_section` (R-WRITE-1) | `{"code":"UNKNOWN_SECTION","message":"multiple sections exist; pass --section <name>. Available sections: Now, Later"}` |
 | `AMBIGUOUS_SECTION` | 1 | A `--section` name matches more than one section | `{"code":"AMBIGUOUS_SECTION","message":"section 'Next' is ambiguous (matches: Next steps, Next release); available sections: Next steps, Next release"}` |
 | `MISSING_FIELD` | 1 | Required field (e.g. `priority`) missing on `add` | `{"code":"MISSING_FIELD","message":"missing required field: priority"}` |
 | `BAD_VALUE` | 1 | Invalid field, config, snapshot number, or `check` failure (refused by a rule: R-WRITE-18, R-MILE-1) | `{"code":"BAD_VALUE","message":"invalid priority \"P9\""}` |
