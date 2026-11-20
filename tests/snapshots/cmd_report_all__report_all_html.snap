@@ -406,6 +406,15 @@ section.project > h2 {
 <li><span class="n">2</span> done</li>
 <li><span class="n">1</span> dropped</li>
 </ul>
+<h4>Open tasks per level</h4>
+<ul class="areas levels">
+<li><span>1</span><span class="count">0</span></li>
+<li><span>2</span><span class="count">0</span></li>
+<li><span>3</span><span class="count">0</span></li>
+<li><span>4</span><span class="count">0</span></li>
+<li><span>5</span><span class="count">0</span></li>
+<li><span class="muted">no level</span><span class="count">3</span></li>
+</ul>
 <h4>Top-level milestones</h4>
 <ul class="card-list">
 <li><a href="#p1-e-T-010">T-010 · Develop the renderer</a> <progress value="1" max="2">1 of 2 done</progress><span class="progress-text">1 of 2 done</span></li>
@@ -430,6 +439,15 @@ section.project > h2 {
 <li><span class="n">0</span> done</li>
 <li><span class="n">0</span> dropped</li>
 </ul>
+<h4>Open tasks per level</h4>
+<ul class="areas levels">
+<li><span>1</span><span class="count">0</span></li>
+<li><span>2</span><span class="count">0</span></li>
+<li><span>3</span><span class="count">0</span></li>
+<li><span>4</span><span class="count">0</span></li>
+<li><span>5</span><span class="count">0</span></li>
+<li><span class="muted">no level</span><span class="count">2</span></li>
+</ul>
 <h4>Top-level milestones</h4>
 <ul class="card-list">
 <li><a href="#p2-e-T-010">T-010 · Light the room</a> <progress value="0" max="1">0 of 1 done</progress><span class="progress-text">0 of 1 done</span></li>
@@ -447,6 +465,28 @@ section.project > h2 {
 <section class="project" id="p1">
 <h2>renderer</h2>
 <p class="path"><renderer>/TODO.md</p>
+<section id="p1-planning">
+<h3>Planning</h3>
+<p class="hint">What the planner still has to do. The target level is 1: a task at or below it needs complete detail before a worker is handed it.</p>
+<h4>Open tasks per level</h4>
+<p class="hint">Open, claimed or blocked tasks, counted by their level.</p>
+<ul class="areas levels">
+<li><span>1</span><span class="count">0</span></li>
+<li><span>2</span><span class="count">0</span></li>
+<li><span>3</span><span class="count">0</span></li>
+<li><span>4</span><span class="count">0</span></li>
+<li><span>5</span><span class="count">0</span></li>
+<li><span class="muted">no level</span><span class="count">3</span></li>
+</ul>
+<h4>Not ready for lack of detail (0)</h4>
+<p class="empty">Every task at or below the target level has its detail.</p>
+<h4>Given back to the planner (0)</h4>
+<p class="empty">Nothing given back.</p>
+<h4>Kept above the target level on purpose (0)</h4>
+<p class="empty">Nothing kept above the target level.</p>
+<h4>Waves</h4>
+<p class="empty">No unfinished task, so no waves.</p>
+</section>
 <section id="p1-work">
 <h3>Work</h3>
 <p class="hint">Milestones with their goal and progress. The tasks below a milestone are indented under it. Open a task to see its fields and notes.</p>
@@ -490,6 +530,12 @@ section.project > h2 {
 <details>
 <summary><span class="id">T-012</span><span class="title">C shader</span><span class="chip" title="priority">P1</span><span class="chip" title="area">gpu</span><span class="chip">claimed by alice, 60345 h</span><span class="chip stale">stale</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>none</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>claimed</dd>
 <dt>owner</dt><dd>alice</dd>
@@ -510,6 +556,12 @@ section.project > h2 {
 <details>
 <summary><span class="id">T-013</span><span class="title">Compute pass</span><span class="chip" title="priority">P2</span><span class="chip" title="area">gpu</span><span class="reason">blocked: waiting for the vendor driver</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>none</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>blocked</dd>
 <dt>owner</dt><dd>—</dd>
@@ -527,6 +579,12 @@ section.project > h2 {
 <details>
 <summary><span class="id">T-014</span><span class="title">Ship lighting</span><span class="chip" title="priority">P2</span><span class="chip" title="area">docs</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>none</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>open</dd>
 <dt>owner</dt><dd>—</dd>
@@ -580,6 +638,12 @@ section.project > h2 {
 <details>
 <summary><span class="kind-label">task</span> <span class="id">T-001</span><span class="title">Setup</span><span class="chip" title="priority">P1</span><span class="chip" title="area">docs</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>none</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>done</dd>
 <dt>owner</dt><dd>—</dd>
@@ -610,6 +674,12 @@ section.project > h2 {
 <details>
 <summary><span class="kind-label">task</span> <span class="id">T-021</span><span class="title">Mix the sound</span><span class="chip" title="priority">P2</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>none</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>done</dd>
 <dt>owner</dt><dd>—</dd>
@@ -631,6 +701,12 @@ section.project > h2 {
 <details>
 <summary><span class="kind-label">task</span> <span class="id">T-015</span><span class="title">Old idea</span><span class="chip" title="priority">P3</span><span class="reason dropped">dropped: superseded by T-012</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>none</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>dropped</dd>
 <dt>owner</dt><dd>—</dd>
@@ -664,6 +740,28 @@ section.project > h2 {
 <section class="project" id="p2">
 <h2>lamp room</h2>
 <p class="path"><lamp room>/TODO.md</p>
+<section id="p2-planning">
+<h3>Planning</h3>
+<p class="hint">What the planner still has to do. The target level is 1: a task at or below it needs complete detail before a worker is handed it.</p>
+<h4>Open tasks per level</h4>
+<p class="hint">Open, claimed or blocked tasks, counted by their level.</p>
+<ul class="areas levels">
+<li><span>1</span><span class="count">0</span></li>
+<li><span>2</span><span class="count">0</span></li>
+<li><span>3</span><span class="count">0</span></li>
+<li><span>4</span><span class="count">0</span></li>
+<li><span>5</span><span class="count">0</span></li>
+<li><span class="muted">no level</span><span class="count">2</span></li>
+</ul>
+<h4>Not ready for lack of detail (0)</h4>
+<p class="empty">Every task at or below the target level has its detail.</p>
+<h4>Given back to the planner (0)</h4>
+<p class="empty">Nothing given back.</p>
+<h4>Kept above the target level on purpose (0)</h4>
+<p class="empty">Nothing kept above the target level.</p>
+<h4>Waves</h4>
+<p class="empty">No unfinished task, so no waves.</p>
+</section>
 <section id="p2-work">
 <h3>Work</h3>
 <p class="hint">Milestones with their goal and progress. The tasks below a milestone are indented under it. Open a task to see its fields and notes.</p>
@@ -689,6 +787,12 @@ section.project > h2 {
 <details>
 <summary><span class="id">T-001</span><span class="title">Trim the wick</span><span class="chip" title="priority">P1</span><span class="chip" title="area">ui</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>none</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>open</dd>
 <dt>owner</dt><dd>—</dd>
@@ -723,6 +827,12 @@ section.project > h2 {
 <details>
 <summary><span class="id">T-002</span><span class="title">Polish the glass</span><span class="chip" title="priority">P2</span><span class="chip" title="area">ui</span><span class="reason">blocked: waiting for the glass supplier</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>none</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>blocked</dd>
 <dt>owner</dt><dd>—</dd>

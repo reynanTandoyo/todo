@@ -400,9 +400,32 @@ section.project > h2 {
 <li><span class="n">2</span> done</li>
 <li><span class="n">2</span> dropped</li>
 </ul>
-<nav class="jump" aria-label="Sections"><a href="#work">Work</a><a href="#areas">Areas</a><a href="#questions">Questions</a><a href="#ideas">Ideas</a><a href="#done">Done</a><a href="#dropped">Dropped</a></nav>
+<nav class="jump" aria-label="Sections"><a href="#planning">Planning</a><a href="#work">Work</a><a href="#areas">Areas</a><a href="#questions">Questions</a><a href="#ideas">Ideas</a><a href="#done">Done</a><a href="#dropped">Dropped</a></nav>
 </header>
 <main>
+<section id="planning">
+<h2>Planning</h2>
+<p class="hint">What the planner still has to do. The target level is 1: a task at or below it needs complete detail before a worker is handed it.</p>
+<h3>Open tasks per level</h3>
+<p class="hint">Open, claimed or blocked tasks, counted by their level.</p>
+<ul class="areas levels">
+<li><span>1</span><span class="count">0</span></li>
+<li><span>2</span><span class="count">0</span></li>
+<li><span>3</span><span class="count">0</span></li>
+<li><span>4</span><span class="count">0</span></li>
+<li><span>5</span><span class="count">0</span></li>
+<li><span class="muted">no level</span><span class="count">1</span></li>
+<li><span class="muted">level not configured</span><span class="count">4</span></li>
+</ul>
+<h3>Not ready for lack of detail (0)</h3>
+<p class="empty">Every task at or below the target level has its detail.</p>
+<h3>Given back to the planner (0)</h3>
+<p class="empty">Nothing given back.</p>
+<h3>Kept above the target level on purpose (0)</h3>
+<p class="empty">Nothing kept above the target level.</p>
+<h3>Waves</h3>
+<p>1 wave in all. Wave 1 holds 3 tasks in 3 lanes.</p>
+</section>
 <section id="work">
 <h2>Work</h2>
 <p class="hint">Milestones with their goal and progress. The tasks below a milestone are indented under it. Open a task to see its fields and notes.</p>
@@ -446,6 +469,12 @@ section.project > h2 {
 <details>
 <summary><span class="id">T-003</span><span class="title">C shader</span><span class="chip" title="priority">P1</span><span class="chip" title="difficulty">medium</span><span class="chip" title="area">ui</span><span class="chip">claimed by alice, 2 h</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>medium</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>claimed</dd>
 <dt>owner</dt><dd>alice</dd>
@@ -463,6 +492,12 @@ section.project > h2 {
 <details>
 <summary><span class="id">T-006</span><span class="title">Shadow maps</span><span class="chip" title="priority">P2</span><span class="chip" title="difficulty">hard</span><span class="chip" title="area">ui</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>hard</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>open</dd>
 <dt>owner</dt><dd>—</dd>
@@ -481,6 +516,12 @@ section.project > h2 {
 <details>
 <summary><span class="id">T-004</span><span class="title">GPU compiler</span><span class="chip" title="priority">P2</span><span class="chip" title="difficulty">hard</span><span class="chip" title="area">gpu</span><span class="reason">blocked: the vendor driver crashes on the test scene</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>hard</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>blocked</dd>
 <dt>owner</dt><dd>—</dd>
@@ -501,6 +542,12 @@ section.project > h2 {
 <details>
 <summary><span class="id">T-005</span><span class="title">Write the docs</span><span class="chip" title="priority">P2</span><span class="chip" title="area">docs</span><span class="chip">claimed by carol, 216 h</span><span class="chip stale">stale</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>none</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>claimed</dd>
 <dt>owner</dt><dd>carol</dd>
@@ -516,6 +563,12 @@ section.project > h2 {
 <details>
 <summary><span class="id">T-015</span><span class="title">Ship the demo</span><span class="chip" title="priority">P1</span><span class="chip" title="difficulty">medium</span><span class="chip" title="area">docs</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>medium</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>open</dd>
 <dt>owner</dt><dd>—</dd>
@@ -616,6 +669,12 @@ section.project > h2 {
 <details>
 <summary><span class="kind-label">task</span> <span class="id">T-011</span><span class="title">Set up the test scene</span><span class="chip" title="priority">P1</span><span class="chip" title="difficulty">easy</span><span class="chip" title="area">ui</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>easy</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>done</dd>
 <dt>owner</dt><dd>—</dd>
@@ -633,6 +692,12 @@ section.project > h2 {
 <details>
 <summary><span class="kind-label">task</span> <span class="id">T-012</span><span class="title">Pick the colour palette</span><span class="chip" title="priority">P3</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>none</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>done</dd>
 <dt>owner</dt><dd>—</dd>
@@ -655,6 +720,12 @@ section.project > h2 {
 <details>
 <summary><span class="kind-label">task</span> <span class="id">T-013</span><span class="title">Old shader</span><span class="chip" title="priority">P2</span><span class="reason dropped">dropped: replaced by the C shader</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>none</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>dropped</dd>
 <dt>owner</dt><dd>—</dd>
@@ -672,6 +743,12 @@ section.project > h2 {
 <details>
 <summary><span class="kind-label">task</span> <span class="id">T-014</span><span class="title">Legacy light path</span><span class="chip" title="priority">P2</span><span class="reason dropped">dropped: the scene no longer needs it</span></summary>
 <div class="more">
+<dl class="fields facts">
+<dt>Level</dt><dd>none</dd>
+<dt>Files</dt><dd>none listed; the task may change any file</dd>
+<dt>Verify</dt><dd>none</dd>
+<dt>Verified</dt><dd>no check to run</dd>
+</dl>
 <dl class="fields">
 <dt>status</dt><dd>dropped</dd>
 <dt>owner</dt><dd>—</dd>

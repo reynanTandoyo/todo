@@ -1026,8 +1026,9 @@ for it, never automatically.
   - A snapshot test uses two invented projects.
 - **R-REPORT-3 COULD** From v0.8 the report shows the planning state (R-LEVEL-2, R-WAVE-1), so the
   owner sees how far the planner is and where workers failed.
-  - Each project page shows the open tasks per level (R-LEVEL-1); how many tasks are not ready for
-    lack of detail (R-DETAIL-2); the tasks given back (R-STUCK-1), each with its problem and its
+  - Each project page shows the open tasks per level (R-LEVEL-1), counted as the areas count open
+    work (open, claimed or blocked tasks), with those without a level counted apart; how many tasks
+    are not ready for lack of detail (R-DETAIL-2); the tasks given back (R-STUCK-1), each with its problem and its
     `attempts`; the tasks kept above the target level, each with the reason of its `final` line
     (R-LEVEL-3); and the number of waves and the size of wave 1 (R-WAVE-1).
   - A task, when opened, shows its level, its `files` and its `verify` command, and whether it was
@@ -1149,6 +1150,9 @@ todo next --claim --max-difficulty 1 --brief --agent worker-1
   - Done, dropped and claimed entries, milestones, ideas and questions are left out, apart from
     the done tasks of group 6. A task in groups 2 to 4 is listed whether or not its dependencies
     are finished.
+  - Each task is listed in the first group it fits, in the order above, so no task is in two
+    groups: a task given back is group 1 even when it is above the target. Group 6 is not listed
+    while `verify = false`, as `check` does not list it (R-VERIFY-2).
   - With `<milestone>` only entries below that milestone, at any depth, are listed; a task that is
     not a milestone is refused (exit 1, `BAD_VALUE`), as for `list --milestone` (R-MILE-3).
   - `target_difficulty` must be one of `difficulties`; anything else is a `todo.toml` error (R-CFG-2).

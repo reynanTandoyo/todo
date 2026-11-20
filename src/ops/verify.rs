@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::json;
 
-use crate::doc::Task;
+use crate::doc::{Status, Task};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::OpsConfig;
 use crate::process_tree::ProcessTree;
@@ -52,6 +52,14 @@ pub enum CheckOutcome {
         /// Plain-English reason, for the error message.
         reason: String,
     },
+}
+
+/// Whether `task` is a done task whose `verify` command has not passed yet (`R-VERIFY-2`): it has a
+/// `verify` command and no `verified` line. `verify --wave` runs these, and `check` and `plan` list
+/// them; the one rule is here so that they cannot disagree.
+#[must_use]
+pub fn awaits_verified(task: &Task) -> bool {
+    task.status == Status::Done && task.verify.is_some() && task.field_value("verified").is_none()
 }
 
 /// The log file of one task's check: `<state folder>/verify/<ID>.log` (`R-VERIFY-1`).

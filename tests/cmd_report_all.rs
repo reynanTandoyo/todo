@@ -723,3 +723,64 @@ fn archived_entries_are_listed_under_their_own_project() {
             .contains("Archived done task")
     );
 }
+
+#[test]
+fn a_card_shows_the_open_tasks_per_level_as_the_project_page_does() {
+    let body = "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 3 -->
+# Card levels
+
+## Work
+
+### T-001 · Level one
+- status: open
+- owner: —
+- priority: P1 · difficulty: 1
+
+### T-002 · Level one, claimed
+- status: claimed
+- owner: alice
+- claimed: 2026-11-20T09:00+01:00
+- priority: P1 · difficulty: 1
+
+### T-003 · Level two
+- status: open
+- owner: —
+- priority: P2 · difficulty: 2
+
+### T-004 · Without a level
+- status: open
+- owner: —
+- priority: P2
+
+### T-005 · Finished at level one
+- status: done
+- owner: alice
+- priority: P2 · difficulty: 1
+- commit: 1a2b3c4d
+- note (2026-11-20, alice): done
+";
+    let world = world();
+    let file = project_file(&world, "levels", body);
+    register(&world, &file, "levels");
+    assert_eq!(report_all(&world, &world.root, &[]).status.code(), Some(0));
+    let html = default_html(&world);
+    let card = card_of(&html, "levels");
+
+    // Two unfinished tasks at level 1 (one claimed), one at level 2, one without a level; the finished
+    // task is not counted, as on the project page (R-REPORT-2, R-REPORT-3).
+    assert!(card.contains("<h4>Open tasks per level</h4>"), "{card}");
+    assert!(
+        card.contains("<li><span>1</span><span class=\"count\">2</span></li>"),
+        "{card}"
+    );
+    assert!(
+        card.contains("<li><span>2</span><span class=\"count\">1</span></li>"),
+        "{card}"
+    );
+    assert!(
+        card.contains("<span class=\"muted\">no level</span><span class=\"count\">1</span>"),
+        "{card}"
+    );
+}

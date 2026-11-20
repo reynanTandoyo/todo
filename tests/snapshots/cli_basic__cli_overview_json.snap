@@ -166,6 +166,11 @@ expression: ok_json
         "summary": "Show every registered project on one line: tasks, milestones, stale claims, open questions"
       },
       {
+        "kind": "read",
+        "name": "plan",
+        "summary": "List what the planner still has to give back, split, detail, level or check"
+      },
+      {
         "kind": "meta",
         "name": "project",
         "summary": "Add, remove or list the projects in the per-user project register"

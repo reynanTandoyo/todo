@@ -147,15 +147,18 @@ todo report --html --out "$env:USERPROFILE\Desktop\tasks.html"
 todo report --html --all
 ```
 
-`todo report --html` writes one read-only page: the work as a tree of milestones with their goals
-and progress, the unfinished tasks per area, open questions, ideas, and the done and dropped entries.
+`todo report --html` writes one read-only page: the planning state (open tasks per level, tasks not
+ready for lack of detail, tasks given back with their attempts, tasks kept above the target level,
+and the waves), the work as a tree of milestones with their goals and progress, the unfinished tasks
+per area, open questions, ideas, and the done and dropped entries. An opened task shows its level,
+files, check and whether the check passed.
 It prints the path of `report.html` in the state folder, which git never sees. It takes no lock,
 never changes `TODO.md`, and needs no network. `--out` writes the page elsewhere, and `--open` opens
 it with the system's default program for HTML files.
 
 `todo report --html --all` writes one page for every project in the project register (see
-`todo project list`): a card per project with its task counts, top-level milestones, blocked tasks
-and open questions, then each project's lists. It prints the path of `report-all.html` next to the
+`todo project list`): a card per project with its task counts, open tasks per level, top-level
+milestones, blocked tasks and open questions, then each project's lists. It prints the path of `report-all.html` next to the
 register. A project that is gone or cannot be read shows its problem instead of its lists.
 
 ### Adding and editing tasks
