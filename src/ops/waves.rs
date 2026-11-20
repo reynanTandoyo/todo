@@ -15,7 +15,7 @@ use std::collections::{HashMap, VecDeque};
 use crate::doc::{DependencyRef, Document, EntryKind, Status, Task, TaskId};
 use crate::find::fs_path;
 use crate::ops::config::OpsConfig;
-use crate::ops::read::{about_id, is_question, lacks_level, milestone_holds_back};
+use crate::ops::read::{about_id, is_question, level_problem, milestone_holds_back};
 use crate::ops::scope::{ScopeEntry, overlap_lanes, parse_files, raw_entries, strip_line_suffix};
 
 /// One wave: the tasks that become ready in round `number`, grouped into lanes. Each lane lists its
@@ -74,12 +74,14 @@ impl WavePlan<'_> {
 ///
 /// With `milestone`, only the tasks below it are shown. The whole file is still scheduled, so the
 /// wave numbers are those of the whole file, and the longest chain is the one that ends at the
-/// milestone's last task; it may run through tasks outside the milestone.
+/// milestone's last task; it may run through tasks outside the milestone. `cfg` gives the configured
+/// levels: a task without a usable level is held back with its reason (`R-LEVEL-1`).
 #[must_use]
 pub fn plan_waves<'a>(
     doc: &'a Document,
     archive: Option<&Document>,
     milestone: Option<TaskId>,
+    cfg: &OpsConfig,
 ) -> WavePlan<'a> {
     let label = |id: TaskId| doc.id_config.format_id(id);
     // Every unfinished task and milestone is a node, in file order.
@@ -126,12 +128,9 @@ pub fn plan_waves<'a>(
                 }
                 deps.extend(above.depends.iter());
             }
-            // A task without a level is held back as `next` holds it back (R-LEVEL-1).
-            if own.is_none() && lacks_level(node) {
-                own = Some(format!(
-                    "no level: give it one with todo set {} --difficulty <level>",
-                    label(node.id)
-                ));
+            // A task without a usable level is held back as `next` holds it back (R-LEVEL-1).
+            if own.is_none() {
+                own = level_problem(node, cfg);
             }
         }
         reason[i] = own;

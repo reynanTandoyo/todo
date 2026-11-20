@@ -10,7 +10,7 @@ use crate::doc::{
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::config::OpsConfig;
-use crate::ops::read::is_task_ready;
+use crate::ops::read::{is_task_ready, lacks_level};
 use crate::ops::scope::files_busy;
 
 /// Parsed `--status` filter for `todo list` (`R-READ-1`).
@@ -342,8 +342,8 @@ pub fn select_next_task<'a>(
         if task.kind() != EntryKind::Task {
             return false;
         }
-        // Not even the task an agent already holds is handed out without a level (R-LEVEL-1).
-        if task.difficulty.is_none() {
+        // Not even the task an agent already holds is handed out without a usable level (R-LEVEL-1).
+        if lacks_level(task, cfg) {
             return false;
         }
         if let Some(ref allowed_sections) = section_matches {

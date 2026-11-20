@@ -313,7 +313,7 @@ the output for a fixture with one open task:
       "claimed": null,
       "stale": false,
       "priority": "P1",
-      "difficulty": "easy",
+      "difficulty": "2",
       "type": "feature",
       "area": "cli",
       "goal": null,
@@ -489,9 +489,10 @@ in any wave: the most workers useful at once.
 `blocked: …` or `given back: …` (`todo stuck`), `below blocked milestone T-…`, `below done milestone
 T-…` or `below dropped milestone T-…` (the milestone above the task that holds it back, `R-MILE-6`),
 `depends on T-…, which does not exist`, `in a dependency cycle: T-… -> T-… -> T-…`, `no level: give it one with
-todo set T-… --difficulty <level>` (`R-LEVEL-1`, the rule of `next`) or `waits on T-…`.
+todo set T-… --difficulty <level>` (`R-LEVEL-1`, the rule of `next`), `level 9 is not configured (configured: 1, 2, …); give it
+one with todo set T-… --difficulty <level>` for a difficulty that is not configured, or `waits on T-…`.
 
-`level` is the task's difficulty as written; a task without one is in `apart`, not in a wave. `missing`
+`level` is the task's difficulty as written; a task without a usable level is in `apart`, not in a wave. `missing`
 lists what the task lacks for the detail rule at the lowest level (`R-DETAIL-2`): `why`, `accept`,
 `steps`, `verify`, `files`, `files: more than 3` or `files: folder or pattern`. It is `[]` when the
 task has all of it, and when it is at another level. A task with a missing item is still placed in
@@ -523,7 +524,7 @@ first group it fits, so no task is in two groups. The example holds one task in 
       { "id": "T-002", "title": "Load the config", "level": "1", "missing": ["accept", "steps", "verify", "files"] }
     ],
     "without_level": [
-      { "id": "T-004", "title": "Write the notes", "priority": "P2", "status": "open" }
+      { "id": "T-004", "title": "Write the notes", "priority": "P2", "status": "open", "reason": "no level: give it one with todo set T-004 --difficulty <level>" }
     ],
     "kept_on_purpose": [
       { "id": "T-005", "title": "Shader design", "level": "3", "reason": "the design is open" }
@@ -540,7 +541,8 @@ first group it fits, so no task is in two groups. The example holds one task in 
   of the task, both `null` when unset.
 - `to_split` lists the tasks above the target level, hardest level first; `to_detail` the tasks at
   or below it that are not ready for lack of detail, with what is `missing` (`R-DETAIL-2`).
-- `without_level` lists the tasks without a difficulty.
+- `without_level` lists the tasks without a usable level: no difficulty, or one that is not one of
+  the configured `difficulties` (`R-LEVEL-1`). `reason` says which, and how to give the task a level.
 - `kept_on_purpose` and `unverified` are counted apart: they do not change the exit code.
   `kept_on_purpose` holds the tasks kept above the target with `final` (`R-LEVEL-3`); `unverified`
   the done tasks with a `verify` command and no `verified` line (`R-VERIFY-2`), and it is `[]`
