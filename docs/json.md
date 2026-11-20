@@ -378,6 +378,64 @@ ones only for the whole tree (no milestone argument and no `--area`); otherwise 
 }
 ```
 
+### `todo waves --json` (`todo.waves.v1`, `R-WAVE-1`)
+
+```json
+{
+  "schema": "todo.waves.v1",
+  "ok": true,
+  "data": {
+    "file": "TODO.md",
+    "milestone": null,
+    "tasks": 3,
+    "wave_count": 2,
+    "max_workers": 1,
+    "longest_chain": [
+      { "id": "T-001", "title": "Parse the config", "status": "open", "owner": null, "level": "1", "missing": [] },
+      { "id": "T-002", "title": "Load the config", "status": "open", "owner": null, "level": "2", "missing": [] }
+    ],
+    "waves": [
+      {
+        "wave": 1,
+        "size": { "tasks": 1, "lanes": 1 },
+        "lanes": [[{ "id": "T-001", "title": "Parse the config", "status": "open", "owner": null, "level": "1", "missing": [] }]]
+      },
+      {
+        "wave": 2,
+        "size": { "tasks": 1, "lanes": 1 },
+        "lanes": [[{ "id": "T-002", "title": "Load the config", "status": "open", "owner": null, "level": "2", "missing": [] }]]
+      }
+    ],
+    "apart": [
+      { "id": "T-003", "title": "Blocked for now", "status": "blocked", "reason": "blocked: waiting for the key" }
+    ]
+  },
+  "warnings": []
+}
+```
+
+`waves` (`R-WAVE-1`) groups the unfinished tasks (open and claimed) into waves: wave 1 holds every
+task that is ready now, and wave `n` the tasks that become ready when the waves before it are done.
+Each wave lists its `lanes`, and the tasks of one lane share files, so they run one after another.
+`size` gives the `tasks` and `lanes` of the wave. `wave_count` is the number of waves, which is the
+length of `longest_chain`, the longest dependency chain task by task. `max_workers` is the most lanes
+in any wave: the most workers useful at once.
+
+`apart` lists the unfinished tasks that are in no wave, in file order, each with its `reason`:
+`blocked: …` or `given back: …` (`todo stuck`), `below blocked milestone T-…`, `below done milestone
+T-…` or `below dropped milestone T-…` (the milestone above the task that holds it back, `R-MILE-6`),
+`depends on T-…, which does not exist`, `in a dependency cycle: T-… -> T-… -> T-…`, `no level: give it one with
+todo set T-… --difficulty <level>` (`R-LEVEL-1`, the rule of `next`) or `waits on T-…`.
+
+`level` is the task's difficulty as written; a task without one is in `apart`, not in a wave. `missing`
+lists what the task lacks for the detail rule at the lowest level (`R-DETAIL-2`): `why`, `accept`,
+`steps`, `verify`, `files`, `files: more than 3` or `files: folder or pattern`. It is `[]` when the
+task has all of it, and when it is at another level. A task with a missing item is still placed in
+its wave.
+
+`todo waves <milestone>` limits `tasks`, the waves and `apart` to the tasks below the milestone;
+`milestone` then holds its ID, and `null` otherwise. The wave numbers are those of the whole file.
+
 ### `todo where --json` (`todo.where.v1`)
 
 ```json

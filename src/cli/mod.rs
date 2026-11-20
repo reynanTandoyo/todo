@@ -621,6 +621,7 @@ register_commands! {
     Unblock => unblock,
     Unlock => unlock,
     Verify => verify,
+    Waves => waves,
     Where => where_cmd,
 }
 

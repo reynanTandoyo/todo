@@ -629,3 +629,60 @@ fn report_example_in_json_md_has_the_keys_of_report_json() {
     assert_eq!(example["schema"], real["schema"]);
     assert_same_keys(&example["data"], &real["data"], "report --html --json");
 }
+
+/// Fixture for the `waves` example: one task per wave, and one blocked task apart (T-163).
+const WAVES_FIXTURE: &str = "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 3 -->
+# Waves example
+
+## Work
+
+### T-001 · Parse the config
+- status: open
+- owner: —
+- priority: P1
+- difficulty: 1
+- files: src/config.rs
+- why: the loader needs the values
+- accept: the tests pass
+- steps:
+  1. open the parser
+- verify: cargo test config
+
+### T-002 · Load the config
+- status: open
+- owner: —
+- priority: P1
+- difficulty: 2
+- files: src/config.rs
+- depends: T-001
+
+### T-003 · Blocked for now
+- status: blocked
+- owner: —
+- priority: P2
+- difficulty: 3
+- note (2026-11-20, bob): blocked — waiting for the key
+";
+
+#[test]
+fn waves_example_in_json_md_has_the_keys_of_waves_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo waves --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(dir.path().join("TODO.md"), WAVES_FIXTURE).expect("write TODO.md");
+    // The levels of the example, set in todo.toml so the example does not depend on the defaults.
+    fs::write(
+        dir.path().join("todo.toml"),
+        "difficulties = [\"1\", \"2\", \"3\", \"4\", \"5\"]\n",
+    )
+    .expect("write todo.toml");
+    let out = run_in(dir.path(), &["waves", "--json"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "waves --json");
+}
