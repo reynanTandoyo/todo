@@ -53,6 +53,8 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
             "New task",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--section",
             "Backlog",
             "--agent",
@@ -80,6 +82,8 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
             "New task",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--section",
             "Next",
             "--agent",
@@ -106,6 +110,8 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
             "New task",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--agent",
             "alice",
         ],
@@ -125,6 +131,8 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
             "existing open",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--section",
             "Now",
             "--agent",
@@ -168,6 +176,8 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
             "Bad prio",
             "--priority",
             "P9",
+            "--difficulty",
+            "3",
             "--section",
             "Now",
             "--agent",
@@ -193,6 +203,8 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
             "Already finished",
             "--priority",
             "p0",
+            "--difficulty",
+            "3",
             "--type",
             "bug",
             "--area",
@@ -226,7 +238,7 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
             "### T-006 · Already finished\n\
 - status: open\n\
 - owner: —\n\
-- priority: P0 · type: bug · area: cli\n\
+- priority: P0 · difficulty: 3 · type: bug · area: cli\n\
 - depends: T-001\n\
 - files: src/cli/add.rs\n\
 - problem: broken\n\
@@ -257,6 +269,8 @@ fn add_sections_fields_duplicates_and_monotonic_ids() {
             "After manual delete",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--section",
             "Now",
             "--agent",
@@ -304,6 +318,8 @@ fn twenty_parallel_adds_lose_nothing_and_get_distinct_ids() {
                     &title,
                     "--priority",
                     "P1",
+                    "--difficulty",
+                    "3",
                     "--agent",
                     &agent,
                 ],

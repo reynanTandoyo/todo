@@ -194,7 +194,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             let existing_archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
             // TODO.md is migrated in this write when it is in an older format (R-MIG-1). The
             // archive is migrated where it is written below.
-            let migrated_todo = migrate_for_write(&parsed, &label)?;
+            let migrated_todo = migrate_for_write(&parsed, &label, &cfg)?;
             let doc = migrated_todo.as_ref().map_or(&parsed, |m| &m.doc);
             let now = current_time();
             let plan = plan_archive(doc, args.older_than, now);
@@ -558,7 +558,7 @@ fn build_updated_archive(
         let _ = validate_utf8(&snap.bytes, &cfg.archive_file)?;
         let parsed = parse_doc_for_write(&snap.bytes, &cfg.archive_file, cfg)?;
         // An archive in an older format is migrated in the same write (R-MIG-1).
-        let arch_doc = match migrate_for_write(&parsed, &cfg.archive_file)? {
+        let arch_doc = match migrate_for_write(&parsed, &cfg.archive_file, cfg)? {
             Some(migrated) => {
                 archive_migration = Some((migrated.from, migrated.to));
                 migrated.doc

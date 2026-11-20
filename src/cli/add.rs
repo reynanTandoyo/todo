@@ -24,10 +24,10 @@ pub const META: CommandMeta = CommandMeta {
     name: "add",
     summary: "Add a new task to a section",
     kind: CommandKind::Write,
-    details: "Adds a new task at the end of the target section using the next monotonic task ID across `TODO.md`, `TODO-archive.md`, and `ids.json`. Refuses duplicate titles among active tasks, missing required fields (default `priority`), and unknown or ambiguous sections.",
+    details: "Adds a new task at the end of the target section using the next monotonic task ID across `TODO.md`, `TODO-archive.md`, and `ids.json`. Refuses duplicate titles among active tasks, missing required fields (default `priority` and `difficulty` for a task; a milestone, question or idea needs neither), and unknown or ambiguous sections.",
     examples: &[
-        "todo add --title \"Fix login timeout\" --priority P1 --section Now --agent agent-1",
-        "todo add --title \"Add metrics\" --priority P2 --type feature --area cli --agent coordinator",
+        "todo add --title \"Fix login timeout\" --priority P1 --difficulty 2 --section Now --agent agent-1",
+        "todo add --title \"Add metrics\" --priority P2 --difficulty 3 --type feature --area cli --agent coordinator",
     ],
 };
 
@@ -50,7 +50,7 @@ pub struct Args {
     #[arg(long, value_name = "VALUE")]
     pub priority: Option<String>,
 
-    /// How hard the task is: one of the configured `difficulties` (default `easy`, `medium`, `hard`).
+    /// The task's level, one of the configured `difficulties` (default `1` to `5`; `todo help add`).
     #[arg(long, value_name = "VALUE")]
     pub difficulty: Option<String>,
 
@@ -131,18 +131,20 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let (found, cfg) = ctx.load_config_with_found()?;
 
     // Validate priority, type, area, and required fields before taking the lock.
-    let priority_val = resolve_priority(args.priority.as_deref(), &extra_fields, &cfg)?;
-    let difficulty_val = resolve_allowed(
-        "difficulty",
-        args.difficulty.as_deref(),
-        &extra_fields,
-        &cfg.difficulties,
-    )?;
     let type_val = resolve_allowed(
         "type",
         args.task_type.as_deref(),
         &extra_fields,
         &cfg.types,
+    )?;
+    let required = required_for_kind(&cfg.required_fields, type_val.as_deref());
+    let priority_val =
+        resolve_priority(args.priority.as_deref(), &extra_fields, &cfg, required)?;
+    let difficulty_val = resolve_allowed(
+        "difficulty",
+        args.difficulty.as_deref(),
+        &extra_fields,
+        &cfg.difficulties,
     )?;
     let area_val = resolve_allowed("area", args.area.as_deref(), &extra_fields, &cfg.areas)?;
     let milestone_val = resolve_opt(args.milestone.as_deref(), &extra_fields, "milestone");
@@ -165,7 +167,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let fix_val = resolve_opt(fix_arg.as_deref(), &extra_fields, "fix");
     let accept_val = resolve_opt(accept_arg.as_deref(), &extra_fields, "accept");
     check_required_fields(
-        &cfg.required_fields,
+        required,
         RequiredValues {
             priority: priority_val.as_deref(),
             difficulty: difficulty_val.as_deref(),
@@ -329,10 +331,21 @@ fn resolve_opt(
     if clean.is_empty() { None } else { Some(clean) }
 }
 
+/// The required fields that apply to an entry of this `type`: `required_fields` for a task, and none
+/// for a milestone, question or idea, which need neither a priority nor a level (R-LEVEL-1).
+fn required_for_kind<'a>(required_fields: &'a [String], task_type: Option<&str>) -> &'a [String] {
+    if EntryKind::from_type(task_type) == EntryKind::Task {
+        required_fields
+    } else {
+        &[]
+    }
+}
+
 fn resolve_priority(
     flag: Option<&str>,
     extra: &[(String, String)],
     cfg: &OpsConfig,
+    required: &[String],
 ) -> Result<Option<String>> {
     let raw = resolve_opt(flag, extra, "priority");
     match raw {
@@ -353,8 +366,7 @@ fn resolve_priority(
             Ok(Some(canonical.clone()))
         }
         None => {
-            if cfg
-                .required_fields
+            if required
                 .iter()
                 .any(|f| f.eq_ignore_ascii_case("priority"))
             {
@@ -408,11 +420,11 @@ struct RequiredValues<'a> {
 }
 
 fn check_required_fields(
-    required_fields: &[String],
+    required: &[String],
     values: RequiredValues<'_>,
     extra: &[(String, String)],
 ) -> Result<()> {
-    for req in required_fields {
+    for req in required {
         let present = match req.to_ascii_lowercase().as_str() {
             "priority" => values.priority.is_some(),
             "difficulty" => values.difficulty.is_some(),
@@ -768,14 +780,15 @@ pub(crate) fn add_batch_text(
             extra.push((key, sanitize_trimmed_value(&v)));
         }
 
-        let priority = resolve_priority(parsed.priority.as_deref(), &extra, &cfg)?;
+        let task_type = resolve_allowed("type", parsed.task_type.as_deref(), &extra, &cfg.types)?;
+        let required = required_for_kind(&cfg.required_fields, task_type.as_deref());
+        let priority = resolve_priority(parsed.priority.as_deref(), &extra, &cfg, required)?;
         let difficulty = resolve_allowed(
             "difficulty",
             parsed.difficulty.as_deref(),
             &extra,
             &cfg.difficulties,
         )?;
-        let task_type = resolve_allowed("type", parsed.task_type.as_deref(), &extra, &cfg.types)?;
         let area = resolve_allowed("area", parsed.area.as_deref(), &extra, &cfg.areas)?;
         let parent = parsed
             .milestone
@@ -853,7 +866,7 @@ pub(crate) fn add_batch_text(
             Some(depends_tokens.join(", "))
         };
         check_required_fields(
-            &cfg.required_fields,
+            required,
             RequiredValues {
                 priority: priority.as_deref(),
                 difficulty: difficulty.as_deref(),

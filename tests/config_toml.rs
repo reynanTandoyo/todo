@@ -17,7 +17,7 @@ fn all_fifteen_keys_parse_and_have_expected_defaults() {
     assert_eq!(def.id_config.prefix, "T");
     assert_eq!(def.id_config.width, 3);
     assert_eq!(def.priorities, vec!["P0", "P1", "P2", "P3"]);
-    assert_eq!(def.required_fields, vec!["priority"]);
+    assert_eq!(def.required_fields, vec!["priority", "difficulty"]);
     assert!(def.types.is_empty());
     assert!(def.areas.is_empty());
     assert_eq!(def.default_section, None);
@@ -148,6 +148,8 @@ lease_max_minutes = 15
             "Missing type",
             "--priority",
             "HIGH",
+            "--difficulty",
+            "3",
             "--area",
             "cli",
         ])
@@ -166,6 +168,8 @@ lease_max_minutes = 15
             "Bad type",
             "--priority",
             "HIGH",
+            "--difficulty",
+            "3",
             "--type",
             "chore",
             "--area",
@@ -186,6 +190,8 @@ lease_max_minutes = 15
             "Bad area",
             "--priority",
             "HIGH",
+            "--difficulty",
+            "3",
             "--type",
             "bug",
             "--area",
@@ -207,6 +213,8 @@ lease_max_minutes = 15
             "Valid task",
             "--priority",
             "HIGH",
+            "--difficulty",
+            "3",
             "--type",
             "bug",
             "--area",

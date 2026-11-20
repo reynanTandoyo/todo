@@ -20,7 +20,7 @@ const FIXTURE: &str = "\
 ### T-001 · Open task
 - status: open
 - owner: —
-- priority: P1
+- priority: P1 · difficulty: 2
 
 ### T-002 · Claimed task
 - status: claimed
@@ -60,6 +60,8 @@ fn dry_run_prints_diff_and_leaves_file_byte_identical_across_all_write_commands(
             "New task",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--section",
             "Tasks",
         ],
@@ -118,6 +120,8 @@ fn dry_run_prints_diff_and_leaves_file_byte_identical_across_all_write_commands(
             "Dry JSON",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--section",
             "Tasks",
         ])

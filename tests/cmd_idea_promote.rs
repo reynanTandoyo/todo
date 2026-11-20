@@ -82,7 +82,7 @@ fn work_only() -> String {
 ### T-001 · Draw the test scene
 - status: open
 - owner: —
-- priority: P1
+- priority: P1 · difficulty: 2
 - type: feature
 - note (2026-11-15, planner): added
 "
@@ -233,13 +233,13 @@ fn summary_counts_ideas_apart_from_open_work() {
 ### T-001 · Draw the test scene
 - status: open
 - owner: —
-- priority: P1
+- priority: P1 · difficulty: 2
 - type: feature
 
 ### T-002 · Light the scene
 - status: open
 - owner: —
-- priority: P1
+- priority: P1 · difficulty: 2
 
 ### T-003 · Old task
 - status: done
@@ -343,7 +343,12 @@ fn promote_turns_an_idea_into_a_task_with_a_note() {
         p.text()
     );
 
-    // It is now ordinary work: `next` hands it out first, as the only P0 task.
+    // `promote` takes no level, so the task has none until one is set, and `next` hands out only
+    // leveled tasks (R-LEVEL-1). Once it has one it is ordinary work: `next` hands it out first.
+    let (_, json) = p.run_json("alice", &["next"]);
+    assert_eq!(json["data"]["task"]["id"], "T-001", "{json}");
+    let set = p.run("alice", &["set", "T-002", "--difficulty", "2"]);
+    assert_eq!(set.status.code(), Some(0), "stderr: {}", stderr_text(&set));
     let (_, json) = p.run_json("alice", &["next"]);
     assert_eq!(json["data"]["task"]["id"], "T-002", "{json}");
 }

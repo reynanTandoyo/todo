@@ -178,7 +178,7 @@ const CONFLICT_BODY: &str = "\
 
 const NEWER_BODY: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
-<!-- todo-format: 3 -->
+<!-- todo-format: 4 -->
 <!-- todo-tool: 0.9.0 -->
 # Newer
 
@@ -197,6 +197,8 @@ const ADD_SECOND_TASK: &[&str] = &[
     "Second task",
     "--priority",
     "P2",
+    "--difficulty",
+    "3",
     "--section",
     "Now",
 ];
@@ -224,6 +226,8 @@ const ERROR_CASES: &[ErrorCase] = &[
             "Second task",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--section",
             "Now",
         ],
@@ -291,6 +295,8 @@ const ERROR_CASES: &[ErrorCase] = &[
             "First task",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--section",
             "Now",
         ],
@@ -309,6 +315,8 @@ const ERROR_CASES: &[ErrorCase] = &[
             "Second task",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--section",
             "Nowhere",
         ],
@@ -329,6 +337,8 @@ const ERROR_CASES: &[ErrorCase] = &[
             "Second task",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
         ],
     },
     ErrorCase {
@@ -345,6 +355,8 @@ const ERROR_CASES: &[ErrorCase] = &[
             "Second task",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--section",
             "Next",
         ],
@@ -407,6 +419,8 @@ const ERROR_CASES: &[ErrorCase] = &[
             "Second task",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--section",
             "Now",
         ],

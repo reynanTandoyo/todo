@@ -15,17 +15,17 @@ const BODY: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->\n
 ### T-001 · First\n\
 - status: open\n\
 - owner: —\n\
-- priority: P1\n\
+- priority: P1 · difficulty: 2\n\
 \n\
 ### T-002 · Second\n\
 - status: open\n\
 - owner: —\n\
-- priority: P2\n\
+- priority: P2 · difficulty: 2\n\
 \n\
 ### T-003 · Third\n\
 - status: open\n\
 - owner: —\n\
-- priority: P2\n";
+- priority: P2 · difficulty: 2\n";
 
 fn todo(home: &Path, work: &Path, args: &[&str], env: &[(&str, &str)]) -> Output {
     run_todo(home, work, args, env).unwrap()
@@ -83,7 +83,11 @@ fn claim_writes_session_from_flag_then_todo_session_then_claude_variable() {
         assert_eq!(lines[2], "- owner: alice", "{block}");
         assert!(lines[3].starts_with("- claimed: "), "{block}");
         assert_eq!(lines[4], format!("- session: {session}"), "{block}");
-        assert_eq!(lines[5], format!("- priority: {prio}"), "{block}");
+        assert_eq!(
+            lines[5],
+            format!("- priority: {prio} · difficulty: 2"),
+            "{block}"
+        );
     }
 
     // The JSON of a task shows the session under `fields`.

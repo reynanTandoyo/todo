@@ -169,9 +169,14 @@ fn list_mine_stale_and_ready_filters_work() {
     // T-001 claimed at 09:30+01:00; T-002 open depends on T-001; T-006 open question.
     // Add T-007 open ready task and T-008 open task depending on archived T-099.
     let mut text = fs::read_to_string("tests/fixtures/clean_basic.md").unwrap();
+    // T-001 has a level here: `list --ready` lists only leveled tasks (R-LEVEL-1).
+    text = text.replace(
+        "- priority: P0 · type: chore",
+        "- priority: P0 · difficulty: 2 · type: chore",
+    );
     text.push_str(
-        "\n### T-007 · Ready open task\n- status: open\n- owner: —\n- priority: P1\n\
-         \n### T-008 · Depends on archived task\n- status: open\n- owner: —\n- depends: T-099\n",
+        "\n### T-007 · Ready open task\n- status: open\n- owner: —\n- priority: P1 · difficulty: 2\n\
+         \n### T-008 · Depends on archived task\n- status: open\n- owner: —\n- difficulty: 2\n- depends: T-099\n",
     );
     fs::write(work.join("TODO.md"), text).unwrap();
     fs::write(

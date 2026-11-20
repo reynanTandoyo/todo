@@ -48,7 +48,7 @@ fn preview_prints_converted_text_and_writes_nothing() {
     );
     assert!(out.status.success(), "{out:?}");
     let stdout = String::from_utf8(out.stdout).unwrap();
-    assert!(stdout.starts_with("<!-- todo-format: 2 -->"), "{stdout}");
+    assert!(stdout.starts_with("<!-- todo-format: 3 -->"), "{stdout}");
     assert!(stdout.contains("### T-001 · Add export"));
     let stderr = String::from_utf8(out.stderr).unwrap();
     assert!(
@@ -324,6 +324,6 @@ fn last_line_without_ending_stays_without_ending() {
     assert!(text.ends_with("- note (2026-11-01, bob): done"), "{text:?}");
     let stamp = format!("<!-- todo-tool: {} -->", env!("CARGO_PKG_VERSION"));
     assert!(text.starts_with(&format!(
-        "<!-- todo-format: 2 -->\n{stamp}\n# T\n## A\n\n### T-001 · One\n"
+        "<!-- todo-format: 3 -->\n{stamp}\n# T\n## A\n\n### T-001 · One\n"
     )));
 }
