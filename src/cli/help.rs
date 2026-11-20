@@ -14,8 +14,8 @@ pub const META: CommandMeta = CommandMeta {
     name: "help",
     summary: "Show overview or detailed help for a command",
     kind: CommandKind::Meta,
-    details: "Without a topic, lists all available commands. With a command name, shows its description and usage examples. Use `todo help agents` to print the agent rules.",
-    examples: &["todo help", "todo help help", "todo help agents"],
+    details: "Without a topic, lists all available commands. With a command name, shows its description and usage examples. `todo help agents` prints the common agent rules; `todo help worker` and `todo help planner` print the rules of each role (R-AGENT-1).",
+    examples: &["todo help", "todo help help", "todo help agents", "todo help worker", "todo help planner"],
 };
 
 /// Arguments for `todo help`.
@@ -88,22 +88,30 @@ const fn kind_label(kind: CommandKind) -> &'static str {
     }
 }
 
+/// Prints one rules text as `todo help <topic>` does: the text, or with `--json` the topic and the
+/// text (`R-AGENT-1`).
+fn emit_rules_topic(out: &mut Output, topic: &'static str, text: &'static str) {
+    if out.is_json() {
+        out.emit_json_ok("help", &HelpAgentsJson { topic, rules: text });
+    } else {
+        out.write_str(text);
+    }
+}
+
 /// Runs `todo help [topic]`.
 pub fn run(args: Args, _ctx: &Context, out: &mut Output) -> Result<()> {
     match args.topic.as_deref() {
         None => print_overview(out, "help"),
         Some(topic) if topic.eq_ignore_ascii_case("agents") => {
-            if out.is_json() {
-                out.emit_json_ok(
-                    "help",
-                    &HelpAgentsJson {
-                        topic: "agents",
-                        rules: crate::agents::RULES_TEXT,
-                    },
-                );
-            } else {
-                out.write_str(crate::agents::RULES_TEXT);
-            }
+            emit_rules_topic(out, "agents", crate::agents::RULES_TEXT);
+            Ok(())
+        }
+        Some(topic) if topic.eq_ignore_ascii_case("worker") => {
+            emit_rules_topic(out, "worker", crate::agents::WORKER_TEXT);
+            Ok(())
+        }
+        Some(topic) if topic.eq_ignore_ascii_case("planner") => {
+            emit_rules_topic(out, "planner", crate::agents::PLANNER_TEXT);
             Ok(())
         }
         Some(topic) if topic.eq_ignore_ascii_case("update") => {

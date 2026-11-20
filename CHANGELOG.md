@@ -4,6 +4,84 @@ All notable changes to `todo` are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-20
+
+The file format is version 3. todo 0.8 writes it, and todo 0.7 can no longer write such a file: it
+refuses the file with `TOOL_TOO_OLD` and names `todo help update`. A `TODO.md` in version 2 is
+migrated by the first write of todo 0.8, or by `todo migrate --yes` (format.md §18). Read commands
+read every older version and never write.
+
+### Added
+- Levels `1` to `5` for every task, and the planner's list: `todo plan` shows, in six groups, what
+  the planner still has to give back, split, detail, level or check. It exits 0 only when the first
+  four groups are empty (`R-LEVEL-2`).
+- The ready rule: a task at or below the target level (`target_difficulty`, by default the lowest
+  level) is handed out only when its detail is complete: `why`, `accept`, `steps`, `verify`, `files`
+  (at most `level1_max_files`, no folder and no pattern), every `read` path that exists, and no open
+  question about it. A task whose difficulty is not configured is held back like a task without one
+  (`R-DETAIL-2`, `R-LEVEL-1`).
+- The detail fields `steps`, `read` and `verify`, set with `todo set`, `todo add` and `apply`.
+- `todo split <task> --from <file|->` turns a task into a milestone with child tasks, all or nothing.
+- `todo stuck <task> --note <problem>` gives a claimed task back to the planner; `todo plan` lists it
+  first. `attempts` counts how often it happened.
+- `final` (`set --final <reason>`) keeps a task above the target level on purpose.
+- `todo brief <task>` and `todo next --claim --brief` print one work order for a worker, with the
+  milestone goals, the files to read and to change, the steps, the `verify` command and the finish
+  commands (`R-DETAIL-3`). `next --max-difficulty` limits what is handed out.
+- Verify: `done` runs a task's `verify` command before it marks the task done; a failure refuses it
+  (`VERIFY_FAILED`), and after `verify_attempts` failures the task is given back. With
+  `verify_when = "wave"`, `todo verify --wave` runs the checks of a finished wave. A timeout
+  (`verify_timeout_seconds`) stops the command and every process it started. `verify = false` turns
+  the checks off (`R-VERIFY-1`, `R-VERIFY-2`).
+- Commit scope: `done --commit` refuses a commit that changed files outside the task's `files`
+  (`OUT_OF_SCOPE`); `--force` finishes it and notes the files (`R-SCOPE-2`).
+- File scopes in one checkout: `next` never hands out a task whose `files` overlap a task another
+  agent holds, and `claim` refuses it (`FILES_BUSY`, `R-SCOPE-1`).
+- `todo waves` groups the unfinished tasks into waves and lanes, and reports the most workers useful
+  at once and the longest dependency chain (`R-WAVE-1`).
+- Rules by role: `todo help worker` (at most ten lines) and `todo help planner`; the common rules
+  that `todo help agents`, `AGENTS.md`, `TODO.md` and the skill carry are at most fifteen lines.
+- `todo.toml` settings `target_difficulty`, `level1_max_files`, `verify`, `verify_when`,
+  `verify_timeout_seconds`, `verify_attempts` and `verify_shell`.
+- Performance tests for `next`, `plan`, `waves`, `brief` and the file scopes on a 5,000-task milestone
+  tree.
+- `todo report --html` shows the planning state (`R-REPORT-3`): open tasks per level, tasks not ready for
+  lack of detail, tasks given back with their attempts, tasks kept above the target level with the reason of
+  their `final`, and the waves. An opened task shows its level, files, verify command and whether it passed.
+
+### Changed
+- Format 3. The default `difficulties` are `1` to `5` (they were `easy`, `medium` and `hard`), and
+  `required_fields` defaults to `priority` and `difficulty` (it was `priority`), so `add` needs a level.
+- The format 2 to 3 migration rewrites the old difficulty names when `todo.toml` sets no
+  `difficulties` of its own: `easy` to `2`, `medium` to `3` and `hard` to `4`. Done and dropped
+  entries keep their old values. Open tasks without a difficulty are left for `todo plan`.
+- `summary` prints the planner's line with the counts that `plan` works down.
+- The agent rules are split by role (`R-AGENT-1`). Milestones, ideas, questions, `migrate` and
+  `update` moved from the common rules to the planner's text.
+- The process tree of a `verify` command is stopped with `libc` (Unix) and `windows-sys` (Windows), which
+  are now direct dependencies in the target where each is used; both were already in `Cargo.lock` (NFR-9, T-172).
+
+### Fixed
+- T-167: the merge driver no longer conflicts when a `steps` change sits next to another field's change.
+- T-168: `summary`'s next-ready list leaves out tasks whose files another agent holds.
+- T-169: `promote` and `apply` refuse a task without a level, instead of making one that `next` never hands out.
+- T-170: `done` no longer reports as newly ready a task whose files another agent holds.
+- T-171: `waves` no longer places a task below a done or dropped milestone, which `next` never hands out.
+- T-172: a verify timeout stops the whole process tree the command started, not only the shell.
+- T-173: `apply` with `done` runs the task's verify command, so the task has a passed check.
+- T-174: `apply` checks a done commit against the task's files, as `done` does.
+- T-175: `apply` writes a done commit's hash, as `done` does, instead of `HEAD`.
+- T-176: the decision for T-172 (see the process-tree note under Changed).
+- T-177: `attempts` and `verified` are read as typed fields, not as unknown fields.
+- T-178: `set --goal` with a separator on a combined priority line no longer corrupts the line.
+- T-179: `set --priority` refuses a value that is not a configured priority, as `add` does.
+- T-180: the README lists every `todo.toml` key with its default.
+- T-181: a task whose difficulty is set but not configured is held back like a task without a level, and `plan` lists it with the reason.
+- T-182: `waves` looks up lane files directly; the 5,000-task milestone tree takes well under the 100 ms budget.
+- T-183: `next` computes each ready task's sort key and file scope once, for the same tree.
+- T-184: the report pages are about 29% smaller: the facts block of each task is shorter, so an all-projects
+  page of many entries is no longer as large.
+
 ## [0.7.0] - 2026-11-19
 
 The file format stays version 2: todo 0.7 reads and writes the same `TODO.md` as 0.6, and no

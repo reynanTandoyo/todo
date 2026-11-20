@@ -109,6 +109,8 @@ $env:TODO_AGENT = "agent-1"
 todo
 todo help claim
 todo help agents
+todo help worker
+todo help planner
 todo help update
 todo --version
 ```
@@ -246,9 +248,12 @@ A `TODO.md` written by todo 0.6 starts with two lines:
 <!-- todo-tool: 0.6.0 -->
 ```
 
-- The **format line** is the file format version. Version 2 (todo 0.6 and later) adds milestones, the
-  kinds of entry and the `why`, `difficulty`, `milestone`, `about` and `goal` fields; version 1 was
-  written by todo 0.1 to 0.5 (`docs/format.md` §18).
+- The **format line** is the file format version. Version 3 (todo 0.8 and later) adds the levels `1`
+  to `5` as the default `difficulties`, the detail fields `steps`, `read` and `verify`, `final`,
+  `attempts` and `verified`, and `files` as a list of paths and patterns. Version 2 (todo 0.6 and 0.7)
+  adds milestones, the kinds of entry and the `why`, `difficulty`, `milestone`, `about` and `goal`
+  fields; version 1 was written by todo 0.1 to 0.5 (`docs/format.md` §18). A file in version 3 stops
+  todo 0.7 with `TOOL_TOO_OLD`: update todo first, then run `todo migrate --yes` in the project.
 - The **tool line** is the newest todo that has written the file. A write by a newer todo raises it, and
   nothing lowers it. `todo where` shows both, and the running version.
 A file in an older format is migrated by the first write of todo 0.6, under the lock and after a snapshot
@@ -438,6 +443,57 @@ Pass `--json` to any command for machine-readable output, `--dry-run` to preview
 diff without modifying `TODO.md`, `--yes` to confirm bulk commands, `--file <path>` (or
 `TODO_FILE`) to target a specific file, and `--force` to override another agent's claim. Colour
 output is enabled only on terminals and is disabled when piped or when `NO_COLOR` is set.
+
+## Roles, levels and parallel work
+
+Two roles use todo (`docs/requirements.md` §2). The **planner**, usually one strong agent or a person,
+splits the work into tasks and gives each task a level, until every task can go to a worker. The
+**workers** are any number of cheaper agents; each takes one ready task, finishes it and records the
+result. Each role has its own rules text, so no agent carries rules it does not need:
+
+- `todo help agents` prints the common rules, which the managed block of `AGENTS.md`, `TODO.md` and the
+  Claude Code skill carry. `todo help worker` prints the worker's rules (at most ten lines), and
+  `todo help planner` the planner's.
+- A task has a **level** from `1` to `5`, its `difficulty`. Level `1` is the lowest: everything is
+  written down (`files`, `read`, `steps`, `verify`, `why` and `accept`), so the weakest worker finishes
+  it without a decision. Higher levels need more understanding, and level `5` is research or a design
+  that the planner splits before anyone works on it. `todo help add` prints what each level means.
+  `target_difficulty` in `todo.toml` sets the level the planner splits down to (by default the lowest),
+  and `final` keeps a task above it on purpose, with a reason.
+- `todo plan` lists what the planner still has to do: tasks given back, tasks above the target level
+  (split them with `todo split`), tasks at the target level that lack their detail, and tasks without a
+  usable level. A task is ready for `next` only when its detail is complete and its dependencies are
+  done.
+- A worker takes its work with `todo next --claim --max-difficulty 1 --brief`, which prints the work
+  order (`todo brief`). It changes only the files the task lists, commits only those files, and finishes
+  with `todo done <id> --commit HEAD`. A worker that cannot finish runs
+  `todo stuck <id> --note "<problem>"`; the task then waits for the planner, which runs `todo unblock` or
+  `todo split` on it, and `todo plan` lists it first.
+
+### File scopes in one checkout
+
+Workers share one checkout, so a task's `files` field is what it may change. Two tasks whose files
+overlap never run at the same time:
+
+- `next` skips a ready task that overlaps a task another agent holds, and `claim` refuses it with
+  `FILES_BUSY` unless `--force`;
+- `todo waves` puts overlapping tasks of one wave in one lane, so they run one after another, and shows
+  how many workers can work at once and the longest chain of tasks;
+- `done --commit` checks that the commit changed only the task's files and refuses a commit that changed
+  others with `OUT_OF_SCOPE`, so one worker's edit does not break another worker's task unnoticed.
+
+### What `verify` is trusted to do
+
+A task's `verify` line is a command that todo runs in the task's folder, through `verify_shell`, outside
+the write lock. todo trusts only its exit code: `0` passes, and anything else fails. After
+`verify_timeout_seconds` the command and every process it started are stopped, and the check fails.
+`done` runs the command before it marks the task done; a failure refuses it with `VERIFY_FAILED` and the
+task stays claimed, and after `verify_attempts` failures the task is given back as stuck. With
+`verify_when = "wave"`, `todo verify --wave` runs the checks of a finished wave instead.
+
+The command is written in `TODO.md`, and it runs with the permissions of the agent that finishes the
+task: review a `verify` line the way you review code. todo does not sandbox it, and a pass proves only
+what the command checks. The output is kept in full in the state folder (`verify/<ID>.log`).
 
 ## Configuration (`todo.toml`)
 

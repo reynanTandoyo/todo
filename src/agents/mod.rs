@@ -9,10 +9,26 @@ pub const BEGIN_MARKER: &str = "<!-- todo:begin -->";
 /// Closing marker for a tool-managed agent rules block (`docs/format.md` §12).
 pub const END_MARKER: &str = "<!-- todo:end -->";
 
-/// The canonical agent rules text required by R-AGENT-1.
+/// The canonical agent rules text required by R-AGENT-1: the common rules, which are what `todo help
+/// agents` prints and what goes into the managed blocks and the skill. It ends with one line per role
+/// that names its own text (`todo help worker`, `todo help planner`). At most
+/// [`COMMON_RULES_MAX_LINES`] lines.
 ///
 /// Reused by `todo help agents`, `todo init`, `todo agents install`, and `todo skill install`.
 pub const RULES_TEXT: &str = include_str!("rules.md");
+
+/// The worker's rules, printed by `todo help worker` (R-AGENT-1): at most [`WORKER_TEXT_MAX_LINES`]
+/// lines, so that a worker reads one short text.
+pub const WORKER_TEXT: &str = include_str!("worker.md");
+
+/// The planner's rules, printed by `todo help planner` (R-AGENT-1).
+pub const PLANNER_TEXT: &str = include_str!("planner.md");
+
+/// The most lines the common rules text may have (R-AGENT-1, T-166).
+pub const COMMON_RULES_MAX_LINES: usize = 15;
+
+/// The most lines the worker's text may have (R-AGENT-1, T-166).
+pub const WORKER_TEXT_MAX_LINES: usize = 10;
 
 /// Status of a managed agent-rules block in a Markdown file (`R-AGENT-3`, `docs/format.md` §12).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,37 +187,100 @@ pub fn upsert_managed_block(
 
 #[cfg(test)]
 mod tests {
-    use super::RULES_TEXT;
+    use super::{
+        COMMON_RULES_MAX_LINES, PLANNER_TEXT, RULES_TEXT, WORKER_TEXT, WORKER_TEXT_MAX_LINES,
+    };
+
+    /// The lines of a text, not counting the blank line that ends it.
+    fn line_count(text: &str) -> usize {
+        text.trim().lines().count()
+    }
 
     #[test]
-    fn rules_text_covers_all_r_agent_1_points() {
+    fn the_common_rules_stay_within_their_line_limit() {
+        // R-AGENT-1 (v0.8): the common block is in every managed block and in the skill, so it is
+        // kept short. A longer text fails here, and the rule moves to the role's text instead.
+        assert!(
+            line_count(RULES_TEXT) <= COMMON_RULES_MAX_LINES,
+            "the common rules have {} lines; the limit is {COMMON_RULES_MAX_LINES}",
+            line_count(RULES_TEXT)
+        );
+    }
+
+    #[test]
+    fn the_worker_text_stays_within_its_line_limit() {
+        assert!(
+            line_count(WORKER_TEXT) <= WORKER_TEXT_MAX_LINES,
+            "the worker text has {} lines; the limit is {WORKER_TEXT_MAX_LINES}",
+            line_count(WORKER_TEXT)
+        );
+    }
+
+    #[test]
+    fn the_common_rules_end_with_one_line_per_role() {
+        let lines: Vec<&str> = RULES_TEXT.trim().lines().collect();
+        let last_two = &lines[lines.len() - 2..];
+        assert!(last_two[0].contains("`todo help worker`"), "{last_two:?}");
+        assert!(last_two[1].contains("`todo help planner`"), "{last_two:?}");
+    }
+
+    #[test]
+    fn the_common_rules_cover_r_agent_1_points() {
         for needle in [
             "Never edit `TODO.md`",
             "--agent",
             "TODO_AGENT",
-            "summary",
-            "next",
-            "next --claim",
             "Exit code `1`",
             "Exit code `3`",
-            "note",
-            "done",
-            "--note",
-            "--commit",
-            "add",
-            "ask",
+            "todo show",
             "T-012:",
-            // From v0.6 (R-AGENT-1): milestones, kinds, migration and updating todo.
+        ] {
+            assert!(RULES_TEXT.contains(needle), "RULES_TEXT missing `{needle}`");
+        }
+    }
+
+    #[test]
+    fn the_worker_text_has_the_finish_path_and_brief() {
+        for needle in [
+            "todo next --claim --max-difficulty 1 --brief",
+            "--commit HEAD",
+            "todo done <id>",
+            "todo stuck <id> --note",
+            "todo brief <id>",
+        ] {
+            assert!(
+                WORKER_TEXT.contains(needle),
+                "WORKER_TEXT missing `{needle}`"
+            );
+        }
+    }
+
+    #[test]
+    fn the_planner_text_has_the_planner_rules() {
+        // From v0.6 and v0.8 (R-AGENT-1): the lines moved out of the common block live here.
+        for needle in [
+            "todo summary",
+            "todo plan",
             "--milestone",
             "--why",
-            "todo show",
             "todo done <milestone-id>",
             "todo idea",
             "--about",
+            "--difficulty",
+            "todo split <id>",
+            "--final",
+            "todo waves",
+            "todo verify --wave",
+            "todo stuck",
+            "todo unblock <id>",
             "todo migrate --yes",
             "todo help update",
+            "todo check",
         ] {
-            assert!(RULES_TEXT.contains(needle), "RULES_TEXT missing `{needle}`");
+            assert!(
+                PLANNER_TEXT.contains(needle),
+                "PLANNER_TEXT missing `{needle}`"
+            );
         }
     }
 }
