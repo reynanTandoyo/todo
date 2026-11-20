@@ -63,7 +63,7 @@ pub fn group_of(
     if task.is_given_back() {
         return Some(Group::GivenBack);
     }
-    if lacks_level(task) {
+    if lacks_level(task, cfg) {
         return Some(Group::WithoutLevel);
     }
     if cfg.is_above_target(task.difficulty.as_deref()) {
@@ -91,7 +91,7 @@ pub struct Plan<'a> {
     pub to_split: Vec<&'a Task>,
     /// Group 3: at or below the target level, without its detail.
     pub to_detail: Vec<&'a Task>,
-    /// Group 4: without a difficulty.
+    /// Group 4: without a usable difficulty: none, or one that is not configured.
     pub without_level: Vec<&'a Task>,
     /// Group 5: kept above the target level on purpose.
     pub kept_on_purpose: Vec<&'a Task>,

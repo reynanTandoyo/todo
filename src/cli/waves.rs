@@ -94,7 +94,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         None => None,
     };
     let archive = loaded.archive.as_ref();
-    let plan = waves::plan_waves(doc, archive, milestone);
+    let plan = waves::plan_waves(doc, archive, milestone, &cfg);
 
     let payload = WavesJson {
         file: loaded.file_label.clone(),
