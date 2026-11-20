@@ -273,6 +273,16 @@ fn load_for_read_inner(
     })
 }
 
+/// Whether a milestone above a task holds the task back: the milestone is blocked, done or dropped
+/// (`R-MILE-6`). `next`, `list --ready` and `waves` all apply this one rule.
+#[must_use]
+pub fn milestone_holds_back(milestone: &Task) -> bool {
+    matches!(
+        milestone.status,
+        Status::Blocked | Status::Done | Status::Dropped
+    )
+}
+
 /// Returns `true` if `task` is eligible to be handed out by `next` / `list --ready` (`R-READ-3`).
 ///
 /// Only entries of kind task are handed out, so questions, ideas and milestones never are
@@ -295,13 +305,10 @@ pub fn is_task_ready(
     if task.kind() != EntryKind::Task {
         return false;
     }
-    // Work is handed out along the tree (R-MILE-6): no milestone above the task may be blocked,
-    // done or dropped, and the dependencies of every milestone above it must be finished too.
+    // Work is handed out along the tree (R-MILE-6): no milestone above the task may hold it back,
+    // and the dependencies of every milestone above it must be finished too.
     let above = doc.milestone_ancestors(task);
-    if above
-        .iter()
-        .any(|m| matches!(m.status, Status::Blocked | Status::Done | Status::Dropped))
-    {
+    if above.iter().any(|m| milestone_holds_back(m)) {
         return false;
     }
     doc.dependencies_satisfied(task, archive)

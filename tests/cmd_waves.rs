@@ -828,3 +828,128 @@ fn waves_reads_only_and_leaves_todo_md_byte_identical() {
     assert!(out.status.success(), "stderr: {}", stderr_text(&out));
     assert_eq!(read_todo(&work), before);
 }
+
+/// `todo list --ready --json` as the IDs of the tasks `next` could hand out (T-171).
+fn ready_ids(home: &Path, work: &Path) -> Vec<String> {
+    let out = run_todo(home, work, &["list", "--ready", "--json"], &[]).expect("run list --ready");
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    parse_json(&out.stdout)["data"]["tasks"]
+        .as_array()
+        .expect("tasks")
+        .iter()
+        .map(|t| t["id"].as_str().expect("id").to_string())
+        .collect()
+}
+
+/// Milestones that hold their tasks back (R-MILE-6): a done one, a dropped one, and an open one
+/// nested under the done one. Plus a task free to go, a dependency on the done milestone, and a
+/// task that waits on a held-back one.
+const HELD_BACK: &str = "\
+### T-100 · Done milestone
+- type: milestone
+- status: done
+- priority: P1
+- goal: finished
+
+### T-101 · Open child of the done milestone
+- status: open
+- priority: P1
+- difficulty: 3
+- milestone: T-100
+
+### T-110 · Dropped milestone
+- type: milestone
+- status: dropped
+- priority: P1
+- goal: dropped
+
+### T-111 · Child of the dropped milestone
+- status: open
+- priority: P1
+- difficulty: 3
+- milestone: T-110
+
+### T-120 · Open milestone under the done one
+- type: milestone
+- status: open
+- priority: P1
+- goal: a part of the work
+- milestone: T-100
+
+### T-121 · Nested under the open milestone
+- status: open
+- priority: P1
+- difficulty: 3
+- milestone: T-120
+
+### T-130 · Free task
+- status: open
+- priority: P1
+- difficulty: 3
+
+### T-150 · Depends on the done milestone
+- status: open
+- priority: P1
+- difficulty: 3
+- depends: T-100
+
+### T-160 · Waits on a held-back task
+- status: open
+- priority: P1
+- difficulty: 3
+- depends: T-101
+";
+
+#[test]
+fn tasks_below_a_done_or_dropped_milestone_are_apart_as_next_holds_them_back() {
+    let tmp = TempDir::new().expect("tempdir");
+    let (home, work) = project(&tmp, HELD_BACK);
+    let json = waves_json(&home, &work, &[]);
+    assert_eq!(
+        apart_reason(&json, "T-101").as_deref(),
+        Some("below done milestone T-100")
+    );
+    assert_eq!(
+        apart_reason(&json, "T-111").as_deref(),
+        Some("below dropped milestone T-110")
+    );
+    // The nearest milestone that holds the task back gives the reason, here through an open one.
+    assert_eq!(
+        apart_reason(&json, "T-121").as_deref(),
+        Some("below done milestone T-100")
+    );
+    assert_eq!(
+        apart_reason(&json, "T-160").as_deref(),
+        Some("waits on T-101")
+    );
+    for held in ["T-101", "T-111", "T-121", "T-160"] {
+        assert_eq!(wave_of(&json, held), None, "{held} is in no wave");
+    }
+    assert_eq!(wave_of(&json, "T-130"), Some(1));
+    assert_eq!(
+        wave_of(&json, "T-150"),
+        Some(1),
+        "a dependency on a done milestone is satisfied"
+    );
+    assert_eq!(ready_ids(&home, &work), vec!["T-130", "T-150"]);
+}
+
+/// Every task that `next` could hand out is in wave 1, on both the fixture with held-back milestones
+/// and the one that covers every kind of entry (T-171: waves and next use one readiness rule).
+#[test]
+fn every_task_next_can_hand_out_is_placed_in_wave_one() {
+    for body in [HELD_BACK, EVERYTHING] {
+        let tmp = TempDir::new().expect("tempdir");
+        let (home, work) = project(&tmp, body);
+        let json = waves_json(&home, &work, &[]);
+        let ready = ready_ids(&home, &work);
+        assert!(!ready.is_empty(), "the fixture has tasks next can hand out");
+        for id in &ready {
+            assert_eq!(
+                wave_of(&json, id),
+                Some(1),
+                "{id} is ready, so it is in wave 1"
+            );
+        }
+    }
+}

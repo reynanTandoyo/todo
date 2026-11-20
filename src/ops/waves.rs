@@ -14,6 +14,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::doc::{DependencyRef, Document, EntryKind, Status, Task, TaskId};
 use crate::ops::config::OpsConfig;
+use crate::ops::read::milestone_holds_back;
 use crate::ops::scope::{ScopeEntry, overlap_lanes, parse_files, raw_entries};
 
 /// The most `files` entries a task at the lowest level may have (`R-DETAIL-2`, the default of
@@ -117,9 +118,14 @@ pub fn plan_waves<'a>(
             if node.status == Status::Blocked {
                 own = Some(blocked_reason(node));
             }
+            // The nearest milestone that holds the task back gives the reason (R-MILE-6).
             for above in doc.milestone_ancestors(node) {
-                if own.is_none() && above.status == Status::Blocked {
-                    own = Some(format!("below blocked milestone {}", label(above.id)));
+                if own.is_none() && milestone_holds_back(above) {
+                    own = Some(format!(
+                        "below {} milestone {}",
+                        above.status.as_str(),
+                        label(above.id)
+                    ));
                 }
                 deps.extend(above.depends.iter());
             }

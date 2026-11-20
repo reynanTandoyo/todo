@@ -422,8 +422,9 @@ length of `longest_chain`, the longest dependency chain task by task. `max_worke
 in any wave: the most workers useful at once.
 
 `apart` lists the unfinished tasks that are in no wave, in file order, each with its `reason`:
-`blocked: …` or `given back: …` (`todo stuck`), `below blocked milestone T-…`, `depends on T-…, which
-does not exist`, `in a dependency cycle: T-… -> T-… -> T-…` or `waits on T-…`.
+`blocked: …` or `given back: …` (`todo stuck`), `below blocked milestone T-…`, `below done milestone
+T-…` or `below dropped milestone T-…` (the milestone above the task that holds it back, `R-MILE-6`),
+`depends on T-…, which does not exist`, `in a dependency cycle: T-… -> T-… -> T-…` or `waits on T-…`.
 
 `level` is the task's difficulty as written, or `null`. `missing` lists what the task lacks for its
 level (`R-LEVEL-1`, `R-DETAIL-2`): `level` when it has none; at the lowest level, `why`, `accept`,

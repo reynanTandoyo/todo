@@ -1370,8 +1370,10 @@ same checkout.
   - It prints the number of waves, the size of each (tasks and lanes), the largest number of
     workers useful at once (the most lanes in any wave), and the longest dependency chain, task by
     task.
-  - Tasks that wait on a missing ID or sit in a cycle (R-DEP-3), blocked tasks and tasks below a
-    blocked milestone are listed apart.
+  - Tasks that wait on a missing ID or sit in a cycle (R-DEP-3), blocked tasks, and tasks below a
+    milestone that is blocked, done or dropped (R-MILE-6, the rule `next` uses) are listed apart,
+    each with its reason. The milestone named in the reason is the nearest one that holds the task
+    back.
   - With `<milestone>`, only the tasks below it, at any depth; a task that is not a milestone is
     refused (exit 1, `BAD_VALUE`).
   - It reads only and takes no lock. `waves --json` (`todo.waves.v1`) matches its snapshot.
