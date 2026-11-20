@@ -1,0 +1,67 @@
+---
+source: tests/cmd_plan.rs
+expression: json
+---
+{
+  "data": {
+    "clean": false,
+    "file": "TODO.md",
+    "given_back": [
+      {
+        "attempts": "2",
+        "id": "T-003",
+        "level": "2",
+        "problem": "the build breaks",
+        "title": "Task T-003"
+      }
+    ],
+    "kept_on_purpose": [
+      {
+        "id": "T-005",
+        "level": "3",
+        "reason": "the design is open",
+        "title": "Task T-005"
+      }
+    ],
+    "milestone": null,
+    "to_detail": [
+      {
+        "id": "T-002",
+        "level": "1",
+        "missing": [
+          "accept",
+          "steps",
+          "verify",
+          "files"
+        ],
+        "title": "Task T-002"
+      }
+    ],
+    "to_split": [
+      {
+        "id": "T-001",
+        "level": "4",
+        "priority": "P1",
+        "title": "Task T-001"
+      }
+    ],
+    "unverified": [
+      {
+        "id": "T-006",
+        "title": "Task T-006",
+        "verify": "cargo test"
+      }
+    ],
+    "without_level": [
+      {
+        "id": "T-004",
+        "priority": "P2",
+        "status": "open",
+        "title": "Task T-004"
+      }
+    ]
+  },
+  "ok": true,
+  "schema": "todo.plan.v1",
+  "warnings": []
+}

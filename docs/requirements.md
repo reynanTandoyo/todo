@@ -1149,6 +1149,9 @@ todo next --claim --max-difficulty 1 --brief --agent worker-1
   - Done, dropped and claimed entries, milestones, ideas and questions are left out, apart from
     the done tasks of group 6. A task in groups 2 to 4 is listed whether or not its dependencies
     are finished.
+  - Each task is listed in the first group it fits, in the order above, so no task is in two
+    groups: a task given back is group 1 even when it is above the target. Group 6 is not listed
+    while `verify = false`, as `check` does not list it (R-VERIFY-2).
   - With `<milestone>` only entries below that milestone, at any depth, are listed; a task that is
     not a milestone is refused (exit 1, `BAD_VALUE`), as for `list --milestone` (R-MILE-3).
   - `target_difficulty` must be one of `difficulties`; anything else is a `todo.toml` error (R-CFG-2).
