@@ -443,12 +443,18 @@ pub struct TaskJson {
     pub ready: bool,
     /// `- files:` value, if present.
     pub files: Option<String>,
+    /// `- read:` paths, split at commas: what the worker should look at but not change (R-DETAIL-1).
+    pub read: Vec<String>,
     /// `- problem:` value, if present.
     pub problem: Option<String>,
     /// `- fix:` value, if present.
     pub fix: Option<String>,
+    /// `- steps:` items in order, without their numbers (R-DETAIL-1); empty when absent.
+    pub steps: Vec<String>,
     /// `- accept:` value, if present.
     pub accept: Option<String>,
+    /// `- verify:` value, if present: the command that checks the task (R-DETAIL-1).
+    pub verify: Option<String>,
     /// Commit hashes from `- commit:`.
     pub commit: Vec<String>,
     /// Unknown `- key: value` fields kept as written (`docs/format.md` §8).
@@ -691,9 +697,12 @@ pub fn build_task_json(
         questions,
         ready: is_task_ready(primary, task, ready_archive, now, cfg),
         files: task.files.clone(),
+        read: task.read_paths(),
         problem: task.problem.clone(),
         fix: task.fix.clone(),
+        steps: task.steps.clone(),
         accept: task.accept.clone(),
+        verify: task.verify.clone(),
         commit: task.commit.clone(),
         fields,
         notes,

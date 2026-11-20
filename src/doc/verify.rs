@@ -275,9 +275,12 @@ fn tasks_semantically_equal(
         && a.area == b.area
         && a.why == b.why
         && a.files == b.files
+        && a.read == b.read
         && a.problem == b.problem
         && a.fix == b.fix
+        && a.steps == b.steps
         && a.accept == b.accept
+        && a.verify == b.verify
         && a.commit == b.commit
         && a.depends.len() == b.depends.len()
         && a.depends

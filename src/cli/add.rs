@@ -13,8 +13,9 @@ use crate::doc::{
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::{
-    DocWritePlan, NewTask, OpsConfig, TaskJson, build_task_json, edit_doc_with_found_and_state_and_write,
-    highest_task_number, matching_section_indices, milestone,
+    DocWritePlan, NewTask, OpsConfig, StepsInput, TaskJson, build_task_json,
+    edit_doc_with_found_and_state_and_write, highest_task_number, matching_section_indices, milestone,
+    steps_from_text,
 };
 use crate::output::Output;
 use crate::state::IdsState;
@@ -82,6 +83,10 @@ pub struct Args {
     #[arg(long, value_name = "TEXT")]
     pub files: Option<String>,
 
+    /// `read` field value: paths to look at but not change, separated by commas.
+    #[arg(long, value_name = "TEXT")]
+    pub read: Option<String>,
+
     /// `problem` field value.
     #[arg(long, value_name = "TEXT")]
     pub problem: Option<String>,
@@ -90,9 +95,17 @@ pub struct Args {
     #[arg(long, value_name = "TEXT")]
     pub fix: Option<String>,
 
+    /// `steps` field: one step per line of the text.
+    #[arg(long, value_name = "TEXT")]
+    pub steps: Option<String>,
+
     /// `accept` field value.
     #[arg(long, value_name = "TEXT")]
     pub accept: Option<String>,
+
+    /// `verify` field value: one command line that checks the task.
+    #[arg(long, value_name = "TEXT")]
+    pub verify: Option<String>,
 
     /// Additional field `key=value` (repeatable).
     #[arg(long = "field", value_name = "KEY=VALUE")]
@@ -155,15 +168,21 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     )?;
     let why_arg = resolve_opt_text_arg(args.why.as_deref())?;
     let files_arg = resolve_opt_text_arg(args.files.as_deref())?;
+    let read_arg = resolve_opt_text_arg(args.read.as_deref())?;
     let problem_arg = resolve_opt_text_arg(args.problem.as_deref())?;
     let fix_arg = resolve_opt_text_arg(args.fix.as_deref())?;
+    let steps_arg = resolve_opt_text_arg(args.steps.as_deref())?;
     let accept_arg = resolve_opt_text_arg(args.accept.as_deref())?;
+    let verify_arg = resolve_opt_text_arg(args.verify.as_deref())?;
     let why_val = resolve_opt(why_arg.as_deref(), &extra_fields, "why");
     let depends_val = resolve_opt(args.depends.as_deref(), &extra_fields, "depends");
     let files_val = resolve_opt(files_arg.as_deref(), &extra_fields, "files");
+    let read_val = resolve_opt(read_arg.as_deref(), &extra_fields, "read");
     let problem_val = resolve_opt(problem_arg.as_deref(), &extra_fields, "problem");
     let fix_val = resolve_opt(fix_arg.as_deref(), &extra_fields, "fix");
+    let steps_val = resolve_steps(steps_arg.as_deref(), &extra_fields);
     let accept_val = resolve_opt(accept_arg.as_deref(), &extra_fields, "accept");
+    let verify_val = resolve_opt(verify_arg.as_deref(), &extra_fields, "verify");
     check_required_fields(
         &cfg.required_fields,
         RequiredValues {
@@ -174,9 +193,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             why: why_val.as_deref(),
             depends: depends_val.as_deref(),
             files: files_val.as_deref(),
+            read: read_val.as_deref(),
             problem: problem_val.as_deref(),
             fix: fix_val.as_deref(),
+            steps: !steps_val.is_empty(),
             accept: accept_val.as_deref(),
+            verify: verify_val.as_deref(),
         },
         &extra_fields,
     )?;
@@ -240,9 +262,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 why: why_val.as_deref(),
                 depends: depends_val.as_deref(),
                 files: files_val.as_deref(),
+                read: read_val.as_deref(),
                 problem: problem_val.as_deref(),
                 fix: fix_val.as_deref(),
+                steps: &steps_val,
                 accept: accept_val.as_deref(),
+                verify: verify_val.as_deref(),
                 extra: &extra_fields,
             }
             .lines(&id_str, &date, agent);
@@ -308,9 +333,27 @@ fn parse_extra_fields(raw: &[String]) -> Result<Vec<(String, String)>> {
             ));
         }
         let resolved_v = resolve_text_arg(v)?;
-        pairs.push((key, sanitize_trimmed_value(&resolved_v)));
+        // `steps` keeps its line breaks: each line is one step.
+        let value = if key == "steps" {
+            resolved_v.trim().to_string()
+        } else {
+            sanitize_trimmed_value(&resolved_v)
+        };
+        pairs.push((key, value));
     }
     Ok(pairs)
+}
+
+/// The steps of a new task: `--steps` when given, else a `steps` field (`R-DETAIL-1`).
+fn resolve_steps(flag: Option<&str>, extra: &[(String, String)]) -> Vec<String> {
+    let text = flag.or_else(|| {
+        extra
+            .iter()
+            .rev()
+            .find(|(k, _)| k == "steps")
+            .map(|(_, v)| v.as_str())
+    });
+    text.map_or_else(Vec::new, steps_from_text)
 }
 
 fn resolve_opt(
@@ -402,9 +445,13 @@ struct RequiredValues<'a> {
     why: Option<&'a str>,
     depends: Option<&'a str>,
     files: Option<&'a str>,
+    read: Option<&'a str>,
     problem: Option<&'a str>,
     fix: Option<&'a str>,
+    /// Whether the task has at least one step.
+    steps: bool,
     accept: Option<&'a str>,
+    verify: Option<&'a str>,
 }
 
 fn check_required_fields(
@@ -421,9 +468,12 @@ fn check_required_fields(
             "why" => values.why.is_some(),
             "depends" => values.depends.is_some(),
             "files" => values.files.is_some(),
+            "read" => values.read.is_some(),
             "problem" => values.problem.is_some(),
             "fix" => values.fix.is_some(),
+            "steps" => values.steps,
             "accept" => values.accept.is_some(),
+            "verify" => values.verify.is_some(),
             other => extra
                 .iter()
                 .any(|(k, v)| k.eq_ignore_ascii_case(other) && !v.trim().is_empty()),
@@ -584,9 +634,12 @@ struct BatchAddEntry {
     why: Option<String>,
     depends: Option<DependsInput>,
     files: Option<String>,
+    read: Option<String>,
     problem: Option<String>,
     fix: Option<String>,
+    steps: Option<StepsInput>,
     accept: Option<String>,
+    verify: Option<String>,
     #[serde(default)]
     fields: BTreeMap<String, String>,
 }
@@ -605,9 +658,12 @@ struct ValidatedBatchEntry {
     why: Option<String>,
     depends_tokens: Vec<String>,
     files: Option<String>,
+    read: Option<String>,
     problem: Option<String>,
     fix: Option<String>,
+    steps: Vec<String>,
     accept: Option<String>,
+    verify: Option<String>,
     extra: Vec<(String, String)>,
 }
 
@@ -765,7 +821,13 @@ pub(crate) fn add_batch_text(
                 )
                 .with_line(line_no));
             }
-            extra.push((key, sanitize_trimmed_value(&v)));
+            // `steps` keeps its line breaks: each line is one step.
+            let value = if key == "steps" {
+                v.trim().to_string()
+            } else {
+                sanitize_trimmed_value(&v)
+            };
+            extra.push((key, value));
         }
 
         let priority = resolve_priority(parsed.priority.as_deref(), &extra, &cfg)?;
@@ -807,6 +869,12 @@ pub(crate) fn add_batch_text(
             .map(sanitize_trimmed_value)
             .filter(|s| !s.is_empty())
             .or_else(|| resolve_opt(None, &extra, "files"));
+        let read = parsed
+            .read
+            .as_deref()
+            .map(sanitize_trimmed_value)
+            .filter(|s| !s.is_empty())
+            .or_else(|| resolve_opt(None, &extra, "read"));
         let problem = parsed
             .problem
             .as_deref()
@@ -819,12 +887,22 @@ pub(crate) fn add_batch_text(
             .map(sanitize_trimmed_value)
             .filter(|s| !s.is_empty())
             .or_else(|| resolve_opt(None, &extra, "fix"));
+        let steps = match &parsed.steps {
+            Some(input) => steps_from_text(&input.text()),
+            None => resolve_steps(None, &extra),
+        };
         let accept = parsed
             .accept
             .as_deref()
             .map(sanitize_trimmed_value)
             .filter(|s| !s.is_empty())
             .or_else(|| resolve_opt(None, &extra, "accept"));
+        let verify = parsed
+            .verify
+            .as_deref()
+            .map(sanitize_trimmed_value)
+            .filter(|s| !s.is_empty())
+            .or_else(|| resolve_opt(None, &extra, "verify"));
 
         let depends_tokens: Vec<String> = match parsed.depends {
             Some(DependsInput::One(s)) => s
@@ -862,9 +940,12 @@ pub(crate) fn add_batch_text(
                 why: why.as_deref(),
                 depends: depends_summary.as_deref(),
                 files: files.as_deref(),
+                read: read.as_deref(),
                 problem: problem.as_deref(),
                 fix: fix.as_deref(),
+                steps: !steps.is_empty(),
                 accept: accept.as_deref(),
+                verify: verify.as_deref(),
             },
             &extra,
         )?;
@@ -890,9 +971,12 @@ pub(crate) fn add_batch_text(
             why,
             depends_tokens,
             files,
+            read,
             problem,
             fix,
+            steps,
             accept,
+            verify,
             extra,
         });
     }
@@ -1001,9 +1085,12 @@ pub(crate) fn add_batch_text(
                     why: entry.why.as_deref(),
                     depends: depends_val.as_deref(),
                     files: entry.files.as_deref(),
+                    read: entry.read.as_deref(),
                     problem: entry.problem.as_deref(),
                     fix: entry.fix.as_deref(),
+                    steps: &entry.steps,
                     accept: entry.accept.as_deref(),
+                    verify: entry.verify.as_deref(),
                     extra: &entry.extra,
                 }
                 .lines(id_str, &date, agent);

@@ -30,16 +30,22 @@ pub const CANONICAL_FIELD_ORDER: &[&str] = &[
     "about",
     "goal",
     "why",
+    "final",
     "depends",
     "files",
+    "read",
     "problem",
     "fix",
+    "steps",
     "accept",
+    "verify",
+    "attempts",
+    "verified",
     "commit",
 ];
 
 /// Number of known fields tracked for repeated-field detection (`known_field_index`).
-const KNOWN_FIELD_SLOTS: usize = 16;
+const KNOWN_FIELD_SLOTS: usize = 19;
 
 /// Accepted heading separators between `<ID>` and `<title>` (`docs/format.md` §6),
 /// canonical separator first.
@@ -139,6 +145,9 @@ pub enum ProblemKind {
     /// A segment of a combined priority line is not `key: value`; it is kept as written and
     /// reported (`docs/format.md` §8).
     PartWithoutField { id: TaskId, text: String },
+    /// A value written on the `- steps:` line, or a `steps` part of the priority line, is read as
+    /// a step before the list; each step belongs on its own line (`docs/format.md` §8).
+    StepsValueOnFieldLine { id: TaskId },
     /// The tool stamp names a todo version newer than the running one (R-VER-1, R-OUT-11).
     NewerToolVersion { stamp: ToolVersion },
     /// The tool stamp value is not `MAJOR.MINOR.PATCH` (`docs/format.md` §4).
@@ -418,6 +427,23 @@ pub struct Task {
     pub accept: Option<String>,
     pub accept_line: Option<usize>,
 
+    /// `- read:` value and line index: the paths the worker should look at but not change (§19).
+    pub read: Option<String>,
+    pub read_line: Option<usize>,
+
+    /// The `steps` list in order, without the numbers (`docs/format.md` §8). A value written on the
+    /// `- steps:` line comes first.
+    pub steps: Vec<String>,
+    /// 0-based line of the `- steps:` field, or of the priority line when `steps` is a part of it.
+    pub steps_line: Option<usize>,
+    /// The field line and its step lines, as a 0-based half-open range; `None` when `steps` is
+    /// absent or a part of the priority line.
+    pub steps_block: Option<Range<usize>>,
+
+    /// `- verify:` value and line index: one command line that checks the task (§8).
+    pub verify: Option<String>,
+    pub verify_line: Option<usize>,
+
     /// Parsed commit hashes from `- commit:`.
     pub commit: Vec<String>,
     /// Raw `- commit:` value, if present.
@@ -450,6 +476,15 @@ impl Task {
         self.depends.iter().filter_map(|d| d.id).collect()
     }
 
+    /// The paths of `read`, split at commas (`docs/format.md` §19); empty when the field is absent.
+    #[must_use]
+    pub fn read_paths(&self) -> Vec<String> {
+        self.read
+            .as_deref()
+            .map(parse_comma_list)
+            .unwrap_or_default()
+    }
+
     /// Returns the 0-based line index where a missing field `key` should be inserted according to
     /// the canonical field order (`docs/format.md` §10).
     #[must_use]
@@ -458,19 +493,24 @@ impl Task {
 
         // Build effective (rank, line) pairs for all existing fields on this task.
         // Note: `type` and `area` living on a combined priority line share its line index.
+        // A `steps` field ends after its step lines, so a field inserted after it comes after them.
         let mut best: Option<(usize, usize)> = None;
         let is_other_field = target_rank == CANONICAL_FIELD_ORDER.len();
         for entry in &self.field_lines {
             let rank = canonical_field_rank(&entry.key);
+            let line = match &self.steps_block {
+                Some(block) if entry.key == "steps" && entry.line == block.start => block.end - 1,
+                _ => entry.line,
+            };
             if rank < target_rank || (is_other_field && rank == target_rank) {
                 let replace = match best {
                     None => true,
                     Some((best_rank, best_line)) => {
-                        rank > best_rank || (rank == best_rank && entry.line > best_line)
+                        rank > best_rank || (rank == best_rank && line > best_line)
                     }
                 };
                 if replace {
-                    best = Some((rank, entry.line));
+                    best = Some((rank, line));
                 }
             }
         }
@@ -524,9 +564,11 @@ impl Task {
             "why" => self.why.as_deref(),
             "depends" => self.depends_raw.as_deref(),
             "files" => self.files.as_deref(),
+            "read" => self.read.as_deref(),
             "problem" => self.problem.as_deref(),
             "fix" => self.fix.as_deref(),
             "accept" => self.accept.as_deref(),
+            "verify" => self.verify.as_deref(),
             "commit" => self.commit_raw.as_deref(),
             _ => self
                 .unknown_fields
@@ -1266,6 +1308,13 @@ fn parse_task_block(
         fix_line: None,
         accept: None,
         accept_line: None,
+        read: None,
+        read_line: None,
+        steps: Vec::new(),
+        steps_line: None,
+        steps_block: None,
+        verify: None,
+        verify_line: None,
         commit: Vec::new(),
         commit_raw: None,
         commit_line: None,
@@ -1276,6 +1325,9 @@ fn parse_task_block(
 
     let mut seen_known = [0usize; KNOWN_FIELD_SLOTS];
     let mut seen_unknown: Vec<(String, usize)> = Vec::new();
+    // True while the lines just read are the step lines of an own-line `- steps:` field; the list
+    // ends at the first line that is not a step line (`docs/format.md` §8).
+    let mut in_steps_list = false;
 
     let check_and_mark_seen = |key: &str,
                                line_no: usize,
@@ -1305,10 +1357,24 @@ fn parse_task_block(
         .skip(heading_line + 1)
     {
         if is_ignored {
+            in_steps_list = false;
             continue;
         }
         let text = &line_doc.lines[idx].text;
         let line_no = idx + 1;
+
+        if in_steps_list {
+            if let Some(step) = parse_step_line(text) {
+                if !step.is_empty() {
+                    task.steps.push(step.to_string());
+                }
+                if let Some(block) = task.steps_block.as_mut() {
+                    block.end = idx + 1;
+                }
+                continue;
+            }
+            in_steps_list = false;
+        }
 
         if let Some(note) = parse_note_line(text, idx) {
             task.notes.push(note);
@@ -1415,6 +1481,10 @@ fn parse_task_block(
                                 task.files = non_empty_string(part_val);
                                 task.files_line = Some(idx);
                             }
+                            "read" => {
+                                task.read = non_empty_string(part_val);
+                                task.read_line = Some(idx);
+                            }
                             "problem" => {
                                 task.problem = non_empty_string(part_val);
                                 task.problem_line = Some(idx);
@@ -1423,9 +1493,24 @@ fn parse_task_block(
                                 task.fix = non_empty_string(part_val);
                                 task.fix_line = Some(idx);
                             }
+                            "steps" => {
+                                // A multi-line field cannot be edited in place on the priority line:
+                                // its one value is read as a step, and writes move it below
+                                // `- steps:` (`docs/format.md` §8).
+                                task.steps = non_empty_string(part_val).into_iter().collect();
+                                task.steps_line = Some(idx);
+                                task.steps_block = None;
+                                if !task.steps.is_empty() {
+                                    problems.push(steps_value_problem(id_config, task.id, line_no));
+                                }
+                            }
                             "accept" => {
                                 task.accept = non_empty_string(part_val);
                                 task.accept_line = Some(idx);
+                            }
+                            "verify" => {
+                                task.verify = non_empty_string(part_val);
+                                task.verify_line = Some(idx);
                             }
                             "commit" => {
                                 task.commit = parse_comma_list(part_val);
@@ -1520,6 +1605,26 @@ fn parse_task_block(
                     };
                     task.files_line = Some(idx);
                 }
+                "read" => {
+                    task.read = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
+                    task.read_line = Some(idx);
+                }
+                "steps" => {
+                    // The field line starts the list; a value on it is read as the first step.
+                    task.steps = if value_str.is_empty() {
+                        Vec::new()
+                    } else {
+                        problems.push(steps_value_problem(id_config, task.id, line_no));
+                        vec![value_str.to_string()]
+                    };
+                    task.steps_line = Some(idx);
+                    task.steps_block = Some(idx..idx + 1);
+                    in_steps_list = true;
+                }
                 "problem" => {
                     task.problem = if owned_val.is_empty() {
                         None
@@ -1543,6 +1648,14 @@ fn parse_task_block(
                         Some(owned_val)
                     };
                     task.accept_line = Some(idx);
+                }
+                "verify" => {
+                    task.verify = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
+                    task.verify_line = Some(idx);
                 }
                 "commit" => {
                     task.commit = parse_comma_list(value_str);
@@ -1584,8 +1697,42 @@ const fn known_field_index(key: &str) -> Option<usize> {
         b"milestone" => Some(13),
         b"goal" => Some(14),
         b"why" => Some(15),
+        b"steps" => Some(16),
+        b"read" => Some(17),
+        b"verify" => Some(18),
         _ => None,
     }
+}
+
+/// The problem reported when a value is written on the `- steps:` line or on the priority line: it
+/// is read as a step before the list (`docs/format.md` §8).
+fn steps_value_problem(id_config: &IdConfig, id: TaskId, line_no: usize) -> Problem {
+    Problem {
+        line: line_no,
+        severity: ProblemSeverity::Warning,
+        kind: ProblemKind::StepsValueOnFieldLine { id },
+        message: format!(
+            "the value of steps on {} is read as a step; write each step on its own numbered line under `- steps:`",
+            id_config.format_id(id)
+        ),
+    }
+}
+
+/// Reads one step line (`docs/format.md` §8): 2 to 4 spaces, a number, `.` and a space, then the
+/// step text. Returns the text, trimmed; `None` when the line is not a step line.
+#[must_use]
+pub fn parse_step_line(line: &str) -> Option<&str> {
+    let spaces = line.bytes().take_while(|&b| b == b' ').count();
+    if !(2..=4).contains(&spaces) {
+        return None;
+    }
+    let rest = &line[spaces..];
+    let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+    if digits == 0 {
+        return None;
+    }
+    let after_number = rest[digits..].strip_prefix(". ")?;
+    Some(after_number.trim())
 }
 
 /// Reads a `status` value, from its own line or a combined priority line, into `task`

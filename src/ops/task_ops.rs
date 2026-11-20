@@ -6,6 +6,7 @@
 //! exists once. Argument parsing, empty-text checks and output stay with the callers.
 
 use chrono::{DateTime, FixedOffset};
+use serde::Deserialize;
 
 use crate::doc::{Document, LineEdit, Status, Task};
 use crate::error::{ErrorCode, Result, TodoError};
@@ -367,6 +368,56 @@ pub fn highest_task_number(doc: &Document, archive: Option<&Document>, state_hig
         .max(state_highest)
 }
 
+/// The steps of a task given as text: each line is one step, and blank lines are skipped. A number
+/// such as `1.` or `2)` at the start of a line is removed, because todo numbers the steps itself
+/// (`R-DETAIL-1`). A dot not followed by a space or the end of the line stays (`2.5 GB`).
+#[must_use]
+pub fn steps_from_text(text: &str) -> Vec<String> {
+    text.split(['\r', '\n'])
+        .map(|line| strip_step_number(line.trim()).trim().to_string())
+        .filter(|step| !step.is_empty())
+        .collect()
+}
+
+/// `line` without a leading `1.` or `2)` and the spaces after it (see [`steps_from_text`]).
+fn strip_step_number(line: &str) -> &str {
+    let digits = line.bytes().take_while(u8::is_ascii_digit).count();
+    if digits == 0 {
+        return line;
+    }
+    let after = &line[digits..];
+    let Some(rest) = after.strip_prefix(['.', ')']) else {
+        return line;
+    };
+    if rest.is_empty() || rest.starts_with(' ') || rest.starts_with('\t') {
+        rest
+    } else {
+        line
+    }
+}
+
+/// The `steps` value of a JSON operation: a list of strings, or one string with line breaks
+/// (`R-DETAIL-1`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum StepsInput {
+    /// One string; each of its lines is a step.
+    One(String),
+    /// A list; each entry is a step, or several lines of them.
+    Many(Vec<String>),
+}
+
+impl StepsInput {
+    /// The steps as text with one step per line, for [`steps_from_text`].
+    #[must_use]
+    pub fn text(&self) -> String {
+        match self {
+            Self::One(text) => text.clone(),
+            Self::Many(items) => items.join("\n"),
+        }
+    }
+}
+
 /// The values of a new task, already validated and trimmed (`todo add`, `add --from`, `apply`).
 #[derive(Debug, Default)]
 pub struct NewTask<'a> {
@@ -390,12 +441,18 @@ pub struct NewTask<'a> {
     pub depends: Option<&'a str>,
     /// `files` value.
     pub files: Option<&'a str>,
+    /// `read` value: the paths to look at but not change (`R-DETAIL-1`).
+    pub read: Option<&'a str>,
     /// `problem` value.
     pub problem: Option<&'a str>,
     /// `fix` value.
     pub fix: Option<&'a str>,
+    /// The steps, one per entry, as [`steps_from_text`] splits them (`R-DETAIL-1`).
+    pub steps: &'a [String],
     /// `accept` value.
     pub accept: Option<&'a str>,
+    /// `verify` value: the command that checks the task (`R-DETAIL-1`).
+    pub verify: Option<&'a str>,
     /// Further `key: value` fields; keys that have their own member above are skipped.
     pub extra: &'a [(String, String)],
 }
@@ -429,10 +486,24 @@ impl NewTask<'_> {
             ("why", self.why),
             ("depends", self.depends),
             ("files", self.files),
+            ("read", self.read),
             ("problem", self.problem),
             ("fix", self.fix),
-            ("accept", self.accept),
         ] {
+            if let Some(v) = value {
+                lines.push(format!("- {key}: {v}"));
+            }
+        }
+        if !self.steps.is_empty() {
+            lines.push("- steps:".to_string());
+            lines.extend(
+                self.steps
+                    .iter()
+                    .enumerate()
+                    .map(|(index, text)| format!("  {}. {text}", index + 1)),
+            );
+        }
+        for (key, value) in [("accept", self.accept), ("verify", self.verify)] {
             if let Some(v) = value {
                 lines.push(format!("- {key}: {v}"));
             }
@@ -447,9 +518,12 @@ impl NewTask<'_> {
             "why",
             "depends",
             "files",
+            "read",
             "problem",
             "fix",
+            "steps",
             "accept",
+            "verify",
         ];
         for (k, v) in self.extra {
             if !known.contains(&k.as_str()) {

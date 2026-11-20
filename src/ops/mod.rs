@@ -72,4 +72,6 @@ pub use rules::{
     bad_transition_error, check_ownership, check_promotable, forced_note_text, plan_claim,
     plan_release, validate_transition,
 };
-pub use task_ops::{NewTask, OpEnv, SetChange, TaskOp, highest_task_number};
+pub use task_ops::{
+    NewTask, OpEnv, SetChange, StepsInput, TaskOp, highest_task_number, steps_from_text,
+};

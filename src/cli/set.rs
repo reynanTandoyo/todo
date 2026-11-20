@@ -14,9 +14,10 @@ pub const META: CommandMeta = CommandMeta {
     name: "set",
     summary: "Edit fields or title of a task",
     kind: CommandKind::Write,
-    details: "Updates task fields (`--title`, `--priority`, `--difficulty`, `--type`, `--area`, `--milestone`, `--goal`, `--why`, `--depends`, `--files`, `--problem`, `--fix`, `--accept`), arbitrary `--field key=value` pairs, or removes fields with `--unset key`. `--milestone` moves the entry, with everything below it, under another milestone; `--unset milestone` makes it top-level. Edits combined `- priority:` lines in place. Refuses changing or unsetting `status`, `owner`, or `claimed`.",
+    details: "Updates task fields (`--title`, `--priority`, `--difficulty`, `--type`, `--area`, `--milestone`, `--goal`, `--why`, `--depends`, `--files`, `--read`, `--problem`, `--fix`, `--steps`, `--accept`, `--verify`), arbitrary `--field key=value` pairs, or removes fields with `--unset key`. `--steps` takes one step per line and replaces the whole list. `--milestone` moves the entry, with everything below it, under another milestone; `--unset milestone` makes it top-level. Edits combined `- priority:` lines in place. Refuses changing or unsetting `status`, `owner`, or `claimed`.",
     examples: &[
         "todo set T-012 --priority P0 --area cli --agent agent-1",
+        "todo set T-012 --verify \"cargo test\" --steps @steps.txt --agent agent-1",
         "todo set T-012 --milestone T-010 --agent agent-1",
         "todo set T-012 --field reqs=R-WRITE-8 --unset fix --agent agent-1",
         "todo set T-012 --title \"New title\" --agent coordinator --force",
@@ -70,6 +71,10 @@ pub struct Args {
     #[arg(long, value_name = "TEXT")]
     pub files: Option<String>,
 
+    /// New `read` field value: paths to look at but not change, separated by commas.
+    #[arg(long, value_name = "TEXT")]
+    pub read: Option<String>,
+
     /// New `problem` field value.
     #[arg(long, value_name = "TEXT")]
     pub problem: Option<String>,
@@ -78,9 +83,17 @@ pub struct Args {
     #[arg(long, value_name = "TEXT")]
     pub fix: Option<String>,
 
+    /// New `steps` list: one step per line of the text, replacing the whole list.
+    #[arg(long, value_name = "TEXT")]
+    pub steps: Option<String>,
+
     /// New `accept` field value.
     #[arg(long, value_name = "TEXT")]
     pub accept: Option<String>,
+
+    /// New `verify` field value: one command line that checks the task.
+    #[arg(long, value_name = "TEXT")]
+    pub verify: Option<String>,
 
     /// Set any field with `key=value` (repeatable).
     #[arg(long = "field", value_name = "KEY=VALUE")]
@@ -106,9 +119,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         || args.why.is_some()
         || args.depends.is_some()
         || args.files.is_some()
+        || args.read.is_some()
         || args.problem.is_some()
         || args.fix.is_some()
+        || args.steps.is_some()
         || args.accept.is_some()
+        || args.verify.is_some()
         || !parsed_fields.is_empty()
         || !parsed_unsets.is_empty();
     if !has_any {
@@ -122,9 +138,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let resolved_goal = resolve_opt_text_arg(args.goal.as_deref())?;
     let resolved_why = resolve_opt_text_arg(args.why.as_deref())?;
     let resolved_files = resolve_opt_text_arg(args.files.as_deref())?;
+    let resolved_read = resolve_opt_text_arg(args.read.as_deref())?;
     let resolved_problem = resolve_opt_text_arg(args.problem.as_deref())?;
     let resolved_fix = resolve_opt_text_arg(args.fix.as_deref())?;
+    let resolved_steps = resolve_opt_text_arg(args.steps.as_deref())?;
     let resolved_accept = resolve_opt_text_arg(args.accept.as_deref())?;
+    let resolved_verify = resolve_opt_text_arg(args.verify.as_deref())?;
 
     if let Some(ref t) = resolved_title
         && t.trim().is_empty()
@@ -150,9 +169,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         ("why", resolved_why.as_ref()),
         ("depends", args.depends.as_ref()),
         ("files", resolved_files.as_ref()),
+        ("read", resolved_read.as_ref()),
         ("problem", resolved_problem.as_ref()),
         ("fix", resolved_fix.as_ref()),
+        ("steps", resolved_steps.as_ref()),
         ("accept", resolved_accept.as_ref()),
+        ("verify", resolved_verify.as_ref()),
     ];
     for (key, value) in named {
         if let Some(value) = value {

@@ -371,11 +371,17 @@ fn canonical_field_order_and_insertion_lines_follow_format_section_10() {
             "about",
             "goal",
             "why",
+            "final",
             "depends",
             "files",
+            "read",
             "problem",
             "fix",
+            "steps",
             "accept",
+            "verify",
+            "attempts",
+            "verified",
             "commit"
         ]
     );
