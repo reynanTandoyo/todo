@@ -423,3 +423,105 @@ fn real_git_merge_is_clean_with_the_driver_where_plain_git_conflicts() {
         assert!(text.contains(want), "missing {want}: {text}");
     }
 }
+
+/// A file whose one task has the detail fields `read`, `steps` and `verify` (T-152).
+fn detailed_base() -> String {
+    format!(
+        "{FIXTURE_MARKER}
+# Demo
+
+## Now
+
+### T-001 · One
+- status: open
+- owner: —
+- priority: P1
+- read: a.md
+- steps:
+  1. one
+  2. two
+  3. three
+- verify: make test
+- note (2026-11-15, a): added
+
+## Later
+
+prose
+"
+    )
+}
+
+#[test]
+fn steps_are_part_of_the_task_block_and_merge_with_other_fields() {
+    let d = TempDir::new().unwrap();
+    let base = detailed_base();
+    // Ours edits step 2; theirs changes the status and adds a note at the end of the block.
+    let ours = base.replace(
+        "  2. two
+",
+        "  2. TWO
+",
+    );
+    let theirs = base
+        .replace(
+            "- status: open
+",
+            "- status: blocked
+",
+        )
+        .replace(
+            "- note (2026-11-15, a): added
+",
+            "- note (2026-11-15, a): added
+- note (2026-11-16, b): theirs
+",
+        );
+    let r = run_driver(d.path(), &base, &ours, &theirs);
+    assert_eq!(code(&r), 0, "{}", r.result);
+    assert!(!r.result.contains("<<<<<<<"), "{}", r.result);
+    assert!(
+        r.result.contains(
+            "- status: blocked
+- owner: —
+- priority: P1
+- read: a.md
+- steps:
+  1. one
+  2. TWO
+  3. three
+- verify: make test
+"
+        ),
+        "{}",
+        r.result
+    );
+    assert!(
+        r.result.contains(
+            "- note (2026-11-16, b): theirs
+"
+        ),
+        "{}",
+        r.result
+    );
+}
+
+#[test]
+fn the_same_step_changed_differently_on_both_sides_is_a_conflict() {
+    let d = TempDir::new().unwrap();
+    let base = detailed_base();
+    let ours = base.replace(
+        "  1. one
+",
+        "  1. ONE
+",
+    );
+    let theirs = base.replace(
+        "  1. one
+",
+        "  1. UNO
+",
+    );
+    let r = run_driver(d.path(), &base, &ours, &theirs);
+    assert_eq!(code(&r), 1, "{}", r.result);
+    assert!(r.result.contains("<<<<<<<"), "{}", r.result);
+}
