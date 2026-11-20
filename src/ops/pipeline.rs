@@ -635,19 +635,41 @@ pub fn build_claim_edits(
     session: Option<&str>,
     now: DateTime<FixedOffset>,
 ) -> (Vec<LineEdit>, TaskChangeIntent) {
+    build_claim_edits_with_note(doc, task, plan, session, now, None)
+}
+
+/// [`build_claim_edits`], with `extra_note` written after the plan's own note. `claim` uses it to
+/// record a `--force` override of a file scope (`FILES_BUSY`, R-SCOPE-1; `docs/format.md` §9).
+#[must_use]
+pub fn build_claim_edits_with_note(
+    doc: &Document,
+    task: &Task,
+    plan: &ClaimPlan,
+    session: Option<&str>,
+    now: DateTime<FixedOffset>,
+    extra_note: Option<&str>,
+) -> (Vec<LineEdit>, TaskChangeIntent) {
     let mut builder = TaskEditBuilder::new(doc, task);
     builder.set_status(plan.new_status);
     builder.set_owner(Some(&plan.new_owner));
     builder.set_claimed(&plan.claimed_timestamp);
     builder.set_session(session);
-    if let Some(ref note_text) = plan.auto_note {
+    let notes: Vec<&str> = plan
+        .auto_note
+        .as_deref()
+        .into_iter()
+        .chain(extra_note)
+        .collect();
+    if !notes.is_empty() {
         let date = OpsConfig::format_note_date(now);
         let author = if plan.new_owner.is_empty() {
             "agent"
         } else {
             &plan.new_owner
         };
-        builder.add_note(&date, author, note_text);
+        for note_text in notes {
+            builder.add_note(&date, author, note_text);
+        }
     }
     builder.build()
 }

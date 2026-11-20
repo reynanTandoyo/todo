@@ -122,6 +122,8 @@ pub enum ErrorCode {
     ToolTooOld,
     /// The project is already in the project register, by its file or by its name (R-PROJ-1).
     DuplicateProject,
+    /// The task's files overlap a task that another agent holds, so the claim is refused (R-SCOPE-1, R-CLAIM-2).
+    FilesBusy,
 }
 
 impl ErrorCode {
@@ -151,6 +153,7 @@ impl ErrorCode {
             Self::NoGitHistory => "NO_GIT_HISTORY",
             Self::ToolTooOld => "TOOL_TOO_OLD",
             Self::DuplicateProject => "DUPLICATE_PROJECT",
+            Self::FilesBusy => "FILES_BUSY",
         }
     }
 
@@ -179,6 +182,7 @@ impl ErrorCode {
         Self::NoGitHistory,
         Self::ToolTooOld,
         Self::DuplicateProject,
+        Self::FilesBusy,
     ];
 
     /// Plain-English meaning of this error code, shown by `todo schema`.
@@ -219,6 +223,9 @@ impl ErrorCode {
             Self::DuplicateProject => {
                 "The project is already in the project register, with the same file or the same name."
             }
+            Self::FilesBusy => {
+                "The task's files overlap a task that another agent holds. Claim with --force to override."
+            }
         }
     }
 
@@ -237,7 +244,8 @@ impl ErrorCode {
             | Self::AmbiguousSection
             | Self::MissingField
             | Self::BadValue
-            | Self::DuplicateProject => ExitCode::Refused,
+            | Self::DuplicateProject
+            | Self::FilesBusy => ExitCode::Refused,
             Self::Busy | Self::LeaseHeld | Self::ChangedDuringWrite => ExitCode::Busy,
             Self::NoGitHistory => ExitCode::CheckError,
             Self::NoFile

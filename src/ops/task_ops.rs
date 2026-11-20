@@ -11,11 +11,12 @@ use serde::Deserialize;
 use crate::doc::{Document, LineEdit, Status, Task};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::milestone;
-use crate::ops::pipeline::{build_claim_edits, build_release_edits};
+use crate::ops::pipeline::{build_claim_edits_with_note, build_release_edits};
 use crate::ops::rules::{
     OwnershipDecision, StatusCommand, TaskCommand, check_ownership, check_promotable,
     forced_note_text, plan_claim, plan_release, validate_transition,
 };
+use crate::ops::scope::check_claim_files;
 use crate::ops::{OpsConfig, TaskEditBuilder};
 
 /// Who performs an operation, when, and with which settings.
@@ -187,7 +188,16 @@ impl TaskOp<'_> {
         match self {
             Self::Claim => {
                 let plan = plan_claim(task, agent, env.force, now, cfg)?;
-                return Ok(build_claim_edits(doc, task, &plan, env.session, now).0);
+                let files_note = check_claim_files(doc, task, agent, env.force, now, cfg)?;
+                let (edits, _) = build_claim_edits_with_note(
+                    doc,
+                    task,
+                    &plan,
+                    env.session,
+                    now,
+                    files_note.as_deref(),
+                );
+                return Ok(edits);
             }
             Self::Release => {
                 let plan = plan_release(task, agent, env.force, cfg)?;

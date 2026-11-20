@@ -45,7 +45,8 @@ Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock
 
 - `type` is the `type` field as written; `section` is the `##` section the entry is under, or `null`.
 - `archived` is `true` for an entry read from `TODO-archive.md`.
-- `stale` is `true` when the claim is past its timeout (`R-CLAIM-4`); `ready` is `true` when `next` could hand the entry out now.
+- `stale` is `true` when the claim is past its timeout (`R-CLAIM-4`); `ready` is `true` when `next` could hand the entry out now, files included.
+- `files_busy` lists the tasks of other agents that hold a file this entry names (`R-SCOPE-1`), in file order, each with `id`, `title`, `status` (`claimed` or `blocked`) and `owner`. It is `[]` when none holds one, and `ready` is `false` while it lists a task. A task owned by the same agent is not listed.
 - `milestones` lists the milestones above the entry, from the top down, with `goal` and `status`; `milestone` is the parent as written.
 - `children` lists the entries whose `milestone` is this entry, with `kind` (`task` or `milestone`).
 - `depends` holds the dependency tokens as written. `dependencies` has one entry per token: `raw`, `id`, `exists`, `archived`, `status`, `title` and `satisfied` (`true` when the target is done or dropped; `null` and `false` when it does not exist).
@@ -163,6 +164,7 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
         "area": null,
         "depends": [],
         "ready": true,
+        "files_busy": [],
         "fields": {},
         "line_start": 7,
         "line_end": 11
@@ -214,6 +216,7 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
       { "id": "T-005", "title": "Are shadows in scope?", "status": "open", "archived": false }
     ],
     "ready": false,
+    "files_busy": [],
     "files": null,
     "read": [],
     "problem": null,
@@ -268,6 +271,7 @@ the output for a fixture with one open task:
       "dependents": [],
       "questions": [],
       "ready": true,
+      "files_busy": [],
       "files": null,
       "read": [],
       "problem": null,
@@ -911,6 +915,7 @@ project's `TODO.md`, never searches folders and writes nothing.
 | `WRITE_FAILED` | 4 | Atomic write or rename failed | `{"code":"WRITE_FAILED","message":"failed writing temporary file"}` |
 | `NO_GIT_HISTORY` | 5 | `align` without git, outside a repository, in a shallow clone or with no commits | `{"code":"NO_GIT_HISTORY","message":"not inside a git repository"}` |
 | `TOOL_TOO_OLD` | 4 | `TODO.md`, the archive or the project register names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 3 is newer than this todo 0.7.0 supports; ...","line":1,"file":"TODO.md"}` |
+| `FILES_BUSY` | 1 | `claim` of a task whose `files` overlap a task another agent holds (R-SCOPE-1, R-CLAIM-2); `--force` overrides it | `{"code":"FILES_BUSY","message":"task T-002 shares files with T-001 (claimed by alice); pass --force to claim it anyway","task":"T-002","files_busy":["T-001"]}` |
 | `DUPLICATE_PROJECT` | 1 | `project add` for a file, or a name, that the project register already has (R-PROJ-1) | `{"code":"DUPLICATE_PROJECT","message":"C:\\Projekte\\TODO.md is already registered as renderer"}` |
 
 ### `TOOL_TOO_OLD` (`R-VER-2`)
