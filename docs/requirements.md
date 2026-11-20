@@ -1277,8 +1277,10 @@ the check itself.
     with `VERIFY_NOT_RUN`, nothing is written, and `attempts` doesn't change. A task without `verify`
     behaves as before v0.8. `reopen` removes `verified` (R-WRITE-10); `set`, `--unset` included,
     cannot write `verified` or `attempts` (R-WRITE-8). `done --no-verify` without `--force` is
-    refused with `USAGE` (exit 2). `apply`'s `done` runs no command, since `apply` writes under one
-    lock (R-LOCK-4); `verify --wave` checks those tasks afterwards.
+    refused with `USAGE` (exit 2). `apply`'s `done` runs the `verify` command of each done task
+    before the lock is taken, as `done` does (R-LOCK-4). A failing check, or one that cannot start,
+    refuses the whole batch with the same code as `done`, and nothing is written, not even the
+    attempt that `done` would record. With `verify_when = "wave"` or `verify = false` nothing runs.
   - `check` and `plan` list done tasks with a `verify` command and no `verified` line (R-CHECK-1,
     R-LEVEL-2). `check` does not list them while `verify = false`, since no check can pass then.
   - Tests use a command that passes, one that fails and one that outlives a short timeout, in each

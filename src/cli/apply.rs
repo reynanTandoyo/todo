@@ -9,21 +9,24 @@ use clap::Args as ClapArgs;
 use serde::{Deserialize, Serialize};
 use similar::TextDiff;
 
+use crate::atomic::read_file_with_snapshot;
 use crate::cli::add::resolve_target_section;
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::doc::{
     Document, LineEdit, TaskChangeIntent, TaskId, verify_task_edits,
 };
 use crate::error::{ErrorCode, Result, TodoError};
-use crate::find::{fs_path, synced_folder_warning};
+use crate::find::{FoundTodo, fs_path, synced_folder_warning, verify_folder};
 use crate::lock::{WriteOutcomeFull, current_time, locked_read_modify_write_full};
 use crate::ops::{
     DoneCheck, NewTask, OpEnv, OpsConfig, OwnershipDecision, SetChange, StepsInput, TaskCommand,
-    TaskOp, check_ownership, check_task_writable, file_label, forced_note_text, highest_task_number,
-    milestone, parse_doc_for_write, read_optional_archive, resolve_task_in_doc, steps_from_text,
+    TaskOp, VerifyWhen, check_ownership, check_task_writable, file_label, forced_note_text,
+    highest_task_number, milestone, parse_doc_for_write, read_optional_archive,
+    resolve_task_in_doc, steps_from_text,
 };
 use crate::ops::identity::done_by;
 use crate::ops::migrate::PendingMigration;
+use crate::ops::verify::{self, CheckOutcome};
 use crate::output::Output;
 use crate::state::{IdsState, StateDir};
 use crate::version::RUNNING_VERSION;
@@ -220,6 +223,25 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         })
         .collect();
 
+    // The `verify` commands of the `done` operations run before the lock is taken, as `done` runs
+    // them (T-173, R-LOCK-4). Nothing runs when the verify commands are off or wait for the wave.
+    let env = BatchEnv {
+        cfg: &cfg,
+        label: &label,
+        agent: &agent,
+        force: ctx.force,
+        session: ctx.session.as_deref(),
+        done_bys: &done_bys,
+        now: current_time(),
+    };
+    let required = cfg.verify_enabled && cfg.verify_when == VerifyWhen::Done;
+    let checked: Vec<Option<String>> = if required {
+        let bytes = read_file_with_snapshot(&found.path)?.bytes;
+        check_done_commands(out, &found, &env, &state, &ops, &bytes)?
+    } else {
+        vec![None; ops.len()]
+    };
+
     let mut lock_warnings = Vec::new();
     let mut stamp_warning: Option<String> = None;
     let mut migrated_notice: Option<String> = None;
@@ -240,99 +262,61 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             let (migrated_todo, migration) =
                 PendingMigration::plan(&parsed, &label, archive.as_ref(), &archive_path, &cfg)?
                     .split();
-            let mut doc = migrated_todo.map_or(parsed, |m| m.doc);
-            let mut working_bytes = doc.to_bytes();
-            // Changes are judged against the migrated text: a migration alone writes nothing here.
-            let start_bytes = working_bytes.clone();
-            let now = current_time();
-
+            let doc = migrated_todo.map_or(parsed, |m| m.doc);
             let initial_state = state.read_ids()?.map_or(0, |s| s.highest_id);
-            let mut highest_id = highest_task_number(&doc, archive.as_ref(), initial_state);
+            let mut pass = run_batch(&ops, doc, archive.as_ref(), initial_state, &env, &checked)?;
 
-            let mut refs: BTreeMap<String, String> = BTreeMap::new();
-            let mut results = Vec::with_capacity(ops.len());
-
-            for (idx, op) in ops.iter().enumerate() {
-                let op_num = idx + 1;
-                let (op_name, task_id_str, edits, step_intent) = apply_one_op(
-                    op,
-                    op_num,
-                    &doc,
-                    archive.as_ref(),
-                    &cfg,
-                    &label,
-                    &agent,
-                    ctx.force,
-                    ctx.session.as_deref(),
-                    done_bys[idx].as_deref(),
-                    now,
-                    &mut highest_id,
-                    &mut refs,
-                )?;
-
-                let applied_step = doc.line_doc.apply_edits(&edits).map_err(|e| {
-                    TodoError::new(
-                        ErrorCode::WriteFailed,
-                        format!("apply operation #{op_num} ({op_name}) failed: {e}"),
-                    )
-                })?;
-                let new_doc =
-                    Document::parse_bytes_with_config(&applied_step.bytes, cfg.id_config.clone())
-                        .map_err(|e| {
-                            TodoError::new(
-                                ErrorCode::WriteFailed,
-                                format!("apply operation #{op_num} ({op_name}) failed: {e}"),
-                            )
-                            .with_file(&label)
-                            .with_line(e.line)
-                        })?;
-                verify_task_edits(&doc, &new_doc, &step_intent).map_err(|e| {
-                    TodoError::new(
-                        ErrorCode::WriteFailed,
-                        format!("apply operation #{op_num} ({op_name}) failed: {e}"),
-                    )
-                })?;
-
-                working_bytes = applied_step.bytes;
-                doc = new_doc;
-                results.push(AppliedOpJson {
-                    index: op_num,
-                    op: op_name.to_string(),
-                    task: task_id_str,
-                });
+            // A `done` whose `verify` line appeared after the batch was checked is refused, so no
+            // change goes through on a check that never ran (T-173).
+            if required {
+                for (idx, entry) in pass.done_verify.iter().enumerate() {
+                    if let Some((id, _)) = entry
+                        && checked[idx].is_none()
+                    {
+                        return Err(TodoError::new(
+                            ErrorCode::ChangedDuringWrite,
+                            format!(
+                                "the verify line of {id} changed while the batch was checked, so nothing was written; run apply again"
+                            ),
+                        )
+                        .with_task(id.clone()));
+                    }
+                }
             }
 
-            if working_bytes == start_bytes {
-                return Ok(WriteOutcomeFull::Unchanged(results));
+            if pass.working_bytes == pass.start_bytes {
+                return Ok(WriteOutcomeFull::Unchanged(pass.results));
             }
 
             // The same write adds or raises the tool stamp (R-VER-1).
-            if let Some(stamped) = doc.with_tool_stamp(RUNNING_VERSION).map_err(|e| {
+            if let Some(stamped) = pass.doc.with_tool_stamp(RUNNING_VERSION).map_err(|e| {
                 TodoError::new(ErrorCode::WriteFailed, e.to_string()).with_file(&label)
             })? {
-                working_bytes = stamped.bytes;
+                pass.working_bytes = stamped.bytes;
             }
 
             if ctx.dry_run {
                 let before_str = String::from_utf8_lossy(bytes);
-                let after_str = String::from_utf8_lossy(&working_bytes);
+                let after_str = String::from_utf8_lossy(&pass.working_bytes);
                 let diff = TextDiff::from_lines(before_str.as_ref(), after_str.as_ref())
                     .unified_diff()
                     .header(&format!("a/{label}"), &format!("b/{label}"))
                     .to_string();
                 dry_run_diff = Some(diff);
-                return Ok(WriteOutcomeFull::Unchanged(results));
+                return Ok(WriteOutcomeFull::Unchanged(pass.results));
             }
 
-            if highest_id > initial_state {
-                state.write_ids(&IdsState { highest_id })?;
+            if pass.highest_id > initial_state {
+                state.write_ids(&IdsState {
+                    highest_id: pass.highest_id,
+                })?;
             }
 
             migrated_notice = migration.as_ref().map(|m| m.summary.clone());
             Ok(WriteOutcomeFull::Changed {
-                new_bytes: working_bytes,
+                new_bytes: pass.working_bytes,
                 touched_tasks: None,
-                value: results,
+                value: pass.results,
                 migration,
                 archive: None,
             })
@@ -473,6 +457,7 @@ fn apply_one_op(
     now: chrono::DateTime<chrono::FixedOffset>,
     highest_id: &mut u64,
     refs: &mut BTreeMap<String, String>,
+    passed: Option<&str>,
 ) -> Result<(&'static str, String, Vec<LineEdit>, TaskChangeIntent)> {
     let date = OpsConfig::format_note_date(now);
 
@@ -668,7 +653,7 @@ fn apply_one_op(
                 now,
                 session,
             };
-            apply_task_op(other, op_num, doc, archive, label, &env, refs, done_by)
+            apply_task_op(other, op_num, doc, archive, label, &env, refs, done_by, passed)
         }
     }
 }
@@ -720,6 +705,7 @@ fn apply_task_op(
     env: &OpEnv<'_>,
     refs: &BTreeMap<String, String>,
     done_by: Option<&str>,
+    passed: Option<&str>,
 ) -> Result<(&'static str, String, Vec<LineEdit>, TaskChangeIntent)> {
     let mut dep_owned = String::new();
     let mut milestone_owned = String::new();
@@ -728,15 +714,17 @@ fn apply_task_op(
     let (raw_task, task_op) = match op {
         ApplyOp::Claim { task } => (task, TaskOp::Claim),
         ApplyOp::Release { task } => (task, TaskOp::Release),
-        // `apply` writes every change under one lock, where no command may run (R-LOCK-4), so its
-        // `done` runs no `verify` command; `verify --wave` checks such tasks afterwards.
+        // The `verify` command of each `done` ran before the lock was taken, as `done` runs it
+        // (T-173); `passed` is the command that passed, which the change checks again.
         ApplyOp::Done { task, note, commit } => (
             task,
             TaskOp::Done {
                 note: note.as_deref(),
                 commit: commit.as_deref().map(str::trim),
                 by: done_by,
-                check: DoneCheck::NotChecked,
+                check: passed.map_or(DoneCheck::NotChecked, |command| DoneCheck::Passed {
+                    command,
+                }),
             },
         ),
         ApplyOp::Drop { task, note } => (
@@ -862,4 +850,181 @@ fn apply_task_op(
         edits,
         TaskChangeIntent::modify_one(task.id),
     ))
+}
+
+/// What `apply` needs for every pass over its batch, apart from the operations and the document
+/// (T-173): the settings, the agent and the time of the batch.
+struct BatchEnv<'a> {
+    cfg: &'a OpsConfig,
+    label: &'a str,
+    agent: &'a str,
+    force: bool,
+    session: Option<&'a str>,
+    /// The person behind each operation (`R-WRITE-16`), by operation index.
+    done_bys: &'a [Option<String>],
+    now: chrono::DateTime<chrono::FixedOffset>,
+}
+
+/// The outcome of one pass over a batch (T-173).
+struct BatchPass {
+    /// One entry per operation, as the output lists them.
+    results: Vec<AppliedOpJson>,
+    /// The text of the document before the batch, as migrated.
+    start_bytes: Vec<u8>,
+    /// The text after the last operation, not yet stamped.
+    working_bytes: Vec<u8>,
+    /// The document after the last operation.
+    doc: Document,
+    /// The highest task number after the batch (`R-ID-2`).
+    highest_id: u64,
+    /// By operation index: the task a `done` finishes, and the `verify` line that task has before it.
+    done_verify: Vec<Option<(String, String)>>,
+}
+
+/// Applies the operations to `doc`, in order, in memory (T-173). `passed` gives, by operation index,
+/// the `verify` command whose check passed before the lock was taken; a `done` with one records it
+/// as its check, and its own change checks again that the line is still that command.
+fn run_batch(
+    ops: &[ApplyOp],
+    mut doc: Document,
+    archive: Option<&Document>,
+    initial_state: u64,
+    env: &BatchEnv<'_>,
+    passed: &[Option<String>],
+) -> Result<BatchPass> {
+    let start_bytes = doc.to_bytes();
+    let mut working_bytes = start_bytes.clone();
+    let mut highest_id = highest_task_number(&doc, archive, initial_state);
+    let mut refs: BTreeMap<String, String> = BTreeMap::new();
+    let mut results = Vec::with_capacity(ops.len());
+    let mut done_verify = Vec::with_capacity(ops.len());
+
+    for (idx, op) in ops.iter().enumerate() {
+        let op_num = idx + 1;
+        done_verify.push(done_verify_line(op, &doc, &refs, env.cfg));
+        let (op_name, task_id_str, edits, step_intent) = apply_one_op(
+            op,
+            op_num,
+            &doc,
+            archive,
+            env.cfg,
+            env.label,
+            env.agent,
+            env.force,
+            env.session,
+            env.done_bys[idx].as_deref(),
+            env.now,
+            &mut highest_id,
+            &mut refs,
+            passed.get(idx).and_then(|command| command.as_deref()),
+        )?;
+
+        let applied_step = doc.line_doc.apply_edits(&edits).map_err(|e| {
+            TodoError::new(
+                ErrorCode::WriteFailed,
+                format!("apply operation #{op_num} ({op_name}) failed: {e}"),
+            )
+        })?;
+        let new_doc =
+            Document::parse_bytes_with_config(&applied_step.bytes, env.cfg.id_config.clone())
+                .map_err(|e| {
+                    TodoError::new(
+                        ErrorCode::WriteFailed,
+                        format!("apply operation #{op_num} ({op_name}) failed: {e}"),
+                    )
+                    .with_file(env.label)
+                    .with_line(e.line)
+                })?;
+        verify_task_edits(&doc, &new_doc, &step_intent).map_err(|e| {
+            TodoError::new(
+                ErrorCode::WriteFailed,
+                format!("apply operation #{op_num} ({op_name}) failed: {e}"),
+            )
+        })?;
+
+        working_bytes = applied_step.bytes;
+        doc = new_doc;
+        results.push(AppliedOpJson {
+            index: op_num,
+            op: op_name.to_string(),
+            task: task_id_str,
+        });
+    }
+    Ok(BatchPass {
+        results,
+        start_bytes,
+        working_bytes,
+        doc,
+        highest_id,
+        done_verify,
+    })
+}
+
+/// The task a `done` operation finishes, and the `verify` line that task has just before the
+/// operation (T-173). `None` for other operations, for a `done` whose task has no `verify` line,
+/// and for a task that does not resolve: applying the operation reports that error.
+fn done_verify_line(
+    op: &ApplyOp,
+    doc: &Document,
+    refs: &BTreeMap<String, String>,
+    cfg: &OpsConfig,
+) -> Option<(String, String)> {
+    let ApplyOp::Done { task, .. } = op else {
+        return None;
+    };
+    let task_ref = resolve_task_ref(task, refs).ok()?;
+    let target = resolve_task_in_doc(doc, &task_ref).ok()?;
+    let command = target.verify.clone()?;
+    Some((cfg.id_config.format_id(target.id), command))
+}
+
+/// Runs the `verify` command of each `done` in the batch before the lock is taken, as `done` runs its
+/// command (T-173). The batch is applied in memory to find the line each `done` finishes with, and
+/// each command runs in the folder `done` uses. A failing check, or one that cannot start, refuses
+/// the whole batch, and nothing is written. Returns, by operation index, the command that passed.
+fn check_done_commands(
+    out: &mut Output,
+    found: &FoundTodo,
+    env: &BatchEnv<'_>,
+    state: &StateDir,
+    ops: &[ApplyOp],
+    bytes: &[u8],
+) -> Result<Vec<Option<String>>> {
+    let cfg = env.cfg;
+    let archive_path = cfg.archive_path(&found.path);
+    let parsed = parse_doc_for_write(bytes, env.label, cfg)?;
+    let archive = read_optional_archive(&archive_path, cfg.id_config.clone())?;
+    let (migrated_todo, _) =
+        PendingMigration::plan(&parsed, env.label, archive.as_ref(), &archive_path, cfg)?.split();
+    let doc = migrated_todo.map_or(parsed, |m| m.doc);
+    let initial_state = state.read_ids()?.map_or(0, |s| s.highest_id);
+    let pass = run_batch(ops, doc, archive.as_ref(), initial_state, env, &[])?;
+
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let folder = verify_folder(found, &cwd);
+    let mut passed: Vec<Option<String>> = vec![None; ops.len()];
+    for (idx, entry) in pass.done_verify.iter().enumerate() {
+        let Some((id, command)) = entry else {
+            continue;
+        };
+        let log = verify::log_path(state.path(), id);
+        match verify::run_check(cfg, command, &folder, &log)? {
+            CheckOutcome::Passed => passed[idx] = Some(command.clone()),
+            CheckOutcome::NotRun { reason } => return Err(verify::not_run_error(id, &reason)),
+            CheckOutcome::Failed(failure) => {
+                if !out.is_json() {
+                    for line in &failure.tail {
+                        out.info(line);
+                    }
+                }
+                let message = format!(
+                    "apply refused: verify of {id} failed ({}), so nothing was written: {}",
+                    verify::exit_text(&failure),
+                    failure.last_line
+                );
+                return Err(verify::failure_error(id, &failure, message));
+            }
+        }
+    }
+    Ok(passed)
 }

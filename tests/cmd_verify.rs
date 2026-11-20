@@ -1106,3 +1106,170 @@ fn wave_check_that_outlives_the_timeout_is_given_back_with_the_timeout_as_its_pr
         "{text}"
     );
 }
+
+// ---------------------------------------------------------------------------------------------
+// `apply`'s `done` runs the same checks as `done` (T-173)
+// ---------------------------------------------------------------------------------------------
+
+/// T-001 and T-002, both claimed by alice, with the given check on each.
+fn two_claimed(first_check: &str, second_check: &str) -> String {
+    let first = format!("verify: {first_check}");
+    let second = format!("verify: {second_check}");
+    file(&[
+        block(
+            "T-001",
+            "First",
+            &[
+                "status: claimed",
+                "owner: alice",
+                "claimed: 2026-11-15T10:00+01:00",
+                "priority: P1 · difficulty: 2",
+                &first,
+                "note (2026-11-15, alice): added",
+            ],
+        ),
+        block(
+            "T-002",
+            "Second",
+            &[
+                "status: claimed",
+                "owner: alice",
+                "claimed: 2026-11-15T10:00+01:00",
+                "priority: P1 · difficulty: 2",
+                &second,
+                "note (2026-11-15, alice): added",
+            ],
+        ),
+    ])
+}
+
+/// Writes the operations as JSON lines to `work/name` and returns the name for `apply`.
+fn write_ops(work: &Path, name: &str, ops: &[serde_json::Value]) -> String {
+    let mut text = String::new();
+    for op in ops {
+        text.push_str(&op.to_string());
+        text.push('\n');
+    }
+    fs::write(work.join(name), text).unwrap();
+    name.to_string()
+}
+
+#[test]
+fn apply_done_refuses_the_whole_batch_when_one_check_fails_and_writes_nothing() {
+    let tmp = TempDir::new().unwrap();
+    let body = two_claimed(&fail_check("tests failed"), pass_check());
+    let (home, work, todo_file) = setup_proj(&tmp, &body);
+    let ops = write_ops(
+        &work,
+        "ops.jsonl",
+        &[
+            serde_json::json!({"op": "done", "task": "T-002", "note": "ok"}),
+            serde_json::json!({"op": "done", "task": "T-001", "note": "ok"}),
+        ],
+    );
+    let before = fs::read(&todo_file).unwrap();
+
+    let out = todo(&home, &work, &["--json", "apply", &ops, "--agent", "alice"]);
+    let json = assert_json_error(&out, "VERIFY_FAILED", 1);
+    assert_eq!(json["error"]["task"], "T-001", "{json}");
+    assert_eq!(json["error"]["last_line"], "tests failed", "{json}");
+    assert_eq!(
+        fs::read(&todo_file).unwrap(),
+        before,
+        "the passing T-002 is not written either"
+    );
+}
+
+#[test]
+fn apply_done_writes_verified_for_each_task_whose_check_passed() {
+    let tmp = TempDir::new().unwrap();
+    let body = two_claimed(pass_check(), pass_check());
+    let (home, work, todo_file) = setup_proj(&tmp, &body);
+    let ops = write_ops(
+        &work,
+        "ops.jsonl",
+        &[
+            serde_json::json!({"op": "done", "task": "T-002", "note": "ok"}),
+            serde_json::json!({"op": "done", "task": "T-001", "note": "ok"}),
+        ],
+    );
+
+    let out = todo(&home, &work, &["apply", &ops, "--agent", "alice"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let text = without_stamps(&read_text(&todo_file));
+    assert_eq!(text.matches("- status: done\n").count(), 2, "{text}");
+    assert_eq!(
+        text.matches("- verified: 2026-11-15\n").count(),
+        2,
+        "{text}"
+    );
+}
+
+#[test]
+fn apply_done_checks_the_verify_line_the_batch_gives_the_task_at_that_point() {
+    let tmp = TempDir::new().unwrap();
+    // T-002 passes its own check, but the batch first changes the check to one that fails.
+    let body = two_claimed(pass_check(), pass_check());
+    let (home, work, todo_file) = setup_proj(&tmp, &body);
+    let ops = write_ops(
+        &work,
+        "ops.jsonl",
+        &[
+            serde_json::json!({"op": "set", "task": "T-002", "verify": fail_check("changed first")}),
+            serde_json::json!({"op": "done", "task": "T-002", "note": "ok"}),
+        ],
+    );
+    let before = fs::read(&todo_file).unwrap();
+
+    let out = todo(&home, &work, &["--json", "apply", &ops, "--agent", "alice"]);
+    let json = assert_json_error(&out, "VERIFY_FAILED", 1);
+    assert_eq!(json["error"]["last_line"], "changed first", "{json}");
+    assert_eq!(fs::read(&todo_file).unwrap(), before);
+}
+
+#[test]
+fn apply_done_whose_check_cannot_start_is_verify_not_run_and_writes_nothing() {
+    let tmp = TempDir::new().unwrap();
+    let body = two_claimed(pass_check(), pass_check());
+    let (home, work, todo_file) = setup_proj(&tmp, &body);
+    write_toml(
+        &work,
+        "verify_shell = [\"todo-test-no-such-shell\", \"-c\"]\n",
+    );
+    let ops = write_ops(
+        &work,
+        "ops.jsonl",
+        &[serde_json::json!({"op": "done", "task": "T-002", "note": "ok"})],
+    );
+    let before = fs::read(&todo_file).unwrap();
+
+    let out = todo(&home, &work, &["--json", "apply", &ops, "--agent", "alice"]);
+    assert_json_error(&out, "VERIFY_NOT_RUN", 5);
+    assert_eq!(fs::read(&todo_file).unwrap(), before);
+}
+
+#[test]
+fn apply_done_runs_no_check_in_wave_mode_and_none_with_verify_false() {
+    for settings in ["verify_when = \"wave\"\n", "verify = false\n"] {
+        let tmp = TempDir::new().unwrap();
+        let body = two_claimed(&fail_check("would fail"), pass_check());
+        let (home, work, todo_file) = setup_proj(&tmp, &body);
+        write_toml(&work, settings);
+        let ops = write_ops(
+            &work,
+            "ops.jsonl",
+            &[serde_json::json!({"op": "done", "task": "T-001", "note": "ok"})],
+        );
+
+        // The check would fail, so a success shows that nothing ran.
+        let out = todo(&home, &work, &["apply", &ops, "--agent", "alice"]);
+        assert!(
+            out.status.success(),
+            "{settings:?}: stderr: {}",
+            stderr_text(&out)
+        );
+        let text = without_stamps(&read_text(&todo_file));
+        assert!(text.contains("- status: done\n"), "{settings:?}: {text}");
+        assert!(!text.contains("verified:"), "{settings:?}: {text}");
+    }
+}
