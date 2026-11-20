@@ -226,6 +226,11 @@ expression: ok_json
         "summary": "Show write lock and manual lease status"
       },
       {
+        "kind": "write",
+        "name": "stuck",
+        "summary": "Give a claimed task back to the planner with the problem"
+      },
+      {
         "kind": "read",
         "name": "summary",
         "summary": "Show a compact session-start overview of TODO.md"

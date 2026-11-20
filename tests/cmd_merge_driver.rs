@@ -423,3 +423,278 @@ fn real_git_merge_is_clean_with_the_driver_where_plain_git_conflicts() {
         assert!(text.contains(want), "missing {want}: {text}");
     }
 }
+
+/// A file whose one task has the detail fields `read`, `steps` and `verify` (T-152).
+fn detailed_base() -> String {
+    format!(
+        "{FIXTURE_MARKER}
+# Demo
+
+## Now
+
+### T-001 · One
+- status: open
+- owner: —
+- priority: P1
+- read: a.md
+- steps:
+  1. one
+  2. two
+  3. three
+- verify: make test
+- note (2026-11-15, a): added
+
+## Later
+
+prose
+"
+    )
+}
+
+#[test]
+fn steps_are_part_of_the_task_block_and_merge_with_other_fields() {
+    let d = TempDir::new().unwrap();
+    let base = detailed_base();
+    // Ours edits step 2; theirs changes the status and adds a note at the end of the block.
+    let ours = base.replace(
+        "  2. two
+",
+        "  2. TWO
+",
+    );
+    let theirs = base
+        .replace(
+            "- status: open
+",
+            "- status: blocked
+",
+        )
+        .replace(
+            "- note (2026-11-15, a): added
+",
+            "- note (2026-11-15, a): added
+- note (2026-11-16, b): theirs
+",
+        );
+    let r = run_driver(d.path(), &base, &ours, &theirs);
+    assert_eq!(code(&r), 0, "{}", r.result);
+    assert!(!r.result.contains("<<<<<<<"), "{}", r.result);
+    assert!(
+        r.result.contains(
+            "- status: blocked
+- owner: —
+- priority: P1
+- read: a.md
+- steps:
+  1. one
+  2. TWO
+  3. three
+- verify: make test
+"
+        ),
+        "{}",
+        r.result
+    );
+    assert!(
+        r.result.contains(
+            "- note (2026-11-16, b): theirs
+"
+        ),
+        "{}",
+        r.result
+    );
+}
+
+#[test]
+fn the_same_step_changed_differently_on_both_sides_is_a_conflict() {
+    let d = TempDir::new().unwrap();
+    let base = detailed_base();
+    let ours = base.replace(
+        "  1. one
+",
+        "  1. ONE
+",
+    );
+    let theirs = base.replace(
+        "  1. one
+",
+        "  1. UNO
+",
+    );
+    let r = run_driver(d.path(), &base, &ours, &theirs);
+    assert_eq!(code(&r), 1, "{}", r.result);
+    assert!(r.result.contains("<<<<<<<"), "{}", r.result);
+}
+
+/// `text` (written with LF) with the line endings `eol`.
+fn with_eol(text: &str, eol: &str) -> String {
+    text.replace('\n', eol)
+}
+
+/// The steps lines of `detailed_base` in `eol`.
+fn steps_block(eol: &str) -> String {
+    with_eol("- steps:\n  1. one\n  2. two\n  3. three\n", eol)
+}
+
+#[test]
+fn a_steps_change_and_a_change_to_the_field_after_the_list_merge_in_lf_and_crlf() {
+    // Ours edits the last step, theirs edits the field right after the list: two different
+    // fields, so the merge is clean (T-167).
+    for eol in ["\n", "\r\n"] {
+        let d = TempDir::new().unwrap();
+        let base = with_eol(&detailed_base(), eol);
+        let ours = base.replace(
+            &with_eol("  3. three\n", eol),
+            &with_eol("  3. THREE\n", eol),
+        );
+        let theirs = base.replace(
+            &with_eol("- verify: make test\n", eol),
+            &with_eol("- verify: make all\n", eol),
+        );
+        let r = run_driver(d.path(), &base, &ours, &theirs);
+        assert_eq!(code(&r), 0, "eol {eol:?}: {}", r.result);
+        assert!(!r.result.contains("<<<<<<<"), "eol {eol:?}: {}", r.result);
+        let want = with_eol(
+            "- steps:\n  1. one\n  2. two\n  3. THREE\n- verify: make all\n",
+            eol,
+        );
+        assert!(r.result.contains(&want), "eol {eol:?}: {}", r.result);
+        if eol == "\r\n" {
+            assert!(
+                !r.result.replace("\r\n", "").contains('\n'),
+                "CRLF kept: {}",
+                r.result
+            );
+        }
+    }
+}
+
+#[test]
+fn a_steps_change_and_a_status_change_merge_in_lf_and_crlf() {
+    for eol in ["\n", "\r\n"] {
+        let d = TempDir::new().unwrap();
+        let base = with_eol(&detailed_base(), eol);
+        let ours = base.replace(&with_eol("  1. one\n", eol), &with_eol("  1. ONE\n", eol));
+        let theirs = base.replace(
+            &with_eol("- status: open\n", eol),
+            &with_eol("- status: blocked\n", eol),
+        );
+        let r = run_driver(d.path(), &base, &ours, &theirs);
+        assert_eq!(code(&r), 0, "eol {eol:?}: {}", r.result);
+        let want = with_eol(
+            "- status: blocked\n- owner: —\n- priority: P1\n- read: a.md\n- steps:\n  1. ONE\n  2. two\n  3. three\n",
+            eol,
+        );
+        assert!(r.result.contains(&want), "eol {eol:?}: {}", r.result);
+    }
+}
+
+#[test]
+fn both_sides_changing_steps_differently_is_a_conflict_in_lf_and_crlf() {
+    for eol in ["\n", "\r\n"] {
+        let d = TempDir::new().unwrap();
+        let base = with_eol(&detailed_base(), eol);
+        let ours = base.replace(&with_eol("  1. one\n", eol), &with_eol("  1. ONE\n", eol));
+        let theirs = base.replace(&with_eol("  1. one\n", eol), &with_eol("  1. UNO\n", eol));
+        let r = run_driver(d.path(), &base, &ours, &theirs);
+        assert_eq!(code(&r), 1, "eol {eol:?}: {}", r.result);
+        assert!(r.result.contains("<<<<<<<"), "eol {eol:?}: {}", r.result);
+    }
+}
+
+#[test]
+fn both_sides_making_the_same_steps_change_merge_in_lf_and_crlf() {
+    for eol in ["\n", "\r\n"] {
+        let d = TempDir::new().unwrap();
+        let base = with_eol(&detailed_base(), eol);
+        let same = base.replace(&with_eol("  1. one\n", eol), &with_eol("  1. ONE\n", eol));
+        let r = run_driver(d.path(), &base, &same, &same);
+        assert_eq!(code(&r), 0, "eol {eol:?}: {}", r.result);
+        assert!(
+            r.result.contains(&with_eol("  1. ONE\n", eol)),
+            "eol {eol:?}: {}",
+            r.result
+        );
+        assert!(!r.result.contains("<<<<<<<"), "eol {eol:?}: {}", r.result);
+    }
+}
+
+#[test]
+fn one_side_deleting_the_steps_and_the_other_changing_a_field_merge_in_lf_and_crlf() {
+    for eol in ["\n", "\r\n"] {
+        let d = TempDir::new().unwrap();
+        let base = with_eol(&detailed_base(), eol);
+        let ours = base.replace(&steps_block(eol), "");
+        let theirs = base.replace(
+            &with_eol("- status: open\n", eol),
+            &with_eol("- status: blocked\n", eol),
+        );
+        let r = run_driver(d.path(), &base, &ours, &theirs);
+        assert_eq!(code(&r), 0, "eol {eol:?}: {}", r.result);
+        assert!(!r.result.contains("- steps:"), "eol {eol:?}: {}", r.result);
+        assert!(
+            r.result.contains(&with_eol("- status: blocked\n", eol)),
+            "eol {eol:?}: {}",
+            r.result
+        );
+    }
+}
+
+#[test]
+fn deleting_the_steps_while_the_other_side_changes_them_is_a_conflict() {
+    for eol in ["\n", "\r\n"] {
+        let d = TempDir::new().unwrap();
+        let base = with_eol(&detailed_base(), eol);
+        let ours = base.replace(&steps_block(eol), "");
+        let theirs = base.replace(&with_eol("  2. two\n", eol), &with_eol("  2. TWO\n", eol));
+        let r = run_driver(d.path(), &base, &ours, &theirs);
+        assert_eq!(code(&r), 1, "eol {eol:?}: {}", r.result);
+        assert!(r.result.contains("<<<<<<<"), "eol {eol:?}: {}", r.result);
+    }
+}
+
+#[test]
+fn a_steps_list_added_on_one_side_and_a_field_change_on_the_other_merge_in_lf_and_crlf() {
+    for eol in ["\n", "\r\n"] {
+        // The base has no steps; the list is added on one side and the status changed on the other.
+        for steps_side_is_ours in [true, false] {
+            let d = TempDir::new().unwrap();
+            let without = detailed_base().replace(&steps_block("\n"), "");
+            let base = with_eol(&without, eol);
+            let added = base.replace(
+                &with_eol("- read: a.md\n", eol),
+                &format!("{}{}", with_eol("- read: a.md\n", eol), steps_block(eol)),
+            );
+            let status = base.replace(
+                &with_eol("- status: open\n", eol),
+                &with_eol("- status: blocked\n", eol),
+            );
+            let (ours, theirs) = if steps_side_is_ours {
+                (added, status)
+            } else {
+                (status, added)
+            };
+            let r = run_driver(d.path(), &base, &ours, &theirs);
+            assert_eq!(
+                code(&r),
+                0,
+                "eol {eol:?} ours-adds {steps_side_is_ours}: {}",
+                r.result
+            );
+            assert!(
+                r.result.contains(&with_eol("- status: blocked\n", eol)),
+                "eol {eol:?}: {}",
+                r.result
+            );
+            assert!(
+                r.result.contains(&format!(
+                    "{}{}",
+                    with_eol("- read: a.md\n", eol),
+                    steps_block(eol)
+                )),
+                "eol {eol:?}: {}",
+                r.result
+            );
+        }
+    }
+}

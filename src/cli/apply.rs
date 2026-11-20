@@ -18,9 +18,9 @@ use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{fs_path, synced_folder_warning};
 use crate::lock::{WriteOutcomeFull, current_time, locked_read_modify_write_full};
 use crate::ops::{
-    NewTask, OpEnv, OpsConfig, OwnershipDecision, SetChange, TaskCommand, TaskOp, check_ownership,
-    check_task_writable, file_label, forced_note_text, highest_task_number, milestone,
-    parse_doc_for_write, read_optional_archive, resolve_task_in_doc,
+    NewTask, OpEnv, OpsConfig, OwnershipDecision, SetChange, StepsInput, TaskCommand, TaskOp,
+    check_ownership, check_task_writable, file_label, forced_note_text, highest_task_number,
+    milestone, parse_doc_for_write, read_optional_archive, resolve_task_in_doc, steps_from_text,
 };
 use crate::ops::identity::done_by;
 use crate::ops::migrate::PendingMigration;
@@ -92,9 +92,12 @@ enum ApplyOp {
         why: Option<String>,
         depends: Option<DependsValue>,
         files: Option<String>,
+        read: Option<String>,
         problem: Option<String>,
         fix: Option<String>,
+        steps: Option<StepsInput>,
         accept: Option<String>,
+        verify: Option<String>,
         #[serde(default)]
         fields: BTreeMap<String, String>,
     },
@@ -139,9 +142,12 @@ enum ApplyOp {
         why: Option<String>,
         depends: Option<DependsValue>,
         files: Option<String>,
+        read: Option<String>,
         problem: Option<String>,
         fix: Option<String>,
+        steps: Option<StepsInput>,
         accept: Option<String>,
+        verify: Option<String>,
         #[serde(default)]
         fields: BTreeMap<String, String>,
     },
@@ -484,9 +490,12 @@ fn apply_one_op(
             why,
             depends,
             files,
+            read,
             problem,
             fix,
+            steps,
             accept,
+            verify,
             fields,
         } => {
             let clean_title = title.trim();
@@ -513,6 +522,22 @@ fn apply_one_op(
                 .or_else(|| fields.get("why").map(String::as_str))
                 .map(str::trim)
                 .filter(|w| !w.is_empty());
+            let read_src = read
+                .as_deref()
+                .or_else(|| fields.get("read").map(String::as_str))
+                .map(str::trim)
+                .filter(|r| !r.is_empty());
+            let verify_src = verify
+                .as_deref()
+                .or_else(|| fields.get("verify").map(String::as_str))
+                .map(str::trim)
+                .filter(|v| !v.is_empty());
+            let steps_list = match steps {
+                Some(input) => steps_from_text(&input.text()),
+                None => fields
+                    .get("steps")
+                    .map_or_else(Vec::new, |text| steps_from_text(text)),
+            };
             let milestone_id = match milestone_src {
                 Some(raw) => {
                     let target = resolve_task_ref(raw, refs)?;
@@ -572,9 +597,12 @@ fn apply_one_op(
                 why: why_src,
                 depends: dep_str.as_deref(),
                 files: trim(files),
+                read: read_src,
                 problem: trim(problem),
                 fix: trim(fix),
+                steps: &steps_list,
                 accept: trim(accept),
+                verify: verify_src,
                 extra: &extra,
             }
             .lines(&id_str, &date, agent);
@@ -695,6 +723,7 @@ fn apply_task_op(
 ) -> Result<(&'static str, String, Vec<LineEdit>, TaskChangeIntent)> {
     let mut dep_owned = String::new();
     let mut milestone_owned = String::new();
+    let mut steps_owned = String::new();
     let mut changes: Vec<SetChange<'_>> = Vec::new();
     let (raw_task, task_op) = match op {
         ApplyOp::Claim { task } => (task, TaskOp::Claim),
@@ -745,11 +774,17 @@ fn apply_task_op(
             why,
             depends,
             files,
+            read,
             problem,
             fix,
+            steps,
             accept,
+            verify,
             fields,
         } => {
+            if let Some(input) = steps {
+                steps_owned = input.text();
+            }
             if let Some(dep) = depends {
                 dep_owned = resolve_depends(dep, refs)?;
             }
@@ -783,12 +818,17 @@ fn apply_task_op(
                     SetChange::Field("depends", &dep_owned)
                 });
             }
+            if steps.is_some() {
+                changes.push(SetChange::Field("steps", &steps_owned));
+            }
             let rest = [
                 ("why", why),
                 ("files", files),
+                ("read", read),
                 ("problem", problem),
                 ("fix", fix),
                 ("accept", accept),
+                ("verify", verify),
             ];
             for (key, value) in rest {
                 if let Some(v) = value {

@@ -6,15 +6,17 @@
 //! exists once. Argument parsing, empty-text checks and output stay with the callers.
 
 use chrono::{DateTime, FixedOffset};
+use serde::Deserialize;
 
 use crate::doc::{Document, LineEdit, Status, Task};
-use crate::error::Result;
+use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::milestone;
-use crate::ops::pipeline::{build_claim_edits, build_release_edits};
+use crate::ops::pipeline::{build_claim_edits_with_note, build_release_edits};
 use crate::ops::rules::{
     OwnershipDecision, StatusCommand, TaskCommand, check_ownership, check_promotable,
     forced_note_text, plan_claim, plan_release, validate_transition,
 };
+use crate::ops::scope::check_claim_files;
 use crate::ops::{OpsConfig, TaskEditBuilder};
 
 /// Who performs an operation, when, and with which settings.
@@ -88,6 +90,12 @@ pub enum TaskOp<'a> {
         /// Optional note text.
         note: Option<&'a str>,
     },
+    /// Give a claimed task back to the planner with the problem (`R-STUCK-1`): blocked, no owner
+    /// and no claim, one more `attempts`, the note `stuck — <problem>`.
+    Stuck {
+        /// The problem text, required and non-empty.
+        reason: &'a str,
+    },
     /// Reopen a done or dropped task, optionally with a note.
     Reopen {
         /// Optional note text.
@@ -127,6 +135,28 @@ fn note_with(verb: &str, text: Option<&str>) -> String {
     }
 }
 
+/// The `attempts` value after one more failure (`R-STUCK-1`): 1 when the task has no `attempts`
+/// line yet, else the number written plus one. A value that is not a whole number is refused
+/// (`BAD_VALUE`) rather than reset, so no failure count is lost silently.
+fn attempts_after_failure(task: &Task, id_str: &str) -> Result<u64> {
+    let Some(raw) = task.field_value("attempts") else {
+        return Ok(1);
+    };
+    raw.trim()
+        .parse::<u64>()
+        .ok()
+        .and_then(|n| n.checked_add(1))
+        .ok_or_else(|| {
+            TodoError::new(
+                ErrorCode::BadValue,
+                format!(
+                    "attempts of {id_str} is not a whole number ({raw}); fix it by hand before giving the task back"
+                ),
+            )
+            .with_task(id_str)
+        })
+}
+
 impl TaskOp<'_> {
     /// Command name, used for forced notes and as the `apply` operation name.
     #[must_use]
@@ -138,6 +168,7 @@ impl TaskOp<'_> {
             Self::Drop { .. } | Self::DropTree { .. } | Self::DropWithin { .. } => "drop",
             Self::Block { .. } => "block",
             Self::Unblock { .. } => "unblock",
+            Self::Stuck { .. } => "stuck",
             Self::Reopen { .. } => "reopen",
             Self::Answer { .. } => "answer",
             Self::Promote { .. } => "promote",
@@ -157,7 +188,16 @@ impl TaskOp<'_> {
         match self {
             Self::Claim => {
                 let plan = plan_claim(task, agent, env.force, now, cfg)?;
-                return Ok(build_claim_edits(doc, task, &plan, env.session, now).0);
+                let files_note = check_claim_files(doc, task, agent, env.force, now, cfg)?;
+                let (edits, _) = build_claim_edits_with_note(
+                    doc,
+                    task,
+                    &plan,
+                    env.session,
+                    now,
+                    files_note.as_deref(),
+                );
+                return Ok(edits);
             }
             Self::Release => {
                 let plan = plan_release(task, agent, env.force, cfg)?;
@@ -217,6 +257,7 @@ impl TaskOp<'_> {
                     }
                     Self::Block { .. } => StatusCommand::Block,
                     Self::Unblock { .. } => StatusCommand::Unblock,
+                    Self::Stuck { .. } => StatusCommand::Stuck,
                     _ => StatusCommand::Reopen,
                 };
                 let (next, ownership) = validate_transition(task, cmd, agent, env.force, &id_str)?;
@@ -234,6 +275,13 @@ impl TaskOp<'_> {
                         builder.set_session(env.session);
                     }
                     Self::Unblock { .. } => builder.remove_claimed(),
+                    Self::Stuck { .. } => {
+                        // R-STUCK-1: the owner and the claim (with its session) go; the level stays.
+                        builder.clear_owner_if_present();
+                        builder.remove_claimed();
+                        let attempts = attempts_after_failure(task, &id_str)?;
+                        builder.set_field("attempts", &attempts.to_string());
+                    }
                     Self::Reopen { .. } => {
                         builder.set_owner(None);
                         builder.remove_claimed();
@@ -307,6 +355,7 @@ impl TaskOp<'_> {
             }
             Self::Block { reason } => Some(note_with("blocked", Some(reason))),
             Self::Unblock { note } => Some(note_with("unblocked", note)),
+            Self::Stuck { reason } => Some(note_with("stuck", Some(reason))),
             Self::Reopen { note } => Some(note_with("reopened", note)),
             Self::Answer { text } => Some(note_with("answer", Some(text))),
             Self::Promote { .. } => Some("promoted from idea".to_string()),
@@ -327,6 +376,56 @@ pub fn highest_task_number(doc: &Document, archive: Option<&Document>, state_hig
     max_of(doc)
         .max(archive.map_or(0, max_of))
         .max(state_highest)
+}
+
+/// The steps of a task given as text: each line is one step, and blank lines are skipped. A number
+/// such as `1.` or `2)` at the start of a line is removed, because todo numbers the steps itself
+/// (`R-DETAIL-1`). A dot not followed by a space or the end of the line stays (`2.5 GB`).
+#[must_use]
+pub fn steps_from_text(text: &str) -> Vec<String> {
+    text.split(['\r', '\n'])
+        .map(|line| strip_step_number(line.trim()).trim().to_string())
+        .filter(|step| !step.is_empty())
+        .collect()
+}
+
+/// `line` without a leading `1.` or `2)` and the spaces after it (see [`steps_from_text`]).
+fn strip_step_number(line: &str) -> &str {
+    let digits = line.bytes().take_while(u8::is_ascii_digit).count();
+    if digits == 0 {
+        return line;
+    }
+    let after = &line[digits..];
+    let Some(rest) = after.strip_prefix(['.', ')']) else {
+        return line;
+    };
+    if rest.is_empty() || rest.starts_with(' ') || rest.starts_with('\t') {
+        rest
+    } else {
+        line
+    }
+}
+
+/// The `steps` value of a JSON operation: a list of strings, or one string with line breaks
+/// (`R-DETAIL-1`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum StepsInput {
+    /// One string; each of its lines is a step.
+    One(String),
+    /// A list; each entry is a step, or several lines of them.
+    Many(Vec<String>),
+}
+
+impl StepsInput {
+    /// The steps as text with one step per line, for [`steps_from_text`].
+    #[must_use]
+    pub fn text(&self) -> String {
+        match self {
+            Self::One(text) => text.clone(),
+            Self::Many(items) => items.join("\n"),
+        }
+    }
 }
 
 /// The values of a new task, already validated and trimmed (`todo add`, `add --from`, `apply`).
@@ -352,12 +451,18 @@ pub struct NewTask<'a> {
     pub depends: Option<&'a str>,
     /// `files` value.
     pub files: Option<&'a str>,
+    /// `read` value: the paths to look at but not change (`R-DETAIL-1`).
+    pub read: Option<&'a str>,
     /// `problem` value.
     pub problem: Option<&'a str>,
     /// `fix` value.
     pub fix: Option<&'a str>,
+    /// The steps, one per entry, as [`steps_from_text`] splits them (`R-DETAIL-1`).
+    pub steps: &'a [String],
     /// `accept` value.
     pub accept: Option<&'a str>,
+    /// `verify` value: the command that checks the task (`R-DETAIL-1`).
+    pub verify: Option<&'a str>,
     /// Further `key: value` fields; keys that have their own member above are skipped.
     pub extra: &'a [(String, String)],
 }
@@ -391,10 +496,24 @@ impl NewTask<'_> {
             ("why", self.why),
             ("depends", self.depends),
             ("files", self.files),
+            ("read", self.read),
             ("problem", self.problem),
             ("fix", self.fix),
-            ("accept", self.accept),
         ] {
+            if let Some(v) = value {
+                lines.push(format!("- {key}: {v}"));
+            }
+        }
+        if !self.steps.is_empty() {
+            lines.push("- steps:".to_string());
+            lines.extend(
+                self.steps
+                    .iter()
+                    .enumerate()
+                    .map(|(index, text)| format!("  {}. {text}", index + 1)),
+            );
+        }
+        for (key, value) in [("accept", self.accept), ("verify", self.verify)] {
             if let Some(v) = value {
                 lines.push(format!("- {key}: {v}"));
             }
@@ -409,9 +528,12 @@ impl NewTask<'_> {
             "why",
             "depends",
             "files",
+            "read",
             "problem",
             "fix",
+            "steps",
             "accept",
+            "verify",
         ];
         for (k, v) in self.extra {
             if !known.contains(&k.as_str()) {

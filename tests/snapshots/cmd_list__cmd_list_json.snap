@@ -15,6 +15,7 @@ expression: parsed
         "fields": {
           "custom_tag": "morning-shift"
         },
+        "files_busy": [],
         "id": "T-001",
         "line_end": 24,
         "line_start": 9,
@@ -35,6 +36,7 @@ expression: parsed
         ],
         "difficulty": null,
         "fields": {},
+        "files_busy": [],
         "id": "T-002",
         "line_end": 34,
         "line_start": 26,
@@ -53,6 +55,7 @@ expression: parsed
         "depends": [],
         "difficulty": null,
         "fields": {},
+        "files_busy": [],
         "id": "T-003",
         "line_end": 42,
         "line_start": 38,
@@ -71,6 +74,7 @@ expression: parsed
         "depends": [],
         "difficulty": null,
         "fields": {},
+        "files_busy": [],
         "id": "T-006",
         "line_end": 62,
         "line_start": 58,

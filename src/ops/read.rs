@@ -15,6 +15,7 @@ use crate::doc::{
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, fs_path};
 use crate::ops::config::OpsConfig;
+use crate::ops::scope::files_busy;
 use crate::output::Output;
 use crate::version::RUNNING_VERSION;
 
@@ -397,6 +398,33 @@ pub struct ChildJson {
     pub status: String,
 }
 
+/// A task that holds files the inspected entry names, as `show --json` and `list --json` list it
+/// (`R-SCOPE-1`).
+#[derive(Debug, Clone, Serialize)]
+pub struct FilesBusyJson {
+    /// Canonical task ID.
+    pub id: String,
+    /// Task title.
+    pub title: String,
+    /// `claimed`, or `blocked` for a task blocked with an owner.
+    pub status: String,
+    /// Owner agent name, or `null` when unowned.
+    pub owner: Option<String>,
+}
+
+/// The tasks that hold files `task` names, as [`FilesBusyJson`] entries in file order.
+#[must_use]
+pub fn files_busy_json(busy: &[&Task], cfg: &OpsConfig) -> Vec<FilesBusyJson> {
+    busy.iter()
+        .map(|t| FilesBusyJson {
+            id: cfg.id_config.format_id(t.id),
+            title: t.title.clone(),
+            status: t.status.as_str().to_string(),
+            owner: t.owner.clone(),
+        })
+        .collect()
+}
+
 /// Full JSON representation of a task (`show`, `next`, and write commands).
 #[derive(Debug, Clone, Serialize)]
 pub struct TaskJson {
@@ -443,16 +471,24 @@ pub struct TaskJson {
     pub dependents: Vec<DependentTaskJson>,
     /// Questions whose `about` field names this entry, in file order (`R-KIND-2`).
     pub questions: Vec<QuestionAboutJson>,
-    /// Whether the task is ready for `next`.
+    /// Whether the task is ready for `next`: nothing holds files it names (`R-SCOPE-1`).
     pub ready: bool,
+    /// The tasks of other agents that hold files this task names (`R-SCOPE-1`); `[]` when none.
+    pub files_busy: Vec<FilesBusyJson>,
     /// `- files:` value, if present.
     pub files: Option<String>,
+    /// `- read:` paths, split at commas: what the worker should look at but not change (R-DETAIL-1).
+    pub read: Vec<String>,
     /// `- problem:` value, if present.
     pub problem: Option<String>,
     /// `- fix:` value, if present.
     pub fix: Option<String>,
+    /// `- steps:` items in order, without their numbers (R-DETAIL-1); empty when absent.
+    pub steps: Vec<String>,
     /// `- accept:` value, if present.
     pub accept: Option<String>,
+    /// `- verify:` value, if present: the command that checks the task (R-DETAIL-1).
+    pub verify: Option<String>,
     /// Commit hashes from `- commit:`.
     pub commit: Vec<String>,
     /// Unknown `- key: value` fields kept as written (`docs/format.md` §8).
@@ -506,8 +542,10 @@ pub struct ListTaskJson {
     pub area: Option<String>,
     /// Dependency tokens from `- depends:`.
     pub depends: Vec<String>,
-    /// Whether the task is ready (`next` could hand it out).
+    /// Whether the task is ready (`next` could hand it out, files included).
     pub ready: bool,
+    /// The tasks of other agents that hold files this task names (`R-SCOPE-1`); `[]` when none.
+    pub files_busy: Vec<FilesBusyJson>,
     /// Unknown `- key: value` fields (`docs/format.md` §8).
     pub fields: BTreeMap<String, String>,
     /// 1-based starting line number of the task block.
@@ -658,6 +696,12 @@ pub fn build_task_json(
         .collect();
 
     let ready_archive = if archived { None } else { secondary };
+    // A finished entry in the archive is not held back by the files of active tasks (R-SCOPE-1).
+    let busy = if archived {
+        Vec::new()
+    } else {
+        files_busy(primary, task, task.owner.as_deref(), now, cfg)
+    };
 
     let milestones = milestone_chain_json(primary, task, cfg);
     let children = primary
@@ -693,11 +737,15 @@ pub fn build_task_json(
         dependencies,
         dependents,
         questions,
-        ready: is_task_ready(primary, task, ready_archive, now, cfg),
+        ready: is_task_ready(primary, task, ready_archive, now, cfg) && busy.is_empty(),
+        files_busy: files_busy_json(&busy, cfg),
         files: task.files.clone(),
+        read: task.read_paths(),
         problem: task.problem.clone(),
         fix: task.fix.clone(),
+        steps: task.steps.clone(),
         accept: task.accept.clone(),
+        verify: task.verify.clone(),
         commit: task.commit.clone(),
         fields,
         notes,
@@ -720,6 +768,7 @@ pub fn build_list_task_json(
         .iter()
         .map(|f| (f.key.clone(), f.value.clone()))
         .collect();
+    let busy = files_busy(doc, task, task.owner.as_deref(), now, cfg);
     ListTaskJson {
         id: cfg.id_config.format_id(task.id),
         title: task.title.clone(),
@@ -733,7 +782,8 @@ pub fn build_list_task_json(
         task_type: task.task_type.clone(),
         area: task.area.clone(),
         depends: task.depends.iter().map(|d| d.raw.clone()).collect(),
-        ready: is_task_ready(doc, task, archive, now, cfg),
+        ready: is_task_ready(doc, task, archive, now, cfg) && busy.is_empty(),
+        files_busy: files_busy_json(&busy, cfg),
         fields,
         line_start: task.block_range.start + 1,
         line_end: task.block_range.end,

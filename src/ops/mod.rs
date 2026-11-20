@@ -40,6 +40,7 @@ pub mod pipeline;
 pub mod query;
 pub mod read;
 pub mod rules;
+pub mod scope;
 pub mod task_ops;
 
 pub use config::{
@@ -62,14 +63,17 @@ pub use query::{
 };
 pub(crate) use read::load_for_read_with_found;
 pub use read::{
-    DependencyStatusJson, DependentTaskJson, ListTaskJson, LoadedRead, MilestoneRefJson, NoteJson,
-    TaskJson, build_list_task_json, build_task_json, file_label, format_is_newer, is_task_ready,
-    load_for_read, load_for_where, milestone_chain_json, questions_about, read_optional_archive,
-    require_known_format, require_known_format_bytes,
+    DependencyStatusJson, DependentTaskJson, FilesBusyJson, ListTaskJson, LoadedRead,
+    MilestoneRefJson, NoteJson, TaskJson, build_list_task_json, build_task_json, file_label,
+    files_busy_json, format_is_newer, is_task_ready, load_for_read, load_for_where,
+    milestone_chain_json, questions_about, read_optional_archive, require_known_format,
+    require_known_format_bytes,
 };
 pub use rules::{
     ClaimPlan, OwnershipDecision, ReleasePlan, StatusCommand, TaskCommand, allowed_commands_from,
     bad_transition_error, check_ownership, check_promotable, forced_note_text, plan_claim,
     plan_release, validate_transition,
 };
-pub use task_ops::{NewTask, OpEnv, SetChange, TaskOp, highest_task_number};
+pub use task_ops::{
+    NewTask, OpEnv, SetChange, StepsInput, TaskOp, highest_task_number, steps_from_text,
+};

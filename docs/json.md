@@ -41,11 +41,12 @@ error is in the table under "Error Codes".
 
 ## Shared `TaskJson` Shape
 
-Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, `idea`, `promote`, and as `next.task`. The example is the `show` output under "`todo show <task> --json`" below, which lists every key. Every key is always present: a value that is not set is `null`, and a list or an object with nothing in it is `[]` or `{}`.
+Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `stuck`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, `idea`, `promote`, and as `next.task`. The example is the `show` output under "`todo show <task> --json`" below, which lists every key. Every key is always present: a value that is not set is `null`, and a list or an object with nothing in it is `[]` or `{}`.
 
 - `type` is the `type` field as written; `section` is the `##` section the entry is under, or `null`.
 - `archived` is `true` for an entry read from `TODO-archive.md`.
-- `stale` is `true` when the claim is past its timeout (`R-CLAIM-4`); `ready` is `true` when `next` could hand the entry out now.
+- `stale` is `true` when the claim is past its timeout (`R-CLAIM-4`); `ready` is `true` when `next` could hand the entry out now, files included.
+- `files_busy` lists the tasks of other agents that hold a file this entry names (`R-SCOPE-1`), in file order, each with `id`, `title`, `status` (`claimed` or `blocked`) and `owner`. It is `[]` when none holds one, and `ready` is `false` while it lists a task. A task owned by the same agent is not listed.
 - `milestones` lists the milestones above the entry, from the top down, with `goal` and `status`; `milestone` is the parent as written.
 - `children` lists the entries whose `milestone` is this entry, with `kind` (`task` or `milestone`).
 - `depends` holds the dependency tokens as written. `dependencies` has one entry per token: `raw`, `id`, `exists`, `archived`, `status`, `title` and `satisfied` (`true` when the target is done or dropped; `null` and `false` when it does not exist).
@@ -163,6 +164,7 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
         "area": null,
         "depends": [],
         "ready": true,
+        "files_busy": [],
         "fields": {},
         "line_start": 7,
         "line_end": 11
@@ -214,10 +216,14 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
       { "id": "T-005", "title": "Are shadows in scope?", "status": "open", "archived": false }
     ],
     "ready": false,
+    "files_busy": [],
     "files": null,
+    "read": [],
     "problem": null,
     "fix": null,
+    "steps": [],
     "accept": null,
+    "verify": null,
     "commit": [],
     "fields": {},
     "notes": [
@@ -265,10 +271,14 @@ the output for a fixture with one open task:
       "dependents": [],
       "questions": [],
       "ready": true,
+      "files_busy": [],
       "files": null,
+      "read": [],
       "problem": null,
       "fix": null,
+      "steps": [],
       "accept": null,
+      "verify": null,
       "commit": [],
       "fields": {},
       "notes": [
@@ -312,7 +322,11 @@ the output for a fixture with one open task:
 }
 ```
 
+`next_ready` lists up to five tasks that `next` could hand out now, in its order. A task whose files another agent holds is left out, as its `ready` is `false` in `show --json` (`R-SCOPE-1`).
+
 `ready_to_close` (`R-MILE-6`) lists the milestones that are ready to close, as `{ "id", "title" }`; the key is left out when there are none.
+
+`given_back` (`R-STUCK-1`) lists the blocked tasks that `todo stuck` gave back to the planner, each as a `blocked` entry whose `reason` is the problem; the key is left out when there are none.
 
 `counts` covers tasks only: `open`, `claimed`, `blocked`, `done`, `dropped` and `total` (their sum) leave out milestones, which are listed under `milestones`. `questions` and `ideas` count the open ones (not done or dropped) apart from the rest (`R-KIND-3`, `R-KIND-1`); the open questions are listed in `open_questions`.
 
@@ -472,7 +486,7 @@ Problems found (`exit 1`): `ok: false`, `error.code: "BAD_VALUE"`, `error.count`
 }
 ```
 
-### Single-task write commands (`add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, `idea`, `promote`)
+### Single-task write commands (`add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `stuck`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, `idea`, `promote`)
 
 Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `TaskJson`.
 
@@ -903,6 +917,7 @@ project's `TODO.md`, never searches folders and writes nothing.
 | `WRITE_FAILED` | 4 | Atomic write or rename failed | `{"code":"WRITE_FAILED","message":"failed writing temporary file"}` |
 | `NO_GIT_HISTORY` | 5 | `align` without git, outside a repository, in a shallow clone or with no commits | `{"code":"NO_GIT_HISTORY","message":"not inside a git repository"}` |
 | `TOOL_TOO_OLD` | 4 | `TODO.md`, the archive or the project register names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 3 is newer than this todo 0.7.0 supports; ...","line":1,"file":"TODO.md"}` |
+| `FILES_BUSY` | 1 | `claim` of a task whose `files` overlap a task another agent holds (R-SCOPE-1, R-CLAIM-2); `--force` overrides it | `{"code":"FILES_BUSY","message":"task T-002 shares files with T-001 (claimed by alice); pass --force to claim it anyway","task":"T-002","files_busy":["T-001"]}` |
 | `DUPLICATE_PROJECT` | 1 | `project add` for a file, or a name, that the project register already has (R-PROJ-1) | `{"code":"DUPLICATE_PROJECT","message":"C:\\Projekte\\TODO.md is already registered as renderer"}` |
 
 ### `TOOL_TOO_OLD` (`R-VER-2`)

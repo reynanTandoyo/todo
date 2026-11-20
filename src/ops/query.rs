@@ -11,6 +11,7 @@ use crate::doc::{
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::config::OpsConfig;
 use crate::ops::read::is_task_ready;
+use crate::ops::scope::files_busy;
 
 /// Parsed `--status` filter for `todo list` (`R-READ-1`).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -322,7 +323,7 @@ pub struct SelectedNext<'a> {
 /// 1. If `filter.agent` is `Some(agent)` and `!filter.ignore_own_claim`, returns the highest-priority
 ///    (then earliest) task already claimed by `agent` that matches the attribute filters.
 /// 2. Otherwise returns the highest-priority (then earliest) ready task (`open` or stale `claimed`,
-///    dependencies satisfied, matching filters).
+///    dependencies satisfied, matching filters) whose files no other agent holds (`R-SCOPE-1`).
 ///
 /// Only entries of kind task are returned, never a question, an idea or a milestone (`R-KIND-3`).
 #[must_use]
@@ -419,10 +420,15 @@ pub fn select_next_task<'a>(
     }
 
     let started = doc.started_milestones();
+    // A ready task whose files another agent holds is held back (R-READ-3, R-SCOPE-1).
     let candidate = doc
         .tasks
         .iter()
-        .filter(|t| is_task_ready(doc, t, archive, now, cfg) && matches_common_filters(t))
+        .filter(|t| {
+            is_task_ready(doc, t, archive, now, cfg)
+                && matches_common_filters(t)
+                && files_busy(doc, t, filter.agent, now, cfg).is_empty()
+        })
         .min_by_key(|t| ready_sort_key(doc, t, &started, cfg))?;
 
     Some(SelectedNext {

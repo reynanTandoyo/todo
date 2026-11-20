@@ -24,6 +24,8 @@ pub enum StatusCommand {
     Drop,
     /// `todo reopen`
     Reopen,
+    /// `todo stuck` (`R-STUCK-1`): a claimed task is given back to the planner.
+    Stuck,
 }
 
 impl StatusCommand {
@@ -38,6 +40,7 @@ impl StatusCommand {
             Self::Done => "done",
             Self::Drop => "drop",
             Self::Reopen => "reopen",
+            Self::Stuck => "stuck",
         }
     }
 }
@@ -102,6 +105,7 @@ pub const fn allowed_commands_from(status: Status) -> &'static [StatusCommand] {
             StatusCommand::Block,
             StatusCommand::Done,
             StatusCommand::Drop,
+            StatusCommand::Stuck,
         ],
         Status::Blocked => &[
             StatusCommand::Release,
@@ -209,7 +213,7 @@ pub fn check_ownership(
     Ok(OwnershipDecision::Allowed)
 }
 
-/// Validates a general status transition (`block`, `unblock`, `done`, `drop`, `reopen`, or
+/// Validates a general status transition (`block`, `unblock`, `done`, `drop`, `reopen`, `stuck`, or
 /// `claim`/`release`) against `R-WRITE-9` and `R-CLAIM-3`.
 ///
 /// Returns `(next_status, ownership_decision)`. For `claim` and `release`, prefer
@@ -232,6 +236,7 @@ pub fn validate_transition(
         (Status::Claimed, StatusCommand::Block) => Status::Blocked,
         (Status::Claimed, StatusCommand::Done) => Status::Done,
         (Status::Claimed, StatusCommand::Drop) => Status::Dropped,
+        (Status::Claimed, StatusCommand::Stuck) => Status::Blocked,
 
         (Status::Blocked, StatusCommand::Claim) if force => Status::Claimed,
         (Status::Blocked, StatusCommand::Release) => Status::Blocked,

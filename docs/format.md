@@ -216,7 +216,8 @@ first line of the file.
   Setting `steps` replaces the field line and all its step lines; removing it removes them all. Any
   other indented line under a field, or a numbered line not directly under `- steps:`, stays plain
   text. A value written by hand after `- steps:` on the same line is read as a step before the list,
-  and `todo check` reports it.
+  and `todo check` reports it. A `steps` part of the combined priority line is read the same way;
+  setting or removing the steps takes that part off the line and writes the list below `- steps:`.
 - **Combined priority line**: `- priority: P1 · difficulty: 3 · type: bug · area: ui`. The value
   is split at ` · `. The first part is the priority; every other part is `key: value` and counts as
   that field (so `difficulty`, `type` and `area` may live here or on their own lines, but not both).

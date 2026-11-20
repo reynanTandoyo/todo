@@ -6,6 +6,7 @@ use crate::doc::{
     CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER, CombinedPart, Document, FieldLocation,
     LineEdit, Status, Task, TaskChangeIntent, canonical_field_rank, sanitize_trimmed_value,
 };
+use crate::ops::task_ops::steps_from_text;
 
 /// A segment of a combined priority line being rebuilt: its key when it is a field, and its text as
 /// it will be written.
@@ -31,6 +32,13 @@ pub struct TaskEditBuilder<'a> {
     /// Planned updates to other parts of the combined priority line, by key (`milestone`, `goal`,
     /// `why`, `depends`, ... and unknown parts); `None` removes the part.
     combined_part_overrides: BTreeMap<String, Option<String>>,
+    /// Whole-range replacements of a multi-line field, such as the `steps` field and its lines
+    /// (`R-DETAIL-1`), keyed by the first line of the range: a later change to the same field
+    /// replaces an earlier one, as a later change to a single line does.
+    block_edits: BTreeMap<usize, LineEdit>,
+    /// The step lines of a `steps` field that has no line of its own yet, to be inserted in canonical
+    /// order by `build`; a later `set_steps` replaces them and `unset_steps` drops them.
+    steps_insert: Option<Vec<String>>,
     seq: usize,
 }
 
@@ -49,6 +57,8 @@ impl<'a> TaskEditBuilder<'a> {
             type_override: None,
             area_override: None,
             combined_part_overrides: BTreeMap::new(),
+            block_edits: BTreeMap::new(),
+            steps_insert: None,
             seq: 0,
         }
     }
@@ -114,8 +124,13 @@ impl<'a> TaskEditBuilder<'a> {
     /// Sets a field by key (`priority`, `difficulty`, `type`, `area`, known fields, or unknown fields),
     /// respecting the combined priority line rules of `docs/format.md` §8 and canonical order §10.
     pub fn set_field(&mut self, key: &str, value: &str) {
-        let clean = sanitize_trimmed_value(value);
         let lower = key.trim().to_ascii_lowercase();
+        // `steps` keeps its line breaks: each line of the value is one step (`R-DETAIL-1`).
+        if lower == "steps" {
+            self.set_steps(&steps_from_text(value));
+            return;
+        }
+        let clean = sanitize_trimmed_value(value);
         match lower.as_str() {
             "priority" => self.priority_override = Some(Some(clean)),
             "difficulty" => self.difficulty_override = Some(Some(clean)),
@@ -133,9 +148,11 @@ impl<'a> TaskEditBuilder<'a> {
             "why" => self.set_line_field("why", self.task.why_line, &clean),
             "depends" => self.set_line_field("depends", self.task.depends_line, &clean),
             "files" => self.set_line_field("files", self.task.files_line, &clean),
+            "read" => self.set_line_field("read", self.task.read_line, &clean),
             "problem" => self.set_line_field("problem", self.task.problem_line, &clean),
             "fix" => self.set_line_field("fix", self.task.fix_line, &clean),
             "accept" => self.set_line_field("accept", self.task.accept_line, &clean),
+            "verify" => self.set_line_field("verify", self.task.verify_line, &clean),
             "commit" => self.set_line_field("commit", self.task.commit_line, &clean),
             _ => {
                 let existing = self.unknown_line(&lower);
@@ -158,9 +175,12 @@ impl<'a> TaskEditBuilder<'a> {
             "why" => self.unset_line_field("why", self.task.why_line),
             "depends" => self.unset_line_field("depends", self.task.depends_line),
             "files" => self.unset_line_field("files", self.task.files_line),
+            "read" => self.unset_line_field("read", self.task.read_line),
             "problem" => self.unset_line_field("problem", self.task.problem_line),
             "fix" => self.unset_line_field("fix", self.task.fix_line),
+            "steps" => self.unset_steps(),
             "accept" => self.unset_line_field("accept", self.task.accept_line),
+            "verify" => self.unset_line_field("verify", self.task.verify_line),
             "commit" => self.unset_line_field("commit", self.task.commit_line),
             _ => {
                 let existing = self.unknown_line(&lower);
@@ -181,6 +201,9 @@ impl<'a> TaskEditBuilder<'a> {
     #[must_use]
     pub fn build(mut self) -> (Vec<LineEdit>, TaskChangeIntent) {
         self.flush_priority_type_area();
+        if let Some(lines) = self.steps_insert.take() {
+            self.queue_block_insert("steps", lines);
+        }
 
         let mut edits = Vec::new();
         for (line, change) in self.line_changes {
@@ -189,6 +212,7 @@ impl<'a> TaskEditBuilder<'a> {
                 None => edits.push(LineEdit::remove(line..line + 1)),
             }
         }
+        edits.extend(self.block_edits.into_values());
 
         // Group insertions by line index; fields stay in canonical field rank order, and appended
         // notes always go after any fields inserted at the end of the block.
@@ -235,6 +259,64 @@ impl<'a> TaskEditBuilder<'a> {
                 self.line_changes.insert(line, None);
             }
             None => {}
+        }
+    }
+
+    /// Sets the `steps` field to `steps`, one numbered line each (`docs/format.md` §8); an empty list
+    /// removes the field. An own-line field is replaced together with its step lines, a `steps` part
+    /// of the priority line moves below it, and a missing field is added in canonical order.
+    pub fn set_steps(&mut self, steps: &[String]) {
+        if steps.is_empty() {
+            self.unset_steps();
+            return;
+        }
+        let mut lines = vec!["- steps:".to_string()];
+        lines.extend(
+            steps
+                .iter()
+                .enumerate()
+                .map(|(index, text)| format!("  {}. {text}", index + 1)),
+        );
+        if let (Some(_), Some(block)) = (self.task.steps_line, self.task.steps_block.clone()) {
+            self.block_edits
+                .insert(block.start, LineEdit::replace_range(block, lines));
+            return;
+        }
+        // No line of its own: a `steps` part of the priority line goes, and the list is inserted.
+        if let Some(line) = self.task.steps_line
+            && self.on_priority_line(line)
+        {
+            self.combined_part_overrides
+                .insert("steps".to_string(), None);
+        }
+        self.steps_insert = Some(lines);
+    }
+
+    /// Removes the `steps` field with all its step lines (`docs/format.md` §8, §10).
+    pub fn unset_steps(&mut self) {
+        self.steps_insert = None;
+        match (self.task.steps_line, self.task.steps_block.clone()) {
+            (Some(_), Some(block)) => {
+                self.block_edits
+                    .insert(block.start, LineEdit::remove(block));
+            }
+            (Some(line), _) if self.on_priority_line(line) => {
+                self.combined_part_overrides
+                    .insert("steps".to_string(), None);
+            }
+            _ => {}
+        }
+    }
+
+    /// Queues `lines` as one field inserted in canonical order: they are kept in their order, and
+    /// their insertion point is the one of a single line for `key`.
+    fn queue_block_insert(&mut self, key: &str, lines: Vec<String>) {
+        let insert_at = self.task.insert_line_for_field(key);
+        let rank = canonical_field_rank(key);
+        for text in lines {
+            let seq = self.seq;
+            self.seq += 1;
+            self.field_inserts.push((insert_at, rank, seq, text));
         }
     }
 
