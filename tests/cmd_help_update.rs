@@ -316,10 +316,12 @@ fn help_update_writes_nothing_and_needs_no_task_list() {
 
 #[test]
 fn agent_rules_name_help_update() {
+    // From v0.8 the planner's text names `todo help update` (R-OUT-11, R-AGENT-1); the common rules
+    // stay short and point to the planner's text for it.
     assert!(
-        todo::agents::RULES_TEXT.contains("todo help update"),
-        "the rules text must name `todo help update`"
+        todo::agents::PLANNER_TEXT.contains("todo help update"),
+        "the planner's rules must name `todo help update`"
     );
-    let out = run_todo(&["help", "agents"]);
+    let out = run_todo(&["help", "planner"]);
     assert!(stdout_text(&out).contains("todo help update"));
 }

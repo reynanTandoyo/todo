@@ -67,7 +67,7 @@ Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock
   "ok": true,
   "data": {
     "name": "todo",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "about": "Concurrency-safe editor for TODO.md task lists",
     "commands": [
       { "kind": "read", "name": "list", "summary": "List and filter tasks" }
@@ -86,12 +86,12 @@ below), not this command.
 {
   "schema": "todo.version.v1",
   "ok": true,
-  "data": { "version": "0.7.0", "commit": "abc1234" },
+  "data": { "version": "0.8.0", "commit": "abc1234" },
   "warnings": []
 }
 ```
 
-### `todo help [<command>|agents] --json` (`todo.help.v1`)
+### `todo help [<command>|agents|worker|planner] --json` (`todo.help.v1`)
 
 ```json
 {
@@ -108,7 +108,7 @@ below), not this command.
 }
 ```
 
-For `todo help agents --json`, `data` is `{"topic":"agents","rules":"..."}`.
+For `todo help agents --json`, `todo help worker --json` and `todo help planner --json`, `data` is `{"topic":"agents"|"worker"|"planner","rules":"..."}`, the text of that topic (`R-AGENT-1`).
 
 ### `todo help update --json` (`todo.help.v1`)
 
@@ -120,7 +120,7 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
   "ok": true,
   "data": {
     "topic": "update",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "executable": "C:\\Users\\alice\\AppData\\Local\\Programs\\todo\\todo.exe",
     "repository": "https://github.com/reynanTandoyo/todo",
     "latest_release": "https://github.com/reynanTandoyo/todo/releases/latest",
@@ -358,6 +358,9 @@ the output for a fixture with one open task:
 - `already_claimed` is `true` when the task was already the agent's own claim. `next` returns that
   task first unless `--new` is given.
 - When no ready task exists, `task` is `null` and `claimed` and `already_claimed` are `false`.
+- With `next --claim --brief` (or `--brief` alone), `data.brief` holds the work order of the picked task, in the
+  `todo.brief.v1` shape of `todo brief --json`; the key is left out without `--brief`. `--max-difficulty 1` hands
+  out only tasks at the lowest level (`R-READ-3`).
 
 ### `todo summary --json` (`todo.summary.v1`)
 
@@ -566,7 +569,7 @@ first group it fits, so no task is in two groups. The example holds one task in 
     "write_lock": { "held": false },
     "format_version": 2,
     "tool_stamp": "0.6.0",
-    "running_version": "0.7.0",
+    "running_version": "0.8.0",
     "counts": { "open": 10, "claimed": 4, "blocked": 0, "done": 27, "dropped": 3, "total": 44, "milestones": 2, "questions": 1, "ideas": 3 }
   },
   "warnings": []
@@ -668,6 +671,38 @@ Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `T
 - `show --json` and every other `TaskJson` carry `questions`: the questions whose `about` field names the entry, each `{"id", "title", "status", "archived"}`, in file order (`[]` when there are none).
 - `add --from <file|-> --json` (`todo.add.v1`): `{"added": [<TaskJson>, ...], "count": N}`.
 - `release --stale --json` / `release --all --json` (`todo.release.v1`): `{"released": [<TaskJson>, ...], "count": N}`.
+
+### `todo stuck <task> --note <problem> --json` (`todo.stuck.v1`, `R-STUCK-1`)
+
+`data` is the `TaskJson` of the task after it was given back: `status` is `blocked`, `owner` and
+`claimed` are `null`, `attempts` is one more than before (`"1"` the first time), and `notes` ends
+with `stuck — <problem>`. `level` (`difficulty`) is unchanged. `plan` lists the task in its first group,
+with the same problem.
+
+### `todo split <task> --from <file|-> --json` (`todo.split.v1`, `R-SPLIT-1`)
+
+`data` has the task that became a milestone (`task`, a `TaskJson`), the IDs of the children in order
+(`ids`), the children as `add --from` reports them (`added`, a list of `TaskJson`) and their number
+(`count`). Every key of `TaskJson` is present in `task` and in each entry of `added`; the example
+shows the keys that differ from a plain task.
+
+```json
+{
+  "schema": "todo.split.v1",
+  "ok": true,
+  "data": {
+    "task": { "id": "T-001", "title": "Parse the config", "type": "milestone", "goal": "the config parses", "children": [{ "id": "T-002", "title": "Read the file", "kind": "task", "status": "open" }], "...": "every TaskJson key" },
+    "ids": ["T-002", "T-003"],
+    "added": [{ "id": "T-002", "title": "Read the file", "milestone": "T-001", "difficulty": "1", "missing": ["steps"], "...": "every TaskJson key" }],
+    "count": 2
+  },
+  "warnings": []
+}
+```
+
+The split task loses `difficulty`, `files`, `read`, `steps`, `verify`, `final`, `attempts` and `verified`,
+and it is a milestone, so `plan` no longer lists it; its children are the tasks to plan. A refusal
+(a milestone, question, idea, done or dropped task, or a task another agent claims) is the error envelope with exit 1.
 
 ### `todo restore <n> --yes --json` (`todo.restore.v1`)
 
@@ -867,6 +902,13 @@ An entry written by a write that migrated the file (R-MIG-1) also has `"migrated
 
 ### `todo done --json` and `todo drop --json` (`newly_ready`, `R-DEP-4`)
 
+A `done` can be refused: `OUT_OF_SCOPE` (exit 1), before anything is written, when `--commit` changed files outside
+the task's `files` (the error names them), and `VERIFY_FAILED` (exit 1) when the `verify` command failed or timed out;
+that failed check adds the note `verify failed — <last line>` and leaves the task claimed, and after
+`verify_attempts` failures the task is given back as stuck. Also
+`VERIFY_NOT_RUN` (exit 5) when no shell could start the command; `todo verify` also refuses with it while
+`verify = false`. Each is in the error table below. A `done` with a passing `verify` writes `verified`.
+
 When finishing or dropping a task makes other tasks ready, their summaries appear in `"newly_ready"`:
 
 ```json
@@ -969,6 +1011,10 @@ command.
 `data` has `path` (the file written, as a full path), `bytes` (its size) and `opened` (`true` only
 when `--open` started the program). The page itself is HTML, not part of the JSON. The `--all` page
 (R-REPORT-2), written with `todo report --html --all --json`, has the same `data`.
+
+The page shows the planning state (`R-REPORT-3`) next to the work: the open tasks per level, the tasks not
+ready for lack of detail, the tasks given back with their attempts, the tasks kept above the target level, and
+the number of waves. The JSON does not repeat these counts; `todo plan --json` and `todo summary --json` do.
 
 ```json
 {
