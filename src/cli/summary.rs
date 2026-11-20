@@ -10,6 +10,7 @@ use crate::cli::{CommandKind, CommandMeta, Context, load_read};
 use crate::doc::{EntryKind, NO_REASON, Progress, Status};
 use crate::error::Result;
 use crate::lock::current_time;
+use crate::ops::scope::files_busy;
 use crate::ops::{is_task_ready, ready_sort_key};
 use crate::output::Output;
 
@@ -18,7 +19,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "summary",
     summary: "Show a compact session-start overview of TODO.md",
     kind: CommandKind::Read,
-    details: "Prints at most 40 lines summarizing counts by status and open priority, the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, tasks given back to the planner with their problem (`todo stuck`), the next 5 ready tasks (in the order `next` uses), milestones ready to close, open questions, and how many ideas are waiting. The status counts and the total count tasks only: milestones are listed apart, and questions and ideas are counted apart (R-KIND-3).",
+    details: "Prints at most 40 lines summarizing counts by status and open priority, the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, tasks given back to the planner with their problem (`todo stuck`), the next 5 ready tasks (in the order `next` uses, leaving out those whose files another agent holds), milestones ready to close, open questions, and how many ideas are waiting. The status counts and the total count tasks only: milestones are listed apart, and questions and ideas are counted apart (R-KIND-3).",
     examples: &["todo summary", "todo summary --json"],
 };
 
@@ -220,8 +221,11 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     counts.total = counts.open + counts.claimed + counts.blocked + counts.done + counts.dropped;
     let started = doc.started_milestones();
     ready_candidates.sort_by_key(|t| ready_sort_key(doc, t, &started, &cfg));
+    // The next ready tasks are the ones `next` could hand out now: a task whose files another agent
+    // holds is left out (R-READ-5, R-SCOPE-1), as `ready` in `show --json` leaves it out.
     let next_ready: Vec<ReadySummary> = ready_candidates
         .into_iter()
+        .filter(|t| files_busy(doc, t, t.owner.as_deref(), now, &cfg).is_empty())
         .take(5)
         .map(|t| ReadySummary {
             id: doc.id_config.format_id(t.id),
