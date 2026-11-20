@@ -609,3 +609,79 @@ fn ten_parallel_next_claim_hands_out_tasks_that_never_overlap() {
         }
     }
 }
+
+/// The IDs in `data.next_ready` of `todo --json summary`.
+fn summary_next_ready_ids(home: &std::path::Path, work: &std::path::Path) -> Vec<String> {
+    let out = run(home, work, &["--json", "summary"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    parse_json(&out.stdout)["data"]["next_ready"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["id"].as_str().unwrap().to_string())
+        .collect()
+}
+
+#[test]
+fn summary_next_ready_leaves_out_the_tasks_whose_files_another_agent_holds() {
+    let tmp = TempDir::new().unwrap();
+    let claimed = fresh_claim();
+    let (home, work, _todo) = setup_proj(
+        &tmp,
+        &body(&[
+            block(
+                1,
+                "Shader",
+                "claimed",
+                "alice",
+                "P1",
+                Some(&claimed),
+                Some("src/a.c"),
+            ),
+            block(
+                2,
+                "Shader part two",
+                "open",
+                "—",
+                "P0",
+                None,
+                Some("src/a.c"),
+            ),
+            block(3, "Docs", "open", "—", "P2", None, Some("docs/")),
+        ]),
+    );
+
+    // `next` skips T-002 because alice's claim holds src/a.c, so the summary must not list it.
+    let next = run(&home, &work, &["--json", "--agent", "bob", "next"]);
+    assert_eq!(parse_json(&next.stdout)["data"]["task"]["id"], "T-003");
+    assert_eq!(summary_next_ready_ids(&home, &work), ["T-003"]);
+
+    let text = run(&home, &work, &["summary"]);
+    assert!(text.status.success(), "stderr: {}", stderr_text(&text));
+    let out = stdout_text(&text);
+    assert!(out.contains("T-003"), "{out}");
+    assert!(!out.contains("T-002"), "{out}");
+}
+
+#[test]
+fn summary_next_ready_keeps_a_task_whose_only_holder_is_stale() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _todo) = setup_proj(
+        &tmp,
+        &body(&[
+            // alice's claim is years old: it is stale and holds nothing (R-CLAIM-4).
+            block(
+                1,
+                "Old claim",
+                "claimed",
+                "alice",
+                "P2",
+                Some("2020-01-01T00:00+00:00"),
+                Some("src/a.c"),
+            ),
+            block(2, "Shader", "open", "—", "P0", None, Some("src/a.c")),
+        ]),
+    );
+
+    assert_eq!(summary_next_ready_ids(&home, &work), ["T-002", "T-001"]);
+}
