@@ -17,6 +17,7 @@ use serde_json::json;
 use crate::doc::Task;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::OpsConfig;
+use crate::process_tree::ProcessTree;
 
 /// How many lines of output a failure keeps for the text report.
 pub const TAIL_LINES: usize = 10;
@@ -62,7 +63,8 @@ pub fn log_path(state_dir: &Path, id: &str) -> PathBuf {
 /// Runs `command` through the configured shell in `work_dir`, saves its output in `log` and
 /// reports the outcome (R-VERIFY-1). The log is replaced by each run.
 ///
-/// Only the shell that todo starts is stopped on a timeout; see the problem recorded for T-158.
+/// On a timeout, and when the shell has ended, every process the check started is stopped too
+/// (T-172): a check leaves nothing running behind it.
 pub fn run_check(
     cfg: &OpsConfig,
     command: &str,
@@ -80,12 +82,32 @@ pub fn run_check(
     let file = File::create(log).map_err(|e| log_error(log, &e))?;
     let second = file.try_clone().map_err(|e| log_error(log, &e))?;
 
-    let mut child = match spawn_shell(cfg, command, work_dir, file, second) {
-        Ok(child) => child,
+    let (mut child, tree) = match spawn_shell(cfg, command, work_dir, file, second) {
+        Ok(started) => started,
         Err(reason) => return Ok(CheckOutcome::NotRun { reason }),
     };
     let timeout = Duration::from_secs(cfg.verify_timeout_seconds);
-    let status = wait_with_timeout(&mut child, timeout).map_err(|e| log_error(log, &e))?;
+    let exited = match wait_for_exit(&mut child, timeout) {
+        Ok(exited) => exited,
+        Err(e) => {
+            tree.stop_all();
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(log_error(log, &e));
+        }
+    };
+    // Stop what the check started, on a timeout and after a normal end (T-172). On a timeout the
+    // shell has not been reaped yet, so the group still exists; after a normal end the group's
+    // leader is reaped, and its id is only reused by a new group leader within microseconds.
+    tree.stop_all();
+    let status = match exited {
+        Some(status) => Some(status),
+        None => {
+            let _ = child.kill();
+            let _ = child.wait();
+            None
+        }
+    };
 
     let text = fs::read(log)
         .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
@@ -111,16 +133,17 @@ pub fn run_check(
     Ok(outcome)
 }
 
-/// Starts the shell with the command as its last argument. `verify_shell` is used when it is set;
-/// otherwise PowerShell 7 (`pwsh`), then Windows PowerShell (`powershell.exe`) on Windows, and
-/// `sh -c` elsewhere (R-CFG-2, R-VERIFY-1). `Err` carries the reason when no shell could start.
+/// Starts the shell with the command as its last argument, in the tree that stops everything it
+/// starts (T-172). `verify_shell` is used when it is set; otherwise PowerShell 7 (`pwsh`), then
+/// Windows PowerShell (`powershell.exe`) on Windows, and `sh -c` elsewhere (R-CFG-2, R-VERIFY-1).
+/// `Err` carries the reason when no shell could start.
 fn spawn_shell(
     cfg: &OpsConfig,
     command: &str,
     work_dir: &Path,
     stdout: File,
     stderr: File,
-) -> std::result::Result<Child, String> {
+) -> std::result::Result<(Child, ProcessTree), String> {
     let shells: Vec<(String, Vec<String>)> = match cfg.verify_shell.split_first() {
         Some((program, args)) => vec![(program.clone(), args.to_vec())],
         None if cfg!(windows) => {
@@ -153,8 +176,19 @@ fn spawn_shell(
             .stdin(Stdio::null())
             .stdout(Stdio::from(out))
             .stderr(Stdio::from(err));
+        ProcessTree::prepare(&mut cmd);
         match cmd.spawn() {
-            Ok(child) => return Ok(child),
+            Ok(mut child) => match ProcessTree::attach(&child) {
+                Ok(tree) => return Ok((child, tree)),
+                Err(e) => {
+                    // Without its tree the check cannot be stopped as a whole, so it does not run.
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!(
+                        "could not set up the process tree of {program}: {e}"
+                    ));
+                }
+            },
             Err(e) if e.kind() == io::ErrorKind::NotFound => tried.push(program.clone()),
             Err(e) => return Err(format!("could not start {program}: {e}")),
         }
@@ -162,8 +196,9 @@ fn spawn_shell(
     Err(format!("no shell could start (tried {})", tried.join(", ")))
 }
 
-/// Waits for `child` for at most `timeout`. On a timeout the child is killed and `None` returned.
-fn wait_with_timeout(child: &mut Child, timeout: Duration) -> io::Result<Option<ExitStatus>> {
+/// Waits for `child` for at most `timeout`, and returns its status, or `None` when the time is up.
+/// The child is not stopped here: the caller stops the tree (T-172).
+fn wait_for_exit(child: &mut Child, timeout: Duration) -> io::Result<Option<ExitStatus>> {
     // A timeout too long to add to the clock means no timeout at all.
     let deadline = Instant::now().checked_add(timeout);
     loop {
@@ -173,8 +208,6 @@ fn wait_with_timeout(child: &mut Child, timeout: Duration) -> io::Result<Option<
         if let Some(deadline) = deadline
             && Instant::now() >= deadline
         {
-            let _ = child.kill();
-            let _ = child.wait();
             return Ok(None);
         }
         thread::sleep(Duration::from_millis(20));
