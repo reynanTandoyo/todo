@@ -38,6 +38,7 @@ pub mod identity;
 pub mod migrate;
 pub mod milestone;
 pub mod pipeline;
+pub mod plan;
 pub mod query;
 pub mod read;
 pub mod rules;

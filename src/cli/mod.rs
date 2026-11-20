@@ -601,6 +601,7 @@ register_commands! {
     Next => next,
     Note => note,
     Overview => overview,
+    Plan => plan,
     Project => project,
     Promote => promote,
     Release => release,

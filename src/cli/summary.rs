@@ -10,6 +10,7 @@ use crate::cli::{CommandKind, CommandMeta, Context, load_read};
 use crate::doc::{EntryKind, NO_REASON, Progress, Status};
 use crate::error::Result;
 use crate::lock::current_time;
+use crate::ops::plan::build_plan;
 use crate::ops::scope::files_busy;
 use crate::ops::{is_task_ready, ready_sort_key};
 use crate::output::Output;
@@ -19,7 +20,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "summary",
     summary: "Show a compact session-start overview of TODO.md",
     kind: CommandKind::Read,
-    details: "Prints at most 40 lines summarizing counts by status and open priority, the number of tasks kept above the target level on purpose (`final`, R-LEVEL-3), the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, tasks given back to the planner with their problem (`todo stuck`), the next 5 ready tasks (in the order `next` uses, leaving out those whose files another agent holds), milestones ready to close, open questions, and how many ideas are waiting. The status counts and the total count tasks only: milestones are listed apart, and questions and ideas are counted apart (R-KIND-3).",
+    details: "Prints at most 40 lines summarizing counts by status and open priority, the planner's line (`todo plan`, R-LEVEL-2): the tasks to split, to detail and without a level, and the tasks kept above the target level on purpose (`final`, R-LEVEL-3), the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, tasks given back to the planner with their problem (`todo stuck`), the next 5 ready tasks (in the order `next` uses, leaving out those whose files another agent holds), milestones ready to close, open questions, and how many ideas are waiting. The status counts and the total count tasks only: milestones are listed apart, and questions and ideas are counted apart (R-KIND-3).",
     examples: &["todo summary", "todo summary --json"],
 };
 
@@ -110,8 +111,13 @@ struct SummaryJson {
     /// the key is left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     given_back: Vec<BlockedSummary>,
-    /// Open or blocked tasks kept above the target level on purpose with `final` (`R-LEVEL-3`); the
-    /// key is left out when there are none.
+    /// The planner's three counts (`R-LEVEL-2`, `todo plan` groups 2 to 4): tasks to split, to
+    /// detail and without a level.
+    to_split: usize,
+    to_detail: usize,
+    without_level: usize,
+    /// Tasks kept above the target level on purpose with `final` (`R-LEVEL-3`, group 5); the key
+    /// is left out when there are none.
     #[serde(skip_serializing_if = "is_zero")]
     kept_on_purpose: usize,
     next_ready: Vec<ReadySummary>,
@@ -150,7 +156,6 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let mut given_back = Vec::new();
     let mut ready_candidates = Vec::new();
     let mut open_questions = Vec::new();
-    let mut kept_on_purpose = 0;
 
     for task in &doc.tasks {
         // Only tasks are counted by status and handed out as work (R-KIND-3). Milestones are
@@ -221,19 +226,14 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             Status::Done => counts.done += 1,
             Status::Dropped => counts.dropped += 1,
         }
-        // The same rule `plan` uses for the tasks kept on purpose: not finished, not claimed.
-        if task.final_reason.is_some()
-            && matches!(task.status, Status::Open | Status::Blocked)
-            && cfg.is_above_target(task.difficulty.as_deref())
-        {
-            kept_on_purpose += 1;
-        }
-
         if is_task_ready(doc, task, archive, now, &cfg) {
             ready_candidates.push(task);
         }
     }
 
+    // The planner's counts come from the planner's own list, so `plan` and `summary` cannot
+    // disagree (R-LEVEL-2).
+    let planner = build_plan(doc, archive, &cfg, None);
     counts.total = counts.open + counts.claimed + counts.blocked + counts.done + counts.dropped;
     let started = doc.started_milestones();
     ready_candidates.sort_by_key(|t| ready_sort_key(doc, t, &started, &cfg));
@@ -305,7 +305,10 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         claimed,
         blocked,
         given_back,
-        kept_on_purpose,
+        to_split: planner.to_split.len(),
+        to_detail: planner.to_detail.len(),
+        without_level: planner.without_level.len(),
+        kept_on_purpose: planner.kept_on_purpose.len(),
         next_ready,
         ready_to_close,
         open_questions,
@@ -351,13 +354,21 @@ fn format_summary_lines(s: &SummaryJson, project_line: Option<&str>) -> Vec<Stri
             .collect();
         lines.push(format!("open by priority: {}", parts.join(" ")));
     }
-    // Counted apart from the work the planner still has to split or detail (R-LEVEL-3).
-    if s.kept_on_purpose > 0 {
-        lines.push(format!(
-            "kept above the target level on purpose: {}",
+    // The planner's one line (R-LEVEL-2): the three counts the planner works down, then the tasks
+    // kept above the target on purpose, which are counted apart and shown only when there are some
+    // (R-LEVEL-3).
+    let kept = if s.kept_on_purpose > 0 {
+        format!(
+            " · kept above the target level on purpose: {}",
             s.kept_on_purpose
-        ));
-    }
+        )
+    } else {
+        String::new()
+    };
+    lines.push(format!(
+        "planner: to split {} · to detail {} · without a level {}{kept}",
+        s.to_split, s.to_detail, s.without_level
+    ));
 
     if !s.milestones.is_empty() {
         lines.push(format!("milestones ({}):", s.milestones.len()));

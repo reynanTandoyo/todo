@@ -22,6 +22,7 @@ use crate::history::{OutsideEditOutcome, detect_outside_edit};
 use crate::lock::current_time;
 use crate::ops::identity::{mailmap_proper_names, repo_root};
 use crate::ops::scope::{outside_folder_reason, raw_entries};
+use crate::ops::verify::awaits_verified;
 use crate::ops::waves::detail_gaps;
 use crate::ops::{
     DocWritePlan, OpsConfig, edit_doc_and_write, file_label, read_optional_archive,
@@ -425,10 +426,7 @@ fn warn_unverified_done(doc: &Document, cfg: &OpsConfig, label: &str, out: &mut 
         return;
     }
     for task in &doc.tasks {
-        if task.status != Status::Done
-            || task.verify.is_none()
-            || task.field_value("verified").is_some()
-        {
+        if !awaits_verified(task) {
             continue;
         }
         out.warn(format!(

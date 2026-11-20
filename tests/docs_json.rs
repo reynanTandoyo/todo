@@ -686,3 +686,63 @@ fn waves_example_in_json_md_has_the_keys_of_waves_json() {
     assert_eq!(example["schema"], real["schema"]);
     assert_same_keys(&example["data"], &real["data"], "waves --json");
 }
+
+/// Fixture for the `plan` example: one task in each group, and a done task that is verified.
+const PLAN_FIXTURE: &str = "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 3 -->
+# Fixture
+
+## Work
+
+### T-003 · Retry the upload
+- status: blocked
+- priority: P2
+- difficulty: 2
+- attempts: 2
+- note (2026-11-15, alice): stuck — the build breaks
+
+### T-001 · Renderer lighting
+- status: open
+- priority: P1
+- difficulty: 4
+
+### T-002 · Load the config
+- status: open
+- priority: P1
+- difficulty: 1
+- why: small
+
+### T-004 · Write the notes
+- status: open
+- priority: P2
+
+### T-005 · Shader design
+- status: open
+- priority: P1
+- difficulty: 3
+- final: the design is open
+
+### T-006 · Parse the config
+- status: done
+- owner: alice
+- priority: P2
+- difficulty: 1
+- verify: cargo test
+";
+
+#[test]
+fn plan_example_in_json_md_has_the_keys_of_plan_json() {
+    let doc = json_doc();
+    let example = json_example(&doc, "### `todo plan --json`");
+
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(dir.path().join("TODO.md"), PLAN_FIXTURE).expect("write TODO.md");
+    let out = run_in(dir.path(), &["--json", "plan"]);
+    // A list with work in its first four groups exits 1 (R-LEVEL-2).
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr_text(&out));
+    let real = parse_json(&out.stdout);
+
+    assert_eq!(example["schema"], real["schema"]);
+    assert_same_keys(&example["data"], &real["data"], "plan --json");
+}

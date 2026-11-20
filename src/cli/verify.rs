@@ -147,11 +147,7 @@ fn check_wave(ctx: &Context, out: &mut Output, found: &FoundTodo, cfg: &OpsConfi
     let pending: Vec<(String, String)> = doc
         .tasks
         .iter()
-        .filter(|task| {
-            task.status == Status::Done
-                && task.verify.is_some()
-                && task.field_value("verified").is_none()
-        })
+        .filter(|task| verify::awaits_verified(task))
         .filter_map(|task| {
             let command = task.verify.clone()?;
             Some((cfg.id_config.format_id(task.id), command))

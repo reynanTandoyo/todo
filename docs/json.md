@@ -319,6 +319,9 @@ the output for a fixture with one open task:
     "file": "TODO.md",
     "counts": { "open": 2, "claimed": 1, "blocked": 1, "done": 3, "dropped": 0, "total": 7, "questions": 1, "ideas": 1 },
     "open_by_priority": [{ "priority": "P0", "count": 1 }],
+    "to_split": 0,
+    "to_detail": 0,
+    "without_level": 0,
     "milestones": [{ "id": "T-010", "title": "Develop the renderer", "priority": "P1", "status": "open", "progress": { "done": 1, "total": 3 } }],
     "claimed": [
       { "id": "T-002", "title": "Work", "owner": "alice", "claimed": "2026-11-15T18:00+01:00", "age_hours": 2, "stale": false }
@@ -446,6 +449,56 @@ its wave.
 
 `todo waves <milestone>` limits `tasks`, the waves and `apart` to the tasks below the milestone;
 `milestone` then holds its ID, and `null` otherwise. The wave numbers are those of the whole file.
+
+### `todo plan --json` (`todo.plan.v1`, `R-LEVEL-2`)
+
+`data` has one list per group of the planner's list, in the order of the list. Each task is in the
+first group it fits, so no task is in two groups. The example holds one task in each group:
+
+```json
+{
+  "schema": "todo.plan.v1",
+  "ok": true,
+  "data": {
+    "file": "TODO.md",
+    "milestone": null,
+    "clean": false,
+    "given_back": [
+      { "id": "T-003", "title": "Retry the upload", "level": "2", "problem": "the build breaks", "attempts": "2" }
+    ],
+    "to_split": [
+      { "id": "T-001", "title": "Renderer lighting", "level": "4", "priority": "P1" }
+    ],
+    "to_detail": [
+      { "id": "T-002", "title": "Load the config", "level": "1", "missing": ["accept", "steps", "verify", "files"] }
+    ],
+    "without_level": [
+      { "id": "T-004", "title": "Write the notes", "priority": "P2", "status": "open" }
+    ],
+    "kept_on_purpose": [
+      { "id": "T-005", "title": "Shader design", "level": "3", "reason": "the design is open" }
+    ],
+    "unverified": [
+      { "id": "T-006", "title": "Parse the config", "verify": "cargo test" }
+    ]
+  },
+  "warnings": []
+}
+```
+
+- `given_back` lists the tasks a worker gave back (`R-STUCK-1`), with the `problem` and `attempts`
+  of the task, both `null` when unset.
+- `to_split` lists the tasks above the target level, hardest level first; `to_detail` the tasks at
+  or below it that are not ready for lack of detail, with what is `missing` (`R-DETAIL-2`).
+- `without_level` lists the tasks without a difficulty.
+- `kept_on_purpose` and `unverified` are counted apart: they do not change the exit code.
+  `kept_on_purpose` holds the tasks kept above the target with `final` (`R-LEVEL-3`); `unverified`
+  the done tasks with a `verify` command and no `verified` line (`R-VERIFY-2`), and it is `[]`
+  while `verify = false`.
+- `clean` is `true` when the first four lists are empty; the exit code is then 0, and 1 otherwise.
+- Done, dropped and claimed entries, milestones, ideas and questions are left out.
+- `todo plan <milestone>` limits the lists to the entries below that milestone, and `milestone`
+  then holds its ID.
 
 ### `todo where --json` (`todo.where.v1`)
 

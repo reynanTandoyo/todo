@@ -67,7 +67,10 @@ expression: json
         "status": "open",
         "title": "Should we ship v0.2 today?"
       }
-    ]
+    ],
+    "to_detail": 0,
+    "to_split": 1,
+    "without_level": 1
   },
   "ok": true,
   "schema": "todo.summary.v1",
