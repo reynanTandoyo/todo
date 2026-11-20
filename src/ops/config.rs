@@ -159,6 +159,27 @@ impl OpsConfig {
             .position(|cfg_d| cfg_d.eq_ignore_ascii_case(d.trim()))
     }
 
+    /// The level the planner splits down to (`R-LEVEL-2`, `R-LEVEL-3`): the first of
+    /// [`Self::difficulties`], until `target_difficulty` is read from `todo.toml`.
+    #[must_use]
+    pub fn target_difficulty(&self) -> &str {
+        self.difficulties.first().map_or("", String::as_str)
+    }
+
+    /// Whether a task at `difficulty` is above the target level, so it may keep a `final` (R-LEVEL-3).
+    /// The target is rank 0; a missing or unconfigured level is not above it.
+    #[must_use]
+    pub fn is_above_target(&self, difficulty: Option<&str>) -> bool {
+        matches!(self.difficulty_rank(difficulty), Some(rank) if rank > 0)
+    }
+
+    /// Whether a task at `difficulty` is at the target level or below it (R-LEVEL-3). With the target
+    /// at the lowest level, that is rank 0; a missing or unconfigured level is neither.
+    #[must_use]
+    pub fn is_at_or_below_target(&self, difficulty: Option<&str>) -> bool {
+        self.difficulty_rank(difficulty) == Some(0)
+    }
+
     /// Whether `required_fields` names `field`, ignoring case: a task must then have it (`R-LEVEL-1`).
     #[must_use]
     pub fn requires_field(&self, field: &str) -> bool {

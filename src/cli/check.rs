@@ -13,7 +13,9 @@ use crate::agents::{
 };
 use crate::atomic::{atomic_write_bytes, read_file_with_snapshot, validate_utf8};
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::{Document, FieldLocation, LineEdit, Status, Task, TaskChangeIntent, TaskId};
+use crate::doc::{
+    Document, EntryKind, FieldLocation, LineEdit, Status, Task, TaskChangeIntent, TaskId,
+};
 use crate::error::{ErrorCode, ExitCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::history::{OutsideEditOutcome, detect_outside_edit};
@@ -337,6 +339,31 @@ pub(crate) fn check_tasks(
                     "{id_str}: difficulty {difficulty:?} is not in configured difficulties"
                 ),
             });
+        }
+
+        // `final` keeps a task above the target level on purpose (R-LEVEL-3). A milestone, question or
+        // idea cannot carry one, and neither can a task at the target level: written by hand, or left
+        // behind when the level was lowered.
+        if task.final_reason.is_some() {
+            if task.kind() != EntryKind::Task {
+                problems.push(CheckProblem {
+                    file: label.to_string(),
+                    line,
+                    message: format!(
+                        "{id_str}: final on {} entry; only a task can stay above the target level",
+                        task.kind().as_str()
+                    ),
+                });
+            } else if cfg.is_at_or_below_target(task.difficulty.as_deref()) {
+                problems.push(CheckProblem {
+                    file: label.to_string(),
+                    line,
+                    message: format!(
+                        "{id_str}: final on a task at the target level {}; split it or give it a higher level",
+                        cfg.target_difficulty()
+                    ),
+                });
+            }
         }
     }
 }

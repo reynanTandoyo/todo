@@ -205,6 +205,7 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
       { "id": "T-012", "title": "C shader", "kind": "task", "status": "open" }
     ],
     "why": null,
+    "final": null,
     "depends": ["T-003"],
     "dependencies": [
       { "raw": "T-003", "id": "T-003", "exists": true, "archived": false, "status": "done", "title": "Setup", "satisfied": true }
@@ -224,6 +225,8 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
     "steps": [],
     "accept": null,
     "verify": null,
+    "attempts": null,
+    "verified": null,
     "commit": [],
     "fields": {},
     "notes": [
@@ -266,6 +269,7 @@ the output for a fixture with one open task:
       "milestones": [],
       "children": [],
       "why": "the reader needs it first",
+      "final": null,
       "depends": [],
       "dependencies": [],
       "dependents": [],
@@ -279,6 +283,8 @@ the output for a fixture with one open task:
       "steps": [],
       "accept": null,
       "verify": null,
+      "attempts": null,
+      "verified": null,
       "commit": [],
       "fields": {},
       "notes": [
@@ -327,6 +333,8 @@ the output for a fixture with one open task:
 `ready_to_close` (`R-MILE-6`) lists the milestones that are ready to close, as `{ "id", "title" }`; the key is left out when there are none.
 
 `given_back` (`R-STUCK-1`) lists the blocked tasks that `todo stuck` gave back to the planner, each as a `blocked` entry whose `reason` is the problem; the key is left out when there are none.
+
+`kept_on_purpose` (`R-LEVEL-3`) is the number of open or blocked tasks above the target level that keep a `final` reason; the key is left out when there are none.
 
 `counts` covers tasks only: `open`, `claimed`, `blocked`, `done`, `dropped` and `total` (their sum) leave out milestones, which are listed under `milestones`. `questions` and `ideas` count the open ones (not done or dropped) apart from the rest (`R-KIND-3`, `R-KIND-1`); the open questions are listed in `open_questions`.
 

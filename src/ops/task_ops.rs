@@ -8,7 +8,7 @@
 use chrono::{DateTime, FixedOffset};
 use serde::Deserialize;
 
-use crate::doc::{COMBINED_PART_SEPARATOR, Document, LineEdit, Status, Task};
+use crate::doc::{COMBINED_PART_SEPARATOR, Document, EntryKind, LineEdit, Status, Task};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::milestone;
 use crate::ops::pipeline::{build_claim_edits_with_note, build_release_edits};
@@ -222,6 +222,57 @@ fn attempts_after_failure(task: &Task, id_str: &str) -> Result<u64> {
             )
             .with_task(id_str)
         })
+}
+
+/// Refuses a `set` that writes `final` (`R-LEVEL-3`, `BAD_VALUE`; the file stays as it was). The
+/// reason must not be empty, the entry must be a task, and the task must stay above the target level
+/// once the `difficulty` changes of the same `set` are made. `--unset final` is never refused.
+fn check_final_changes(
+    task: &Task,
+    changes: &[SetChange<'_>],
+    cfg: &OpsConfig,
+    id_str: &str,
+) -> Result<()> {
+    let target = cfg.target_difficulty();
+    let refuse = |message: String| TodoError::new(ErrorCode::BadValue, message).with_task(id_str);
+    let mut difficulty = task.difficulty.clone();
+    for change in changes {
+        match *change {
+            SetChange::Field(key, value) if key.trim().eq_ignore_ascii_case("difficulty") => {
+                difficulty = Some(cfg.canonical_difficulty(value)?);
+            }
+            SetChange::Unset(key) if key.trim().eq_ignore_ascii_case("difficulty") => {
+                difficulty = None;
+            }
+            SetChange::Field(key, value) if key.trim().eq_ignore_ascii_case("final") => {
+                if value.trim().is_empty() {
+                    return Err(refuse(format!(
+                        "final needs a reason: say why {id_str} stays above the target level {target}"
+                    )));
+                }
+                if task.kind() != EntryKind::Task {
+                    return Err(refuse(format!(
+                        "final applies only to a task; {id_str} is an entry of kind {}",
+                        task.kind().as_str()
+                    )));
+                }
+                if !cfg.is_above_target(difficulty.as_deref()) {
+                    let message = if cfg.is_at_or_below_target(difficulty.as_deref()) {
+                        format!(
+                            "{id_str} is at the target level {target}; final keeps a task above it, so split the task instead"
+                        )
+                    } else {
+                        format!(
+                            "{id_str} has no configured level above the target {target}; give it a higher level first, or split the task instead"
+                        )
+                    };
+                    return Err(refuse(message));
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 /// Refuses `verified` written from a check of a command that is no longer the task's `verify` line
@@ -458,6 +509,7 @@ impl TaskOp<'_> {
             refuse_counted_fields(changes, &id_str)?;
             check_priority_value(changes)?;
             milestone::check_set_changes(doc, cfg, task, changes)?;
+            check_final_changes(task, changes, cfg, &id_str)?;
             for change in *changes {
                 match *change {
                     SetChange::Title(t) => builder.set_title(t),

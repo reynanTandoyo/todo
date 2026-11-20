@@ -561,3 +561,17 @@ fn validates_agent_names_per_format_section_11() {
     assert!(!is_valid_agent_name("agent/1"));
     assert!(agent_names_equal("Agent-1", "agent-1"));
 }
+
+#[test]
+fn attempts_and_verified_are_typed_fields_on_their_own_line_and_on_the_priority_line() {
+    // T-177: read as fields of their own, like `final` and `verify`, not as unknown fields.
+    let sample = b"## Tasks\n### T-001 \xC2\xB7 Example\n- status: open\n- priority: P1 \xC2\xB7 attempts: 2\n- verified: 2026-11-15\n- accept: works\n";
+    let doc = Document::parse_bytes(sample).expect("parse");
+    let task = doc.task_by_id(TaskId(1)).expect("T-001");
+
+    assert_eq!(task.attempts.as_deref(), Some("2"));
+    assert_eq!(task.verified.as_deref(), Some("2026-11-15"));
+    assert_eq!(task.field_value("attempts"), Some("2"));
+    assert_eq!(task.field_value("verified"), Some("2026-11-15"));
+    assert!(task.unknown_fields.is_empty(), "{:?}", task.unknown_fields);
+}
