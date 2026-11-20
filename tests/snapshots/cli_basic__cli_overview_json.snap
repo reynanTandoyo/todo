@@ -221,6 +221,11 @@ expression: ok_json
         "summary": "Install the Claude Code skill for working with TODO.md"
       },
       {
+        "kind": "write",
+        "name": "split",
+        "summary": "Turn a task into a milestone with child tasks"
+      },
+      {
         "kind": "read",
         "name": "status",
         "summary": "Show write lock and manual lease status"

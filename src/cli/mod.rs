@@ -613,6 +613,7 @@ register_commands! {
     Set => set,
     Show => show,
     Skill => skill,
+    Split => split,
     Status => status,
     Stuck => stuck,
     Summary => summary,
