@@ -46,26 +46,34 @@ pub fn parse_files(value: &str) -> Vec<ScopeEntry> {
     raw_entries(value).filter_map(ScopeEntry::parse).collect()
 }
 
+/// A path as `files` compares it: `/` separators, no `.` or empty parts, lower case on Windows. A
+/// trailing `/` (a folder) is kept. `None` when no part is left.
+fn normalise(text: &str) -> Option<String> {
+    let slashed = text.replace('\\', "/");
+    let folder = slashed.ends_with('/');
+    let parts: Vec<&str> = slashed
+        .split('/')
+        .filter(|part| !part.is_empty() && *part != ".")
+        .collect();
+    if parts.is_empty() {
+        return None;
+    }
+    let mut out = parts.join("/");
+    if folder {
+        out.push('/');
+    }
+    if cfg!(windows) {
+        out = out.to_lowercase();
+    }
+    Some(out)
+}
+
 impl ScopeEntry {
     /// Parses one entry as written. `None` when nothing is left once `.` parts are removed.
     #[must_use]
     pub fn parse(raw: &str) -> Option<Self> {
-        let slashed = strip_line_suffix(raw.trim()).replace('\\', "/");
-        let folder = slashed.ends_with('/');
-        let parts: Vec<&str> = slashed
-            .split('/')
-            .filter(|part| !part.is_empty() && *part != ".")
-            .collect();
-        if parts.is_empty() {
-            return None;
-        }
-        let mut text = parts.join("/");
-        if folder {
-            text.push('/');
-        }
-        if cfg!(windows) {
-            text = text.to_lowercase();
-        }
+        let mut text = normalise(strip_line_suffix(raw.trim()))?;
+        let folder = text.ends_with('/');
         let kind = if text.contains('*') {
             Kind::Pattern
         } else if folder {
@@ -74,10 +82,20 @@ impl ScopeEntry {
             Kind::Path
         };
         // A pattern that names folders covers everything below them: `src/*/` is `src/*/**`.
-        if kind == Kind::Pattern && text.ends_with('/') {
+        if kind == Kind::Pattern && folder {
             text.push_str("**");
         }
         Some(Self { text, kind })
+    }
+
+    /// A file named by a path, as a changed file is (`R-SCOPE-2`): a `*` in its name is an ordinary
+    /// character, and nothing is cut off as a line number.
+    fn file(path: &str) -> Option<Self> {
+        let text = normalise(path)?.trim_end_matches('/').to_string();
+        Some(Self {
+            text,
+            kind: Kind::Path,
+        })
     }
 
     /// The text before the first `*`, which is the part of a pattern that is fixed.
@@ -122,6 +140,30 @@ pub fn entries_overlap(a: &ScopeEntry, b: &ScopeEntry) -> bool {
 #[must_use]
 pub fn scopes_overlap(a: &[ScopeEntry], b: &[ScopeEntry]) -> bool {
     a.iter().any(|x| b.iter().any(|y| entries_overlap(x, y)))
+}
+
+/// Whether the changed file `path` lies inside the entries of a task's `files` (R-SCOPE-2). `path`
+/// is relative to the folder of `TODO.md`, with `/` or `\` separators. A path that leaves that
+/// folder (a `..` part) never does, whatever the entries say.
+#[must_use]
+pub fn path_in_scope(entries: &[ScopeEntry], path: &str) -> bool {
+    if path.split(['/', '\\']).any(|part| part == "..") {
+        return false;
+    }
+    match ScopeEntry::file(path) {
+        Some(file) => entries.iter().any(|entry| entries_overlap(entry, &file)),
+        None => false,
+    }
+}
+
+/// Whether two paths name the same file, compared the way `files` entries are (case is ignored on
+/// Windows). Used for `TODO.md` and the archive file, which `done --commit` always allows.
+#[must_use]
+pub fn same_path(a: &str, b: &str) -> bool {
+    match (ScopeEntry::file(a), ScopeEntry::file(b)) {
+        (Some(x), Some(y)) => x == y,
+        _ => false,
+    }
 }
 
 /// Whether one of two texts starts with the other.
@@ -324,4 +366,75 @@ pub fn check_claim_files(
         &busy,
         cfg,
     ))
+}
+
+/// What `done` learnt from git before the write lock is taken, for the `--commit` it was given
+/// (R-SCOPE-2, NFR-5). [`check_done_commit`] checks it against the task's `files` under the lock.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommitScope {
+    /// No git repository holds `TODO.md`, or git is not on `PATH`: nothing is checked, and
+    /// `--commit` stays optional, as before v0.8.
+    NoGit,
+    /// Git can be used, and `done` got no `--commit`.
+    NoCommit,
+    /// The files the commit changed, relative to the folder of `TODO.md`, with `/` separators and
+    /// without `TODO.md` and the archive file. A path outside that folder starts with `../`.
+    Changed(Vec<String>),
+}
+
+/// Whether `task` is at or below the target level (`R-DETAIL-2`): the lowest level, the first of
+/// `difficulties`, until a `target_difficulty` is set.
+fn at_or_below_target(task: &Task, cfg: &OpsConfig) -> bool {
+    cfg.difficulty_rank(task.difficulty.as_deref()) == Some(0)
+}
+
+/// Checks a `done` of `task` against its `files` and the commit it named (`R-SCOPE-2`). A task
+/// without `files` is not checked. A commit that changed a file outside `files` is refused
+/// (`OUT_OF_SCOPE`) unless `force` is given; then the returned note records the files. A task at
+/// or below the target level that has `files` needs its commit while git is there (`MISSING_FIELD`);
+/// `force` does not override that.
+pub fn check_done_commit(
+    task: &Task,
+    cfg: &OpsConfig,
+    scope: &CommitScope,
+    force: bool,
+    id_str: &str,
+) -> Result<Option<String>> {
+    let Some(files) = task.files.as_deref() else {
+        return Ok(None);
+    };
+    match scope {
+        CommitScope::NoGit => Ok(None),
+        CommitScope::NoCommit if at_or_below_target(task, cfg) => Err(TodoError::new(
+            ErrorCode::MissingField,
+            format!(
+                "{id_str} names files, so done needs the commit that holds its work: pass --commit HEAD"
+            ),
+        )
+        .with_task(id_str)),
+        CommitScope::NoCommit => Ok(None),
+        CommitScope::Changed(changed) => {
+            let entries = parse_files(files);
+            let outside: Vec<&str> = changed
+                .iter()
+                .map(String::as_str)
+                .filter(|path| !path_in_scope(&entries, path))
+                .collect();
+            if outside.is_empty() {
+                return Ok(None);
+            }
+            let list = outside.join(", ");
+            if force {
+                return Ok(Some(format!("forced done outside files: {list}")));
+            }
+            Err(TodoError::new(
+                ErrorCode::OutOfScope,
+                format!(
+                    "{id_str} changed files outside its files: {list}; pass --force to finish it anyway"
+                ),
+            )
+            .with_task(id_str)
+            .with_detail("files_outside", json!(outside)))
+        }
+    }
 }

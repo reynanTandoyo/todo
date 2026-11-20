@@ -16,7 +16,7 @@ use crate::ops::rules::{
     OwnershipDecision, StatusCommand, TaskCommand, check_ownership, check_promotable,
     forced_note_text, plan_claim, plan_release, validate_transition,
 };
-use crate::ops::scope::check_claim_files;
+use crate::ops::scope::{CommitScope, check_claim_files, check_done_commit};
 use crate::ops::{OpsConfig, TaskEditBuilder};
 
 /// Who performs an operation, when, and with which settings.
@@ -60,6 +60,9 @@ pub enum TaskOp<'a> {
         commit: Option<&'a str>,
         /// Optional `by` value: the person behind the work (`R-WRITE-16`).
         by: Option<&'a str>,
+        /// What git said about the commit before the lock (`R-SCOPE-2`), checked against the task's
+        /// `files`.
+        scope: &'a CommitScope,
     },
     /// Drop the task with a reason. A milestone with unfinished entries below it is refused
     /// (R-MILE-2); `drop --tree` drops those entries first.
@@ -293,6 +296,13 @@ impl TaskOp<'_> {
             }
         };
 
+        // R-SCOPE-2: the commit stays inside the task's files, and a task at the target level names
+        // its commit. Checked after the status change is accepted, so a wrong status is reported first.
+        let forced_scope = match self {
+            Self::Done { scope, .. } => check_done_commit(task, cfg, scope, env.force, &id_str)?,
+            _ => None,
+        };
+
         if let Self::Done { commit, by, .. } = self {
             if let Some(c) = commit {
                 builder.set_field("commit", c);
@@ -344,6 +354,9 @@ impl TaskOp<'_> {
                 agent,
                 &format!("forced done ({count} entries below unfinished)"),
             );
+        }
+        if let Some(text) = &forced_scope {
+            builder.add_note(&date, agent, text);
         }
         let note = match *self {
             Self::Done { note, .. } => Some(note_with("done", note)),

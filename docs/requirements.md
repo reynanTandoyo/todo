@@ -1349,10 +1349,12 @@ same checkout.
     compares them with the task's entries, as paths relative to the folder of `TODO.md`. A file
     outside them refuses `done` (exit 1, `OUT_OF_SCOPE`), naming the files. `TODO.md` and the
     archive file are always allowed.
-  - `--force` overrides and adds the note `forced done outside files: <files>`.
+  - `--force` overrides the file check and adds the note `forced done outside files: <files>`. It
+    does not override the `--commit` rule below.
   - A task at or below the target level that has `files` cannot be finished without `--commit`
     while git is available (exit 1, `MISSING_FIELD`, naming `--commit HEAD`).
-  - A task without `files`, or a folder where git isn't available (NFR-5), behaves as before v0.8.
+  - git is available when it is on `PATH` and the folder of `TODO.md` is inside a repository. A
+    task without `files`, or a folder where git isn't available (NFR-5), behaves as before v0.8.
   - Tests use a temporary repository with one commit inside the scope and one outside.
 
 ### 5.31 Waves — WAVE

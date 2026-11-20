@@ -124,6 +124,8 @@ pub enum ErrorCode {
     DuplicateProject,
     /// The task's files overlap a task that another agent holds, so the claim is refused (R-SCOPE-1, R-CLAIM-2).
     FilesBusy,
+    /// The commit given to `done` changed files outside the task's files, so `done` is refused (R-SCOPE-2).
+    OutOfScope,
 }
 
 impl ErrorCode {
@@ -154,6 +156,7 @@ impl ErrorCode {
             Self::ToolTooOld => "TOOL_TOO_OLD",
             Self::DuplicateProject => "DUPLICATE_PROJECT",
             Self::FilesBusy => "FILES_BUSY",
+            Self::OutOfScope => "OUT_OF_SCOPE",
         }
     }
 
@@ -183,6 +186,7 @@ impl ErrorCode {
         Self::ToolTooOld,
         Self::DuplicateProject,
         Self::FilesBusy,
+        Self::OutOfScope,
     ];
 
     /// Plain-English meaning of this error code, shown by `todo schema`.
@@ -226,6 +230,9 @@ impl ErrorCode {
             Self::FilesBusy => {
                 "The task's files overlap a task that another agent holds. Claim with --force to override."
             }
+            Self::OutOfScope => {
+                "The commit changed files outside the task's files. Finish with --force to record them in a note."
+            }
         }
     }
 
@@ -245,7 +252,8 @@ impl ErrorCode {
             | Self::MissingField
             | Self::BadValue
             | Self::DuplicateProject
-            | Self::FilesBusy => ExitCode::Refused,
+            | Self::FilesBusy
+            | Self::OutOfScope => ExitCode::Refused,
             Self::Busy | Self::LeaseHeld | Self::ChangedDuringWrite => ExitCode::Busy,
             Self::NoGitHistory => ExitCode::CheckError,
             Self::NoFile
@@ -428,6 +436,7 @@ mod tests {
             (ErrorCode::UnsafeFile, "UNSAFE_FILE", ExitCode::FileError),
             (ErrorCode::ReadOnly, "READ_ONLY", ExitCode::FileError),
             (ErrorCode::WriteFailed, "WRITE_FAILED", ExitCode::FileError),
+            (ErrorCode::OutOfScope, "OUT_OF_SCOPE", ExitCode::Refused),
         ];
 
         for (code, expected_str, expected_exit) in cases {

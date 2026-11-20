@@ -2,7 +2,9 @@
 //! `todo::ops::scope` API: paths, folders, patterns, `**`, separators, case, `:<line>` suffixes,
 //! and the entries that `check` reports.
 
-use todo::ops::scope::{outside_folder_reason, parse_files, scopes_overlap};
+use todo::ops::scope::{
+    outside_folder_reason, parse_files, path_in_scope, same_path, scopes_overlap,
+};
 
 /// Whether the `files` value `a` and the `files` value `b` overlap (a task-level comparison).
 fn overlaps(a: &str, b: &str) -> bool {
@@ -122,4 +124,52 @@ fn ordinary_relative_entries_are_not_reported() {
     assert_eq!(outside_folder_reason("src/a.c:12"), None);
     assert_eq!(outside_folder_reason("docs/"), None);
     assert_eq!(outside_folder_reason("src/*.c"), None);
+}
+
+/// Whether the changed file `path` lies inside the `files` value `files` (R-SCOPE-2).
+fn inside(files: &str, path: &str) -> bool {
+    path_in_scope(&parse_files(files), path)
+}
+
+#[test]
+fn a_changed_file_is_inside_a_path_folder_or_pattern_entry_that_covers_it() {
+    assert!(inside("src/shader.c", "src/shader.c"));
+    assert!(!inside("src/shader.c", "src/shader.h"));
+    assert!(inside("src/gpu/", "src/gpu/kernel/a.c"));
+    assert!(!inside("src/gpu/", "src/gpu2/a.c"));
+    assert!(inside("src/*.c", "src/a.c"));
+    assert!(!inside("src/*.c", "src/gpu/a.c"));
+    assert!(inside("tests/**/fixture_*.md", "tests/a/b/fixture_1.md"));
+    assert!(!inside("tests/**/fixture_*.md", "tests/a/b/case_1.md"));
+}
+
+#[test]
+fn a_changed_file_with_backslashes_or_a_line_suffix_in_the_entry_is_the_same_file() {
+    assert!(inside("src\\gpu\\", "src/gpu/a.c"));
+    assert!(inside("src/a.c:42", "src/a.c"));
+    assert!(inside("./src/a.c", "src\\a.c"));
+}
+
+#[test]
+fn a_path_that_leaves_the_folder_is_never_inside_even_for_a_wildcard() {
+    assert!(!inside("**/*.rs", "../x.rs"));
+    assert!(!inside("**", "../other/x.txt"));
+    assert!(!inside("..", "../x.txt"));
+    assert!(!inside("src/", "src/../../x.txt"));
+}
+
+#[test]
+fn a_star_in_a_changed_file_name_is_an_ordinary_character() {
+    assert!(inside("src/", "src/a*b.c"));
+    assert!(!inside("src/a.c", "src/a*b.c"));
+}
+
+#[test]
+fn same_path_ignores_separators_dot_parts_and_case_on_windows() {
+    assert!(same_path("TODO.md", "./TODO.md"));
+    assert!(same_path("docs\\TODO-archive.md", "docs/TODO-archive.md"));
+    assert!(!same_path("TODO.md", "TODO-archive.md"));
+    if cfg!(windows) {
+        assert!(same_path("TODO.md", "todo.md"));
+    }
 }

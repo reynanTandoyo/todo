@@ -916,6 +916,7 @@ project's `TODO.md`, never searches folders and writes nothing.
 | `NO_GIT_HISTORY` | 5 | `align` without git, outside a repository, in a shallow clone or with no commits | `{"code":"NO_GIT_HISTORY","message":"not inside a git repository"}` |
 | `TOOL_TOO_OLD` | 4 | `TODO.md`, the archive or the project register names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 3 is newer than this todo 0.7.0 supports; ...","line":1,"file":"TODO.md"}` |
 | `FILES_BUSY` | 1 | `claim` of a task whose `files` overlap a task another agent holds (R-SCOPE-1, R-CLAIM-2); `--force` overrides it | `{"code":"FILES_BUSY","message":"task T-002 shares files with T-001 (claimed by alice); pass --force to claim it anyway","task":"T-002","files_busy":["T-001"]}` |
+| `OUT_OF_SCOPE` | 1 | `done --commit` whose commit changed files outside the task's `files` (R-SCOPE-2); `--force` finishes it and notes the files | `{"code":"OUT_OF_SCOPE","message":"T-001 changed files outside its files: other/x.txt; pass --force to finish it anyway","task":"T-001","files_outside":["other/x.txt"]}` |
 | `DUPLICATE_PROJECT` | 1 | `project add` for a file, or a name, that the project register already has (R-PROJ-1) | `{"code":"DUPLICATE_PROJECT","message":"C:\\Projekte\\TODO.md is already registered as renderer"}` |
 
 ### `TOOL_TOO_OLD` (`R-VER-2`)

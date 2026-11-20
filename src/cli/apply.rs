@@ -734,6 +734,8 @@ fn apply_task_op(
                 note: note.as_deref(),
                 commit: commit.as_deref().map(str::trim),
                 by: done_by,
+                // `apply` does not check the files of a commit yet; only `done` does (R-SCOPE-2).
+                scope: &crate::ops::scope::CommitScope::NoGit,
             },
         ),
         ApplyOp::Drop { task, note } => (

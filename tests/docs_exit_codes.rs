@@ -15,7 +15,7 @@ use std::process::Command;
 
 use tempfile::TempDir;
 
-use common::{parse_json, stderr_text, todo_bin};
+use common::{git_command, parse_json, stderr_text, todo_bin};
 
 /// `docs/json.md`, read from this repository.
 fn json_doc() -> String {
@@ -87,6 +87,9 @@ enum Setup {
     /// The folder of the project register is a file, so the register cannot be written
     /// (`WRITE_FAILED`).
     RegisterFolderIsAFile,
+    /// The folder is a git repository whose last commit changed a file outside the files of the task
+    /// (`OUT_OF_SCOPE`).
+    CommitOutsideFiles,
 }
 
 /// A command that makes one error. `before` lists commands that must succeed first.
@@ -187,6 +190,19 @@ const NEWER_BODY: &str = "\
 
 /// `todo.toml` that does not wait for the write lock or a lease.
 const NO_WAIT: &str = "lock_wait_seconds = 0\n";
+
+/// Task T-001 names the folder `src/`, so a commit that changes `other.txt` is outside it.
+const SCOPE_BODY: &str = "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+## Queue
+
+### T-001 · Scoped task
+- status: open
+- owner: —
+- priority: P1
+- difficulty: 1
+- files: src/
+";
 
 /// Two open tasks that name the same file, so one claim blocks the other (`FILES_BUSY`, R-SCOPE-1).
 const FILES_BODY: &str = "\
@@ -488,6 +504,14 @@ const ERROR_CASES: &[ErrorCase] = &[
         before: &[&["--agent", "alice", "claim", "T-001"]],
         args: &["--agent", "bob", "claim", "T-002"],
     },
+    ErrorCase {
+        code: "OUT_OF_SCOPE",
+        todo: Some(SCOPE_BODY),
+        config: None,
+        setup: Setup::CommitOutsideFiles,
+        before: &[],
+        args: &["--agent", "alice", "done", "T-001", "--commit", "HEAD"],
+    },
 ];
 
 /// `todo --json --file <todo>` plus `args`, run in `work`, with the register at `register`.
@@ -516,6 +540,41 @@ fn hold_write_lock(work: &Path) -> File {
         .expect("open write.lock");
     file.try_lock().expect("take the write lock");
     file
+}
+
+/// Makes `work` a git repository whose first commit holds TODO.md and `src/a.rs`, and whose second
+/// commit changes `other.txt`, which lies outside the files of T-001 (`src/`).
+fn commit_outside_files(work: &Path) {
+    let git = |args: &[&str]| {
+        let out = git_command()
+            .current_dir(work)
+            .env("GIT_CONFIG_GLOBAL", work.join("no-such-gitconfig"))
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .args([
+                "-c",
+                "user.name=Test User",
+                "-c",
+                "user.email=test@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+            ])
+            .args(args)
+            .output()
+            .expect("run git");
+        assert!(
+            out.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+    fs::create_dir_all(work.join("src")).expect("create src");
+    fs::write(work.join("src/a.rs"), "pub fn a() {}\n").expect("write src/a.rs");
+    git(&["init", "-q"]);
+    git(&["add", "--", "TODO.md", "src/a.rs"]);
+    git(&["commit", "-q", "-m", "T-001: start"]);
+    fs::write(work.join("other.txt"), "outside the task\n").expect("write other.txt");
+    git(&["add", "--", "other.txt"]);
+    git(&["commit", "-q", "-m", "T-001: outside"]);
 }
 
 fn set_read_only(path: &Path, read_only: bool) {
@@ -557,6 +616,9 @@ fn error_codes_exit_with_the_code_the_table_gives() {
         };
 
         let _lock = (case.setup == Setup::HeldWriteLock).then(|| hold_write_lock(&work));
+        if case.setup == Setup::CommitOutsideFiles {
+            commit_outside_files(&work);
+        }
         for step in case.before {
             let out = case_command(&todo, &work, &register, step)
                 .output()
