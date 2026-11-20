@@ -48,6 +48,8 @@ fn text_with_quotes_backticks_and_dollar_arrives_intact_via_stdin_and_at_file() 
             &at_arg,
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--problem",
             &at_arg,
         ])

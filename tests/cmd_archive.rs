@@ -85,7 +85,7 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
     assert_eq!(old_json["data"]["count"], 2);
 
     let archive_text = read_text(&dir.path().join("TODO-archive.md"));
-    assert!(archive_text.starts_with("<!-- todo-format: 2 -->"));
+    assert!(archive_text.starts_with("<!-- todo-format: 3 -->"));
     assert!(archive_text.contains("## Backend"));
     assert!(archive_text.contains("### T-001 · Old done backend task"));
     assert!(archive_text.contains("## Frontend"));
@@ -129,6 +129,8 @@ fn archive_moves_done_and_dropped_to_matching_sections_and_preserves_lookups_and
             "Backend",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--agent",
             "alice",
             "--json",

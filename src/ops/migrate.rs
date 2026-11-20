@@ -10,8 +10,8 @@ use serde::Serialize;
 
 use crate::atomic::read_file_with_snapshot;
 use crate::doc::{
-    CURRENT_FORMAT_VERSION, Document, Migrated, MigrationError, MigrationStep, STEPS,
-    migrate_document,
+    CURRENT_FORMAT_VERSION, Document, Migrated, MigrationError, MigrationSettings, MigrationStep,
+    STEPS, migrate_document,
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::{ArchiveWrite, MigrationWrite};
@@ -59,7 +59,7 @@ impl PendingMigration {
         cfg: &OpsConfig,
     ) -> Result<Self> {
         let mut files = Vec::new();
-        let todo = migrate_for_write(doc, label)?;
+        let todo = migrate_for_write(doc, label, cfg)?;
         if let Some(m) = &todo {
             files.push(MigratedFile {
                 file: label.to_string(),
@@ -114,23 +114,33 @@ pub(crate) fn describe(files: &[MigratedFile]) -> String {
         .join("; ")
 }
 
-/// Migrates a parsed document to the current format (R-MIG-1). `None` when it is already current.
+/// Migrates a parsed document to the current format (R-MIG-1), with the `todo.toml` of `cfg`.
+/// `None` when it is already current.
 ///
 /// The migrated text must parse without write-blocking problems (`docs/format.md` §13); otherwise
 /// the migration is refused with `UNSAFE_FILE` (exit 4) and nothing is written.
-pub(crate) fn migrate_for_write(doc: &Document, label: &str) -> Result<Option<Migrated>> {
-    migrate_checked(doc, label, STEPS, CURRENT_FORMAT_VERSION)
+pub(crate) fn migrate_for_write(
+    doc: &Document,
+    label: &str,
+    cfg: &OpsConfig,
+) -> Result<Option<Migrated>> {
+    let settings = MigrationSettings {
+        difficulties_set: cfg.difficulties_set,
+    };
+    migrate_checked(doc, label, STEPS, CURRENT_FORMAT_VERSION, &settings)
 }
 
-/// [`migrate_for_write`] with the steps and the target version given, so that tests can run other
-/// steps through the same refusal.
+/// [`migrate_for_write`] with the steps, the target version and the settings given, so that tests
+/// can run other steps through the same refusal.
 pub(crate) fn migrate_checked(
     doc: &Document,
     label: &str,
     steps: &[MigrationStep],
     target: u32,
+    settings: &MigrationSettings,
 ) -> Result<Option<Migrated>> {
-    let migrated = migrate_document(doc, steps, target).map_err(|e| migration_error(&e, label))?;
+    let migrated =
+        migrate_document(doc, steps, target, settings).map_err(|e| migration_error(&e, label))?;
     if let Some(m) = &migrated
         && let Some(problem) = m.doc.problems.iter().find(|p| p.blocks_all_writes())
     {
@@ -151,7 +161,7 @@ pub(crate) fn migrate_checked(
 fn plan_archive(archive_path: &Path, cfg: &OpsConfig) -> Result<Option<(ArchiveWrite, u32, u32)>> {
     let snap = read_file_with_snapshot(archive_path)?;
     let parsed = parse_doc_for_write(&snap.bytes, &cfg.archive_file, cfg)?;
-    let Some(migrated) = migrate_for_write(&parsed, &cfg.archive_file)? else {
+    let Some(migrated) = migrate_for_write(&parsed, &cfg.archive_file, cfg)? else {
         return Ok(None);
     };
     let new_bytes = stamped_bytes(&migrated.doc, &cfg.archive_file)?;
@@ -189,7 +199,7 @@ mod tests {
     use crate::error::{ErrorCode, ExitCode};
 
     /// A step whose result is a format line this build does not know, so it must be refused.
-    fn unknown_version_edits(doc: &Document) -> Vec<LineEdit> {
+    fn unknown_version_edits(doc: &Document, _settings: &MigrationSettings) -> Vec<LineEdit> {
         vec![LineEdit::replace_line(
             doc.format_line.unwrap_or(0),
             "<!-- todo-format: 99 -->",
@@ -209,8 +219,14 @@ mod tests {
     #[test]
     fn a_migration_that_leaves_a_blocking_problem_is_refused_with_exit_four() {
         let doc = parse("<!-- todo-format: 1 -->\n# Title\n");
-        let err = migrate_checked(&doc, "TODO.md", &[UNKNOWN_VERSION_STEP], 2)
-            .expect_err("the migrated text must be refused");
+        let err = migrate_checked(
+            &doc,
+            "TODO.md",
+            &[UNKNOWN_VERSION_STEP],
+            2,
+            &MigrationSettings::default(),
+        )
+        .expect_err("the migrated text must be refused");
         assert_eq!(err.code, ErrorCode::UnsafeFile);
         assert_eq!(err.exit_code, ExitCode::FileError);
         assert!(
@@ -227,14 +243,14 @@ mod tests {
         let doc = parse(&format!(
             "<!-- todo-format: {CURRENT_FORMAT_VERSION} -->\n# Title\n"
         ));
-        let migrated = migrate_for_write(&doc, "TODO.md").expect("no error");
+        let migrated = migrate_for_write(&doc, "TODO.md", &OpsConfig::default()).expect("no error");
         assert!(migrated.is_none());
     }
 
     #[test]
     fn a_format_one_document_migrates_to_the_current_format() {
         let doc = parse("<!-- todo-format: 1 -->\n# Title\n");
-        let migrated = migrate_for_write(&doc, "TODO.md")
+        let migrated = migrate_for_write(&doc, "TODO.md", &OpsConfig::default())
             .expect("no error")
             .expect("format 1 is migrated");
         assert_eq!((migrated.from, migrated.to), (1, CURRENT_FORMAT_VERSION));

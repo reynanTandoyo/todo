@@ -60,7 +60,7 @@ fn run_at_now(home: &Path, work: &Path, args: &[&str]) -> Output {
 /// `stamped` in tests/cmd_milestone.rs does.
 fn stamped(text: &str) -> String {
     format!(
-        "<!-- todo-format: 2 -->\n<!-- todo-tool: {} -->\n{text}",
+        "<!-- todo-format: 3 -->\n<!-- todo-tool: {} -->\n{text}",
         env!("CARGO_PKG_VERSION")
     )
 }
@@ -82,6 +82,8 @@ fn add_why_is_written_before_depends_and_problem() {
             "Add the shading stage",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--type",
             "feature",
             "--area",
@@ -107,7 +109,7 @@ fn add_why_is_written_before_depends_and_problem() {
         "{BASE}\n### T-002 · Add the shading stage\n\
 - status: open\n\
 - owner: —\n\
-- priority: P2 · type: feature · area: renderer\n\
+- priority: P2 · difficulty: 3 · type: feature · area: renderer\n\
 - why: shading makes the frame match the reference images\n\
 - depends: T-001\n\
 - problem: the frame is flat\n\
@@ -133,6 +135,8 @@ fn add_field_why_is_the_same_field_as_the_why_flag() {
             "Light pass",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--depends",
             "T-001",
             "--field",
@@ -155,7 +159,7 @@ fn add_field_why_is_the_same_field_as_the_why_flag() {
         "### T-002 · Light pass\n\
 - status: open\n\
 - owner: —\n\
-- priority: P2\n\
+- priority: P2 · difficulty: 3\n\
 - why: lights come after shading\n\
 - depends: T-001\n\
 - note (2026-11-18, alice): added\n"
@@ -180,6 +184,8 @@ fn add_why_reads_stdin_and_an_at_file_in_a_folder_with_spaces_and_non_ascii() {
             "From stdin",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--why",
             "-",
         ],
@@ -211,6 +217,8 @@ fn add_why_reads_stdin_and_an_at_file_in_a_folder_with_spaces_and_non_ascii() {
             "From file",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--why",
             &at_arg,
         ],
@@ -248,6 +256,8 @@ fn required_why_refuses_add_and_add_from_and_leaves_the_file_alone() {
             "No reason given",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
         ],
     );
     assert_eq!(refused.status.code(), Some(1));
@@ -283,6 +293,8 @@ fn required_why_refuses_add_and_add_from_and_leaves_the_file_alone() {
             "With a reason",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--why",
             "it is the next step",
         ],
@@ -432,7 +444,7 @@ fn hand_written_why_line_is_read_as_the_why_field_and_keeps_working() {
     assert_eq!(set.status.code(), Some(0), "stderr: {}", stderr_text(&set));
     // The write migrates the format line and adds the tool stamp directly after it (R-MIG-1, R-VER-1).
     let stamp_after_format = format!(
-        "<!-- todo-format: 2 -->\n<!-- todo-tool: {} -->\n",
+        "<!-- todo-format: 3 -->\n<!-- todo-tool: {} -->\n",
         env!("CARGO_PKG_VERSION")
     );
     assert_eq!(
@@ -487,8 +499,8 @@ fn add_from_and_apply_write_why_in_the_field_order() {
         &home,
         &work,
         &["--json", "--agent", "alice", "add", "--from", "-"],
-        "{\"title\":\"Ship the first frame\",\"priority\":\"P2\",\"why\":\"the reference scene must match\"}\n\
-{\"title\":\"Light pass\",\"priority\":\"P2\",\"depends\":\"T-001\",\"fields\":{\"why\":\"lights come after shading\"}}\n",
+        "{\"title\":\"Ship the first frame\",\"priority\":\"P2\",\"difficulty\":\"3\",\"why\":\"the reference scene must match\"}\n\
+{\"title\":\"Light pass\",\"priority\":\"P2\",\"difficulty\":\"3\",\"depends\":\"T-001\",\"fields\":{\"why\":\"lights come after shading\"}}\n",
     );
     assert_eq!(
         batch.status.code(),
@@ -505,14 +517,14 @@ fn add_from_and_apply_write_why_in_the_field_order() {
 ### T-002 · Ship the first frame\n\
 - status: open\n\
 - owner: —\n\
-- priority: P2\n\
+- priority: P2 · difficulty: 3\n\
 - why: the reference scene must match\n\
 - note (2026-11-18, alice): added\n\
 \n\
 ### T-003 · Light pass\n\
 - status: open\n\
 - owner: —\n\
-- priority: P2\n\
+- priority: P2 · difficulty: 3\n\
 - why: lights come after shading\n\
 - depends: T-001\n\
 - note (2026-11-18, alice): added\n"
@@ -524,7 +536,7 @@ fn add_from_and_apply_write_why_in_the_field_order() {
         &home,
         &work,
         &["--json", "--agent", "alice", "apply", "-"],
-        "{\"op\":\"add\",\"ref\":\"buffer\",\"title\":\"Frame buffer\",\"priority\":\"P1\",\"why\":\"the buffer holds the frame\"}\n\
+        "{\"op\":\"add\",\"ref\":\"buffer\",\"title\":\"Frame buffer\",\"priority\":\"P1\",\"difficulty\":\"3\",\"why\":\"the buffer holds the frame\"}\n\
 {\"op\":\"set\",\"task\":\"T-001\",\"why\":\"the first frame is the goal\"}\n",
     );
     assert_eq!(
@@ -541,7 +553,7 @@ fn add_from_and_apply_write_why_in_the_field_order() {
         ) + "\n### T-004 · Frame buffer\n\
 - status: open\n\
 - owner: —\n\
-- priority: P1\n\
+- priority: P1 · difficulty: 3\n\
 - why: the buffer holds the frame\n\
 - note (2026-11-18, alice): added\n"),
     );
@@ -608,7 +620,7 @@ fn apply_add_reads_why_from_fields_too() {
         &home,
         &work,
         &["--json", "--agent", "alice", "apply", "-"],
-        "{\"op\":\"add\",\"title\":\"Reason in fields\",\"priority\":\"P2\",\"fields\":{\"why\":\"carried in fields\"}}\n",
+        "{\"op\":\"add\",\"title\":\"Reason in fields\",\"priority\":\"P2\",\"difficulty\":\"3\",\"fields\":{\"why\":\"carried in fields\"}}\n",
     );
     assert_eq!(
         applied.status.code(),

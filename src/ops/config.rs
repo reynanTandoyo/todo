@@ -38,14 +38,19 @@ pub struct OpsConfig {
     pub id_config: IdConfig,
     /// Ordered priority names from most urgent to least urgent (`R-CFG-2`).
     pub priorities: Vec<String>,
-    /// Fields required by `todo add` (`R-WRITE-1`, default `["priority"]`).
+    /// Fields required of a task by `todo add` (`R-WRITE-1`, default `["priority", "difficulty"]`;
+    /// milestones, questions and ideas need none of them, `R-LEVEL-1`).
     pub required_fields: Vec<String>,
     /// Allowed `type` values; empty allows any (`R-CFG-2`).
     pub types: Vec<String>,
     /// Allowed `area` values; empty allows any (`R-CFG-2`).
     pub areas: Vec<String>,
-    /// Allowed `difficulty` values, easiest first; never empty (`R-CFG-2`, `R-WRITE-18`).
+    /// Allowed `difficulty` values, easiest first; never empty (`R-CFG-2`, `R-WRITE-18`, default
+    /// the levels `1` to `5`).
     pub difficulties: Vec<String>,
+    /// `true` when `todo.toml` sets `difficulties` itself. The format 2 to 3 migration then keeps
+    /// the difficulty values as they are (`R-MIG-1`).
+    pub difficulties_set: bool,
     /// Default section name for `todo add` when `--section` is omitted (`R-WRITE-1`).
     pub default_section: Option<String>,
     /// Section name for `todo ask` (`R-WRITE-11`, default `"Questions"`).
@@ -74,10 +79,11 @@ impl Default for OpsConfig {
                 "P2".to_string(),
                 "P3".to_string(),
             ],
-            required_fields: vec!["priority".to_string()],
+            required_fields: vec!["priority".to_string(), "difficulty".to_string()],
             types: Vec::new(),
             areas: Vec::new(),
-            difficulties: vec!["easy".to_string(), "medium".to_string(), "hard".to_string()],
+            difficulties: ["1", "2", "3", "4", "5"].map(str::to_string).to_vec(),
+            difficulties_set: false,
             default_section: None,
             question_section: DEFAULT_QUESTION_SECTION.to_string(),
             idea_section: DEFAULT_IDEA_SECTION.to_string(),
@@ -119,6 +125,14 @@ impl OpsConfig {
         self.difficulties
             .iter()
             .position(|cfg_d| cfg_d.eq_ignore_ascii_case(d.trim()))
+    }
+
+    /// Whether `required_fields` names `field`, ignoring case: a task must then have it (`R-LEVEL-1`).
+    #[must_use]
+    pub fn requires_field(&self, field: &str) -> bool {
+        self.required_fields
+            .iter()
+            .any(|f| f.eq_ignore_ascii_case(field))
     }
 
     /// Returns the configured spelling of one `difficulty` value (`R-WRITE-18`).
@@ -286,6 +300,7 @@ impl OpsConfig {
                         return Err(toml_err(line, "difficulties must not be empty"));
                     }
                     cfg.difficulties = items;
+                    cfg.difficulties_set = true;
                 }
                 "default_section" => {
                     let s = expect_string(&key, val, line)?;

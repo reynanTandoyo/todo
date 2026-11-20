@@ -36,7 +36,8 @@ pub use lines::{
     verify_expected_byte_changes,
 };
 pub use migrate::{
-    Migrated, MigrationError, MigrationStep, STEPS, format_line_text, migrate_document,
+    Migrated, MigrationError, MigrationSettings, MigrationStep, STEPS, format_line_text,
+    migrate_document,
 };
 pub use parser::{
     CANONICAL_FIELD_ORDER, CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER,

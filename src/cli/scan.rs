@@ -19,12 +19,12 @@ pub const META: CommandMeta = CommandMeta {
     name: "scan",
     summary: "Find TODO: and FIXME: comments in the project",
     kind: CommandKind::Read,
-    details: "Lists `TODO:` and `FIXME:` comments in the files of the folder that holds `TODO.md`, as `path:line: text` (paths use forward slashes). With git on `PATH` and the folder inside a repository, the files are those from `git ls-files --cached --others --exclude-standard`; otherwise the folder is walked, skipping hidden folders, `target` and `node_modules`. Skips `TODO.md`, the archive, files that are not UTF-8, files over 1 MB, comments that name a task ID, and comments whose text equals an existing task title (ignoring case). `--add` adds the rest as tasks in one locked write (`files: <path>:<line>`, title cut to 120 characters); with `--dry-run` nothing is written.",
+    details: "Lists `TODO:` and `FIXME:` comments in the files of the folder that holds `TODO.md`, as `path:line: text` (paths use forward slashes). With git on `PATH` and the folder inside a repository, the files are those from `git ls-files --cached --others --exclude-standard`; otherwise the folder is walked, skipping hidden folders, `target` and `node_modules`. Skips `TODO.md`, the archive, files that are not UTF-8, files over 1 MB, comments that name a task ID, and comments whose text equals an existing task title (ignoring case). `--add` adds the rest as tasks in one locked write (`files: <path>:<line>`, title cut to 120 characters, with `--priority` and `--difficulty` as `add` takes them); with `--dry-run` nothing is written.",
     examples: &[
         "todo scan",
         "todo scan --json",
-        "todo scan --add --section Now --priority P2 --agent coordinator",
-        "todo scan --add --dry-run --agent coordinator",
+        "todo scan --add --section Now --priority P2 --difficulty 2 --agent coordinator",
+        "todo scan --add --dry-run --priority P2 --difficulty 2 --agent coordinator",
     ],
 };
 
@@ -42,6 +42,10 @@ pub struct Args {
     /// Priority for the new tasks; with `--add`.
     #[arg(long, value_name = "PRIORITY", requires = "add")]
     pub priority: Option<String>,
+
+    /// Level (`1` to `5`) for the new tasks; with `--add`. A task needs one (R-LEVEL-1).
+    #[arg(long, value_name = "LEVEL", requires = "add")]
+    pub difficulty: Option<String>,
 }
 
 /// Files larger than this are not scanned (1 MB).
@@ -90,6 +94,7 @@ struct ScanJson<'a> {
 struct BatchLine<'a> {
     title: &'a str,
     priority: Option<&'a str>,
+    difficulty: Option<&'a str>,
     files: String,
 }
 
@@ -152,7 +157,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 added: Vec::new(),
             }
         } else {
-            let raw = batch_lines(&picked, args.priority.as_deref())?;
+            let raw = batch_lines(&picked, args.priority.as_deref(), args.difficulty.as_deref())?;
             add_batch_text(&raw, args.section.as_deref(), ctx, out)?
         };
         Some(batch)
@@ -218,12 +223,17 @@ fn pick_new<'a>(found: &'a [Candidate], out: &mut Output) -> Vec<&'a Candidate> 
 }
 
 /// The JSON lines for `add --from` describing the candidates.
-fn batch_lines(picked: &[&Candidate], priority: Option<&str>) -> Result<String> {
+fn batch_lines(
+    picked: &[&Candidate],
+    priority: Option<&str>,
+    difficulty: Option<&str>,
+) -> Result<String> {
     let mut lines = Vec::with_capacity(picked.len());
     for c in picked {
         let entry = BatchLine {
             title: &title_of(&c.body),
             priority,
+            difficulty,
             files: format!("{}:{}", c.path, c.line),
         };
         let line = serde_json::to_string(&entry).map_err(|e| {

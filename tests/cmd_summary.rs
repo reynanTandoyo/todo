@@ -22,7 +22,7 @@ fn summary_json_matches_snapshot() {
 ### T-001 · Ready critical task
 - status: open
 - owner: —
-- priority: P0
+- priority: P0 · difficulty: 2
 
 ### T-002 · Claimed fresh task
 - status: claimed
@@ -33,7 +33,7 @@ fn summary_json_matches_snapshot() {
 ### T-003 · Claimed stale task
 - status: claimed
 - owner: bob
-- priority: P1
+- priority: P1 · difficulty: 2
 - claimed: 2026-11-13T10:00+01:00
 
 ### T-004 · Blocked task
@@ -137,7 +137,7 @@ fn summary_counts_only_tasks_and_counts_questions_and_ideas_apart() {
 ### T-002 · Shader task
 - status: open
 - owner: —
-- priority: P1 · type: feature
+- priority: P1 · difficulty: 2 · type: feature
 - milestone: T-001
 
 ### T-003 · Finished task

@@ -36,8 +36,10 @@ fn block(
     claimed: Option<&str>,
     files: Option<&str>,
 ) -> String {
+    // Every task has a level (R-LEVEL-1): `next` hands out only leveled tasks, and these tests are
+    // about files, not levels.
     let mut text = format!(
-        "### T-{id:03} · {title}\n- status: {status}\n- owner: {owner}\n- priority: {priority}\n"
+        "### T-{id:03} · {title}\n- status: {status}\n- owner: {owner}\n- priority: {priority} · difficulty: 2\n"
     );
     if let Some(claimed) = claimed {
         text.push_str(&format!("- claimed: {claimed}\n"));

@@ -23,7 +23,7 @@ fn doc(body: &str) -> String {
 /// directly after the format line (R-VER-1).
 fn written(body: &str) -> String {
     format!(
-        "{MARKER}\n<!-- todo-format: 2 -->\n<!-- todo-tool: {} -->\n\n## Tasks\n\n{body}",
+        "{MARKER}\n<!-- todo-format: 3 -->\n<!-- todo-tool: {} -->\n\n## Tasks\n\n{body}",
         env!("CARGO_PKG_VERSION")
     )
 }
@@ -95,7 +95,7 @@ fn why_problem_fix_accept_files_depends_and_commit_on_the_combined_line_are_read
     let body = "### T-001 · Parse the config\n- status: open\n- owner: —\n\
                 - priority: P0 · why: keep the parser simple · files: src/config.rs · problem: no parser yet · \
                 fix: add one · accept: the test passes · depends: T-002 · commit: abc1234\n\
-                ### T-002 · Write the parser\n- status: open\n- owner: —\n- priority: P2\n";
+                ### T-002 · Write the parser\n- status: open\n- owner: —\n- priority: P2 · difficulty: 2\n";
     let (home, work, _) = setup_proj(&tmp, &doc(body));
 
     let show = parse_json(&ok(&home, &work, &["--json", "show", "T-001"]).stdout);
@@ -268,7 +268,7 @@ fn status_owner_and_claimed_on_the_combined_line_are_read_and_drive_next() {
     let tmp = TempDir::new().unwrap();
     let body = "### T-001 · Claimed on the line\n\
                 - priority: P1 · status: claimed · owner: alice · claimed: 2026-11-15T10:00+01:00\n\
-                ### T-002 · Open\n- status: open\n- owner: —\n- priority: P2\n";
+                ### T-002 · Open\n- status: open\n- owner: —\n- priority: P2 · difficulty: 2\n";
     let (home, work, _) = setup_proj(&tmp, &doc(body));
 
     let show = parse_json(&ok(&home, &work, &["--json", "show", "T-001"]).stdout);

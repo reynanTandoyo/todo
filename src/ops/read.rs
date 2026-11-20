@@ -305,6 +305,10 @@ pub fn is_task_ready(
     if task.kind() != EntryKind::Task {
         return false;
     }
+    // A task without a level is not handed out until it has one (R-LEVEL-1).
+    if task.difficulty.is_none() {
+        return false;
+    }
     // Work is handed out along the tree (R-MILE-6): no milestone above the task may hold it back,
     // and the dependencies of every milestone above it must be finished too.
     let above = doc.milestone_ancestors(task);

@@ -22,39 +22,39 @@ fn next_respects_priority_dependencies_questions_stale_and_filters() {
 ## 1. Backend\n\n\
 ### T-001 · Blocking open dependency\n\
 - status: open\n\
-- priority: P2\n\
+- priority: P2 · difficulty: 2\n\
 - type: task\n\
 \n\
 ### T-002 · High prio waiting on T-001\n\
 - status: open\n\
-- priority: P0\n\
+- priority: P0 · difficulty: 2\n\
 - depends: T-001\n\
 \n\
 ### T-003 · Design question should never be picked\n\
 - status: open\n\
-- priority: P0\n\
+- priority: P0 · difficulty: 2\n\
 - type: question\n\
 \n\
 ### T-004 · Live claimed P0\n\
 - status: claimed\n\
 - owner: bob\n\
 - claimed: 2026-11-15T13:00+01:00\n\
-- priority: P0\n\
+- priority: P0 · difficulty: 2\n\
 \n\
 ### T-005 · Missing dependency\n\
 - status: open\n\
-- priority: P0\n\
+- priority: P0 · difficulty: 2\n\
 - depends: T-999\n\
 \n\
 ### T-006 · Unblocked P1 ready\n\
 - status: open\n\
-- priority: P1 · type: bug · area: api\n\
+- priority: P1 · difficulty: 2 · type: bug · area: api\n\
 - flavor: hot\n\
 \n\
 ## 2. Frontend\n\n\
 ### T-007 · Archived dependency satisfied P1\n\
 - status: open\n\
-- priority: P1 · type: feat · area: ui\n\
+- priority: P1 · difficulty: 2 · type: feat · area: ui\n\
 - depends: T-090\n\
 \n\
 ## 3. Maintenance\n\n\
@@ -62,7 +62,7 @@ fn next_respects_priority_dependencies_questions_stale_and_filters() {
 - status: claimed\n\
 - owner: sleepy\n\
 - claimed: 2026-11-14T10:00+01:00\n\
-- priority: P0\n";
+- priority: P0 · difficulty: 2\n";
 
     let archive = "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
 ## Done\n\n\
@@ -125,17 +125,17 @@ fn next_returns_own_claim_first_unless_new_and_claims_atomically() {
 ## Work\n\n\
 ### T-001 · P0 ready open task\n\
 - status: open\n\
-- priority: P0\n\
+- priority: P0 · difficulty: 2\n\
 \n\
 ### T-002 · P1 open task earlier\n\
 - status: open\n\
-- priority: P1\n\
+- priority: P1 · difficulty: 2\n\
 \n\
 ### T-003 · P2 already mine\n\
 - status: claimed\n\
 - owner: alice\n\
 - claimed: 2026-11-15T13:30+01:00\n\
-- priority: P2\n\
+- priority: P2 · difficulty: 2\n\
 \n\
 ### T-004 · Unprioritized ready\n\
 - status: open\n";
@@ -231,7 +231,7 @@ fn ten_parallel_next_claim_get_ten_different_tasks() {
             "P2"
         };
         body.push_str(&format!(
-            "### T-{i:03} · Parallel work item {i}\n- status: open\n- owner: —\n- priority: {prio}\n\n"
+            "### T-{i:03} · Parallel work item {i}\n- status: open\n- owner: —\n- priority: {prio} · difficulty: 2\n\n"
         ));
     }
     let (home, work, todo_file) = setup_proj(&tmp, &body);

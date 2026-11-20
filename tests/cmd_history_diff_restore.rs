@@ -37,6 +37,8 @@ fn writes_create_snapshots_pruned_to_snapshots_keep_and_diff_restore_work() {
                 &format!("Task number {i}"),
                 "--priority",
                 "P2",
+                "--difficulty",
+                "3",
                 "--agent",
                 "agent-1",
             ],
