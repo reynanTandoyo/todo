@@ -19,7 +19,7 @@ fn renderer_body() -> String {
     let version = env!("CARGO_PKG_VERSION");
     format!(
         "{FIXTURE_MARKER}
-<!-- todo-format: 2 -->
+<!-- todo-format: 3 -->
 <!-- todo-tool: {version} -->
 # Renderer
 
@@ -131,7 +131,7 @@ const BROKEN_BODY: &str = "\
 /// A file in a format this todo does not know.
 const NEWER_BODY: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
-<!-- todo-format: 3 -->
+<!-- todo-format: 4 -->
 <!-- todo-tool: 0.9.0 -->
 # Newer
 
@@ -280,7 +280,7 @@ fn overview_shows_one_line_per_project_and_each_problem_stops_only_its_own() {
         .find(|l| l.starts_with("newer | "))
         .expect("newer line");
     assert!(
-        newer.contains("problem: format version 3 is newer than this todo"),
+        newer.contains("problem: format version 4 is newer than this todo"),
         "{newer}"
     );
     assert!(
@@ -299,7 +299,7 @@ fn overview_json_has_the_figures_and_the_problems_of_each_project() {
 
     let renderer = project_named(&projects, "renderer");
     assert!(renderer["problem"].is_null(), "{renderer}");
-    assert_eq!(renderer["format_version"], 2);
+    assert_eq!(renderer["format_version"], 3);
     assert_eq!(renderer["tool_stamp"], env!("CARGO_PKG_VERSION"));
     assert_eq!(renderer["needs_migration"], false);
     assert_eq!(

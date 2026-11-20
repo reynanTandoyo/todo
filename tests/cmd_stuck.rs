@@ -35,13 +35,13 @@ const CLAIMED_BY_BOB: &str = "<!-- TEST FIXTURE: invented data, not a real task 
 - owner: bob\n\
 - claimed: 2026-11-15T10:00+01:00\n\
 - session: sess-bob\n\
-- priority: P1 · difficulty: hard · type: feature · area: core\n\
+- priority: P1 · difficulty: 4 · type: feature · area: core\n\
 - note (2026-11-15, bob): added\n\
 \n\
 ### T-002 · Write the docs\n\
 - status: open\n\
 - owner: —\n\
-- priority: P2 · difficulty: easy\n\
+- priority: P2 · difficulty: 2\n\
 - note (2026-11-15, bob): added\n";
 
 #[test]
@@ -71,7 +71,7 @@ fn stuck_gives_a_claimed_task_back_in_one_write_and_keeps_its_level() {
 ### T-001 · Build the parser\n\
 - status: blocked\n\
 - owner: —\n\
-- priority: P1 · difficulty: hard · type: feature · area: core\n\
+- priority: P1 · difficulty: 4 · type: feature · area: core\n\
 - attempts: 1\n\
 - note (2026-11-15, bob): added\n\
 - note (2026-11-15, bob): stuck — the schema file does not exist\n\
@@ -79,7 +79,7 @@ fn stuck_gives_a_claimed_task_back_in_one_write_and_keeps_its_level() {
 ### T-002 · Write the docs\n\
 - status: open\n\
 - owner: —\n\
-- priority: P2 · difficulty: easy\n\
+- priority: P2 · difficulty: 2\n\
 - note (2026-11-15, bob): added\n"
     );
 }
@@ -124,7 +124,7 @@ fn stuck_by_another_agent_needs_force_and_the_forced_change_says_so() {
     assert!(text.contains(
         "- status: blocked\n\
 - owner: —\n\
-- priority: P1 · difficulty: hard · type: feature · area: core\n\
+- priority: P1 · difficulty: 4 · type: feature · area: core\n\
 - attempts: 1\n\
 - note (2026-11-15, bob): added\n\
 - note (2026-11-15, alice): forced stuck (owner was bob)\n\
@@ -238,7 +238,7 @@ fn each_failure_raises_attempts_and_a_task_given_back_waits_for_the_planner() {
 ### T-001 · Build the parser\n\
 - status: open\n\
 - owner: —\n\
-- priority: P1 · difficulty: hard\n";
+- priority: P1 · difficulty: 4\n";
     let (home, work, todo_file) = setup_proj(&tmp, body);
 
     // First attempt: claim, then give it back.
@@ -308,7 +308,7 @@ fn each_failure_raises_attempts_and_a_task_given_back_waits_for_the_planner() {
 ### T-001 · Build the parser\n\
 - status: blocked\n\
 - owner: —\n\
-- priority: P1 · difficulty: hard\n\
+- priority: P1 · difficulty: 4\n\
 - attempts: 2\n\
 - note (2026-11-15, bob): stuck \u{2014} no schema\n\
 - note (2026-11-15, planner): unblocked \u{2014} schema added\n\

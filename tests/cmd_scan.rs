@@ -142,6 +142,8 @@ fn scan_add_writes_all_tasks_in_one_locked_write() {
             "Now",
             "--priority",
             "P1",
+            "--difficulty",
+            "2",
         ],
     );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
@@ -153,7 +155,7 @@ fn scan_add_writes_all_tasks_in_one_locked_write() {
     let todo_md = read_todo(&work);
     assert!(todo_md.contains("### T-002 · first\n"), "{todo_md}");
     assert!(
-        todo_md.contains("- priority: P1\n- files: src/a.rs:1\n"),
+        todo_md.contains("- priority: P1 · difficulty: 2\n- files: src/a.rs:1\n"),
         "{todo_md}"
     );
     assert!(todo_md.contains("### T-003 · second\n"), "{todo_md}");
@@ -184,6 +186,8 @@ fn scan_add_json_reports_the_task_ids() {
             "--add",
             "--priority",
             "P0",
+            "--difficulty",
+            "2",
         ],
     );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
@@ -211,6 +215,8 @@ fn scan_add_dry_run_writes_nothing() {
             "--add",
             "--priority",
             "P1",
+            "--difficulty",
+            "2",
         ],
     );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
@@ -227,7 +233,15 @@ fn scan_add_needs_an_agent_name() {
     let out = todo(
         &home,
         &work,
-        &["--json", "scan", "--add", "--priority", "P1"],
+        &[
+            "--json",
+            "scan",
+            "--add",
+            "--priority",
+            "P1",
+            "--difficulty",
+            "2",
+        ],
     );
     assert_eq!(out.status.code(), Some(2));
     let json = parse_json(&out.stdout);
@@ -245,7 +259,16 @@ fn scan_add_cuts_titles_to_120_characters() {
     let out = todo(
         &home,
         &work,
-        &["--agent", "scanner", "scan", "--add", "--priority", "P1"],
+        &[
+            "--agent",
+            "scanner",
+            "scan",
+            "--add",
+            "--priority",
+            "P1",
+            "--difficulty",
+            "2",
+        ],
     );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
     let todo_md = read_todo(&work);
@@ -272,7 +295,16 @@ fn scan_add_skips_a_second_comment_with_the_same_title() {
     let out = todo(
         &home,
         &work,
-        &["--agent", "scanner", "scan", "--add", "--priority", "P1"],
+        &[
+            "--agent",
+            "scanner",
+            "scan",
+            "--add",
+            "--priority",
+            "P1",
+            "--difficulty",
+            "2",
+        ],
     );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
     let text = stdout_text(&out);

@@ -107,13 +107,15 @@ pub enum TaskOp<'a> {
         text: &'a str,
     },
     /// Turn an idea into a task (`R-KIND-1`): removes `type: idea`, sets the priority and, when
-    /// given, the milestone, and adds the note `promoted from idea`. The milestone is an ID the
-    /// caller has already checked.
+    /// given, the milestone and the level, and adds the note `promoted from idea`. The milestone is
+    /// an ID the caller has already checked.
     Promote {
         /// Configured priority, canonical spelling.
         priority: &'a str,
         /// Canonical ID of the parent milestone, if any.
         milestone: Option<&'a str>,
+        /// Configured level, canonical spelling, when the promotion sets one (`R-LEVEL-1`).
+        difficulty: Option<&'a str>,
     },
     /// Append a note.
     Note {
@@ -304,12 +306,16 @@ impl TaskOp<'_> {
         if let Self::Promote {
             priority,
             milestone,
+            difficulty,
         } = self
         {
             builder.unset_field("type");
             builder.set_field("priority", priority);
             if let Some(m) = milestone {
                 builder.set_field("milestone", m);
+            }
+            if let Some(d) = difficulty {
+                builder.set_field("difficulty", d);
             }
         }
         if let Self::Set { changes } = self {

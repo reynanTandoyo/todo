@@ -57,6 +57,8 @@ fn add_writes_files_read_steps_accept_and_verify_in_canonical_order() {
             "New task",
             "--priority",
             "P2",
+            "--difficulty",
+            "2",
             "--files",
             "src/new.rs",
             "--read",
@@ -78,7 +80,7 @@ fn add_writes_files_read_steps_accept_and_verify_in_canonical_order() {
     let text = read_text(&todo_file);
     assert!(
         text.contains(
-            "### T-002 · New task\n- status: open\n- owner: —\n- priority: P2\n- files: src/new.rs\n\
+            "### T-002 · New task\n- status: open\n- owner: —\n- priority: P2 · difficulty: 2\n- files: src/new.rs\n\
              - read: docs/a.md, src/lib.rs\n- steps:\n  1. first step\n  2. second step\n  3. third step\n\
              - accept: tests pass\n- verify: cargo test\n- note ("
         ),
@@ -250,9 +252,9 @@ fn add_from_takes_steps_as_a_list_or_as_text_with_read_and_verify() {
     fs::write(
         work.join("batch.jsonl"),
         concat!(
-            r#"{"title":"From list","priority":"P1","steps":["1. one","two\nthree"],"read":"a.md","verify":"make a"}"#,
+            r#"{"title":"From list","priority":"P1","difficulty":"2","steps":["1. one","two\nthree"],"read":"a.md","verify":"make a"}"#,
             "\n",
-            r#"{"title":"From text","priority":"P2","steps":"one\n2. two"}"#,
+            r#"{"title":"From text","priority":"P2","difficulty":"2","steps":"one\n2. two"}"#,
             "\n",
         ),
     )
@@ -270,14 +272,14 @@ fn add_from_takes_steps_as_a_list_or_as_text_with_read_and_verify() {
     let text = read_text(&todo_file);
     assert!(
         text.contains(
-            "### T-002 · From list\n- status: open\n- owner: —\n- priority: P1\n- read: a.md\n\
+            "### T-002 · From list\n- status: open\n- owner: —\n- priority: P1 · difficulty: 2\n- read: a.md\n\
              - steps:\n  1. one\n  2. two\n  3. three\n- verify: make a\n- note ("
         ),
         "{text}"
     );
     assert!(
         text.contains(
-            "### T-003 · From text\n- status: open\n- owner: —\n- priority: P2\n\
+            "### T-003 · From text\n- status: open\n- owner: —\n- priority: P2 · difficulty: 2\n\
              - steps:\n  1. one\n  2. two\n- note ("
         ),
         "{text}"
@@ -291,7 +293,7 @@ fn apply_add_and_set_take_steps_read_and_verify() {
     fs::write(
         work.join("ops.jsonl"),
         concat!(
-            r#"{"op":"add","title":"Applied add","priority":"P1","steps":["a step"],"read":"r.md","verify":"v"}"#,
+            r#"{"op":"add","title":"Applied add","priority":"P1","difficulty":"2","steps":["a step"],"read":"r.md","verify":"v"}"#,
             "\n",
             r#"{"op":"set","task":"T-001","steps":"x\ny","verify":"make it"}"#,
             "\n",
@@ -318,7 +320,7 @@ fn apply_add_and_set_take_steps_read_and_verify() {
     );
     assert!(
         text.contains(
-            "### T-002 · Applied add\n- status: open\n- owner: —\n- priority: P1\n- read: r.md\n\
+            "### T-002 · Applied add\n- status: open\n- owner: —\n- priority: P1 · difficulty: 2\n- read: r.md\n\
              - steps:\n  1. a step\n- verify: v\n"
         ),
         "{text}"
@@ -338,6 +340,8 @@ fn add_field_steps_is_the_same_as_the_steps_option() {
             "Via field",
             "--priority",
             "P1",
+            "--difficulty",
+            "2",
             "--field",
             "steps=only one",
             "--field",
@@ -351,7 +355,9 @@ fn add_field_steps_is_the_same_as_the_steps_option() {
     assert!(out.status.success(), "{}", stderr_text(&out));
     let text = read_text(&todo_file);
     assert!(
-        text.contains("- priority: P1\n- read: a.md\n- steps:\n  1. only one\n- note ("),
+        text.contains(
+            "- priority: P1 · difficulty: 2\n- read: a.md\n- steps:\n  1. only one\n- note ("
+        ),
         "{text}"
     );
 }

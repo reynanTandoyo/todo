@@ -252,11 +252,11 @@ fn done_lists_tasks_that_became_ready() {
          - priority: P1\n\n\
          ### T-003 · Needs T-001 only\n\
          - status: open\n\
-         - priority: P1\n\
+         - priority: P1 · difficulty: 2\n\
          - depends: T-001\n\n\
          ### T-004 · Needs T-001 and T-002\n\
          - status: open\n\
-         - priority: P1\n\
+         - priority: P1 · difficulty: 2\n\
          - depends: T-001, T-002\n",
     )
     .unwrap();

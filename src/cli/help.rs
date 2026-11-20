@@ -43,8 +43,35 @@ struct HelpListJson {
 struct HelpCommandJson {
     name: &'static str,
     summary: &'static str,
-    details: &'static str,
+    details: String,
     examples: &'static [&'static str],
+}
+
+/// What the levels of `difficulty` mean (R-LEVEL-1). `todo help add` and `todo help set` print it
+/// after their own text. It names no agent or model.
+pub const DIFFICULTY_LEVELS: &str = concat!(
+    "Levels (the task's difficulty, 1 to 5): how much of the work is still open, what the agent has\n",
+    "to find out, guess or decide. Not how urgent the task is (that is the priority).\n",
+    "  1  Everything is written down: the files to change (files), the files to look at (read),\n",
+    "     numbered steps (steps), the check (verify) and the result (accept). Nothing is left to\n",
+    "     explore, guess or decide.\n",
+    "  2  Small and clear, inside one part of the code, but the agent has to find the exact places\n",
+    "     and work out the steps itself.\n",
+    "  3  Needs an understanding of one part of the code and a few decisions that stay inside the task.\n",
+    "  4  Spans several parts of the code, or needs design decisions that affect other tasks.\n",
+    "  5  Open: needs research, a design, or decisions only a person can make. It is split before\n",
+    "     anyone works on it.\n",
+    "A task needs a level: add refuses one without it, and next hands out only tasks that have one.",
+);
+
+/// The details `todo help <command>` shows: the command's own text and, for the commands that set a
+/// task's difficulty, the levels.
+fn details_of(meta: &CommandMeta) -> String {
+    if matches!(meta.name, "add" | "set") {
+        format!("{}\n\n{DIFFICULTY_LEVELS}", meta.details)
+    } else {
+        meta.details.to_string()
+    }
 }
 
 #[derive(Serialize)]
@@ -144,13 +171,14 @@ pub fn print_overview(out: &mut Output, schema_cmd: &str) -> Result<()> {
 }
 
 fn print_command_help(meta: &CommandMeta, out: &mut Output) {
+    let details = details_of(meta);
     if out.is_json() {
         out.emit_json_ok(
             "help",
             &HelpCommandJson {
                 name: meta.name,
                 summary: meta.summary,
-                details: meta.details,
+                details,
                 examples: meta.examples,
             },
         );
@@ -159,7 +187,7 @@ fn print_command_help(meta: &CommandMeta, out: &mut Output) {
 
     out.write_line(&format!("{} — {}", meta.name, meta.summary));
     out.write_line("");
-    out.write_line(meta.details);
+    out.write_line(&details);
     if !meta.examples.is_empty() {
         out.write_line("");
         out.write_line("Examples:");
