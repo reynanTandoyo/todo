@@ -196,3 +196,172 @@ fn set_refuses_status_owner_claimed_and_invalid_args() {
 
     assert_eq!(fs::read(&todo_file).unwrap(), before);
 }
+
+// T-179: a priority is checked as `add` checks it, and a refused value writes nothing.
+
+/// The `set` fixture: one task with a configured priority, in the current format.
+const PRIORITY_FIXTURE: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
+<!-- todo-format: 3 -->\n\n## Now\n\n\
+### T-001 · Lighting\n\
+- status: open\n\
+- owner: —\n\
+- priority: P1 · difficulty: 2\n\
+- note (2026-11-15, planner): added\n";
+
+#[test]
+fn set_refuses_a_priority_that_is_not_configured_and_writes_nothing() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, PRIORITY_FIXTURE);
+    let before = fs::read(&todo_file).unwrap();
+
+    for args in [
+        vec![
+            "--json",
+            "set",
+            "T-001",
+            "--priority",
+            "P9",
+            "--agent",
+            "bob",
+        ],
+        vec![
+            "--json",
+            "set",
+            "T-001",
+            "--field",
+            "priority=P9",
+            "--agent",
+            "bob",
+        ],
+        vec![
+            "--json",
+            "set",
+            "T-001",
+            "--priority",
+            "P1 · x",
+            "--agent",
+            "bob",
+        ],
+    ] {
+        let out = common::run_todo(&home, &work, &args, &[]).unwrap();
+        assert_eq!(
+            out.status.code(),
+            Some(1),
+            "{args:?}: {}",
+            stdout_text(&out)
+        );
+        let json = parse_json(&out.stdout);
+        assert_eq!(json["error"]["code"], "BAD_VALUE", "{args:?}");
+        assert_eq!(
+            fs::read(&todo_file).unwrap(),
+            before,
+            "{args:?} changed TODO.md"
+        );
+    }
+}
+
+#[test]
+fn set_refuses_an_unconfigured_priority_with_the_message_add_gives() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, PRIORITY_FIXTURE);
+    let before = fs::read(&todo_file).unwrap();
+
+    let set = common::run_todo(
+        &home,
+        &work,
+        &[
+            "--json",
+            "set",
+            "T-001",
+            "--priority",
+            "P9",
+            "--agent",
+            "bob",
+        ],
+        &[],
+    )
+    .unwrap();
+    let add = common::run_todo(
+        &home,
+        &work,
+        &[
+            "--json",
+            "add",
+            "--title",
+            "Other",
+            "--priority",
+            "P9",
+            "--difficulty",
+            "2",
+            "--agent",
+            "bob",
+        ],
+        &[],
+    )
+    .unwrap();
+    let set_error = parse_json(&set.stdout)["error"].clone();
+    let add_error = parse_json(&add.stdout)["error"].clone();
+    assert_eq!(set_error["code"], add_error["code"]);
+    assert_eq!(set_error["message"], add_error["message"]);
+    assert_eq!(fs::read(&todo_file).unwrap(), before);
+}
+
+#[test]
+fn set_writes_a_configured_priority_in_its_configured_spelling() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, PRIORITY_FIXTURE);
+
+    let out = common::run_todo(
+        &home,
+        &work,
+        &["set", "T-001", "--priority", "p3", "--agent", "bob"],
+        &[],
+    )
+    .unwrap();
+    assert_eq!(out.status.code(), Some(0), "{}", stderr_text(&out));
+    let text = read_text(&todo_file);
+    assert!(text.contains("- priority: P3 · difficulty: 2\n"), "{text}");
+}
+
+#[test]
+fn set_checks_the_priority_against_the_configured_priorities() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, todo_file) = setup_proj(&tmp, PRIORITY_FIXTURE);
+    common::write_toml(&work, "priorities = [\"URGENT\", \"NORMAL\", \"LOW\"]\n");
+    let before = fs::read(&todo_file).unwrap();
+
+    // P1 is a priority of the default list, not of this one: refused, with this list named.
+    let refused = common::run_todo(
+        &home,
+        &work,
+        &[
+            "--json",
+            "set",
+            "T-001",
+            "--priority",
+            "P1",
+            "--agent",
+            "bob",
+        ],
+        &[],
+    )
+    .unwrap();
+    assert_eq!(refused.status.code(), Some(1));
+    let json = parse_json(&refused.stdout);
+    assert_eq!(json["error"]["code"], "BAD_VALUE");
+    assert_eq!(
+        json["error"]["message"],
+        "invalid priority 'P1'; expected one of: URGENT, NORMAL, LOW"
+    );
+    assert_eq!(fs::read(&todo_file).unwrap(), before);
+
+    let ok = common::run_todo(
+        &home,
+        &work,
+        &["set", "T-001", "--priority", "normal", "--agent", "bob"],
+        &[],
+    )
+    .unwrap();
+    assert_eq!(ok.status.code(), Some(0), "{}", stderr_text(&ok));
+    assert!(read_text(&todo_file).contains("- priority: NORMAL · difficulty: 2\n"));
+}

@@ -175,25 +175,6 @@ pub enum TaskOp<'a> {
     },
 }
 
-/// Refuses a `priority` that holds the combined-line separator (`BAD_VALUE`, T-178). The priority is
-/// the first part of the `- priority:` line, so it cannot move to a line of its own: it would split.
-fn check_priority_value(changes: &[SetChange<'_>]) -> Result<()> {
-    for change in changes {
-        if let SetChange::Field(key, value) = *change
-            && key.trim().eq_ignore_ascii_case("priority")
-            && value.contains(COMBINED_PART_SEPARATOR)
-        {
-            return Err(TodoError::new(
-                ErrorCode::BadValue,
-                format!(
-                    "priority {value:?} holds ' · ', which would split the combined priority line"
-                ),
-            ));
-        }
-    }
-    Ok(())
-}
-
 /// `verb`, or `verb — text` for a non-empty trimmed `text`.
 fn note_with(verb: &str, text: Option<&str>) -> String {
     match text.map(str::trim).filter(|s| !s.is_empty()) {
@@ -507,7 +488,6 @@ impl TaskOp<'_> {
         }
         if let Self::Set { changes } = self {
             refuse_counted_fields(changes, &id_str)?;
-            check_priority_value(changes)?;
             milestone::check_set_changes(doc, cfg, task, changes)?;
             check_final_changes(task, changes, cfg, &id_str)?;
             for change in *changes {
@@ -515,6 +495,11 @@ impl TaskOp<'_> {
                     SetChange::Title(t) => builder.set_title(t),
                     SetChange::Field(k, v) if k.trim().eq_ignore_ascii_case("milestone") => {
                         builder.set_field(k, &milestone::canonical_parent(doc, cfg, v));
+                    }
+                    SetChange::Field(k, v) if k.trim().eq_ignore_ascii_case("priority") => {
+                        // Only a configured priority is written, in its configured spelling (T-179).
+                        let canonical = cfg.canonical_priority(v)?;
+                        builder.set_field("priority", &canonical);
                     }
                     SetChange::Field("difficulty", v) => {
                         // Only configured difficulties are written (`R-WRITE-18`).

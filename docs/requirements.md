@@ -342,7 +342,8 @@ or with `--json` the task as it is after the change.
   commands. From v0.8 `set` also takes `--difficulty`, `--steps`, `--read`, `--verify` and
   `--final` (R-DETAIL-1, R-LEVEL-3); `attempts` and `verified` change only through `stuck`, `done`,
   `verify` and `reopen` (R-STUCK-1, R-VERIFY-1, R-VERIFY-2), and `set` refuses them (exit 1,
-  `BAD_VALUE`), so no agent can write a passed check by hand.
+  `BAD_VALUE`), so no agent can write a passed check by hand. A `--priority` must be one of the
+  configured priorities, as `add` requires, and is refused otherwise (`BAD_VALUE`, nothing written).
 - **R-WRITE-9 MUST** Status changes follow this table. Anything else is refused (exit 1,
   `BAD_TRANSITION`) with the current status and the commands allowed from it.
 
