@@ -689,13 +689,15 @@ fn summary_next_ready_keeps_a_task_whose_only_holder_is_stale() {
 }
 
 /// `T-001` (open) and `T-002` (open, depends on `T-001`, names `dependent_files`), plus `extra`.
+/// Both tasks have a level (R-LEVEL-1): `next` and the newly ready list hand out only leveled tasks,
+/// and this fixture is about files, not levels.
 fn finishing_body(dependent_files: &str, extra: &[String]) -> String {
     let mut blocks = format!(
-        "### T-001 · First\n- status: open\n- owner: —\n- priority: P1\n\n\
-         ### T-002 · Second\n- status: open\n- owner: —\n- priority: P1\n- depends: T-001\n- files: {dependent_files}\n\n"
+        "### T-001 · First\n- status: open\n- owner: —\n- priority: P1 · difficulty: 2\n\n\
+         ### T-002 · Second\n- status: open\n- owner: —\n- priority: P1 · difficulty: 2\n- depends: T-001\n- files: {dependent_files}\n\n"
     );
     blocks.push_str(&extra.concat());
-    format!("{MARKER}\n## Queue\n\n{blocks}")
+    format!("{MARKER}\n<!-- todo-format: 3 -->\n## Queue\n\n{blocks}")
 }
 
 /// The `T-…` IDs in `data.newly_ready` of a `--json` write, empty when the key is left out.
