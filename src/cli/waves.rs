@@ -9,7 +9,7 @@ use crate::doc::{Document, Task};
 use crate::error::Result;
 use crate::ops::OpsConfig;
 use crate::ops::milestone::resolve_milestone;
-use crate::ops::waves::{self, detail_gaps};
+use crate::ops::waves::{self, OpenQuestionTargets, detail_gaps_with};
 use crate::output::Output;
 
 /// Metadata for the `waves` command.
@@ -95,6 +95,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     };
     let archive = loaded.archive.as_ref();
     let plan = waves::plan_waves(doc, archive, milestone, &cfg);
+    // The open questions are indexed once for every task the output lists (T-186).
+    let questions = OpenQuestionTargets::new(doc, archive, &cfg);
 
     let payload = WavesJson {
         file: loaded.file_label.clone(),
@@ -105,7 +107,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         longest_chain: plan
             .longest_chain
             .iter()
-            .map(|task| task_entry(doc, archive, &cfg, task))
+            .map(|task| task_entry(doc, &questions, &cfg, task))
             .collect(),
         waves: plan
             .waves
@@ -121,7 +123,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                     .iter()
                     .map(|lane| {
                         lane.iter()
-                            .map(|task| task_entry(doc, archive, &cfg, task))
+                            .map(|task| task_entry(doc, &questions, &cfg, task))
                             .collect()
                     })
                     .collect(),
@@ -138,6 +140,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             })
             .collect(),
     };
+    loaded.leak_for_exit();
 
     if out.is_json() {
         out.emit_json_ok(META.name, &payload);
@@ -147,14 +150,19 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     Ok(())
 }
 
-fn task_entry(doc: &Document, archive: Option<&Document>, cfg: &OpsConfig, task: &Task) -> TaskEntry {
+fn task_entry(
+    doc: &Document,
+    questions: &OpenQuestionTargets,
+    cfg: &OpsConfig,
+    task: &Task,
+) -> TaskEntry {
     TaskEntry {
         id: doc.id_config.format_id(task.id),
         title: task.title.clone(),
         status: task.status.as_str(),
         owner: task.owner.clone(),
         level: task.difficulty.clone(),
-        missing: detail_gaps(task, doc, archive, cfg),
+        missing: detail_gaps_with(task, cfg, questions),
     }
 }
 

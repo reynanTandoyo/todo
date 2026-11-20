@@ -52,6 +52,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         &cfg,
         ctx.agent.as_deref(),
     );
+    // Read-only: the work order is built, so the documents are not needed any more (T-186).
+    loaded.leak_for_exit();
     if out.is_json() {
         out.emit_json_ok(META.name, &brief);
     } else {

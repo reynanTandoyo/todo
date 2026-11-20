@@ -4,7 +4,7 @@
 //! `todo plan` and the planner's line of `todo summary` both read this module, so each task is put
 //! in its group here and nowhere else. The rules are the ones the other commands use: the target
 //! level ([`OpsConfig::is_above_target`], [`OpsConfig::is_at_or_below_target`]), the detail rule
-//! ([`detail_gaps`]), the given-back rule ([`Task::is_given_back`]), the missing level ([`lacks_level`])
+//! ([`detail_complete`]), the given-back rule ([`Task::is_given_back`]), the missing level ([`lacks_level`])
 //! and the unverified done task ([`awaits_verified`]).
 //!
 //! Each task is listed in the first group it fits, in this order, so the groups do not overlap.
@@ -13,7 +13,7 @@ use crate::doc::{Document, EntryKind, Status, Task, TaskId};
 use crate::ops::config::OpsConfig;
 use crate::ops::read::lacks_level;
 use crate::ops::verify::awaits_verified;
-use crate::ops::waves::detail_gaps;
+use crate::ops::waves::{OpenQuestionTargets, detail_complete};
 
 /// One group of the planner's list (`R-LEVEL-2`), in the order `todo plan` shows them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,12 +44,7 @@ impl Group {
 /// questions, claimed and dropped entries are never in a group, and neither are done tasks that
 /// need no check (R-LEVEL-2).
 #[must_use]
-pub fn group_of(
-    doc: &Document,
-    archive: Option<&Document>,
-    task: &Task,
-    cfg: &OpsConfig,
-) -> Option<Group> {
+pub fn group_of(questions: &OpenQuestionTargets, task: &Task, cfg: &OpsConfig) -> Option<Group> {
     if task.kind() != EntryKind::Task {
         return None;
     }
@@ -74,7 +69,7 @@ pub fn group_of(
         });
     }
     if cfg.is_at_or_below_target(task.difficulty.as_deref())
-        && !detail_gaps(task, doc, archive, cfg).is_empty()
+        && !detail_complete(task, cfg, |id| questions.names(id))
     {
         return Some(Group::ToDetail);
     }
@@ -122,13 +117,15 @@ pub fn build_plan<'a>(
     milestone: Option<TaskId>,
 ) -> Plan<'a> {
     let mut plan = Plan::default();
+    // The open questions are indexed once for every task of the list (T-186).
+    let questions = OpenQuestionTargets::new(doc, archive, cfg);
     for task in &doc.tasks {
         if let Some(m) = milestone
             && !doc.milestone_ancestors(task).iter().any(|a| a.id == m)
         {
             continue;
         }
-        let Some(group) = group_of(doc, archive, task, cfg) else {
+        let Some(group) = group_of(&questions, task, cfg) else {
             continue;
         };
         let list = match group {

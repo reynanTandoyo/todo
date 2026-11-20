@@ -35,6 +35,18 @@ pub struct LoadedRead {
     pub archive_present: bool,
 }
 
+impl LoadedRead {
+    /// Ends a read-only command without freeing the documents it loaded (T-186).
+    ///
+    /// The process exits right after the command prints, and freeing a parsed 5,000-entry file is
+    /// about 10 ms of small deallocations, which the operating system does at exit anyway. Only a
+    /// command that writes nothing may call this, and only after its output is built; a write, a test
+    /// or any code that goes on using the documents must let them drop as usual.
+    pub fn leak_for_exit(self) {
+        std::mem::forget(self);
+    }
+}
+
 /// Returns the short filename label used in `file:line: message` diagnostics (`R-OUT-4`).
 #[must_use]
 pub fn file_label(path: &Path) -> String {
