@@ -8,7 +8,7 @@
 use chrono::{DateTime, FixedOffset};
 use serde::Deserialize;
 
-use crate::doc::{Document, LineEdit, Status, Task};
+use crate::doc::{COMBINED_PART_SEPARATOR, Document, LineEdit, Status, Task};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::milestone;
 use crate::ops::pipeline::{build_claim_edits_with_note, build_release_edits};
@@ -170,6 +170,25 @@ pub enum TaskOp<'a> {
         /// Changes in order.
         changes: &'a [SetChange<'a>],
     },
+}
+
+/// Refuses a `priority` that holds the combined-line separator (`BAD_VALUE`, T-178). The priority is
+/// the first part of the `- priority:` line, so it cannot move to a line of its own: it would split.
+fn check_priority_value(changes: &[SetChange<'_>]) -> Result<()> {
+    for change in changes {
+        if let SetChange::Field(key, value) = *change
+            && key.trim().eq_ignore_ascii_case("priority")
+            && value.contains(COMBINED_PART_SEPARATOR)
+        {
+            return Err(TodoError::new(
+                ErrorCode::BadValue,
+                format!(
+                    "priority {value:?} holds ' · ', which would split the combined priority line"
+                ),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// `verb`, or `verb — text` for a non-empty trimmed `text`.
@@ -427,6 +446,7 @@ impl TaskOp<'_> {
         }
         if let Self::Set { changes } = self {
             refuse_counted_fields(changes, &id_str)?;
+            check_priority_value(changes)?;
             milestone::check_set_changes(doc, cfg, task, changes)?;
             for change in *changes {
                 match *change {
@@ -663,18 +683,27 @@ impl NewTask<'_> {
             "- status: open".to_string(),
             format!("- owner: {CANONICAL_NOBODY_OWNER}"),
         ];
-        let combined: Vec<String> = [
+        // A value that holds the part separator cannot share the combined line (`docs/format.md` §8): it
+        // gets a line of its own, right after the combined line.
+        let mut combined = Vec::new();
+        let mut own_lines = Vec::new();
+        for (key, value) in [
             ("priority", self.priority),
             ("difficulty", self.difficulty),
             ("type", self.task_type),
             ("area", self.area),
-        ]
-        .into_iter()
-        .filter_map(|(k, v)| v.map(|v| format!("{k}: {v}")))
-        .collect();
-        if !combined.is_empty() {
-            lines.push(format!("- {}", combined.join(" \u{00b7} ")));
+        ] {
+            let Some(value) = value else { continue };
+            if key != "priority" && value.contains(COMBINED_PART_SEPARATOR) {
+                own_lines.push(format!("- {key}: {value}"));
+            } else {
+                combined.push(format!("{key}: {value}"));
+            }
         }
+        if !combined.is_empty() {
+            lines.push(format!("- {}", combined.join(COMBINED_PART_SEPARATOR)));
+        }
+        lines.extend(own_lines);
         for (key, value) in [
             ("milestone", self.milestone),
             ("goal", self.goal),
