@@ -536,7 +536,7 @@ fn add_from_and_apply_write_why_in_the_field_order() {
         &home,
         &work,
         &["--json", "--agent", "alice", "apply", "-"],
-        "{\"op\":\"add\",\"ref\":\"buffer\",\"title\":\"Frame buffer\",\"priority\":\"P1\",\"why\":\"the buffer holds the frame\"}\n\
+        "{\"op\":\"add\",\"ref\":\"buffer\",\"title\":\"Frame buffer\",\"priority\":\"P1\",\"difficulty\":\"3\",\"why\":\"the buffer holds the frame\"}\n\
 {\"op\":\"set\",\"task\":\"T-001\",\"why\":\"the first frame is the goal\"}\n",
     );
     assert_eq!(
@@ -553,7 +553,7 @@ fn add_from_and_apply_write_why_in_the_field_order() {
         ) + "\n### T-004 · Frame buffer\n\
 - status: open\n\
 - owner: —\n\
-- priority: P1\n\
+- priority: P1 · difficulty: 3\n\
 - why: the buffer holds the frame\n\
 - note (2026-11-18, alice): added\n"),
     );
@@ -620,7 +620,7 @@ fn apply_add_reads_why_from_fields_too() {
         &home,
         &work,
         &["--json", "--agent", "alice", "apply", "-"],
-        "{\"op\":\"add\",\"title\":\"Reason in fields\",\"priority\":\"P2\",\"fields\":{\"why\":\"carried in fields\"}}\n",
+        "{\"op\":\"add\",\"title\":\"Reason in fields\",\"priority\":\"P2\",\"difficulty\":\"3\",\"fields\":{\"why\":\"carried in fields\"}}\n",
     );
     assert_eq!(
         applied.status.code(),

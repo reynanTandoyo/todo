@@ -869,9 +869,12 @@ todo tree T-010
   `next` never returns an idea, not even one already claimed by the asking agent. `summary` counts
   the ideas that are not done or dropped apart from the work: they are left out of `total` and
   the status and priority counts, shown as `ideas: N` in text and as `counts.ideas` in JSON.
-  `promote <idea> --priority P [--milestone <task>] [--section S]` turns an idea into an ordinary
-  task: `--priority` is required and must be a configured priority; it removes `type: idea`, sets
-  the priority and the milestone (which must name a milestone: `NOT_FOUND` when missing,
+  `promote <idea> --priority P [--difficulty D] [--milestone <task>] [--section S]` turns an idea
+  into an ordinary task: `--priority` is required and must be a configured priority; the task needs
+  a level as `add` requires one (R-LEVEL-1): `--difficulty` sets it, the idea's own level is kept,
+  and without either the promotion is refused (exit 1, `MISSING_FIELD`) and the file is left
+  unchanged. It removes `type: idea`, sets the priority and the milestone (which must name a
+  milestone: `NOT_FOUND` when missing,
   `BAD_VALUE` when it names another kind of entry), keeps `about`, and adds the note
   `promoted from idea` (format.md §9). The status and owner don't change, and the ownership rule of
   `set` applies (R-CLAIM-3). `--section S` moves the entry to the end of section S in the same
@@ -1118,13 +1121,16 @@ todo next --claim --max-difficulty 1 --brief --agent worker-1
   - `required_fields` defaults to `priority` and `difficulty` and applies to tasks only:
     milestones, questions and ideas need neither, whatever the setting says. `add` and `add --from`
     of a task without a difficulty are refused (exit 1, `MISSING_FIELD`), and the file stays
-    byte-identical.
+    byte-identical. So are an `add` operation of `apply` and a `promote` that would leave a task
+    without one: `promote --difficulty D` sets the level, and an idea that already has one keeps it
+    (R-KIND-1).
   - `next` never hands out a task without a difficulty, with or without a difficulty option.
   - The lowest level is the first value of `difficulties`; a project that sets its own
     `difficulties` keeps them, and the rules of this section use its first value.
   - Files written before v0.8 are moved to the levels by the format 2 to 3 migration (R-MIG-1,
     format.md §18); open tasks without a difficulty are left for the planner's list (R-LEVEL-2).
-  - todo never changes a level by itself; only `add`, `set` and `split` write it (`stuck` keeps it,
+  - todo never changes a level by itself; only `add`, `apply`, `promote`, `set` and `split` write
+    it, and `promote` and `apply` only for what they create or are told to set (`stuck` keeps it,
     R-STUCK-1).
 - **R-LEVEL-2 COULD** `todo plan [<milestone>]` lists what the planner still has to do before
   every task can go to a worker. It lists, in this order:

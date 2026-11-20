@@ -58,7 +58,7 @@ fn apply_runs_multiple_ops_with_one_snapshot_and_is_atomic_on_error() {
     assert_eq!(hist_json["data"]["count"], 0);
 
     // 2. Valid batch via stdin: add @new, claim T-001, note T-001, done T-001, claim @new
-    let good_ops = "{\"op\":\"add\",\"ref\":\"new\",\"title\":\"Follow-up\",\"priority\":\"P1\",\"depends\":\"T-001\"}\n\
+    let good_ops = "{\"op\":\"add\",\"ref\":\"new\",\"title\":\"Follow-up\",\"priority\":\"P1\",\"difficulty\":\"3\",\"depends\":\"T-001\"}\n\
                     {\"op\":\"claim\",\"task\":\"T-001\"}\n\
                     {\"op\":\"note\",\"task\":\"T-001\",\"text\":\"investigated\"}\n\
                     {\"op\":\"done\",\"task\":\"T-001\",\"note\":\"fixed\"}\n\

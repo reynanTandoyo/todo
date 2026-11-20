@@ -127,6 +127,14 @@ impl OpsConfig {
             .position(|cfg_d| cfg_d.eq_ignore_ascii_case(d.trim()))
     }
 
+    /// Whether `required_fields` names `field`, ignoring case: a task must then have it (`R-LEVEL-1`).
+    #[must_use]
+    pub fn requires_field(&self, field: &str) -> bool {
+        self.required_fields
+            .iter()
+            .any(|f| f.eq_ignore_ascii_case(field))
+    }
+
     /// Returns the configured spelling of one `difficulty` value (`R-WRITE-18`).
     ///
     /// An unknown value is refused with `BAD_VALUE` and the list of allowed values.

@@ -324,7 +324,10 @@ fn promote_turns_an_idea_into_a_task_with_a_note() {
 - note (2026-11-15, planner): added
 ";
     let p = Project::new(&with_idea(idea));
-    let out = p.run("alice", &["promote", "T-002", "--priority", "P0"]);
+    let out = p.run(
+        "alice",
+        &["promote", "T-002", "--priority", "P0", "--difficulty", "3"],
+    );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
     assert_eq!(stdout_text(&out), "T-002: promote ok\n");
 
@@ -334,7 +337,7 @@ fn promote_turns_an_idea_into_a_task_with_a_note() {
             "### T-002 · Cache parsed files\n\
              - status: open\n\
              - owner: —\n\
-             - priority: P0\n\
+             - priority: P0 · difficulty: 3\n\
              - about: T-001\n\
              - note (2026-11-15, planner): added\n\
              - note (2026-11-18, alice): promoted from idea\n"
@@ -343,12 +346,8 @@ fn promote_turns_an_idea_into_a_task_with_a_note() {
         p.text()
     );
 
-    // `promote` takes no level, so the task has none until one is set, and `next` hands out only
-    // leveled tasks (R-LEVEL-1). Once it has one it is ordinary work: `next` hands it out first.
-    let (_, json) = p.run_json("alice", &["next"]);
-    assert_eq!(json["data"]["task"]["id"], "T-001", "{json}");
-    let set = p.run("alice", &["set", "T-002", "--difficulty", "2"]);
-    assert_eq!(set.status.code(), Some(0), "stderr: {}", stderr_text(&set));
+    // With its level from `--difficulty` the promoted task is ordinary work: `next` hands it out
+    // first, as the only P0 task (R-LEVEL-1).
     let (_, json) = p.run_json("alice", &["next"]);
     assert_eq!(json["data"]["task"]["id"], "T-002", "{json}");
 }
@@ -356,7 +355,10 @@ fn promote_turns_an_idea_into_a_task_with_a_note() {
 #[test]
 fn promote_json_shows_a_plain_task_with_the_new_priority() {
     let p = Project::new(&with_idea(PLAIN_IDEA));
-    let (code, json) = p.run_json("alice", &["promote", "T-002", "--priority", "P2"]);
+    let (code, json) = p.run_json(
+        "alice",
+        &["promote", "T-002", "--priority", "P2", "--difficulty", "3"],
+    );
     assert_eq!(code, Some(0), "{json}");
     assert_eq!(json["data"]["id"], "T-002");
     assert!(json["data"]["type"].is_null(), "{json}");
@@ -379,10 +381,16 @@ fn promote_keeps_other_parts_of_a_combined_priority_line() {
 - note (2026-11-15, planner): added
 ";
     let p = Project::new(&with_idea(idea));
-    let out = p.run("alice", &["promote", "T-002", "--priority", "p1"]);
+    let out = p.run(
+        "alice",
+        &["promote", "T-002", "--priority", "p1", "--difficulty", "3"],
+    );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
     let text = p.text();
-    assert!(text.contains("- priority: P1 · area: cli\n"), "{text}");
+    assert!(
+        text.contains("- priority: P1 · difficulty: 3 · area: cli\n"),
+        "{text}"
+    );
     assert!(!text.contains("type: idea"), "{text}");
 }
 
@@ -390,7 +398,10 @@ fn promote_keeps_other_parts_of_a_combined_priority_line() {
 fn promote_refuses_an_entry_that_is_not_an_idea() {
     let p = Project::new(&work_only());
     let before = p.text();
-    let (code, json) = p.run_json("alice", &["promote", "T-001", "--priority", "P1"]);
+    let (code, json) = p.run_json(
+        "alice",
+        &["promote", "T-001", "--priority", "P1", "--difficulty", "3"],
+    );
     assert_eq!(code, Some(1));
     assert_eq!(error_code(&json), "BAD_TRANSITION");
     assert_eq!(p.text(), before);
@@ -422,6 +433,8 @@ fn promote_milestone_must_name_a_milestone_that_exists() {
             "T-002",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--milestone",
             "T-001",
         ],
@@ -436,6 +449,8 @@ fn promote_milestone_must_name_a_milestone_that_exists() {
             "T-002",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--milestone",
             "T-099",
         ],
@@ -451,6 +466,8 @@ fn promote_milestone_must_name_a_milestone_that_exists() {
             "T-002",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--milestone",
             "T-010",
         ],
@@ -458,7 +475,7 @@ fn promote_milestone_must_name_a_milestone_that_exists() {
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
     assert!(
         p.text().contains(
-            "- priority: P1\n- milestone: T-010\n- note (2026-11-15, planner): added\n\
+            "- priority: P1 · difficulty: 3\n- milestone: T-010\n- note (2026-11-15, planner): added\n\
              - note (2026-11-18, alice): promoted from idea\n"
         ),
         "{}",
@@ -490,6 +507,8 @@ fn promote_section_moves_the_task_to_the_end_of_that_section() {
             "T-002",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--section",
             "backlog",
         ],
@@ -504,7 +523,7 @@ fn promote_section_moves_the_task_to_the_end_of_that_section() {
              - status: open\n- owner: —\n- priority: P2\n\
              - note (2026-11-15, planner): added\n\n\
              ### T-002 · Cache parsed files\n\
-             - status: open\n- owner: —\n- priority: P1\n\
+             - status: open\n- owner: —\n- priority: P1 · difficulty: 3\n\
              - note (2026-11-15, planner): added\n\
              - note (2026-11-18, alice): promoted from idea\n"
         ),
@@ -515,13 +534,16 @@ fn promote_section_moves_the_task_to_the_end_of_that_section() {
 #[test]
 fn promote_without_section_leaves_the_entry_where_it_is() {
     let p = Project::new(&with_idea(PLAIN_IDEA));
-    let out = p.run("alice", &["promote", "T-002", "--priority", "P1"]);
+    let out = p.run(
+        "alice",
+        &["promote", "T-002", "--priority", "P1", "--difficulty", "3"],
+    );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
     let text = p.text();
     assert!(
         text.ends_with(
             "## Ideas\n\n### T-002 · Cache parsed files\n\
-             - status: open\n- owner: —\n- priority: P1\n\
+             - status: open\n- owner: —\n- priority: P1 · difficulty: 3\n\
              - note (2026-11-15, planner): added\n\
              - note (2026-11-18, alice): promoted from idea\n"
         ),
@@ -538,13 +560,25 @@ fn promote_checks_its_arguments_before_writing() {
     let out = p.run("alice", &["promote", "T-002"]);
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr_text(&out));
 
-    let (code, json) = p.run_json("alice", &["promote", "T-002", "--priority", "P9"]);
+    let (code, json) = p.run_json(
+        "alice",
+        &["promote", "T-002", "--priority", "P9", "--difficulty", "3"],
+    );
     assert_eq!(code, Some(1));
     assert_eq!(error_code(&json), "BAD_VALUE");
 
     let (code, json) = p.run_json(
         "alice",
-        &["promote", "T-002", "--priority", "P1", "--section", "Nope"],
+        &[
+            "promote",
+            "T-002",
+            "--priority",
+            "P1",
+            "--difficulty",
+            "3",
+            "--section",
+            "Nope",
+        ],
     );
     assert_eq!(code, Some(1));
     assert_eq!(error_code(&json), "UNKNOWN_SECTION");
@@ -562,14 +596,25 @@ fn promote_of_an_idea_claimed_by_someone_else_needs_force() {
 ";
     let p = Project::new(&with_idea(claimed));
     let before = p.text();
-    let (code, json) = p.run_json("alice", &["promote", "T-002", "--priority", "P1"]);
+    let (code, json) = p.run_json(
+        "alice",
+        &["promote", "T-002", "--priority", "P1", "--difficulty", "3"],
+    );
     assert_eq!(code, Some(1));
     assert_eq!(error_code(&json), "NOT_OWNER");
     assert_eq!(p.text(), before);
 
     let out = p.run(
         "alice",
-        &["--force", "promote", "T-002", "--priority", "P1"],
+        &[
+            "--force",
+            "promote",
+            "T-002",
+            "--priority",
+            "P1",
+            "--difficulty",
+            "3",
+        ],
     );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr_text(&out));
     let text = p.text();

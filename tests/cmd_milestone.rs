@@ -848,7 +848,7 @@ fn apply_takes_milestone_references_and_refuses_a_cycle_whole() {
         concat!(
             "{\"op\":\"add\",\"ref\":\"m\",\"title\":\"Shading\",\"type\":\"milestone\",\"priority\":\"P1\",",
             "\"goal\":\"surfaces shade correctly\",\"milestone\":\"T-001\"}\n",
-            "{\"op\":\"add\",\"ref\":\"t\",\"title\":\"Shading pass\",\"priority\":\"P2\",\"milestone\":\"@m\"}\n",
+            "{\"op\":\"add\",\"ref\":\"t\",\"title\":\"Shading pass\",\"priority\":\"P2\",\"difficulty\":\"3\",\"milestone\":\"@m\"}\n",
             "{\"op\":\"set\",\"task\":\"T-004\",\"milestone\":\"@m\"}\n",
         ),
     )
@@ -873,7 +873,7 @@ fn apply_takes_milestone_references_and_refuses_a_cycle_whole() {
         "\n### T-006 · Shading pass\n",
         "- status: open\n",
         "- owner: —\n",
-        "- priority: P2\n",
+        "- priority: P2 · difficulty: 3\n",
         "- milestone: T-005\n",
         "- note (2026-11-18, planner): added\n",
     );
@@ -883,7 +883,7 @@ fn apply_takes_milestone_references_and_refuses_a_cycle_whole() {
     fs::write(
         &ops,
         concat!(
-            "{\"op\":\"add\",\"title\":\"Another\",\"priority\":\"P2\",\"milestone\":\"T-002\"}\n",
+            "{\"op\":\"add\",\"title\":\"Another\",\"priority\":\"P2\",\"difficulty\":\"3\",\"milestone\":\"T-002\"}\n",
             "{\"op\":\"set\",\"task\":\"T-001\",\"milestone\":\"T-005\"}\n",
         ),
     )
