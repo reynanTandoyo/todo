@@ -18,7 +18,9 @@
 //!
 //! - Task IDs are recognised with the default prefix `T` (the driver does not read `todo.toml`).
 //!   With another prefix no task is recognised and everything is merged as prose by git.
-//! - A field is a whole `- key: value` line, so the combined priority line is one field.
+//! - A field is a whole `- key: value` line, so the combined priority line is one field. The
+//!   `steps` field is its line with the step lines below it, so a change to the list is one
+//!   field change.
 //! - Notes are never deleted: the result is ours' notes followed by the notes only theirs has,
 //!   except notes that were in the base and are missing on one side (those stay removed).
 //! - Other lines inside a task block (prose, tables) are merged by `git merge-file` on the block
@@ -527,9 +529,13 @@ enum Kind {
     Other,
 }
 
+/// The lines of one field: its field line, then the lines that belong to it (the step lines of
+/// `steps`, `docs/format.md` §8).
+type Group<'a> = Vec<&'a Line>;
+
 struct Parts<'a> {
     kinds: Vec<Kind>,
-    fields: HashMap<&'a str, &'a Line>,
+    fields: HashMap<&'a str, Group<'a>>,
     field_order: Vec<&'a str>,
     notes: Vec<&'a Line>,
     others: Vec<&'a Line>,
@@ -547,12 +553,21 @@ fn parts<'a>(b: &BlockRef<'a>) -> Option<Parts<'a>> {
     let mut field_order = Vec::new();
     for f in &b.task.field_lines {
         let idx = f.line.checked_sub(start)?;
-        let line = b.lines.get(idx)?;
-        if fields.insert(f.key.as_str(), line).is_some() {
+        // The `steps` field runs from its field line to the end of its step lines (format.md §8).
+        let end = match &b.task.steps_block {
+            Some(block) if f.key == "steps" && block.start == f.line => {
+                block.end.checked_sub(start)?
+            }
+            _ => idx + 1,
+        };
+        let group: Group<'a> = b.lines.get(idx..end)?.iter().collect();
+        if fields.insert(f.key.as_str(), group).is_some() {
             return None;
         }
         field_order.push(f.key.as_str());
-        kinds[idx] = Kind::Field(f.key.clone());
+        for kind in &mut kinds[idx..end] {
+            *kind = Kind::Field(f.key.clone());
+        }
     }
     let mut notes = Vec::new();
     for n in &b.task.notes {
@@ -577,7 +592,7 @@ fn parts<'a>(b: &BlockRef<'a>) -> Option<Parts<'a>> {
     })
 }
 
-/// Three-way choice of one value; the outer `None` is a conflict.
+/// Three-way choice of one line; the outer `None` is a conflict.
 fn three<'a>(
     b: Option<&'a Line>,
     o: Option<&'a Line>,
@@ -586,6 +601,33 @@ fn three<'a>(
     if same_opt(o, t) || same_opt(t, b) {
         Some(o)
     } else if same_opt(o, b) {
+        Some(t)
+    } else {
+        None
+    }
+}
+
+/// Whether two fields have the same lines; a missing field equals only a missing field.
+fn same_group(a: Option<&Group<'_>>, b: Option<&Group<'_>>) -> bool {
+    match (a, b) {
+        (None, None) => true,
+        (Some(x), Some(y)) => {
+            x.len() == y.len() && x.iter().zip(y.iter()).all(|(p, q)| same(p, q))
+        }
+        _ => false,
+    }
+}
+
+/// Three-way choice of one field's lines, as [`three`] chooses a line; the outer `None` is a
+/// conflict.
+fn three_group<'g, 'a>(
+    b: Option<&'g Group<'a>>,
+    o: Option<&'g Group<'a>>,
+    t: Option<&'g Group<'a>>,
+) -> Option<Option<&'g Group<'a>>> {
+    if same_group(o, t) || same_group(t, b) {
+        Some(o)
+    } else if same_group(o, b) {
         Some(t)
     } else {
         None
@@ -620,19 +662,26 @@ fn merge_fields(b: &BlockRef<'_>, o: &BlockRef<'_>, t: &BlockRef<'_>) -> Option<
     };
 
     let mut out: Vec<(Kind, Line)> = Vec::new();
+    let mut emitted: HashSet<&str> = HashSet::new();
     for (i, kind) in po.kinds.iter().enumerate() {
         match kind {
             Kind::Heading => out.push((Kind::Heading, heading.clone())),
             Kind::Field(key) => {
-                let merged = three(
-                    pb.fields.get(key.as_str()).copied(),
-                    po.fields.get(key.as_str()).copied(),
-                    pt.fields.get(key.as_str()).copied(),
+                // A field is written once, where its first line is in ours.
+                if !emitted.insert(key.as_str()) {
+                    continue;
+                }
+                let merged = three_group(
+                    pb.fields.get(key.as_str()),
+                    po.fields.get(key.as_str()),
+                    pt.fields.get(key.as_str()),
                 );
                 match merged {
                     None => return conflict(),
                     Some(None) => {}
-                    Some(Some(l)) => out.push((kind.clone(), l.clone())),
+                    Some(Some(group)) => {
+                        out.extend(group.iter().map(|l| (kind.clone(), (*l).clone())));
+                    }
                 }
             }
             Kind::Note | Kind::Other => out.push((kind.clone(), o.lines[i].clone())),
@@ -644,14 +693,10 @@ fn merge_fields(b: &BlockRef<'_>, o: &BlockRef<'_>, t: &BlockRef<'_>) -> Option<
         if po.fields.contains_key(key) {
             continue;
         }
-        match three(
-            pb.fields.get(key).copied(),
-            None,
-            pt.fields.get(key).copied(),
-        ) {
+        match three_group(pb.fields.get(key), None, pt.fields.get(key)) {
             None => return conflict(),
             Some(None) => {}
-            Some(Some(l)) => {
+            Some(Some(group)) => {
                 // After the nearest earlier field of theirs that is in the result, else after the
                 // heading.
                 let at = pt.field_order[..pos]
@@ -662,7 +707,12 @@ fn merge_fields(b: &BlockRef<'_>, o: &BlockRef<'_>, t: &BlockRef<'_>) -> Option<
                             .rposition(|(kk, _)| *kk == Kind::Field((*k).to_string()))
                     })
                     .unwrap_or(0);
-                out.insert(at + 1, (Kind::Field((*key).to_string()), l.clone()));
+                for (offset, line) in group.iter().enumerate() {
+                    out.insert(
+                        at + 1 + offset,
+                        (Kind::Field((*key).to_string()), (*line).clone()),
+                    );
+                }
             }
         }
     }
