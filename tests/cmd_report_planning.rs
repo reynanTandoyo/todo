@@ -246,36 +246,31 @@ fn an_opened_task_shows_its_level_files_check_and_whether_it_was_verified() {
     let tmp = TempDir::new().expect("tempdir");
     let (_home, _work, html) = built(&tmp);
 
+    // The facts come first, on one line: level, files, check, and whether the check passed.
     let t002 = row_of(&html, "T-002");
-    assert!(t002.contains("<dt>Level</dt><dd>1</dd>"), "{t002}");
     assert!(
-        t002.contains("<dt>Files</dt><dd>src/config.rs</dd>"),
+        t002.contains(
+            "<p class=\"facts\">Level: 1 \u{00B7} Files: src/config.rs \u{00B7} Verify: <code>cargo test config</code> \u{00B7} Verified: not yet</p>"
+        ),
         "{t002}"
     );
-    assert!(
-        t002.contains("<dt>Verify</dt><dd><code>cargo test config</code></dd>"),
-        "{t002}"
-    );
-    assert!(t002.contains("<dt>Verified</dt><dd>not yet</dd>"), "{t002}");
 
     // A done task that passed its check shows the date.
     let t007 = row_of(&html, "T-007");
     assert!(
-        t007.contains("<dt>Verified</dt><dd>2026-11-20</dd>"),
+        t007.contains("Verify: <code>cargo test config</code> \u{00B7} Verified: 2026-11-20</p>"),
         "{t007}"
     );
 
-    // A task with no level or files says so.
+    // A task with no level, files or check says `none`, and has no `Verified` part.
     let t006 = row_of(&html, "T-006");
-    assert!(t006.contains("<dt>Level</dt><dd>none</dd>"), "{t006}");
     assert!(
-        t006.contains("<dt>Files</dt><dd>none listed; the task may change any file</dd>"),
+        t006.contains(
+            "<p class=\"facts\">Level: none \u{00B7} Files: none \u{00B7} Verify: none</p>"
+        ),
         "{t006}"
     );
-    assert!(
-        t006.contains("<dt>Verified</dt><dd>no check to run</dd>"),
-        "{t006}"
-    );
+    assert!(!t006.contains("Verified:"), "{t006}");
 }
 
 #[test]

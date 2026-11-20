@@ -104,10 +104,13 @@ fn page_shows_the_work_the_lists_and_the_facts_the_accept_line_asks_for() {
     assert!(html.contains("the test scene renders with lighting at 60 frames per second"));
     assert!(html.contains("<progress value=\"1\" max=\"4\">1 of 4 done</progress>"));
 
-    // Priority, difficulty and area are shown on each task.
-    assert!(html.contains("<span class=\"chip\" title=\"priority\">P1</span>"));
-    assert!(html.contains("<span class=\"chip\" title=\"difficulty\">hard</span>"));
-    assert!(html.contains("<span class=\"chip\" title=\"area\">gpu</span>"));
+    // Priority, difficulty and area are shown on each task. The fixture is format 3, so the old
+    // level `hard` is level 4 (the migration of format 2 to 3, R-MIG-1).
+    // The priority and the area read as they are; the level keeps its label, as a bare number needs it.
+    assert!(html.contains("<span class=\"chip\">P1</span>"));
+    assert!(html.contains("<span class=\"chip\" title=\"difficulty\">4</span>"));
+    assert!(!html.contains("title=\"difficulty\">hard</span>"));
+    assert!(html.contains("<span class=\"chip\">gpu</span>"));
 
     // A claim shows its owner and age; a stale claim is marked.
     assert!(html.contains("claimed by alice, 2 h"));

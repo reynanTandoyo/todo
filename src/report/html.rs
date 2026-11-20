@@ -346,34 +346,31 @@ fn counted(count: usize, singular: &str, plural: &str) -> String {
     format!("{count} {word}")
 }
 
-/// The level and the check of a task, as an opened task shows them first (`R-REPORT-3`).
+/// The level, files and check of a task, as an opened task shows them first (`R-REPORT-3`), on one
+/// line to keep the page short. A missing part reads `none` (a task without files may change any
+/// file, as the work section says); `Verified` is shown only when there is a check to run.
 fn push_facts(h: &mut String, facts: &Facts) {
-    h.push_str("<dl class=\"fields facts\">\n");
     let level = facts.level.as_deref().unwrap_or("none");
-    let _ = writeln!(h, "<dt>Level</dt><dd>{}</dd>", escape(level));
-    match facts.files.as_deref() {
-        Some(files) => {
-            let _ = writeln!(h, "<dt>Files</dt><dd>{}</dd>", escape(files));
-        }
-        None => h.push_str("<dt>Files</dt><dd>none listed; the task may change any file</dd>\n"),
-    }
+    let files = facts.files.as_deref().unwrap_or("none");
+    let _ = write!(
+        h,
+        "<p class=\"facts\">Level: {} \u{00B7} Files: {}",
+        escape(level),
+        escape(files)
+    );
     match facts.verify.as_deref() {
+        None => h.push_str(" \u{00B7} Verify: none"),
         Some(command) => {
-            let _ = writeln!(
+            let verified = facts.verified.as_deref().unwrap_or("not yet");
+            let _ = write!(
                 h,
-                "<dt>Verify</dt><dd><code>{}</code></dd>",
-                escape(command)
+                " \u{00B7} Verify: <code>{}</code> \u{00B7} Verified: {}",
+                escape(command),
+                escape(verified)
             );
         }
-        None => h.push_str("<dt>Verify</dt><dd>none</dd>\n"),
     }
-    let verified = match (&facts.verify, &facts.verified) {
-        (None, _) => "no check to run",
-        (Some(_), Some(date)) => date.as_str(),
-        (Some(_), None) => "not yet",
-    };
-    let _ = writeln!(h, "<dt>Verified</dt><dd>{}</dd>", escape(verified));
-    h.push_str("</dl>\n");
+    h.push_str("</p>\n");
 }
 
 /// Opens a section with its anchor and its heading, at the heading level of `scope`.
@@ -390,7 +387,7 @@ fn section_start(h: &mut String, scope: Scope<'_>, name: &str, heading: &str) {
 fn push_work(h: &mut String, page: &Page, scope: Scope<'_>) {
     section_start(h, scope, "work", "Work");
     h.push_str(
-        "<p class=\"hint\">Milestones with their goal and progress. The tasks below a milestone are indented under it. Open a task to see its fields and notes.</p>\n",
+        "<p class=\"hint\">Milestones with their goal and progress. The tasks below a milestone are indented under it. Open a task to see its level, files, check, fields and notes; files none means the task may change any file.</p>\n",
     );
     if page.work.is_empty() {
         h.push_str("<p class=\"empty\">Nothing unfinished.</p>\n");
@@ -415,8 +412,7 @@ fn push_node(h: &mut String, node: &WorkNode, scope: Scope<'_>) {
     } else {
         let _ = writeln!(
             h,
-            "<li class=\"node task {}\" id=\"{}\">",
-            status_class(entry.status),
+            "<li class=\"node\" id=\"{}\">",
             escape(&scope.entry_id(&entry.id))
         );
         h.push_str("<details>\n<summary>");
@@ -475,12 +471,9 @@ fn push_task_row(h: &mut String, entry: &Entry) {
 
 /// The priority, difficulty and area of an entry, when it has them.
 fn push_chips(h: &mut String, entry: &Entry) {
+    // A priority code and an area name read as they are; a bare level number needs its label.
     if let Some(priority) = &entry.priority {
-        let _ = write!(
-            h,
-            "<span class=\"chip\" title=\"priority\">{}</span>",
-            escape(priority)
-        );
+        let _ = write!(h, "<span class=\"chip\">{}</span>", escape(priority));
     }
     if let Some(difficulty) = &entry.difficulty {
         let _ = write!(
@@ -490,11 +483,7 @@ fn push_chips(h: &mut String, entry: &Entry) {
         );
     }
     if let Some(area) = &entry.area {
-        let _ = write!(
-            h,
-            "<span class=\"chip\" title=\"area\">{}</span>",
-            escape(area)
-        );
+        let _ = write!(h, "<span class=\"chip\">{}</span>", escape(area));
     }
 }
 
@@ -559,24 +548,21 @@ fn push_progress(h: &mut String, progress: Option<Progress>) {
 
 /// The fields as written and the dated notes of an entry, shown when it is opened.
 fn push_body(h: &mut String, entry: &Entry) {
-    h.push_str("<div class=\"more\">\n");
     if let Some(facts) = &entry.facts {
         push_facts(h, facts);
     }
     if entry.fields.is_empty() {
         h.push_str("<p class=\"muted\">No fields.</p>\n");
     } else {
-        h.push_str("<dl class=\"fields\">\n");
+        h.push_str("<dl class=\"fields\">");
         for (key, value) in &entry.fields {
-            let _ = writeln!(h, "<dt>{}</dt><dd>{}</dd>", escape(key), escape(value));
+            let _ = write!(h, "<dt>{}</dt><dd>{}</dd>", escape(key), escape(value));
         }
         h.push_str("</dl>\n");
     }
-    h.push_str("<h4>Notes</h4>\n");
-    if entry.notes.is_empty() {
-        h.push_str("<p class=\"muted\">No notes.</p>\n");
-    } else {
-        h.push_str("<ul class=\"notes\">\n");
+    // A task without notes has no notes block.
+    if !entry.notes.is_empty() {
+        h.push_str("<h4>Notes</h4>\n<ul class=\"notes\">\n");
         for note in &entry.notes {
             let _ = writeln!(
                 h,
@@ -588,7 +574,6 @@ fn push_body(h: &mut String, entry: &Entry) {
         }
         h.push_str("</ul>\n");
     }
-    h.push_str("</div>\n");
 }
 
 fn push_areas(h: &mut String, page: &Page, scope: Scope<'_>) {
