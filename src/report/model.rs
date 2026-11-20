@@ -611,7 +611,7 @@ fn planning_state(
             level: task.difficulty.clone(),
         }
     };
-    let waves = plan_waves(doc, archive, None);
+    let waves = plan_waves(doc, archive, None, cfg);
     let first = waves.waves.first();
     Planning {
         target: cfg.target_difficulty().to_string(),
