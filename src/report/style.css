@@ -192,7 +192,12 @@ summary {
   cursor: pointer;
 }
 
-.more {
+/* What an opened entry shows: its facts, its fields and its notes, indented under the summary. */
+details > .facts,
+details > dl.fields,
+details > .muted,
+details > h4,
+details > ul.notes {
   margin: 0.5rem 0 0.25rem 0.25rem;
 }
 

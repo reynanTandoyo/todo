@@ -12,7 +12,10 @@ use std::fmt::Write as _;
 use crate::doc::{EntryKind, Progress, Status};
 use crate::register::overview::TaskCounts;
 use crate::report::all::{AllPage, Content, Lists, ProjectPage};
-use crate::report::model::{About, AreaCount, Claim, Counts, Entry, Page, WorkNode};
+use crate::report::model::{
+    About, AreaCount, Claim, Counts, Entry, Facts, LevelCount, LevelCounts, Page, PlanRow,
+    Planning, WorkNode,
+};
 
 /// The stylesheet, copied into the page (`style.css`, light and dark mode, narrow windows).
 pub const STYLE: &str = include_str!("style.css");
@@ -133,6 +136,7 @@ fn push_header(h: &mut String, page: &Page) {
     push_counts(h, &page.counts);
     h.push_str(
         "<nav class=\"jump\" aria-label=\"Sections\">\
+<a href=\"#planning\">Planning</a>\
 <a href=\"#work\">Work</a>\
 <a href=\"#areas\">Areas</a>\
 <a href=\"#questions\">Questions</a>\
@@ -176,12 +180,197 @@ fn push_counts(h: &mut String, counts: &Counts) {
 
 /// The sections of one page's lists, in the order the single-project page shows them.
 fn push_lists(h: &mut String, page: &Page, scope: Scope<'_>) {
+    push_planning(h, page, scope);
     push_work(h, page, scope);
     push_areas(h, page, scope);
     push_questions(h, page, scope);
     push_ideas(h, page, scope);
     push_done(h, page, scope);
     push_dropped(h, page, scope);
+}
+
+/// The planning state (`R-REPORT-3`): open tasks per level, what is not ready for lack of detail, what
+/// was given back and why, what is kept above the target level, and the waves. Each count is the one
+/// `todo plan` and `todo waves` give.
+fn push_planning(h: &mut String, page: &Page, scope: Scope<'_>) {
+    section_start(h, scope, "planning", "Planning");
+    let planning: &Planning = &page.planning;
+    let sub = scope.level + 1;
+    let _ = writeln!(
+        h,
+        "<p class=\"hint\">What the planner still has to do. The target level is {}: a task at or below it needs complete detail before a worker is handed it.</p>",
+        escape(&planning.target)
+    );
+
+    let _ = writeln!(h, "<h{sub}>Open tasks per level</h{sub}>");
+    h.push_str("<p class=\"hint\">Open, claimed or blocked tasks, counted by their level.</p>\n");
+    push_level_counts(h, &page.levels);
+
+    let _ = writeln!(
+        h,
+        "<h{sub}>Not ready for lack of detail ({})</h{sub}>",
+        planning.not_ready.len()
+    );
+    if planning.not_ready.is_empty() {
+        h.push_str(
+            "<p class=\"empty\">Every task at or below the target level has its detail.</p>\n",
+        );
+    } else {
+        h.push_str("<ul class=\"card-list\">\n");
+        for item in &planning.not_ready {
+            h.push_str("<li>");
+            push_plan_row(h, &item.row, scope);
+            if !item.missing.is_empty() {
+                let missing: Vec<String> = item.missing.iter().map(|m| escape(m)).collect();
+                let _ = write!(
+                    h,
+                    " <span class=\"reason\">missing: {}</span>",
+                    missing.join(", ")
+                );
+            }
+            h.push_str("</li>\n");
+        }
+        h.push_str("</ul>\n");
+    }
+
+    let _ = writeln!(
+        h,
+        "<h{sub}>Given back to the planner ({})</h{sub}>",
+        planning.given_back.len()
+    );
+    if planning.given_back.is_empty() {
+        h.push_str("<p class=\"empty\">Nothing given back.</p>\n");
+    } else {
+        h.push_str("<ul class=\"card-list\">\n");
+        for item in &planning.given_back {
+            h.push_str("<li>");
+            push_plan_row(h, &item.row, scope);
+            let _ = write!(
+                h,
+                " <span class=\"reason\">{}</span> <span class=\"chip\">attempts {}</span>",
+                escape(&item.problem),
+                escape(&item.attempts)
+            );
+            h.push_str("</li>\n");
+        }
+        h.push_str("</ul>\n");
+    }
+
+    let _ = writeln!(
+        h,
+        "<h{sub}>Kept above the target level on purpose ({})</h{sub}>",
+        planning.kept_on_purpose.len()
+    );
+    if planning.kept_on_purpose.is_empty() {
+        h.push_str("<p class=\"empty\">Nothing kept above the target level.</p>\n");
+    } else {
+        h.push_str("<ul class=\"card-list\">\n");
+        for item in &planning.kept_on_purpose {
+            h.push_str("<li>");
+            push_plan_row(h, &item.row, scope);
+            let _ = write!(h, " <span class=\"reason\">{}</span>", escape(&item.reason));
+            h.push_str("</li>\n");
+        }
+        h.push_str("</ul>\n");
+    }
+
+    let _ = writeln!(h, "<h{sub}>Waves</h{sub}>");
+    if planning.waves == 0 {
+        h.push_str("<p class=\"empty\">No unfinished task, so no waves.</p>\n");
+    } else {
+        let _ = writeln!(
+            h,
+            "<p>{} in all. Wave 1 holds {} in {}.</p>",
+            counted(planning.waves, "wave", "waves"),
+            counted(planning.wave1_tasks, "task", "tasks"),
+            counted(planning.wave1_lanes, "lane", "lanes")
+        );
+    }
+    h.push_str("</section>\n");
+}
+
+/// A task of the planning state: its ID and title, linked to its row when the page shows it, then its
+/// level.
+fn push_plan_row(h: &mut String, row: &PlanRow, scope: Scope<'_>) {
+    let name = format!("{} \u{00B7} {}", row.id, row.title);
+    if row.linked {
+        let _ = write!(
+            h,
+            "<a href=\"#{}\">{}</a>",
+            escape(&scope.entry_id(&row.id)),
+            escape(&name)
+        );
+    } else {
+        let _ = write!(h, "<span>{}</span>", escape(&name));
+    }
+    if let Some(level) = &row.level {
+        let _ = write!(
+            h,
+            " <span class=\"chip\" title=\"level\">{}</span>",
+            escape(level)
+        );
+    }
+}
+
+/// Unfinished tasks per level: each configured level, then the tasks without a level and those whose
+/// level is not configured, when there are any.
+fn push_level_counts(h: &mut String, levels: &LevelCounts) {
+    h.push_str("<ul class=\"areas levels\">\n");
+    for LevelCount { level, count } in &levels.levels {
+        let _ = writeln!(
+            h,
+            "<li><span>{}</span><span class=\"count\">{count}</span></li>",
+            escape(level)
+        );
+    }
+    if levels.no_level > 0 {
+        let _ = writeln!(
+            h,
+            "<li><span class=\"muted\">no level</span><span class=\"count\">{}</span></li>",
+            levels.no_level
+        );
+    }
+    if levels.other > 0 {
+        let _ = writeln!(
+            h,
+            "<li><span class=\"muted\">level not configured</span><span class=\"count\">{}</span></li>",
+            levels.other
+        );
+    }
+    h.push_str("</ul>\n");
+}
+
+/// `count` with the singular or the plural word, such as `1 wave` or `3 waves`.
+fn counted(count: usize, singular: &str, plural: &str) -> String {
+    let word = if count == 1 { singular } else { plural };
+    format!("{count} {word}")
+}
+
+/// The level, files and check of a task, as an opened task shows them first (`R-REPORT-3`), on one
+/// line to keep the page short. A missing part reads `none` (a task without files may change any
+/// file, as the work section says); `Verified` is shown only when there is a check to run.
+fn push_facts(h: &mut String, facts: &Facts) {
+    let level = facts.level.as_deref().unwrap_or("none");
+    let files = facts.files.as_deref().unwrap_or("none");
+    let _ = write!(
+        h,
+        "<p class=\"facts\">Level: {} \u{00B7} Files: {}",
+        escape(level),
+        escape(files)
+    );
+    match facts.verify.as_deref() {
+        None => h.push_str(" \u{00B7} Verify: none"),
+        Some(command) => {
+            let verified = facts.verified.as_deref().unwrap_or("not yet");
+            let _ = write!(
+                h,
+                " \u{00B7} Verify: <code>{}</code> \u{00B7} Verified: {}",
+                escape(command),
+                escape(verified)
+            );
+        }
+    }
+    h.push_str("</p>\n");
 }
 
 /// Opens a section with its anchor and its heading, at the heading level of `scope`.
@@ -198,7 +387,7 @@ fn section_start(h: &mut String, scope: Scope<'_>, name: &str, heading: &str) {
 fn push_work(h: &mut String, page: &Page, scope: Scope<'_>) {
     section_start(h, scope, "work", "Work");
     h.push_str(
-        "<p class=\"hint\">Milestones with their goal and progress. The tasks below a milestone are indented under it. Open a task to see its fields and notes.</p>\n",
+        "<p class=\"hint\">Milestones with their goal and progress. The tasks below a milestone are indented under it. Open a task to see its level, files, check, fields and notes; files none means the task may change any file.</p>\n",
     );
     if page.work.is_empty() {
         h.push_str("<p class=\"empty\">Nothing unfinished.</p>\n");
@@ -223,8 +412,7 @@ fn push_node(h: &mut String, node: &WorkNode, scope: Scope<'_>) {
     } else {
         let _ = writeln!(
             h,
-            "<li class=\"node task {}\" id=\"{}\">",
-            status_class(entry.status),
+            "<li class=\"node\" id=\"{}\">",
             escape(&scope.entry_id(&entry.id))
         );
         h.push_str("<details>\n<summary>");
@@ -283,12 +471,9 @@ fn push_task_row(h: &mut String, entry: &Entry) {
 
 /// The priority, difficulty and area of an entry, when it has them.
 fn push_chips(h: &mut String, entry: &Entry) {
+    // A priority code and an area name read as they are; a bare level number needs its label.
     if let Some(priority) = &entry.priority {
-        let _ = write!(
-            h,
-            "<span class=\"chip\" title=\"priority\">{}</span>",
-            escape(priority)
-        );
+        let _ = write!(h, "<span class=\"chip\">{}</span>", escape(priority));
     }
     if let Some(difficulty) = &entry.difficulty {
         let _ = write!(
@@ -298,11 +483,7 @@ fn push_chips(h: &mut String, entry: &Entry) {
         );
     }
     if let Some(area) = &entry.area {
-        let _ = write!(
-            h,
-            "<span class=\"chip\" title=\"area\">{}</span>",
-            escape(area)
-        );
+        let _ = write!(h, "<span class=\"chip\">{}</span>", escape(area));
     }
 }
 
@@ -367,21 +548,21 @@ fn push_progress(h: &mut String, progress: Option<Progress>) {
 
 /// The fields as written and the dated notes of an entry, shown when it is opened.
 fn push_body(h: &mut String, entry: &Entry) {
-    h.push_str("<div class=\"more\">\n");
+    if let Some(facts) = &entry.facts {
+        push_facts(h, facts);
+    }
     if entry.fields.is_empty() {
         h.push_str("<p class=\"muted\">No fields.</p>\n");
     } else {
-        h.push_str("<dl class=\"fields\">\n");
+        h.push_str("<dl class=\"fields\">");
         for (key, value) in &entry.fields {
-            let _ = writeln!(h, "<dt>{}</dt><dd>{}</dd>", escape(key), escape(value));
+            let _ = write!(h, "<dt>{}</dt><dd>{}</dd>", escape(key), escape(value));
         }
         h.push_str("</dl>\n");
     }
-    h.push_str("<h4>Notes</h4>\n");
-    if entry.notes.is_empty() {
-        h.push_str("<p class=\"muted\">No notes.</p>\n");
-    } else {
-        h.push_str("<ul class=\"notes\">\n");
+    // A task without notes has no notes block.
+    if !entry.notes.is_empty() {
+        h.push_str("<h4>Notes</h4>\n<ul class=\"notes\">\n");
         for note in &entry.notes {
             let _ = writeln!(
                 h,
@@ -393,7 +574,6 @@ fn push_body(h: &mut String, entry: &Entry) {
         }
         h.push_str("</ul>\n");
     }
-    h.push_str("</div>\n");
 }
 
 fn push_areas(h: &mut String, page: &Page, scope: Scope<'_>) {
@@ -638,6 +818,9 @@ fn push_card_body(h: &mut String, lists: &Lists, index: usize) {
     };
     let card = &lists.card;
     push_task_counts(h, card.tasks);
+
+    h.push_str("<h4>Open tasks per level</h4>\n");
+    push_level_counts(h, &card.levels);
 
     h.push_str("<h4>Top-level milestones</h4>\n");
     if card.milestones.is_empty() {

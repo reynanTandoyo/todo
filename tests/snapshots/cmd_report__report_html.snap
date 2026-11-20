@@ -203,7 +203,12 @@ summary {
   cursor: pointer;
 }
 
-.more {
+/* What an opened entry shows: its facts, its fields and its notes, indented under the summary. */
+details > .facts,
+details > dl.fields,
+details > .muted,
+details > h4,
+details > ul.notes {
   margin: 0.5rem 0 0.25rem 0.25rem;
 }
 
@@ -400,130 +405,93 @@ section.project > h2 {
 <li><span class="n">2</span> done</li>
 <li><span class="n">2</span> dropped</li>
 </ul>
-<nav class="jump" aria-label="Sections"><a href="#work">Work</a><a href="#areas">Areas</a><a href="#questions">Questions</a><a href="#ideas">Ideas</a><a href="#done">Done</a><a href="#dropped">Dropped</a></nav>
+<nav class="jump" aria-label="Sections"><a href="#planning">Planning</a><a href="#work">Work</a><a href="#areas">Areas</a><a href="#questions">Questions</a><a href="#ideas">Ideas</a><a href="#done">Done</a><a href="#dropped">Dropped</a></nav>
 </header>
 <main>
+<section id="planning">
+<h2>Planning</h2>
+<p class="hint">What the planner still has to do. The target level is 1: a task at or below it needs complete detail before a worker is handed it.</p>
+<h3>Open tasks per level</h3>
+<p class="hint">Open, claimed or blocked tasks, counted by their level.</p>
+<ul class="areas levels">
+<li><span>1</span><span class="count">0</span></li>
+<li><span>2</span><span class="count">0</span></li>
+<li><span>3</span><span class="count">2</span></li>
+<li><span>4</span><span class="count">2</span></li>
+<li><span>5</span><span class="count">0</span></li>
+<li><span class="muted">no level</span><span class="count">1</span></li>
+</ul>
+<h3>Not ready for lack of detail (0)</h3>
+<p class="empty">Every task at or below the target level has its detail.</p>
+<h3>Given back to the planner (0)</h3>
+<p class="empty">Nothing given back.</p>
+<h3>Kept above the target level on purpose (0)</h3>
+<p class="empty">Nothing kept above the target level.</p>
+<h3>Waves</h3>
+<p>1 wave in all. Wave 1 holds 3 tasks in 3 lanes.</p>
+</section>
 <section id="work">
 <h2>Work</h2>
-<p class="hint">Milestones with their goal and progress. The tasks below a milestone are indented under it. Open a task to see its fields and notes.</p>
+<p class="hint">Milestones with their goal and progress. The tasks below a milestone are indented under it. Open a task to see its level, files, check, fields and notes; files none means the task may change any file.</p>
 <ol class="tree">
 <li class="node milestone status-open" id="e-T-001">
-<div class="milestone-head"><span class="id">T-001</span><span class="title">Develop the renderer</span><span class="chip" title="priority">P1</span><progress value="1" max="4">1 of 4 done</progress><span class="progress-text">1 of 4 done</span></div>
+<div class="milestone-head"><span class="id">T-001</span><span class="title">Develop the renderer</span><span class="chip">P1</span><progress value="1" max="4">1 of 4 done</progress><span class="progress-text">1 of 4 done</span></div>
 <p class="goal">the test scene renders with lighting at 60 frames per second</p>
 <details>
 <summary>Fields and notes</summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>open</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>priority</dt><dd>P1 · type: milestone</dd>
-<dt>goal</dt><dd>the test scene renders with lighting at 60 frames per second</dd>
-</dl>
-<h4>Notes</h4>
-<p class="muted">No notes.</p>
-</div>
+<dl class="fields"><dt>status</dt><dd>open</dd><dt>owner</dt><dd>—</dd><dt>priority</dt><dd>P1 · type: milestone</dd><dt>goal</dt><dd>the test scene renders with lighting at 60 frames per second</dd></dl>
 </details>
 <ol class="children">
 <li class="node milestone status-open" id="e-T-002">
-<div class="milestone-head"><span class="id">T-002</span><span class="title">Lighting</span><span class="chip" title="priority">P1</span><progress value="0" max="2">0 of 2 done</progress><span class="progress-text">0 of 2 done</span></div>
+<div class="milestone-head"><span class="id">T-002</span><span class="title">Lighting</span><span class="chip">P1</span><progress value="0" max="2">0 of 2 done</progress><span class="progress-text">0 of 2 done</span></div>
 <p class="goal">point and directional lights match the reference images</p>
 <details>
 <summary>Fields and notes</summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>open</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>priority</dt><dd>P1 · type: milestone</dd>
-<dt>milestone</dt><dd>T-001</dd>
-<dt>goal</dt><dd>point and directional lights match the reference images</dd>
-</dl>
-<h4>Notes</h4>
-<p class="muted">No notes.</p>
-</div>
+<dl class="fields"><dt>status</dt><dd>open</dd><dt>owner</dt><dd>—</dd><dt>priority</dt><dd>P1 · type: milestone</dd><dt>milestone</dt><dd>T-001</dd><dt>goal</dt><dd>point and directional lights match the reference images</dd></dl>
 </details>
 <ol class="children">
-<li class="node task status-claimed" id="e-T-003">
+<li class="node" id="e-T-003">
 <details>
-<summary><span class="id">T-003</span><span class="title">C shader</span><span class="chip" title="priority">P1</span><span class="chip" title="difficulty">medium</span><span class="chip" title="area">ui</span><span class="chip">claimed by alice, 2 h</span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>claimed</dd>
-<dt>owner</dt><dd>alice</dd>
-<dt>priority</dt><dd>P1 · difficulty: medium · area: ui</dd>
-<dt>claimed</dt><dd>2026-11-19T08:00+01:00</dd>
-<dt>milestone</dt><dd>T-002</dd>
-<dt>why</dt><dd>the scene needs a shader before anything else</dd>
-</dl>
-<h4>Notes</h4>
-<p class="muted">No notes.</p>
-</div>
+<summary><span class="id">T-003</span><span class="title">C shader</span><span class="chip">P1</span><span class="chip" title="difficulty">3</span><span class="chip">ui</span><span class="chip">claimed by alice, 2 h</span></summary>
+<p class="facts">Level: 3 · Files: none · Verify: none</p>
+<dl class="fields"><dt>status</dt><dd>claimed</dd><dt>owner</dt><dd>alice</dd><dt>priority</dt><dd>P1 · difficulty: 3 · area: ui</dd><dt>claimed</dt><dd>2026-11-19T08:00+01:00</dd><dt>milestone</dt><dd>T-002</dd><dt>why</dt><dd>the scene needs a shader before anything else</dd></dl>
 </details>
 </li>
-<li class="node task status-open" id="e-T-006">
+<li class="node" id="e-T-006">
 <details>
-<summary><span class="id">T-006</span><span class="title">Shadow maps</span><span class="chip" title="priority">P2</span><span class="chip" title="difficulty">hard</span><span class="chip" title="area">ui</span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>open</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>priority</dt><dd>P2 · difficulty: hard · area: ui</dd>
-<dt>milestone</dt><dd>T-002</dd>
-<dt>why</dt><dd>the reference images show soft shadows</dd>
-</dl>
-<h4>Notes</h4>
-<p class="muted">No notes.</p>
-</div>
+<summary><span class="id">T-006</span><span class="title">Shadow maps</span><span class="chip">P2</span><span class="chip" title="difficulty">4</span><span class="chip">ui</span></summary>
+<p class="facts">Level: 4 · Files: none · Verify: none</p>
+<dl class="fields"><dt>status</dt><dd>open</dd><dt>owner</dt><dd>—</dd><dt>priority</dt><dd>P2 · difficulty: 4 · area: ui</dd><dt>milestone</dt><dd>T-002</dd><dt>why</dt><dd>the reference images show soft shadows</dd></dl>
 </details>
 </li>
 </ol>
 </li>
-<li class="node task status-blocked" id="e-T-004">
+<li class="node" id="e-T-004">
 <details>
-<summary><span class="id">T-004</span><span class="title">GPU compiler</span><span class="chip" title="priority">P2</span><span class="chip" title="difficulty">hard</span><span class="chip" title="area">gpu</span><span class="reason">blocked: the vendor driver crashes on the test scene</span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>blocked</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>priority</dt><dd>P2 · difficulty: hard · area: gpu</dd>
-<dt>milestone</dt><dd>T-001</dd>
-</dl>
+<summary><span class="id">T-004</span><span class="title">GPU compiler</span><span class="chip">P2</span><span class="chip" title="difficulty">4</span><span class="chip">gpu</span><span class="reason">blocked: the vendor driver crashes on the test scene</span></summary>
+<p class="facts">Level: 4 · Files: none · Verify: none</p>
+<dl class="fields"><dt>status</dt><dd>blocked</dd><dt>owner</dt><dd>—</dd><dt>priority</dt><dd>P2 · difficulty: 4 · area: gpu</dd><dt>milestone</dt><dd>T-001</dd></dl>
 <h4>Notes</h4>
 <ul class="notes">
 <li><span class="when">2026-11-17</span> <span class="who">bob</span>: waiting for the driver update</li>
 <li><span class="when">2026-11-18</span> <span class="who">bob</span>: blocked — the vendor driver crashes on the test scene</li>
 </ul>
-</div>
 </details>
 </li>
 </ol>
 </li>
-<li class="node task status-claimed" id="e-T-005">
+<li class="node" id="e-T-005">
 <details>
-<summary><span class="id">T-005</span><span class="title">Write the docs</span><span class="chip" title="priority">P2</span><span class="chip" title="area">docs</span><span class="chip">claimed by carol, 216 h</span><span class="chip stale">stale</span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>claimed</dd>
-<dt>owner</dt><dd>carol</dd>
-<dt>priority</dt><dd>P2 · area: docs</dd>
-<dt>claimed</dt><dd>2026-11-10T09:30+01:00</dd>
-</dl>
-<h4>Notes</h4>
-<p class="muted">No notes.</p>
-</div>
+<summary><span class="id">T-005</span><span class="title">Write the docs</span><span class="chip">P2</span><span class="chip">docs</span><span class="chip">claimed by carol, 216 h</span><span class="chip stale">stale</span></summary>
+<p class="facts">Level: none · Files: none · Verify: none</p>
+<dl class="fields"><dt>status</dt><dd>claimed</dd><dt>owner</dt><dd>carol</dd><dt>priority</dt><dd>P2 · area: docs</dd><dt>claimed</dt><dd>2026-11-10T09:30+01:00</dd></dl>
 </details>
 </li>
-<li class="node task status-open" id="e-T-015">
+<li class="node" id="e-T-015">
 <details>
-<summary><span class="id">T-015</span><span class="title">Ship the demo</span><span class="chip" title="priority">P1</span><span class="chip" title="difficulty">medium</span><span class="chip" title="area">docs</span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>open</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>priority</dt><dd>P1 · difficulty: medium · area: docs</dd>
-</dl>
-<h4>Notes</h4>
-<p class="muted">No notes.</p>
-</div>
+<summary><span class="id">T-015</span><span class="title">Ship the demo</span><span class="chip">P1</span><span class="chip" title="difficulty">3</span><span class="chip">docs</span></summary>
+<p class="facts">Level: 3 · Files: none · Verify: none</p>
+<dl class="fields"><dt>status</dt><dd>open</dd><dt>owner</dt><dd>—</dd><dt>priority</dt><dd>P1 · difficulty: 3 · area: docs</dd></dl>
 </details>
 </li>
 </ol>
@@ -543,47 +511,20 @@ section.project > h2 {
 <ul class="list">
 <li class="item" id="e-T-007">
 <details>
-<summary><span class="id">T-007</span><span class="title">Which lamp model to use</span><span class="chip" title="priority">P2</span><span class="chip">about <a href="#e-T-002">T-002 · Lighting</a></span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>open</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>priority</dt><dd>P2 · type: question</dd>
-<dt>about</dt><dd>T-002</dd>
-</dl>
-<h4>Notes</h4>
-<p class="muted">No notes.</p>
-</div>
+<summary><span class="id">T-007</span><span class="title">Which lamp model to use</span><span class="chip">P2</span><span class="chip">about <a href="#e-T-002">T-002 · Lighting</a></span></summary>
+<dl class="fields"><dt>status</dt><dd>open</dd><dt>owner</dt><dd>—</dd><dt>priority</dt><dd>P2 · type: question</dd><dt>about</dt><dd>T-002</dd></dl>
 </details>
 </li>
 <li class="item" id="e-T-008">
 <details>
-<summary><span class="id">T-008</span><span class="title">Keep the old renderer?</span><span class="chip" title="priority">P2</span><span class="chip">about <a href="#e-T-001">T-001 · Develop the renderer</a></span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>open</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>priority</dt><dd>P2 · type: question</dd>
-<dt>about</dt><dd>T-001</dd>
-</dl>
-<h4>Notes</h4>
-<p class="muted">No notes.</p>
-</div>
+<summary><span class="id">T-008</span><span class="title">Keep the old renderer?</span><span class="chip">P2</span><span class="chip">about <a href="#e-T-001">T-001 · Develop the renderer</a></span></summary>
+<dl class="fields"><dt>status</dt><dd>open</dd><dt>owner</dt><dd>—</dd><dt>priority</dt><dd>P2 · type: question</dd><dt>about</dt><dd>T-001</dd></dl>
 </details>
 </li>
 <li class="item" id="e-T-009">
 <details>
-<summary><span class="id">T-009</span><span class="title">Is the old exporter still needed?</span><span class="chip" title="priority">P3</span><span class="chip">about T-099</span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>open</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>priority</dt><dd>P3 · type: question</dd>
-<dt>about</dt><dd>T-099</dd>
-</dl>
-<h4>Notes</h4>
-<p class="muted">No notes.</p>
-</div>
+<summary><span class="id">T-009</span><span class="title">Is the old exporter still needed?</span><span class="chip">P3</span><span class="chip">about T-099</span></summary>
+<dl class="fields"><dt>status</dt><dd>open</dd><dt>owner</dt><dd>—</dd><dt>priority</dt><dd>P3 · type: question</dd><dt>about</dt><dd>T-099</dd></dl>
 </details>
 </li>
 </ul>
@@ -595,15 +536,7 @@ section.project > h2 {
 <li class="item" id="e-T-010">
 <details>
 <summary><span class="id">T-010</span><span class="title">Hot-reload shaders while the scene runs</span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>open</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>type</dt><dd>idea</dd>
-</dl>
-<h4>Notes</h4>
-<p class="muted">No notes.</p>
-</div>
+<dl class="fields"><dt>status</dt><dd>open</dd><dt>owner</dt><dd>—</dd><dt>type</dt><dd>idea</dd></dl>
 </details>
 </li>
 </ul>
@@ -614,35 +547,24 @@ section.project > h2 {
 <ul class="list">
 <li class="item" id="e-T-011">
 <details>
-<summary><span class="kind-label">task</span> <span class="id">T-011</span><span class="title">Set up the test scene</span><span class="chip" title="priority">P1</span><span class="chip" title="difficulty">easy</span><span class="chip" title="area">ui</span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>done</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>priority</dt><dd>P1 · difficulty: easy · area: ui</dd>
-<dt>milestone</dt><dd>T-001</dd>
-</dl>
+<summary><span class="kind-label">task</span> <span class="id">T-011</span><span class="title">Set up the test scene</span><span class="chip">P1</span><span class="chip" title="difficulty">easy</span><span class="chip">ui</span></summary>
+<p class="facts">Level: easy · Files: none · Verify: none</p>
+<dl class="fields"><dt>status</dt><dd>done</dd><dt>owner</dt><dd>—</dd><dt>priority</dt><dd>P1 · difficulty: easy · area: ui</dd><dt>milestone</dt><dd>T-001</dd></dl>
 <h4>Notes</h4>
 <ul class="notes">
 <li><span class="when">2026-11-12</span> <span class="who">alice</span>: done</li>
 </ul>
-</div>
 </details>
 </li>
 <li class="item" id="e-T-012">
 <details>
-<summary><span class="kind-label">task</span> <span class="id">T-012</span><span class="title">Pick the colour palette</span><span class="chip" title="priority">P3</span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>done</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>priority</dt><dd>P3</dd>
-</dl>
+<summary><span class="kind-label">task</span> <span class="id">T-012</span><span class="title">Pick the colour palette</span><span class="chip">P3</span></summary>
+<p class="facts">Level: none · Files: none · Verify: none</p>
+<dl class="fields"><dt>status</dt><dd>done</dd><dt>owner</dt><dd>—</dd><dt>priority</dt><dd>P3</dd></dl>
 <h4>Notes</h4>
 <ul class="notes">
 <li><span class="when">2026-11-13</span> <span class="who">carol</span>: done — the warm palette wins</li>
 </ul>
-</div>
 </details>
 </li>
 </ul>
@@ -653,36 +575,24 @@ section.project > h2 {
 <ul class="list">
 <li class="item" id="e-T-013">
 <details>
-<summary><span class="kind-label">task</span> <span class="id">T-013</span><span class="title">Old shader</span><span class="chip" title="priority">P2</span><span class="reason dropped">dropped: replaced by the C shader</span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>dropped</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>priority</dt><dd>P2</dd>
-<dt>milestone</dt><dd>T-002</dd>
-</dl>
+<summary><span class="kind-label">task</span> <span class="id">T-013</span><span class="title">Old shader</span><span class="chip">P2</span><span class="reason dropped">dropped: replaced by the C shader</span></summary>
+<p class="facts">Level: none · Files: none · Verify: none</p>
+<dl class="fields"><dt>status</dt><dd>dropped</dd><dt>owner</dt><dd>—</dd><dt>priority</dt><dd>P2</dd><dt>milestone</dt><dd>T-002</dd></dl>
 <h4>Notes</h4>
 <ul class="notes">
 <li><span class="when">2026-11-14</span> <span class="who">carol</span>: dropped — replaced by the C shader</li>
 </ul>
-</div>
 </details>
 </li>
 <li class="item" id="e-T-014">
 <details>
-<summary><span class="kind-label">task</span> <span class="id">T-014</span><span class="title">Legacy light path</span><span class="chip" title="priority">P2</span><span class="reason dropped">dropped: the scene no longer needs it</span></summary>
-<div class="more">
-<dl class="fields">
-<dt>status</dt><dd>dropped</dd>
-<dt>owner</dt><dd>—</dd>
-<dt>priority</dt><dd>P2</dd>
-<dt>milestone</dt><dd>T-001</dd>
-</dl>
+<summary><span class="kind-label">task</span> <span class="id">T-014</span><span class="title">Legacy light path</span><span class="chip">P2</span><span class="reason dropped">dropped: the scene no longer needs it</span></summary>
+<p class="facts">Level: none · Files: none · Verify: none</p>
+<dl class="fields"><dt>status</dt><dd>dropped</dd><dt>owner</dt><dd>—</dd><dt>priority</dt><dd>P2</dd><dt>milestone</dt><dd>T-001</dd></dl>
 <h4>Notes</h4>
 <ul class="notes">
 <li><span class="when">2026-11-16</span> <span class="who">carol</span>: dropped with T-001 — the scene no longer needs it</li>
 </ul>
-</div>
 </details>
 </li>
 </ul>

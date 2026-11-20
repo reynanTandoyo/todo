@@ -16,7 +16,7 @@ use crate::error::Result;
 use crate::ops::{file_label, read_optional_archive};
 use crate::register::Project;
 use crate::register::overview::{ProblemJson, TaskCounts, load_todo_doc};
-use crate::report::model::{Page, build_page, generated_text};
+use crate::report::model::{LevelCounts, Page, build_page, generated_text};
 
 /// The page for every registered project, in the order they were added.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -80,6 +80,8 @@ pub struct Card {
     pub blocked: Vec<BlockedRow>,
     /// Open questions, in file order.
     pub questions: Vec<Row>,
+    /// Unfinished tasks per level (`R-REPORT-2`, `R-REPORT-3`): the same counts as the project's page.
+    pub levels: LevelCounts,
 }
 
 /// A top-level milestone on a card.
@@ -206,5 +208,6 @@ fn card_of(doc: &Document, page: &Page) -> Card {
         milestones,
         blocked,
         questions,
+        levels: page.levels.clone(),
     }
 }

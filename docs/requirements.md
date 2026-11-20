@@ -1026,8 +1026,9 @@ for it, never automatically.
   - A snapshot test uses two invented projects.
 - **R-REPORT-3 COULD** From v0.8 the report shows the planning state (R-LEVEL-2, R-WAVE-1), so the
   owner sees how far the planner is and where workers failed.
-  - Each project page shows the open tasks per level (R-LEVEL-1); how many tasks are not ready for
-    lack of detail (R-DETAIL-2); the tasks given back (R-STUCK-1), each with its problem and its
+  - Each project page shows the open tasks per level (R-LEVEL-1), counted as the areas count open
+    work (open, claimed or blocked tasks), with those without a level counted apart; how many tasks
+    are not ready for lack of detail (R-DETAIL-2); the tasks given back (R-STUCK-1), each with its problem and its
     `attempts`; the tasks kept above the target level, each with the reason of its `final` line
     (R-LEVEL-3); and the number of waves and the size of wave 1 (R-WAVE-1).
   - A task, when opened, shows its level, its `files` and its `verify` command, and whether it was

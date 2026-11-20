@@ -1,6 +1,6 @@
 <!-- TEST FIXTURE: invented data, not a real task list -->
-<!-- todo-format: 2 -->
-<!-- todo-tool: 0.6.0 -->
+<!-- todo-format: 3 -->
+<!-- todo-tool: 0.7.0 -->
 # Harbour lights — tasks
 
 ## Now
@@ -21,7 +21,7 @@
 ### T-003 · C shader
 - status: claimed
 - owner: alice
-- priority: P1 · difficulty: medium · area: ui
+- priority: P1 · difficulty: 3 · area: ui
 - claimed: 2026-11-19T08:00+01:00
 - milestone: T-002
 - why: the scene needs a shader before anything else
@@ -29,7 +29,7 @@
 ### T-004 · GPU compiler
 - status: blocked
 - owner: —
-- priority: P2 · difficulty: hard · area: gpu
+- priority: P2 · difficulty: 4 · area: gpu
 - milestone: T-001
 - note (2026-11-17, bob): waiting for the driver update
 - note (2026-11-18, bob): blocked — the vendor driver crashes on the test scene
@@ -43,7 +43,7 @@
 ### T-006 · Shadow maps
 - status: open
 - owner: —
-- priority: P2 · difficulty: hard · area: ui
+- priority: P2 · difficulty: 4 · area: ui
 - milestone: T-002
 - why: the reference images show soft shadows
 
@@ -100,4 +100,4 @@
 ### T-015 · Ship the demo
 - status: open
 - owner: —
-- priority: P1 · difficulty: medium · area: docs
+- priority: P1 · difficulty: 3 · area: docs

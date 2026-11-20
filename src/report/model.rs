@@ -9,7 +9,9 @@ use chrono::{DateTime, FixedOffset};
 
 use crate::doc::{Document, EntryKind, NO_REASON, Note, Progress, Status, Task, TaskId};
 use crate::ops::OpsConfig;
+use crate::ops::plan::build_plan;
 use crate::ops::read::about_id;
+use crate::ops::waves::{detail_gaps, plan_waves};
 
 /// Title used when `TODO.md` has no `# ` heading before its first section.
 const DEFAULT_TITLE: &str = "Tasks";
@@ -28,6 +30,10 @@ pub struct Page {
     pub counts: Counts,
     /// Unfinished tasks (open, claimed or blocked) per area, in area order; `no_area` is shown last.
     pub areas: Vec<AreaCount>,
+    /// Unfinished tasks per level (`R-LEVEL-1`, `R-REPORT-3`), as the planner counts them.
+    pub levels: LevelCounts,
+    /// The planning state: what the planner still has to do (`R-LEVEL-2`, `R-REPORT-3`).
+    pub planning: Planning,
     /// The work: milestones with their goals and progress, tasks indented below them, and the
     /// top-level tasks last (`R-REPORT-1`).
     pub work: Vec<WorkNode>,
@@ -72,6 +78,97 @@ pub struct AreaCount {
     pub count: usize,
 }
 
+/// Unfinished tasks per level, in the order of `difficulties` (`R-LEVEL-1`). Every configured level is
+/// listed, even at zero; a task whose level is not configured is counted apart.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LevelCounts {
+    pub levels: Vec<LevelCount>,
+    /// Unfinished tasks without a level.
+    pub no_level: usize,
+    /// Unfinished tasks whose level is not one of `difficulties`.
+    pub other: usize,
+}
+
+/// Unfinished tasks at one level.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LevelCount {
+    /// The level as `difficulties` spells it.
+    pub level: String,
+    pub count: usize,
+}
+
+/// The planning state of a project, decided by the planner's list and the waves (`R-REPORT-3`), so
+/// the page counts a task as `todo plan` and `todo waves` do.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Planning {
+    /// The target level (`target_difficulty`); a task at or below it needs complete detail.
+    pub target: String,
+    /// Tasks at or below the target level that are not ready for lack of detail (`R-DETAIL-2`), in
+    /// file order, each with what is missing.
+    pub not_ready: Vec<NotReadyRow>,
+    /// Tasks a worker gave back (`R-STUCK-1`), in file order, each with its problem and attempts.
+    pub given_back: Vec<GivenBackRow>,
+    /// Tasks kept above the target level on purpose (`R-LEVEL-3`), in file order, each with its reason.
+    pub kept_on_purpose: Vec<KeptRow>,
+    /// The number of waves (`R-WAVE-1`).
+    pub waves: usize,
+    /// The tasks in wave 1.
+    pub wave1_tasks: usize,
+    /// The lanes of wave 1 (`R-SCOPE-1`).
+    pub wave1_lanes: usize,
+}
+
+/// A task in the planning state, with a link to its row when the page shows it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlanRow {
+    /// The canonical ID (`T-007`).
+    pub id: String,
+    pub title: String,
+    /// The level as written, `None` when the task has none.
+    pub level: Option<String>,
+    /// Whether the page shows the task, so a link can point at its row.
+    pub linked: bool,
+}
+
+/// A task that is not ready for lack of detail.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotReadyRow {
+    pub row: PlanRow,
+    /// What the detail rule lacks (`R-DETAIL-2`), as `detail_gaps` names it.
+    pub missing: Vec<String>,
+}
+
+/// A task a worker gave back.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GivenBackRow {
+    pub row: PlanRow,
+    /// The problem of the latest `stuck — <problem>` note, or [`NO_REASON`].
+    pub problem: String,
+    /// The `attempts` value as written, `0` when there is none.
+    pub attempts: String,
+}
+
+/// A task kept above the target level on purpose.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeptRow {
+    pub row: PlanRow,
+    /// The reason of its `final` line, or [`NO_REASON`].
+    pub reason: String,
+}
+
+/// What a task shows when it is opened about its level and its check (`R-REPORT-3`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Facts {
+    /// The level as written, `None` when the task has none.
+    pub level: Option<String>,
+    /// The `files` value as written, `None` when there is none.
+    pub files: Option<String>,
+    /// The `verify` command as written, `None` when there is none.
+    pub verify: Option<String>,
+    /// The date the check last passed (`verified`), `None` when it has not.
+    pub verified: Option<String>,
+}
+
 /// One entry of the page: a task, a milestone, a question or an idea.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
@@ -97,6 +194,9 @@ pub struct Entry {
     pub fields: Vec<(String, String)>,
     /// The dated notes of the entry, in file order.
     pub notes: Vec<NoteView>,
+    /// The level and the check of a task, shown first when it is opened (`R-REPORT-3`); `None` for
+    /// milestones, questions and ideas.
+    pub facts: Option<Facts>,
 }
 
 /// Who holds a claim, and how old it is (`R-CLAIM-4`).
@@ -223,6 +323,10 @@ pub fn build_page(
     for entry in questions.iter().chain(&ideas).chain(&done).chain(&dropped) {
         shown.insert(entry.id.clone());
     }
+    // Built from the planner's list and the waves, once per page; the rows link to the entries the
+    // page shows, so the set is complete before they are made.
+    let planning = planning_state(doc, archive, cfg, &shown);
+    let levels = level_counts(doc, cfg);
     link_work(&mut work, &shown);
     for entry in questions
         .iter_mut()
@@ -243,6 +347,8 @@ pub fn build_page(
         generated: generated_text(now),
         counts,
         areas,
+        levels,
+        planning,
         work,
         questions,
         ideas,
@@ -350,6 +456,12 @@ impl<'a> Builder<'a> {
                 .map(|field| (field.key.clone(), field.value.clone()))
                 .collect(),
             notes: task.notes.iter().map(note_view).collect(),
+            facts: (kind == EntryKind::Task).then(|| Facts {
+                level: task.difficulty.clone(),
+                files: task.files.clone(),
+                verify: task.verify.clone(),
+                verified: task.verified.clone(),
+            }),
         }
     }
 }
@@ -442,6 +554,105 @@ fn area_counts(doc: &Document) -> (Vec<AreaCount>, usize) {
         }
     }
     (by_area.into_values().collect(), no_area)
+}
+
+/// Unfinished tasks per configured level, and those without a level or with one that is not
+/// configured (`R-LEVEL-1`). The same tally as the open tasks of the areas, by level.
+fn level_counts(doc: &Document, cfg: &OpsConfig) -> LevelCounts {
+    let mut counts = LevelCounts {
+        levels: cfg
+            .difficulties
+            .iter()
+            .map(|level| LevelCount {
+                level: level.clone(),
+                count: 0,
+            })
+            .collect(),
+        no_level: 0,
+        other: 0,
+    };
+    for task in doc
+        .tasks
+        .iter()
+        .filter(|t| t.kind() == EntryKind::Task && is_unfinished(t.status))
+    {
+        match (
+            task.difficulty.as_deref(),
+            cfg.difficulty_rank(task.difficulty.as_deref()),
+        ) {
+            (None, _) => counts.no_level += 1,
+            (Some(_), Some(rank)) => {
+                if let Some(level) = counts.levels.get_mut(rank) {
+                    level.count += 1;
+                }
+            }
+            (Some(_), None) => counts.other += 1,
+        }
+    }
+    counts
+}
+
+/// The planning state of `doc` (`R-REPORT-3`), from `ops::plan` and `ops::waves`: the planner's
+/// groups and the waves are the ones `todo plan` and `todo waves` show. `shown` holds the IDs the page
+/// lists, so a row links only to an entry that has a row.
+fn planning_state(
+    doc: &Document,
+    archive: Option<&Document>,
+    cfg: &OpsConfig,
+    shown: &BTreeSet<String>,
+) -> Planning {
+    let plan = build_plan(doc, archive, cfg, None);
+    let row = |task: &Task| {
+        let id = doc.id_config.format_id(task.id);
+        PlanRow {
+            linked: shown.contains(&id),
+            id,
+            title: task.title.clone(),
+            level: task.difficulty.clone(),
+        }
+    };
+    let waves = plan_waves(doc, archive, None, cfg);
+    let first = waves.waves.first();
+    Planning {
+        target: cfg.target_difficulty().to_string(),
+        not_ready: plan
+            .to_detail
+            .iter()
+            .map(|task| NotReadyRow {
+                row: row(task),
+                missing: detail_gaps(task, doc, archive, cfg),
+            })
+            .collect(),
+        given_back: plan
+            .given_back
+            .iter()
+            .map(|task| GivenBackRow {
+                row: row(task),
+                problem: task.blocked_reason().unwrap_or(NO_REASON).to_string(),
+                attempts: task
+                    .attempts
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or("0")
+                    .to_string(),
+            })
+            .collect(),
+        kept_on_purpose: plan
+            .kept_on_purpose
+            .iter()
+            .map(|task| KeptRow {
+                row: row(task),
+                reason: task
+                    .final_reason
+                    .clone()
+                    .unwrap_or_else(|| NO_REASON.to_string()),
+            })
+            .collect(),
+        waves: waves.waves.len(),
+        wave1_tasks: first.map_or(0, |wave| wave.lanes.iter().map(Vec::len).sum()),
+        wave1_lanes: first.map_or(0, |wave| wave.lanes.len()),
+    }
 }
 
 fn count(
