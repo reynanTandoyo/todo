@@ -34,6 +34,9 @@ pub const DEFAULT_VERIFY_TIMEOUT_SECONDS: u64 = 300;
 /// Default `verify_attempts` from requirements §5.14 (`R-VERIFY-1`).
 pub const DEFAULT_VERIFY_ATTEMPTS: u64 = 3;
 
+/// Default `level1_max_files` from requirements §5.14 (`R-DETAIL-2`).
+pub const DEFAULT_LEVEL1_MAX_FILES: usize = 3;
+
 /// When the `verify` command of a task runs (`verify_when`, `R-VERIFY-2`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VerifyWhen {
@@ -94,6 +97,16 @@ pub struct OpsConfig {
     /// The program and its arguments that run a `verify` line, which is added as the last
     /// argument; empty means the default shell of the platform (`R-VERIFY-1`).
     pub verify_shell: Vec<String>,
+    /// The level the planner splits down to (`target_difficulty`, `R-LEVEL-2`); `None` means the
+    /// first of `difficulties`. A task at or below it needs complete detail (`R-DETAIL-2`).
+    pub target_difficulty: Option<String>,
+    /// Most `files` entries a task at or below the target level may have (`level1_max_files`,
+    /// `R-DETAIL-2`, default `3`).
+    pub level1_max_files: usize,
+    /// The folder of `TODO.md`, which the `read` paths of a task are relative to (`R-DETAIL-2`).
+    /// [`Self::load_next_to`] sets it; without it (a configuration that was not loaded from a file)
+    /// the `read` paths are not checked.
+    pub todo_folder: Option<PathBuf>,
 }
 
 impl Default for OpsConfig {
@@ -124,6 +137,9 @@ impl Default for OpsConfig {
             verify_timeout_seconds: DEFAULT_VERIFY_TIMEOUT_SECONDS,
             verify_attempts: DEFAULT_VERIFY_ATTEMPTS,
             verify_shell: Vec::new(),
+            target_difficulty: None,
+            level1_max_files: DEFAULT_LEVEL1_MAX_FILES,
+            todo_folder: None,
         }
     }
 }
@@ -157,6 +173,17 @@ impl OpsConfig {
         self.difficulties
             .iter()
             .position(|cfg_d| cfg_d.eq_ignore_ascii_case(d.trim()))
+    }
+
+    /// Returns the position of the target level in [`Self::difficulties`] (`R-LEVEL-2`): the value
+    /// of `target_difficulty`, or 0, the lowest level, when it is not set. A task at or below this
+    /// position needs complete detail (`R-DETAIL-2`).
+    #[must_use]
+    pub fn target_rank(&self) -> usize {
+        self.target_difficulty
+            .as_deref()
+            .and_then(|target| self.difficulty_rank(Some(target)))
+            .unwrap_or(0)
     }
 
     /// Whether `required_fields` names `field`, ignoring case: a task must then have it (`R-LEVEL-1`).
@@ -251,7 +278,9 @@ impl OpsConfig {
     /// Loads `todo.toml` sitting next to `todo_path`, or returns [`OpsConfig::default`] if absent (`R-CFG-1`, `R-CFG-2`).
     pub fn load_next_to(todo_path: &Path) -> Result<Self> {
         let toml_path = todo_path.with_file_name(CONFIG_FILENAME);
-        Self::load_from_file(&toml_path)
+        let mut cfg = Self::load_from_file(&toml_path)?;
+        cfg.todo_folder = todo_path.parent().map(Path::to_path_buf);
+        Ok(cfg)
     }
 
     /// Loads `todo.toml` from `toml_path`, or returns [`OpsConfig::default`] if the file does not exist.
@@ -283,6 +312,7 @@ impl OpsConfig {
         let mut cfg = Self::default();
         let mut lease_minutes_line: Option<usize> = None;
         let mut lease_max_line: Option<usize> = None;
+        let mut target: Option<(String, usize)> = None;
 
         for (key, spanned_val) in table {
             let line = line_at_offset(content, spanned_val.span().start);
@@ -434,10 +464,38 @@ impl OpsConfig {
                 "verify_shell" => {
                     cfg.verify_shell = expect_string_list(&key, val, line, false)?;
                 }
+                "target_difficulty" => {
+                    target = Some((expect_string(&key, val, line)?, line));
+                }
+                "level1_max_files" => {
+                    let n = expect_u64(&key, val, line, 1)?;
+                    cfg.level1_max_files = usize::try_from(n)
+                        .map_err(|_| toml_err(line, "level1_max_files is too large"))?;
+                }
                 _ => {
                     return Err(toml_err(line, format!("unknown setting `{key}`")));
                 }
             }
+        }
+
+        // The target is checked once `difficulties` is known, since the two keys may come in any
+        // order; it is kept in the configured spelling.
+        if let Some((raw, line)) = target {
+            let canonical = cfg
+                .difficulties
+                .iter()
+                .find(|d| d.eq_ignore_ascii_case(raw.trim()))
+                .cloned();
+            let Some(canonical) = canonical else {
+                return Err(toml_err(
+                    line,
+                    format!(
+                        "target_difficulty {raw:?} is not one of difficulties: {}",
+                        cfg.difficulties.join(", ")
+                    ),
+                ));
+            };
+            cfg.target_difficulty = Some(canonical);
         }
 
         if cfg.lock.lease_minutes > cfg.lock.lease_max_minutes {

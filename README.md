@@ -438,7 +438,8 @@ output is enabled only on terminals and is disabled when piped or when `NO_COLOR
 ## Configuration (`todo.toml`)
 
 An optional `todo.toml` next to `TODO.md` can configure `id_prefix`, `id_width`, `priorities`,
-`required_fields`, `types`, `areas`, `difficulties`, `default_section`, `question_section`,
+`required_fields`, `types`, `areas`, `difficulties`, `target_difficulty`, `level1_max_files`,
+`default_section`, `question_section`,
 `idea_section`, `archive_file`,
 `claim_ttl_hours`, `lock_wait_seconds`, `lease_minutes`, `lease_max_minutes`, `snapshots_keep`,
 and `worktree` (`"shared"` or `"local"`). See [`docs/requirements.md`](docs/requirements.md) §5.14

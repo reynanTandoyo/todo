@@ -420,9 +420,20 @@ fn todo_toml_sets_the_allowed_difficulties_and_their_order() {
             "P2",
             "--difficulty",
             "trivial",
+            "--why",
+            "the reason for the work",
+            "--accept",
+            "the result is visible",
+            "--steps",
+            "open the file",
+            "--verify",
+            "cargo test",
+            "--files",
+            "src/lib.rs",
         ],
     );
-    // `trivial` is the easiest value; `tough` is not within it.
+    // `trivial` is the easiest value, which is the target level: its task is handed out only with
+    // its detail complete (R-DETAIL-2), so this one has all of it. `tough` is not within `trivial`.
     let next = ok(
         &home,
         &work,

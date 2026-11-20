@@ -15,7 +15,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "show",
     summary: "Show full details of a task",
     kind: CommandKind::Read,
-    details: "Prints the task block exactly as it appears in TODO.md (or TODO-archive.md if archived), then the questions about it with their status, then the milestones above it from the top down with their goals. With `--json`, returns all known and unknown fields, notes, line numbers, dependencies with their statuses, tasks waiting on this task, the questions about it (`questions`), and the milestones above it (`milestones`). Works for milestones too.",
+    details: "Prints the task block exactly as it appears in TODO.md (or TODO-archive.md if archived), then the questions about it with their status, then the milestones above it from the top down with their goals. With `--json`, returns all known and unknown fields, notes, line numbers, dependencies with their statuses, tasks waiting on this task, the questions about it (`questions`), the milestones above it (`milestones`), whether `next` could hand it out now (`ready`) and what the detail rule lacks at the target level (`missing`, R-DETAIL-2). Works for milestones too.",
     examples: &[
         "todo show T-001",
         "todo show 1",

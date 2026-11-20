@@ -361,3 +361,50 @@ fn verify_settings_have_their_defaults_and_bad_values_are_refused_with_the_line(
         assert_eq!(err.details.line, Some(line), "{text:?}: {}", err.message);
     }
 }
+
+#[test]
+fn detail_settings_have_their_defaults_and_bad_values_are_refused_with_the_line() {
+    // T-153 (R-DETAIL-2, R-CFG-2): the target level and the file limit of the detail rule.
+    let def = OpsConfig::default();
+    assert_eq!(def.target_rank(), 0, "the lowest level by default");
+    assert_eq!(def.level1_max_files, 3);
+    assert!(def.todo_folder.is_none(), "not loaded from a file");
+
+    // Without its own target, a project's target is the first of its difficulties.
+    let own = OpsConfig::from_toml_str("difficulties = [\"easy\", \"hard\"]\n").unwrap();
+    assert_eq!(own.target_rank(), 0);
+    assert!(own.target_difficulty.is_none());
+
+    // A target is kept in the spelling of `difficulties`, whatever the case written.
+    let raised = OpsConfig::from_toml_str(
+        "difficulties = [\"easy\", \"hard\"]\ntarget_difficulty = \"HARD\"\nlevel1_max_files = 5\n",
+    )
+    .unwrap();
+    assert_eq!(raised.target_rank(), 1);
+    assert_eq!(raised.target_difficulty.as_deref(), Some("hard"));
+    assert_eq!(raised.level1_max_files, 5);
+
+    // Each bad value is refused, and the error names its line in todo.toml.
+    for (text, line) in [
+        ("target_difficulty = \"6\"\n", 1),
+        (
+            "difficulties = [\"easy\"]\n\ntarget_difficulty = \"medium\"\n",
+            3,
+        ),
+        ("target_difficulty = 2\n", 1),
+        ("level1_max_files = 0\n", 1),
+        ("\nlevel1_max_files = \"3\"\n", 2),
+    ] {
+        let err = OpsConfig::from_toml_str(text).unwrap_err();
+        assert_eq!(err.code, todo::error::ErrorCode::BadValue, "{text:?}");
+        assert_eq!(err.details.line, Some(line), "{text:?}: {}", err.message);
+    }
+}
+
+#[test]
+fn load_next_to_names_the_folder_of_todo_md_for_the_read_paths() {
+    // T-153 (R-DETAIL-2): `read` paths are relative to the folder that holds TODO.md.
+    let dir = TempDir::new().unwrap();
+    let cfg = OpsConfig::load_next_to(&dir.path().join("TODO.md")).unwrap();
+    assert_eq!(cfg.todo_folder.as_deref(), Some(dir.path()));
+}

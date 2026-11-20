@@ -101,8 +101,9 @@ impl ScopeEntry {
     }
 }
 
-/// Removes a trailing `:<digits>` line number, as `todo scan` writes it (`src/main.rs:42`).
-fn strip_line_suffix(text: &str) -> &str {
+/// Removes a trailing `:<digits>` line number, as `todo scan` writes it (`src/main.rs:42`). The
+/// same holds for `read` paths (`docs/format.md` §19).
+pub fn strip_line_suffix(text: &str) -> &str {
     match text.rsplit_once(':') {
         Some((head, digits))
             if !head.is_empty()

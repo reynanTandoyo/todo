@@ -17,7 +17,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "waves",
     summary: "Group the unfinished tasks into waves: rounds, workers at once, longest chain",
     kind: CommandKind::Read,
-    details: "Groups the unfinished tasks into waves (R-WAVE-1). Wave 1 holds every task that is ready now, claimed ones included; wave n holds the tasks that become ready when the waves before it are done. Readiness uses each task's dependencies and those of the milestones above it; a dependency on a milestone waits for the entries directly below it. Tasks in one wave whose `files` overlap form one lane, because they must run one after another. Prints the number of waves, the size of each (tasks and lanes), the most workers useful at once (the most lanes in any wave) and the longest dependency chain, task by task. A task without a level is held back with its reason, as `next` holds it back (R-LEVEL-1); a task at the lowest level without its detail (R-DETAIL-2) is placed by its dependencies and marked `not ready`. Blocked tasks (given back or not), tasks below a milestone that is blocked, done or dropped (the rule `next` uses, R-MILE-6), and tasks that wait on a missing ID or on a cycle are listed apart, each with its reason. `<milestone>` shows only the tasks below it, with the wave numbers of the whole file. Reads only; takes no lock.",
+    details: "Groups the unfinished tasks into waves (R-WAVE-1). Wave 1 holds every task that is ready now, claimed ones included; wave n holds the tasks that become ready when the waves before it are done. Readiness uses each task's dependencies and those of the milestones above it; a dependency on a milestone waits for the entries directly below it. Tasks in one wave whose `files` overlap form one lane, because they must run one after another. Prints the number of waves, the size of each (tasks and lanes), the most workers useful at once (the most lanes in any wave) and the longest dependency chain, task by task. A task without a level is held back with its reason, as `next` holds it back (R-LEVEL-1); a task at or below the target level (`target_difficulty`, by default the lowest level) without its detail (R-DETAIL-2) is placed by its dependencies and marked `not ready`, with what it lacks. Blocked tasks (given back or not), tasks below a milestone that is blocked, done or dropped (the rule `next` uses, R-MILE-6), and tasks that wait on a missing ID or on a cycle are listed apart, each with its reason. `<milestone>` shows only the tasks below it, with the wave numbers of the whole file. Reads only; takes no lock.",
     examples: &["todo waves", "todo waves T-010", "todo waves --json"],
 };
 
@@ -37,8 +37,8 @@ struct TaskEntry {
     owner: Option<String>,
     /// The difficulty as written, which is the task's level; `null` when it has none.
     level: Option<String>,
-    /// What the task lacks at the lowest level (`R-DETAIL-2`); `[]` when it has all of it, or is at
-    /// another level.
+    /// What the task lacks at or below the target level (`R-DETAIL-2`); `[]` when it has all of it,
+    /// or is above the target level.
     missing: Vec<String>,
 }
 
@@ -93,7 +93,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         Some(raw) => Some(resolve_milestone(doc, raw)?.id),
         None => None,
     };
-    let plan = waves::plan_waves(doc, loaded.archive.as_ref(), milestone);
+    let archive = loaded.archive.as_ref();
+    let plan = waves::plan_waves(doc, archive, milestone);
 
     let payload = WavesJson {
         file: loaded.file_label.clone(),
@@ -104,7 +105,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         longest_chain: plan
             .longest_chain
             .iter()
-            .map(|task| task_entry(doc, &cfg, task))
+            .map(|task| task_entry(doc, archive, &cfg, task))
             .collect(),
         waves: plan
             .waves
@@ -120,7 +121,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                     .iter()
                     .map(|lane| {
                         lane.iter()
-                            .map(|task| task_entry(doc, &cfg, task))
+                            .map(|task| task_entry(doc, archive, &cfg, task))
                             .collect()
                     })
                     .collect(),
@@ -146,14 +147,14 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     Ok(())
 }
 
-fn task_entry(doc: &Document, cfg: &OpsConfig, task: &Task) -> TaskEntry {
+fn task_entry(doc: &Document, archive: Option<&Document>, cfg: &OpsConfig, task: &Task) -> TaskEntry {
     TaskEntry {
         id: doc.id_config.format_id(task.id),
         title: task.title.clone(),
         status: task.status.as_str(),
         owner: task.owner.clone(),
         level: task.difficulty.clone(),
-        missing: detail_gaps(task, cfg),
+        missing: detail_gaps(task, doc, archive, cfg),
     }
 }
 

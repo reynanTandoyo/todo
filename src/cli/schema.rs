@@ -208,6 +208,7 @@ fn task_fields() -> TaskFieldsJson {
         dependents: Vec::new(),
         questions: Vec::new(),
         ready: false,
+        missing: Vec::new(),
         files_busy: Vec::new(),
         files: None,
         read: Vec::new(),
