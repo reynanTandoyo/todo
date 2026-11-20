@@ -693,3 +693,91 @@ fn apply_without_git_keeps_the_commit_as_given() {
     );
     assert_eq!(commit_line(&read_text(&p.todo)), "- commit: cafebabe");
 }
+
+// The order of the checks of `done` and `apply` (T-158, T-173): the commit scope first, then the
+// `verify` command, so a commit outside the task's files runs no command.
+
+/// A `verify` command that writes `ran.txt` in the folder of TODO.md, so a test can see that it ran.
+fn marker_check() -> String {
+    if cfg!(windows) {
+        "Set-Content -Path ran.txt -Value ok".to_string()
+    } else {
+        "echo ok > ran.txt".to_string()
+    }
+}
+
+/// A TODO.md with T-001 at level 1, naming `files`, with the `verify` command `verify`.
+fn verify_body(files: &str, verify: &str) -> String {
+    format!(
+        "{MARKER}\n{FORMAT_LINE}\n## Queue\n\n### T-001 · Scoped task\n- status: open\n- owner: —\n- priority: P1\n- difficulty: 1\n- files: {files}\n- verify: {verify}\n"
+    )
+}
+
+/// A project with [`verify_body`] and a repository whose first commit is inside the files.
+fn verified_repo_project() -> Proj {
+    let tmp = TempDir::new().expect("tempdir");
+    let (home, work, todo) = setup_proj(&tmp, &verify_body("src/", &marker_check()));
+    let p = Proj {
+        _tmp: tmp,
+        home,
+        work,
+        todo,
+    };
+    repo_with_first_commit(&p);
+    p
+}
+
+#[test]
+fn done_refuses_a_commit_outside_the_files_before_the_verify_command_runs() {
+    let p = verified_repo_project();
+    write(&p.work, "src/b.rs", "pub fn b() {}\n");
+    write(&p.work, "other.txt", "outside the task\n");
+    commit(&p.work, &["src/b.rs", "other.txt"], "T-001: work");
+    let before = fs::read(&p.todo).expect("read TODO.md");
+
+    let out = done(&p, &["--commit", "HEAD"]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(parse_json(&out.stdout)["error"]["code"], "OUT_OF_SCOPE");
+    assert!(
+        !p.work.join("ran.txt").exists(),
+        "the verify command ran before the commit scope was checked"
+    );
+    assert_eq!(fs::read(&p.todo).expect("read TODO.md"), before);
+}
+
+#[test]
+fn done_runs_the_verify_command_once_the_commit_is_inside_the_files() {
+    let p = verified_repo_project();
+    write(&p.work, "src/b.rs", "pub fn b() {}\n");
+    commit(&p.work, &["src/b.rs"], "T-001: work");
+
+    let out = done(&p, &["--commit", "HEAD"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        p.work.join("ran.txt").exists(),
+        "the verify command did not run"
+    );
+    assert!(read_text(&p.todo).contains("verified: 2026-11-15"));
+}
+
+#[test]
+fn apply_refuses_a_batch_with_a_commit_outside_the_files_before_the_verify_command_runs() {
+    let p = verified_repo_project();
+    write(&p.work, "src/b.rs", "pub fn b() {}\n");
+    write(&p.work, "other.txt", "outside the task\n");
+    commit(&p.work, &["src/b.rs", "other.txt"], "T-001: work");
+    let before = fs::read(&p.todo).expect("read TODO.md");
+
+    let out = apply(&p, &[done_op(Some("HEAD")).as_str()], &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(parse_json(&out.stdout)["error"]["code"], "OUT_OF_SCOPE");
+    assert!(
+        !p.work.join("ran.txt").exists(),
+        "the verify command ran before the commit scope was checked"
+    );
+    assert_eq!(fs::read(&p.todo).expect("read TODO.md"), before);
+}

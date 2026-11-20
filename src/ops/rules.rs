@@ -60,6 +60,8 @@ pub enum TaskCommand {
     Answer,
     /// `todo promote` (`R-KIND-1`).
     Promote,
+    /// `todo split` (`R-SPLIT-1`).
+    Split,
 }
 
 impl TaskCommand {
@@ -73,6 +75,7 @@ impl TaskCommand {
             Self::Move => "move",
             Self::Answer => "answer",
             Self::Promote => "promote",
+            Self::Split => "split",
         }
     }
 }

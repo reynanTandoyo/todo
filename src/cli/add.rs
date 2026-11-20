@@ -617,7 +617,7 @@ fn check_batch_milestones(entries: &[ValidatedBatchEntry]) -> Result<()> {
 }
 
 /// Adds the batch line number to a refusal, as the other `--from` errors do (`R-OUT-4`).
-fn at_batch_line(mut err: TodoError, line_no: usize) -> TodoError {
+pub(crate) fn at_batch_line(mut err: TodoError, line_no: usize) -> TodoError {
     err.message = format!("--from line {line_no}: {}", err.message);
     err.with_line(line_no)
 }
@@ -656,27 +656,29 @@ struct BatchAddEntry {
     fields: BTreeMap<String, String>,
 }
 
-struct ValidatedBatchEntry {
-    ref_name: Option<String>,
-    title: String,
-    section: Option<String>,
-    priority: Option<String>,
-    difficulty: Option<String>,
-    task_type: Option<String>,
-    area: Option<String>,
+pub(crate) struct ValidatedBatchEntry {
+    pub(crate) ref_name: Option<String>,
+    pub(crate) title: String,
+    pub(crate) section: Option<String>,
+    pub(crate) priority: Option<String>,
+    pub(crate) difficulty: Option<String>,
+    pub(crate) task_type: Option<String>,
+    pub(crate) area: Option<String>,
     /// Parent milestone as given: an ID, or `@ref` naming an entry of the same batch (R-MILE-1).
-    milestone: Option<String>,
-    goal: Option<String>,
-    why: Option<String>,
-    depends_tokens: Vec<String>,
-    files: Option<String>,
-    read: Option<String>,
-    problem: Option<String>,
-    fix: Option<String>,
-    steps: Vec<String>,
-    accept: Option<String>,
-    verify: Option<String>,
-    extra: Vec<(String, String)>,
+    pub(crate) milestone: Option<String>,
+    pub(crate) goal: Option<String>,
+    pub(crate) why: Option<String>,
+    pub(crate) depends_tokens: Vec<String>,
+    pub(crate) files: Option<String>,
+    pub(crate) read: Option<String>,
+    pub(crate) problem: Option<String>,
+    pub(crate) fix: Option<String>,
+    pub(crate) steps: Vec<String>,
+    pub(crate) accept: Option<String>,
+    pub(crate) verify: Option<String>,
+    pub(crate) extra: Vec<(String, String)>,
+    /// Line of the batch input the entry came from (1-based), for refusals.
+    pub(crate) line_no: usize,
 }
 
 #[derive(Serialize)]
@@ -686,7 +688,7 @@ struct BatchAddJson {
     count: usize,
 }
 
-fn read_batch_input(src: &str) -> Result<String> {
+pub(crate) fn read_batch_input(src: &str) -> Result<String> {
     if src == "-" {
         let mut buf = Vec::new();
         std::io::stdin().read_to_end(&mut buf).map_err(|e| {
@@ -763,6 +765,138 @@ pub(crate) fn add_batch_text(
 ) -> Result<BatchAdded> {
     let (found, cfg) = ctx.load_config_with_found()?;
 
+    let entries = parse_batch_entries(raw, default_section_flag, &cfg)?;
+    check_batch_milestones(&entries)?;
+
+    let cfg_clone = cfg.clone();
+    let res = edit_doc_with_found_and_state_and_write(
+        ctx,
+        found,
+        &cfg,
+        META.name,
+        out,
+        |doc, archive, state, _label, agent, now| {
+            // 1. Check duplicate titles against existing active tasks (R-WRITE-1).
+            check_batch_titles(doc, &entries, &cfg)?;
+
+            // 2. Allocate monotonic IDs for the entire batch.
+            let max_state = state.read_ids()?.map_or(0, |s| s.highest_id);
+            let mut next_num = highest_task_number(doc, archive, max_state);
+
+            let mut allocated_ids = Vec::with_capacity(entries.len());
+            let mut ref_to_id = HashMap::new();
+            for entry in &entries {
+                next_num = next_num
+                    .checked_add(1)
+                    .ok_or_else(|| TodoError::new(ErrorCode::WriteFailed, "task ID overflow"))?;
+                let id = TaskId(next_num);
+                let id_str = cfg.id_config.format_id(id);
+                if let Some(ref r) = entry.ref_name {
+                    ref_to_id.insert(r.clone(), id_str.clone());
+                }
+                allocated_ids.push((id, id_str));
+            }
+
+            // 3. Resolve sections and `@ref` dependencies before writing `ids.json`.
+            let date = OpsConfig::format_note_date(now);
+            let mut grouped_lines: BTreeMap<usize, Vec<String>> = BTreeMap::new();
+            let mut added_ids = BTreeSet::new();
+            let mut ordered_ids = Vec::with_capacity(entries.len());
+
+            for (entry, (new_id, id_str)) in entries.iter().zip(allocated_ids.iter()) {
+                // A `@ref` parent is an entry of this batch (checked before the lock); any other
+                // parent must already be a milestone in TODO.md (R-MILE-1).
+                let milestone_id = match entry.milestone.as_deref() {
+                    Some(value) => match value.strip_prefix('@') {
+                        Some(name) => Some(ref_to_id.get(name).cloned().ok_or_else(|| {
+                            TodoError::new(
+                                ErrorCode::BadValue,
+                                format!("unknown milestone reference {value:?}"),
+                            )
+                        })?),
+                        None => Some(milestone::check_parent(doc, &cfg, None, value)?),
+                    },
+                    None => None,
+                };
+                let sec_idx = resolve_target_section(doc, entry.section.as_deref(), &cfg)?;
+                let insert_at = doc.sections[sec_idx].content_end;
+
+                let depends_val = resolve_batch_depends(&entry.depends_tokens, &ref_to_id)?;
+                let lines = entry_lines(
+                    entry,
+                    milestone_id.as_deref(),
+                    depends_val.as_deref(),
+                    id_str,
+                    &date,
+                    agent,
+                );
+                grouped_lines.entry(insert_at).or_default().extend(lines);
+
+                added_ids.insert(*new_id);
+                ordered_ids.push((*new_id, id_str.clone()));
+            }
+
+            // All validations succeeded: persist the new high-water mark under the lock (unless --dry-run).
+            if !ctx.dry_run {
+                state.write_ids(&IdsState {
+                    highest_id: next_num,
+                })?;
+            }
+
+            let edits: Vec<LineEdit> = grouped_lines
+                .into_iter()
+                .map(|(idx, lines)| LineEdit::insert(idx, lines))
+                .collect();
+            let intent = TaskChangeIntent {
+                added_ids,
+                ..TaskChangeIntent::default()
+            };
+            let arch_owned = archive.cloned();
+            let cfg_owned = cfg_clone.clone();
+
+            Ok(DocWritePlan::Edits {
+                edits,
+                intent,
+                build_value: Box::new(move |new_doc| {
+                    let mut ids = Vec::with_capacity(ordered_ids.len());
+                    let mut added = Vec::with_capacity(ordered_ids.len());
+                    for (id, id_str) in ordered_ids {
+                        let task = new_doc.task_by_id(id).ok_or_else(|| {
+                            TodoError::new(
+                                ErrorCode::WriteFailed,
+                                format!("added task {id_str} missing after verification"),
+                            )
+                        })?;
+                        ids.push(id_str);
+                        added.push(build_task_json(
+                            new_doc,
+                            task,
+                            arch_owned.as_ref(),
+                            false,
+                            now,
+                            &cfg_owned,
+                        ));
+                    }
+                    Ok((ids, added))
+                }),
+            })
+        },
+    )?;
+
+    Ok(BatchAdded {
+        ids: res.value.0,
+        added: res.value.1,
+    })
+}
+
+/// Parses the JSON lines of a batch into validated entries (R-WRITE-13), before anything is locked.
+/// Shared by `todo add --from` and `todo split --from`; `default_section_flag` names the section of
+/// an entry that gives none.
+pub(crate) fn parse_batch_entries(
+    raw: &str,
+    default_section_flag: Option<&str>,
+    cfg: &OpsConfig,
+) -> Result<Vec<ValidatedBatchEntry>> {
     let mut entries = Vec::new();
     let mut seen_refs = HashMap::new();
     let mut seen_titles = Vec::<String>::new();
@@ -844,7 +978,7 @@ pub(crate) fn add_batch_text(
 
         let task_type = resolve_allowed("type", parsed.task_type.as_deref(), &extra, &cfg.types)?;
         let required = required_for_kind(&cfg.required_fields, task_type.as_deref());
-        let priority = resolve_priority(parsed.priority.as_deref(), &extra, &cfg, required)?;
+        let priority = resolve_priority(parsed.priority.as_deref(), &extra, cfg, required)?;
         let difficulty = resolve_allowed(
             "difficulty",
             parsed.difficulty.as_deref(),
@@ -991,6 +1125,7 @@ pub(crate) fn add_batch_text(
             accept,
             verify,
             extra,
+            line_no,
         });
     }
 
@@ -1000,168 +1135,86 @@ pub(crate) fn add_batch_text(
             "no tasks found in --from input",
         ));
     }
-    check_batch_milestones(&entries)?;
 
-    let cfg_clone = cfg.clone();
-    let res = edit_doc_with_found_and_state_and_write(
-        ctx,
-        found,
-        &cfg,
-        META.name,
-        out,
-        |doc, archive, state, _label, agent, now| {
-            // 1. Check duplicate titles against existing active tasks.
-            for entry in &entries {
-                if let Some(existing) = doc.tasks.iter().find(|t| {
-                    !matches!(t.status, Status::Done | Status::Dropped)
-                        && t.title.trim().eq_ignore_ascii_case(&entry.title)
-                }) {
-                    let existing_id = cfg.id_config.format_id(existing.id);
-                    return Err(TodoError::new(
-                        ErrorCode::DuplicateTitle,
-                        format!("task {existing_id} already has title {:?}", entry.title),
-                    )
-                    .with_task(existing_id));
-                }
-            }
+    Ok(entries)
+}
 
-            // 2. Allocate monotonic IDs for the entire batch.
-            let max_state = state.read_ids()?.map_or(0, |s| s.highest_id);
-            let mut next_num = highest_task_number(doc, archive, max_state);
+/// Refuses a batch title that an active task already has (R-WRITE-1), as `add` does.
+pub(crate) fn check_batch_titles(
+    doc: &Document,
+    entries: &[ValidatedBatchEntry],
+    cfg: &OpsConfig,
+) -> Result<()> {
+    for entry in entries {
+        if let Some(existing) = doc.tasks.iter().find(|t| {
+            !matches!(t.status, Status::Done | Status::Dropped)
+                && t.title.trim().eq_ignore_ascii_case(&entry.title)
+        }) {
+            let existing_id = cfg.id_config.format_id(existing.id);
+            return Err(TodoError::new(
+                ErrorCode::DuplicateTitle,
+                format!("task {existing_id} already has title {:?}", entry.title),
+            )
+            .with_task(existing_id));
+        }
+    }
+    Ok(())
+}
 
-            let mut allocated_ids = Vec::with_capacity(entries.len());
-            let mut ref_to_id = HashMap::new();
-            for entry in &entries {
-                next_num = next_num
-                    .checked_add(1)
-                    .ok_or_else(|| TodoError::new(ErrorCode::WriteFailed, "task ID overflow"))?;
-                let id = TaskId(next_num);
-                let id_str = cfg.id_config.format_id(id);
-                if let Some(ref r) = entry.ref_name {
-                    ref_to_id.insert(r.clone(), id_str.clone());
-                }
-                allocated_ids.push((id, id_str));
-            }
-
-            // 3. Resolve sections and `@ref` dependencies before writing `ids.json`.
-            let date = OpsConfig::format_note_date(now);
-            let mut grouped_lines: BTreeMap<usize, Vec<String>> = BTreeMap::new();
-            let mut added_ids = BTreeSet::new();
-            let mut ordered_ids = Vec::with_capacity(entries.len());
-
-            for (entry, (new_id, id_str)) in entries.iter().zip(allocated_ids.iter()) {
-                // A `@ref` parent is an entry of this batch (checked before the lock); any other
-                // parent must already be a milestone in TODO.md (R-MILE-1).
-                let milestone_id = match entry.milestone.as_deref() {
-                    Some(value) => match value.strip_prefix('@') {
-                        Some(name) => Some(ref_to_id.get(name).cloned().ok_or_else(|| {
-                            TodoError::new(
-                                ErrorCode::BadValue,
-                                format!("unknown milestone reference {value:?}"),
-                            )
-                        })?),
-                        None => Some(milestone::check_parent(doc, &cfg, None, value)?),
-                    },
-                    None => None,
-                };
-                let sec_idx = resolve_target_section(doc, entry.section.as_deref(), &cfg)?;
-                let insert_at = doc.sections[sec_idx].content_end;
-
-                let mut resolved_deps = Vec::with_capacity(entry.depends_tokens.len());
-                for tok in &entry.depends_tokens {
-                    if let Some(rname) = tok.strip_prefix('@') {
-                        let Some(target_id) = ref_to_id.get(rname) else {
-                            return Err(TodoError::new(
-                                ErrorCode::BadValue,
-                                format!("unknown dependency reference {tok:?}"),
-                            ));
-                        };
-                        resolved_deps.push(target_id.clone());
-                    } else {
-                        resolved_deps.push(tok.clone());
-                    }
-                }
-                let depends_val = if resolved_deps.is_empty() {
-                    None
-                } else {
-                    Some(resolved_deps.join(", "))
-                };
-
-                let lines = NewTask {
-                    title: &entry.title,
-                    priority: entry.priority.as_deref(),
-                    difficulty: entry.difficulty.as_deref(),
-                    task_type: entry.task_type.as_deref(),
-                    area: entry.area.as_deref(),
-                    milestone: milestone_id.as_deref(),
-                    goal: entry.goal.as_deref(),
-                    why: entry.why.as_deref(),
-                    depends: depends_val.as_deref(),
-                    files: entry.files.as_deref(),
-                    read: entry.read.as_deref(),
-                    problem: entry.problem.as_deref(),
-                    fix: entry.fix.as_deref(),
-                    steps: &entry.steps,
-                    accept: entry.accept.as_deref(),
-                    verify: entry.verify.as_deref(),
-                    extra: &entry.extra,
-                }
-                .lines(id_str, &date, agent);
-                grouped_lines.entry(insert_at).or_default().extend(lines);
-
-                added_ids.insert(*new_id);
-                ordered_ids.push((*new_id, id_str.clone()));
-            }
-
-            // All validations succeeded: persist the new high-water mark under the lock (unless --dry-run).
-            if !ctx.dry_run {
-                state.write_ids(&IdsState {
-                    highest_id: next_num,
-                })?;
-            }
-
-            let edits: Vec<LineEdit> = grouped_lines
-                .into_iter()
-                .map(|(idx, lines)| LineEdit::insert(idx, lines))
-                .collect();
-            let intent = TaskChangeIntent {
-                added_ids,
-                ..TaskChangeIntent::default()
+/// The `depends` value of a batch entry: its tokens, each `@ref` replaced by the ID of the entry it
+/// names (R-WRITE-13). `None` when the entry has no dependencies.
+pub(crate) fn resolve_batch_depends(
+    tokens: &[String],
+    ref_to_id: &HashMap<String, String>,
+) -> Result<Option<String>> {
+    let mut resolved_deps = Vec::with_capacity(tokens.len());
+    for tok in tokens {
+        if let Some(rname) = tok.strip_prefix('@') {
+            let Some(target_id) = ref_to_id.get(rname) else {
+                return Err(TodoError::new(
+                    ErrorCode::BadValue,
+                    format!("unknown dependency reference {tok:?}"),
+                ));
             };
-            let arch_owned = archive.cloned();
-            let cfg_owned = cfg_clone.clone();
+            resolved_deps.push(target_id.clone());
+        } else {
+            resolved_deps.push(tok.clone());
+        }
+    }
+    if resolved_deps.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(resolved_deps.join(", ")))
+    }
+}
 
-            Ok(DocWritePlan::Edits {
-                edits,
-                intent,
-                build_value: Box::new(move |new_doc| {
-                    let mut ids = Vec::with_capacity(ordered_ids.len());
-                    let mut added = Vec::with_capacity(ordered_ids.len());
-                    for (id, id_str) in ordered_ids {
-                        let task = new_doc.task_by_id(id).ok_or_else(|| {
-                            TodoError::new(
-                                ErrorCode::WriteFailed,
-                                format!("added task {id_str} missing after verification"),
-                            )
-                        })?;
-                        ids.push(id_str);
-                        added.push(build_task_json(
-                            new_doc,
-                            task,
-                            arch_owned.as_ref(),
-                            false,
-                            now,
-                            &cfg_owned,
-                        ));
-                    }
-                    Ok((ids, added))
-                }),
-            })
-        },
-    )?;
-
-    Ok(BatchAdded {
-        ids: res.value.0,
-        added: res.value.1,
-    })
+/// The lines of a batch entry as a new task under `milestone`, with its resolved `depends` value.
+pub(crate) fn entry_lines(
+    entry: &ValidatedBatchEntry,
+    milestone: Option<&str>,
+    depends: Option<&str>,
+    id_str: &str,
+    date: &str,
+    agent: &str,
+) -> Vec<String> {
+    NewTask {
+        title: &entry.title,
+        priority: entry.priority.as_deref(),
+        difficulty: entry.difficulty.as_deref(),
+        task_type: entry.task_type.as_deref(),
+        area: entry.area.as_deref(),
+        milestone,
+        goal: entry.goal.as_deref(),
+        why: entry.why.as_deref(),
+        depends,
+        files: entry.files.as_deref(),
+        read: entry.read.as_deref(),
+        problem: entry.problem.as_deref(),
+        fix: entry.fix.as_deref(),
+        steps: &entry.steps,
+        accept: entry.accept.as_deref(),
+        verify: entry.verify.as_deref(),
+        extra: &entry.extra,
+    }
+    .lines(id_str, date, agent)
 }

@@ -1,0 +1,170 @@
+---
+source: tests/cmd_waves.rs
+expression: json
+---
+{
+  "data": {
+    "apart": [
+      {
+        "id": "T-005",
+        "reason": "no level: give it one with todo set T-005 --difficulty <level>",
+        "status": "open",
+        "title": "Pick a colour theme"
+      },
+      {
+        "id": "T-006",
+        "reason": "blocked: waiting for the API key",
+        "status": "blocked",
+        "title": "Wait for the API key"
+      },
+      {
+        "id": "T-007",
+        "reason": "given back: the schema file does not exist",
+        "status": "blocked",
+        "title": "Write the schema"
+      },
+      {
+        "id": "T-008",
+        "reason": "waits on T-006",
+        "status": "open",
+        "title": "Wait for the key task"
+      },
+      {
+        "id": "T-009",
+        "reason": "depends on T-404, which does not exist",
+        "status": "open",
+        "title": "Wait for an ID that is not there"
+      },
+      {
+        "id": "T-010",
+        "reason": "in a dependency cycle: T-010 -> T-011 -> T-010",
+        "status": "open",
+        "title": "First of a cycle"
+      },
+      {
+        "id": "T-011",
+        "reason": "in a dependency cycle: T-010 -> T-011 -> T-010",
+        "status": "open",
+        "title": "Second of a cycle"
+      },
+      {
+        "id": "T-012",
+        "reason": "waits on T-011",
+        "status": "open",
+        "title": "Wait for the cycle"
+      },
+      {
+        "id": "T-031",
+        "reason": "below blocked milestone T-030",
+        "status": "open",
+        "title": "Under the old plan"
+      }
+    ],
+    "file": "TODO.md",
+    "longest_chain": [
+      {
+        "id": "T-001",
+        "level": "1",
+        "missing": [],
+        "owner": "alice",
+        "status": "claimed",
+        "title": "Parse the config file"
+      },
+      {
+        "id": "T-002",
+        "level": "1",
+        "missing": [],
+        "owner": null,
+        "status": "open",
+        "title": "Write the loader"
+      }
+    ],
+    "max_workers": 3,
+    "milestone": null,
+    "tasks": 15,
+    "wave_count": 2,
+    "waves": [
+      {
+        "lanes": [
+          [
+            {
+              "id": "T-001",
+              "level": "1",
+              "missing": [],
+              "owner": "alice",
+              "status": "claimed",
+              "title": "Parse the config file"
+            }
+          ],
+          [
+            {
+              "id": "T-004",
+              "level": "1",
+              "missing": [
+                "files: folder or pattern"
+              ],
+              "owner": null,
+              "status": "open",
+              "title": "Render the report"
+            }
+          ],
+          [
+            {
+              "id": "T-014",
+              "level": "3",
+              "missing": [],
+              "owner": null,
+              "status": "open",
+              "title": "Starts after a finished task"
+            }
+          ]
+        ],
+        "size": {
+          "lanes": 3,
+          "tasks": 3
+        },
+        "wave": 1
+      },
+      {
+        "lanes": [
+          [
+            {
+              "id": "T-002",
+              "level": "1",
+              "missing": [],
+              "owner": null,
+              "status": "open",
+              "title": "Write the loader"
+            },
+            {
+              "id": "T-003",
+              "level": "2",
+              "missing": [],
+              "owner": null,
+              "status": "open",
+              "title": "Document the keys"
+            }
+          ],
+          [
+            {
+              "id": "T-021",
+              "level": "1",
+              "missing": [],
+              "owner": null,
+              "status": "open",
+              "title": "Draw the page"
+            }
+          ]
+        ],
+        "size": {
+          "lanes": 2,
+          "tasks": 3
+        },
+        "wave": 2
+      }
+    ]
+  },
+  "ok": true,
+  "schema": "todo.waves.v1",
+  "warnings": []
+}

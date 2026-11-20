@@ -119,6 +119,21 @@ const BASE_BODY: &str = "\
 - priority: P1
 ";
 
+/// One open task with a `verify` line that always fails, on any shell (`exit 1`).
+const VERIFY_BODY: &str = "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 2 -->
+# Fixture
+
+## Now
+
+### T-001 · First task
+- status: open
+- owner: —
+- priority: P1 · difficulty: 2
+- verify: exit 1
+";
+
 const AMBIGUOUS_BODY: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
 <!-- todo-format: 2 -->
@@ -208,7 +223,7 @@ const SCOPE_BODY: &str = "\
 /// Two open tasks that name the same file, so one claim blocks the other (`FILES_BUSY`, R-SCOPE-1).
 const FILES_BODY: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
-<!-- todo-format: 2 -->
+<!-- todo-format: 3 -->
 # Fixture
 
 ## Now
@@ -216,13 +231,13 @@ const FILES_BODY: &str = "\
 ### T-001 · First task
 - status: open
 - owner: —
-- priority: P1
+- priority: P1 · difficulty: 2
 - files: src/a.c
 
 ### T-002 · Second task
 - status: open
 - owner: —
-- priority: P1
+- priority: P1 · difficulty: 2
 - files: src/a.c
 ";
 
@@ -494,6 +509,22 @@ const ERROR_CASES: &[ErrorCase] = &[
         setup: Setup::Plain,
         before: &[&["project", "add"]],
         args: &["project", "add"],
+    },
+    ErrorCase {
+        code: "VERIFY_FAILED",
+        todo: Some(VERIFY_BODY),
+        config: None,
+        setup: Setup::Plain,
+        before: &[],
+        args: &["verify", "T-001", "--agent", "alice"],
+    },
+    ErrorCase {
+        code: "VERIFY_NOT_RUN",
+        todo: Some(VERIFY_BODY),
+        config: Some("verify = false\n"),
+        setup: Setup::Plain,
+        before: &[],
+        args: &["verify", "T-001", "--agent", "alice"],
     },
     ErrorCase {
         code: "NO_GIT_HISTORY",

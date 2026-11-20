@@ -221,6 +221,11 @@ expression: ok_json
         "summary": "Install the Claude Code skill for working with TODO.md"
       },
       {
+        "kind": "write",
+        "name": "split",
+        "summary": "Turn a task into a milestone with child tasks"
+      },
+      {
         "kind": "read",
         "name": "status",
         "summary": "Show write lock and manual lease status"
@@ -249,6 +254,16 @@ expression: ok_json
         "kind": "write",
         "name": "unlock",
         "summary": "End a manual editing lease on TODO.md"
+      },
+      {
+        "kind": "write",
+        "name": "verify",
+        "summary": "Run a task's verify command, or the checks of a finished wave"
+      },
+      {
+        "kind": "read",
+        "name": "waves",
+        "summary": "Group the unfinished tasks into waves: rounds, workers at once, longest chain"
       },
       {
         "kind": "read",

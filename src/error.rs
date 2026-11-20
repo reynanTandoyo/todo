@@ -126,6 +126,10 @@ pub enum ErrorCode {
     FilesBusy,
     /// The commit given to `done` changed files outside the task's files, so `done` is refused (R-SCOPE-2).
     OutOfScope,
+    /// A task's `verify` command ran and failed, or timed out (R-VERIFY-1, R-VERIFY-2).
+    VerifyFailed,
+    /// A `verify` command could not run: no shell could be started, or `verify = false` (R-VERIFY-1).
+    VerifyNotRun,
 }
 
 impl ErrorCode {
@@ -157,6 +161,8 @@ impl ErrorCode {
             Self::DuplicateProject => "DUPLICATE_PROJECT",
             Self::FilesBusy => "FILES_BUSY",
             Self::OutOfScope => "OUT_OF_SCOPE",
+            Self::VerifyFailed => "VERIFY_FAILED",
+            Self::VerifyNotRun => "VERIFY_NOT_RUN",
         }
     }
 
@@ -187,6 +193,8 @@ impl ErrorCode {
         Self::DuplicateProject,
         Self::FilesBusy,
         Self::OutOfScope,
+        Self::VerifyFailed,
+        Self::VerifyNotRun,
     ];
 
     /// Plain-English meaning of this error code, shown by `todo schema`.
@@ -233,6 +241,12 @@ impl ErrorCode {
             Self::OutOfScope => {
                 "The commit changed files outside the task's files. Finish with --force to record them in a note."
             }
+            Self::VerifyFailed => {
+                "A task's verify command failed or timed out, so the task was not marked done (or was not verified)."
+            }
+            Self::VerifyNotRun => {
+                "A verify command could not run: no shell could be started, or verify = false in todo.toml."
+            }
         }
     }
 
@@ -255,7 +269,8 @@ impl ErrorCode {
             | Self::FilesBusy
             | Self::OutOfScope => ExitCode::Refused,
             Self::Busy | Self::LeaseHeld | Self::ChangedDuringWrite => ExitCode::Busy,
-            Self::NoGitHistory => ExitCode::CheckError,
+            Self::VerifyFailed => ExitCode::Refused,
+            Self::NoGitHistory | Self::VerifyNotRun => ExitCode::CheckError,
             Self::NoFile
             | Self::UnsafeFile
             | Self::ReadOnly
@@ -437,6 +452,12 @@ mod tests {
             (ErrorCode::ReadOnly, "READ_ONLY", ExitCode::FileError),
             (ErrorCode::WriteFailed, "WRITE_FAILED", ExitCode::FileError),
             (ErrorCode::OutOfScope, "OUT_OF_SCOPE", ExitCode::Refused),
+            (ErrorCode::VerifyFailed, "VERIFY_FAILED", ExitCode::Refused),
+            (
+                ErrorCode::VerifyNotRun,
+                "VERIFY_NOT_RUN",
+                ExitCode::CheckError,
+            ),
         ];
 
         for (code, expected_str, expected_exit) in cases {

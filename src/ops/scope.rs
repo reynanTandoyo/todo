@@ -5,6 +5,8 @@
 //! (`R-CLAIM-4`). `next`, `next --claim` and `claim` keep a task off the files another agent holds;
 //! `show --json` and `list` report them as `files_busy`.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Duration, FixedOffset};
 use serde_json::json;
 
@@ -102,6 +104,19 @@ impl ScopeEntry {
     fn fixed(&self) -> &str {
         self.text.split('*').next().unwrap_or_default()
     }
+
+    /// Whether the entry names one file, not a folder or a pattern (`R-DETAIL-2`).
+    #[must_use]
+    pub fn is_single_file(&self) -> bool {
+        self.kind == Kind::Path
+    }
+
+    /// The first part of the entry, unless it holds a `*`. Two entries whose first parts differ
+    /// never overlap, so [`overlap_lanes`] compares only entries that share one.
+    fn first_part(&self) -> Option<&str> {
+        let first = self.text.split('/').next().unwrap_or_default();
+        (!first.contains('*')).then_some(first)
+    }
 }
 
 /// Removes a trailing `:<digits>` line number, as `todo scan` writes it (`src/main.rs:42`).
@@ -164,6 +179,67 @@ pub fn same_path(a: &str, b: &str) -> bool {
         (Some(x), Some(y)) => x == y,
         _ => false,
     }
+}
+
+/// Groups items into lanes (`R-WAVE-1`): items whose file scopes overlap, directly or through other
+/// items, share a lane, because they must run one after another. `scopes` holds the parsed `files`
+/// of each item, in order. The result gives the lane of each item, numbered from 0 in order of first
+/// appearance; an item without files is a lane of its own.
+///
+/// The result is the one a comparison of every pair of items gives (see [`scopes_overlap`]). Entries
+/// are compared only with entries that can overlap them: those with the same first part, and those
+/// whose first part holds a `*`.
+#[must_use]
+pub fn overlap_lanes(scopes: &[Vec<ScopeEntry>]) -> Vec<usize> {
+    let entries: Vec<(usize, &ScopeEntry)> = scopes
+        .iter()
+        .enumerate()
+        .flat_map(|(item, list)| list.iter().map(move |entry| (item, entry)))
+        .collect();
+    let mut parent: Vec<usize> = (0..scopes.len()).collect();
+    let mut by_part: HashMap<&str, Vec<usize>> = HashMap::new();
+    let mut wildcard: Vec<usize> = Vec::new();
+    for (g, &(item, entry)) in entries.iter().enumerate() {
+        let earlier: Vec<usize> = match entry.first_part() {
+            Some(part) => by_part
+                .get(part)
+                .into_iter()
+                .flatten()
+                .chain(wildcard.iter())
+                .copied()
+                .collect(),
+            None => (0..g).collect(),
+        };
+        for h in earlier {
+            let (other, other_entry) = entries[h];
+            let root_a = find_root(&mut parent, item);
+            let root_b = find_root(&mut parent, other);
+            if root_a != root_b && entries_overlap(entry, other_entry) {
+                parent[root_a] = root_b;
+            }
+        }
+        match entry.first_part() {
+            Some(part) => by_part.entry(part).or_default().push(g),
+            None => wildcard.push(g),
+        }
+    }
+    let mut lane_of_root: HashMap<usize, usize> = HashMap::new();
+    (0..scopes.len())
+        .map(|item| {
+            let root = find_root(&mut parent, item);
+            let next = lane_of_root.len();
+            *lane_of_root.entry(root).or_insert(next)
+        })
+        .collect()
+}
+
+/// The root of `x` in a forest of items, with path halving.
+fn find_root(parent: &mut [usize], mut x: usize) -> usize {
+    while parent[x] != x {
+        parent[x] = parent[parent[x]];
+        x = parent[x];
+    }
+    x
 }
 
 /// Whether one of two texts starts with the other.

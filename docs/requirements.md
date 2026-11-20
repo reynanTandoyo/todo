@@ -1235,13 +1235,14 @@ todo next --claim --max-difficulty 1 --brief --agent worker-1
   and a crash in between leaves half a split.
   - The children are JSON lines in the shape of `add --from` (R-WRITE-13); they may depend on each
     other with `"@ref"`. Each child is added with `milestone` set to the split task, directly after
-    the split task's block, in the given order; a child that names a `milestone` of its own is
-    refused (`BAD_VALUE`). Children follow the rules of `add`, `required_fields` included.
+    the split task's block, in the given order; a child that names a `milestone` of its own, or a
+    `section` (it goes where the split task is), is refused (`BAD_VALUE`), and so is a child that is
+    a question or an idea (R-MILE-1). Children follow the rules of `add`, `required_fields` included.
   - In the same write the task becomes `type: milestone`, with `goal` from `--goal`, or else from its
     `accept`; without either the split is refused (exit 1, `MISSING_FIELD`). It loses `difficulty`,
-    `files`, `read`, `steps`, `verify`, `final`, `attempts` and its claim (`owner`, `claimed`,
-    `session`); a blocked task — usually one given back (R-STUCK-1) — becomes open, so its children
-    can be handed out (R-MILE-6). Every other line stays, and a note on it names the children
+    `files`, `read`, `steps`, `verify`, `final`, `attempts`, `verified` and its claim (`owner`,
+    `claimed`, `session`); a blocked task — usually one given back (R-STUCK-1) — becomes open, so its
+    children can be handed out (R-MILE-6). Every other line stays, and a note on it names the children
     (`split into T-021, T-022, T-023`, format.md §9).
   - Tasks that depended on the split task still name it, and now wait for the whole milestone
     (R-MILE-6); nothing that depended on it breaks.
@@ -1263,7 +1264,8 @@ the check itself.
     -NonInteractive -Command`, else `powershell.exe` with the same arguments, on Windows; `sh -c`
     elsewhere), with the `verify` line as the last argument and standard input closed. After
     `verify_timeout_seconds` (default 300) the command and the processes it started are stopped, and
-    the check counts as failed. Exit 0 passes; anything else fails.
+    the check counts as failed. Exit 0 passes; anything else fails. A timeout's last line is
+    `timed out after <N> seconds`.
   - **Output.** Standard output and standard error are captured and saved in full in the state
     folder (`verify/<ID>.log`, §7, replaced by each run); they never reach todo's own standard
     output, so `--json` stays one object (R-OUT-1). On a failure the text output shows the last
@@ -1275,7 +1277,8 @@ the check itself.
     task last went back to work (the latest `unblocked`, `reopened` or `stuck` note, or else since it
     was added) reach `verify_attempts` (default 3), that failure gives the task back as `stuck` does
     (R-STUCK-1), with the note `stuck — verify failed <N> times: <last line>` instead, and `attempts`
-    raised once.
+    raised once; that refusal also exits 1 with `VERIFY_FAILED`. A `done` that the rules refuse
+    (R-WRITE-9) is refused before the command runs.
   - **Mode `wave`** is R-VERIFY-2.
   - **In both modes.** `todo verify <task>` runs the one command and changes nothing in `TODO.md`
     (exit 0 pass, 1 `VERIFY_FAILED`). `done --no-verify` needs `--force` and adds the note
@@ -1283,10 +1286,14 @@ the check itself.
     running anything and writes no `verified`, and `todo verify` exits 5 with `VERIFY_NOT_RUN`. A
     command that cannot be started (the shell is missing) is not a failure: `done` and `verify` exit 5
     with `VERIFY_NOT_RUN`, nothing is written, and `attempts` doesn't change. A task without `verify`
-    behaves as before v0.8. `reopen` removes `verified` (R-WRITE-10); `set` cannot write `verified`
-    or `attempts` (R-WRITE-8).
+    behaves as before v0.8. `reopen` removes `verified` (R-WRITE-10); `set`, `--unset` included,
+    cannot write `verified` or `attempts` (R-WRITE-8). `done --no-verify` without `--force` is
+    refused with `USAGE` (exit 2). `apply`'s `done` runs the `verify` command of each done task
+    before the lock is taken, as `done` does (R-LOCK-4). A failing check, or one that cannot start,
+    refuses the whole batch with the same code as `done`, and nothing is written, not even the
+    attempt that `done` would record. With `verify_when = "wave"` or `verify = false` nothing runs.
   - `check` and `plan` list done tasks with a `verify` command and no `verified` line (R-CHECK-1,
-    R-LEVEL-2).
+    R-LEVEL-2). `check` does not list them while `verify = false`, since no check can pass then.
   - Tests use a command that passes, one that fails and one that outlives a short timeout, in each
     mode.
 - **R-VERIFY-2 COULD** Wave mode (`verify_when = "wave"`). In a compiled project one worker's
@@ -1362,6 +1369,9 @@ same checkout.
   - A `done` operation of `apply` is checked the same way, for each of its commits, and one
     refusal refuses the whole batch and writes nothing (R-WRITE-15). A commit that git does not
     know is refused (`BAD_VALUE`) by `done` and by `apply` alike.
+  - The order with the `verify` command (R-VERIFY-1): the commit scope is checked first, and only
+    then does the command run. A commit outside the files, or a missing commit, runs no command in
+    `done` or in `apply`; the check is repeated under the lock with the document read there.
   - `--force` overrides the file check and adds the note `forced done outside files: <files>`. It
     does not override the `--commit` rule below.
   - A task at or below the target level that has `files` cannot be finished without `--commit`
@@ -1378,15 +1388,18 @@ same checkout.
   - It groups the unfinished tasks (open, claimed, and not given back): wave 1 is every task ready
     now (claimed tasks included, as running); wave n is what becomes ready when the waves before it
     are done. Readiness uses each task's dependencies and those inherited from the milestones above
-    it (R-DEP-1, R-MILE-6). A task that isn't ready for lack of detail (R-DETAIL-2) or a level is
-    placed by its dependencies and marked.
+    it (R-DEP-1, R-MILE-6). A task without a level is held back with its reason, as `next` holds it
+    back (R-LEVEL-1). A task at the lowest level that lacks detail (R-DETAIL-2) is placed by its
+    dependencies and marked.
   - Inside a wave, tasks that overlap (R-SCOPE-1) form one lane, because they must run one after
     another.
   - It prints the number of waves, the size of each (tasks and lanes), the largest number of
     workers useful at once (the most lanes in any wave), and the longest dependency chain, task by
     task.
-  - Tasks that wait on a missing ID or sit in a cycle (R-DEP-3), blocked tasks and tasks below a
-    blocked milestone are listed apart.
+  - Tasks that wait on a missing ID or sit in a cycle (R-DEP-3), blocked tasks, and tasks below a
+    milestone that is blocked, done or dropped (R-MILE-6, the rule `next` uses) are listed apart,
+    each with its reason. The milestone named in the reason is the nearest one that holds the task
+    back.
   - With `<milestone>`, only the tasks below it, at any depth; a task that is not a milestone is
     refused (exit 1, `BAD_VALUE`).
   - It reads only and takes no lock. `waves --json` (`todo.waves.v1`) matches its snapshot.
