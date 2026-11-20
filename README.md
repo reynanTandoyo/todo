@@ -437,12 +437,36 @@ output is enabled only on terminals and is disabled when piped or when `NO_COLOR
 
 ## Configuration (`todo.toml`)
 
-An optional `todo.toml` next to `TODO.md` can configure `id_prefix`, `id_width`, `priorities`,
-`required_fields`, `types`, `areas`, `difficulties`, `default_section`, `question_section`,
-`idea_section`, `archive_file`,
-`claim_ttl_hours`, `lock_wait_seconds`, `lease_minutes`, `lease_max_minutes`, `snapshots_keep`,
-and `worktree` (`"shared"` or `"local"`). See [`docs/requirements.md`](docs/requirements.md) §5.14
-for defaults.
+An optional `todo.toml` next to `TODO.md` sets the project's options. Without it, every default below
+applies. An unknown key or a bad value is an error, reported as `todo.toml:<line>: message`. The
+requirements in [`docs/requirements.md`](docs/requirements.md) §5.14 (R-CFG-2) are the reference.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `id_prefix` | `"T"` | prefix of task IDs |
+| `id_width` | `3` | digits in new IDs |
+| `priorities` | `["P0", "P1", "P2", "P3"]` | allowed priorities, most urgent first |
+| `required_fields` | `["priority", "difficulty"]` | fields `add` requires of a task; milestones, questions and ideas need none of them; `["priority"]` before v0.8 |
+| `types` | `[]` | allowed types; empty allows any |
+| `areas` | `[]` | allowed areas; empty allows any |
+| `default_section` | `""` | section for `add` without `--section`; empty means none |
+| `question_section` | `"Questions"` | section for `ask` |
+| `idea_section` | `"Ideas"` | section for `idea` |
+| `difficulties` | `["1", "2", "3", "4", "5"]` | allowed levels, easiest first; `["easy", "medium", "hard"]` before v0.8 |
+| `target_difficulty` | the first of `difficulties` | the level the planner splits down to: tasks at or below it need complete detail before `next` hands them out, and `final` keeps a task above it |
+| `level1_max_files` | `3` | most `files` entries a task at or below the target level may have |
+| `verify` | `true` | `false`: todo never runs a task's `verify` command |
+| `verify_when` | `"done"` | `"done"`: `done` runs the command; `"wave"`: `todo verify --wave` runs it after the wave |
+| `verify_timeout_seconds` | `300` | seconds a `verify` command may run before it is stopped and counts as failed |
+| `verify_attempts` | `3` | failed checks after which `done` gives the task back |
+| `verify_shell` | `[]` | the program and arguments that run a `verify` line, which is added last; empty means `pwsh -NoProfile -NonInteractive -Command` (else `powershell.exe` with the same arguments) on Windows, and `sh -c` elsewhere |
+| `archive_file` | `"TODO-archive.md"` | archive file name |
+| `claim_ttl_hours` | `24` | hours before a claim becomes stale |
+| `lock_wait_seconds` | `30` | how long a write waits for the lock or a lease |
+| `lease_minutes` | `10` | default length of `todo lock` |
+| `lease_max_minutes` | `60` | longest allowed lease |
+| `snapshots_keep` | `200` | snapshots kept |
+| `worktree` | `"shared"` | `"local"`: each worktree uses its own `TODO.md` |
 
 ## Adding it to a project
 

@@ -16,6 +16,7 @@ use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, fs_path};
 use crate::ops::config::OpsConfig;
 use crate::ops::scope::files_busy;
+use crate::ops::waves::detail_gaps;
 use crate::output::Output;
 use crate::version::RUNNING_VERSION;
 
@@ -322,13 +323,17 @@ pub fn is_task_ready(
     if above.iter().any(|m| milestone_holds_back(m)) {
         return false;
     }
+    // A task at or below the target level is handed out only with its detail complete, and no open
+    // question about it (R-DETAIL-2); the same list `show`, `check` and `waves` report.
     doc.dependencies_satisfied(task, archive)
         && above.iter().all(|m| doc.dependencies_satisfied(m, archive))
+        && detail_gaps(task, doc, archive, cfg).is_empty()
 }
 
 /// Returns `true` if the readiness of `waiting` can change when `changed` changes state: it names
-/// `changed` in `depends`, a milestone above it names `changed` in `depends`, or `changed` is a
-/// milestone above `waiting` (`R-DEP-4`, `R-MILE-6`).
+/// `changed` in `depends`, a milestone above it names `changed` in `depends`, `changed` is a
+/// milestone above `waiting`, or `changed` is a question about `waiting` (`R-DEP-4`, `R-MILE-6`,
+/// `R-DETAIL-2`).
 #[must_use]
 pub fn waits_on_task(doc: &Document, waiting: &Task, changed: &Task) -> bool {
     if waiting.id == changed.id {
@@ -339,6 +344,7 @@ pub fn waits_on_task(doc: &Document, waiting: &Task, changed: &Task) -> bool {
     names_changed(waiting)
         || above.iter().any(|m| names_changed(m))
         || (changed.is_milestone() && above.iter().any(|m| m.id == changed.id))
+        || (is_question(changed) && about_id_in(changed, &doc.id_config) == Some(waiting.id))
 }
 
 /// JSON representation of a dependency reference with its resolved status (`R-READ-2`, `R-DEP-2`).
@@ -488,8 +494,12 @@ pub struct TaskJson {
     pub dependents: Vec<DependentTaskJson>,
     /// Questions whose `about` field names this entry, in file order (`R-KIND-2`).
     pub questions: Vec<QuestionAboutJson>,
-    /// Whether the task is ready for `next`: nothing holds files it names (`R-SCOPE-1`).
+    /// Whether the task is ready for `next`: nothing holds files it names (`R-SCOPE-1`), and its
+    /// detail is complete when it is at or below the target level (`R-DETAIL-2`).
     pub ready: bool,
+    /// What the detail rule lacks (`R-DETAIL-2`), in a fixed order; `[]` when complete, or when the
+    /// task is above the target level. `ready` is `false` while anything is listed.
+    pub missing: Vec<String>,
     /// The tasks of other agents that hold files this task names (`R-SCOPE-1`); `[]` when none.
     pub files_busy: Vec<FilesBusyJson>,
     /// `- files:` value, if present.
@@ -587,8 +597,14 @@ pub fn is_question(task: &Task) -> bool {
 /// absent or does not hold an ID.
 #[must_use]
 pub fn about_id(task: &Task, cfg: &OpsConfig) -> Option<TaskId> {
+    about_id_in(task, &cfg.id_config)
+}
+
+/// [`about_id`] with only the ID format, for code that has a document but no configuration.
+#[must_use]
+pub fn about_id_in(task: &Task, ids: &IdConfig) -> Option<TaskId> {
     let field = task.unknown_fields.iter().find(|f| f.key == "about")?;
-    cfg.id_config.parse_user_id(&field.value)
+    ids.parse_user_id(&field.value)
 }
 
 /// The questions whose `about` field names `target` (`R-KIND-2`), in file order, looking first in
@@ -717,6 +733,8 @@ pub fn build_task_json(
         .collect();
 
     let ready_archive = if archived { None } else { secondary };
+    // Questions about the task may sit in either file, so both are searched (R-DETAIL-2).
+    let missing = detail_gaps(task, primary, secondary, cfg);
     // A finished entry in the archive is not held back by the files of active tasks (R-SCOPE-1).
     let busy = if archived {
         Vec::new()
@@ -760,6 +778,7 @@ pub fn build_task_json(
         dependents,
         questions,
         ready: is_task_ready(primary, task, ready_archive, now, cfg) && busy.is_empty(),
+        missing,
         files_busy: files_busy_json(&busy, cfg),
         files: task.files.clone(),
         read: task.read_paths(),

@@ -119,8 +119,9 @@ impl ScopeEntry {
     }
 }
 
-/// Removes a trailing `:<digits>` line number, as `todo scan` writes it (`src/main.rs:42`).
-fn strip_line_suffix(text: &str) -> &str {
+/// Removes a trailing `:<digits>` line number, as `todo scan` writes it (`src/main.rs:42`). The
+/// same holds for `read` paths (`docs/format.md` §19).
+pub fn strip_line_suffix(text: &str) -> &str {
     match text.rsplit_once(':') {
         Some((head, digits))
             if !head.is_empty()
@@ -458,12 +459,6 @@ pub enum CommitScope {
     Changed(Vec<String>),
 }
 
-/// Whether `task` is at or below the target level (`R-DETAIL-2`): the lowest level, the first of
-/// `difficulties`, until a `target_difficulty` is set.
-fn at_or_below_target(task: &Task, cfg: &OpsConfig) -> bool {
-    cfg.difficulty_rank(task.difficulty.as_deref()) == Some(0)
-}
-
 /// Checks a `done` of `task` against its `files` and the commit it named (`R-SCOPE-2`). A task
 /// without `files` is not checked. A commit that changed a file outside `files` is refused
 /// (`OUT_OF_SCOPE`) unless `force` is given; then the returned note records the files. A task at
@@ -481,7 +476,7 @@ pub fn check_done_commit(
     };
     match scope {
         CommitScope::NoGit => Ok(None),
-        CommitScope::NoCommit if at_or_below_target(task, cfg) => Err(TodoError::new(
+        CommitScope::NoCommit if cfg.is_at_or_below_target(task.difficulty.as_deref()) => Err(TodoError::new(
             ErrorCode::MissingField,
             format!(
                 "{id_str} names files, so done needs the commit that holds its work: pass --commit HEAD"

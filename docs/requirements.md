@@ -537,8 +537,8 @@ or with `--json` the task as it is after the change.
   difficulty outside `difficulties` is not reported on a done or dropped entry, which keeps the
   value it was finished with (format.md §18); `check` also reports a `final` that R-LEVEL-3 doesn't
   allow, and a `files` or `read` entry that is absolute or leaves the folder of `TODO.md`
-  (R-SCOPE-1). These are reported as warnings that don't change the exit code: a task at or below
-  the target level that lacks detail, with what is missing (R-DETAIL-2), and a done task with a
+  (R-SCOPE-1). These are reported as warnings that don't change the exit code: an unfinished task at
+  or below the target level that lacks detail, with what is missing (R-DETAIL-2), and a done task with a
   `verify` command and no `verified` line (R-VERIFY-2).
 - **R-CHECK-2 COULD** `check --fix` makes mechanical repairs only — canonical IDs and separators, a
   missing `status: open`, leftover temporary files, an outdated rules block — and reports the rest.
@@ -1201,10 +1201,11 @@ todo next --claim --max-difficulty 1 --brief --agent worker-1
     R-KIND-2).
 
   `next` and `list --ready` never hand out or list a task that fails the rule; `claim` of it by ID
-  still works. `check` reports each such task with what is missing, as a warning that doesn't change
-  the exit code. `show --json` carries `ready` (whether `next` could hand the task out now) and
-  `missing` (what this rule lacks, empty when complete). Tasks above the target level are not
-  affected; `plan` lists the failing ones (R-LEVEL-2).
+  still works. `check` reports each such task that is not finished (open, claimed or blocked) with
+  what is missing, as a warning that doesn't change the exit code; a done or dropped task is not
+  handed out, so it is not reported. `show --json` carries `ready` (whether `next` could hand the
+  task out now) and `missing` (what this rule lacks, empty when complete). Tasks above the target
+  level are not affected; `plan` lists the failing ones (R-LEVEL-2).
 - **R-DETAIL-3 COULD** `todo brief <task>` prints one work order, so a worker reads one text and
   starts. In this order:
   1. the goals of the milestones above the task, from the top down (R-MILE-4);
