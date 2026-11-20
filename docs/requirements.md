@@ -1265,7 +1265,10 @@ the check itself.
     elsewhere), with the `verify` line as the last argument and standard input closed. After
     `verify_timeout_seconds` (default 300) the command and the processes it started are stopped, and
     the check counts as failed. Exit 0 passes; anything else fails. A timeout's last line is
-    `timed out after <N> seconds`.
+    `timed out after <N> seconds`. The processes are stopped as a whole: on Unix the shell leads its
+    own process group, which `killpg` ends; on Windows the shell is in a Job Object that kills its
+    processes when it closes. The same happens when the shell ends normally, so a check leaves no
+    process behind (T-172).
   - **Output.** Standard output and standard error are captured and saved in full in the state
     folder (`verify/<ID>.log`, §7, replaced by each run); they never reach todo's own standard
     output, so `--json` stays one object (R-OUT-1). On a failure the text output shows the last
@@ -1508,7 +1511,10 @@ With `TODO_REGISTER`, the lock and `report-all.html` sit next to the file it nam
   `CHANGELOG.md`; the file format has its own version line.
 - **NFR-9 SHOULD** Few, well-known dependencies: `clap`, `serde`, `serde_json`, `toml`, `sha2`,
   `similar`, `chrono` and `clap_complete`; for tests `assert_cmd`, `predicates`, `tempfile`, `proptest` and `insta`.
-  Anything else needs a reason in its commit message. The release `todo.exe` stays under 5 MB.
+  Also `libc` (Unix only) and `windows-sys` (Windows only), which stop the processes a `verify`
+  command starts (R-VERIFY-1): a process group killed with `killpg`, and a Job Object (T-172). Both
+  were already in `Cargo.lock`. Anything else needs a reason in its commit message. The release
+  `todo.exe` stays under 5 MB.
 - **NFR-10 MUST** Builds with stable Rust 1.89 or newer, edition 2024.
 - **NFR-11 SHOULD** The README explains that the lock protects one machine, that folders synced by
   OneDrive or Dropbox aren't safe for parallel agents, and the SmartScreen warning for a self-built

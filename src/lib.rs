@@ -14,6 +14,7 @@ pub mod import;
 pub mod lock;
 pub mod ops;
 pub mod output;
+pub(crate) mod process_tree;
 pub mod register;
 pub mod report;
 pub mod state;
