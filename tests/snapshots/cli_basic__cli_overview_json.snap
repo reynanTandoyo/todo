@@ -252,6 +252,11 @@ expression: ok_json
       },
       {
         "kind": "read",
+        "name": "waves",
+        "summary": "Group the unfinished tasks into waves: rounds, workers at once, longest chain"
+      },
+      {
+        "kind": "read",
         "name": "where",
         "summary": "Show resolved TODO.md, repo root, state folder, lock status, and task counts"
       }

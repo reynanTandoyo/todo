@@ -42,6 +42,7 @@ pub mod read;
 pub mod rules;
 pub mod scope;
 pub mod task_ops;
+pub mod waves;
 
 pub use config::{
     CONFIG_FILENAME, DEFAULT_ARCHIVE_FILE, DEFAULT_CLAIM_TTL_HOURS, DEFAULT_IDEA_SECTION,
