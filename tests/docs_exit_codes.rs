@@ -206,7 +206,7 @@ const NO_WAIT: &str = "lock_wait_seconds = 0\n";
 /// Two open tasks that name the same file, so one claim blocks the other (`FILES_BUSY`, R-SCOPE-1).
 const FILES_BODY: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
-<!-- todo-format: 2 -->
+<!-- todo-format: 3 -->
 # Fixture
 
 ## Now
@@ -214,13 +214,13 @@ const FILES_BODY: &str = "\
 ### T-001 · First task
 - status: open
 - owner: —
-- priority: P1
+- priority: P1 · difficulty: 2
 - files: src/a.c
 
 ### T-002 · Second task
 - status: open
 - owner: —
-- priority: P1
+- priority: P1 · difficulty: 2
 - files: src/a.c
 ";
 
