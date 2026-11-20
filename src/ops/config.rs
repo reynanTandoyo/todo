@@ -167,6 +167,28 @@ impl OpsConfig {
             .any(|f| f.eq_ignore_ascii_case(field))
     }
 
+    /// Returns the configured spelling of one `priority` value (`docs/format.md` §8).
+    ///
+    /// An unknown value is refused with `BAD_VALUE` and the list of allowed values. `add`, `ask`,
+    /// `promote` and `set` all check a priority here, so they refuse the same values (T-179).
+    pub fn canonical_priority(&self, raw: &str) -> Result<String> {
+        let value = raw.trim();
+        match self
+            .priorities
+            .iter()
+            .find(|p| p.eq_ignore_ascii_case(value))
+        {
+            Some(canonical) => Ok(canonical.clone()),
+            None => Err(TodoError::new(
+                ErrorCode::BadValue,
+                format!(
+                    "invalid priority '{value}'; expected one of: {}",
+                    self.priorities.join(", ")
+                ),
+            )),
+        }
+    }
+
     /// Returns the configured spelling of one `difficulty` value (`R-WRITE-18`).
     ///
     /// An unknown value is refused with `BAD_VALUE` and the list of allowed values.

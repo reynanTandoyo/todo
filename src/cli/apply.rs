@@ -581,13 +581,17 @@ fn apply_one_op(
                     "add",
                 ));
             }
+            // The priority is checked as `add` checks it (T-179).
+            let priority = cfg
+                .canonical_priority(priority)
+                .map_err(|e| at_operation(e, op_num, "add"))?;
             let extra: Vec<(String, String)> = fields
                 .iter()
                 .map(|(k, v)| (k.clone(), v.trim().to_string()))
                 .collect();
             let lines = NewTask {
                 title: clean_title,
-                priority: Some(priority.trim()),
+                priority: Some(priority.as_str()),
                 difficulty: difficulty.as_deref(),
                 task_type: trim(task_type),
                 area: trim(area),

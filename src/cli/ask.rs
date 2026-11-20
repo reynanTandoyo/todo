@@ -61,23 +61,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     let cfg = ctx.load_config()?;
     let priority_val = match args.priority.as_deref() {
-        Some(raw) => {
-            let clean = sanitize_trimmed_value(raw);
-            let Some(canonical) = cfg
-                .priorities
-                .iter()
-                .find(|p| p.eq_ignore_ascii_case(&clean))
-            else {
-                return Err(TodoError::new(
-                    ErrorCode::BadValue,
-                    format!(
-                        "invalid priority '{clean}'; expected one of: {}",
-                        cfg.priorities.join(", ")
-                    ),
-                ));
-            };
-            Some(canonical.clone())
-        }
+        Some(raw) => Some(cfg.canonical_priority(raw)?),
         None => None,
     };
     let area_val = match args.area.as_deref() {
