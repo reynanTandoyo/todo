@@ -22,8 +22,10 @@ use crate::ops::{
     check_ownership, check_task_writable, file_label, forced_note_text, highest_task_number,
     milestone, parse_doc_for_write, read_optional_archive, resolve_task_in_doc, steps_from_text,
 };
+use crate::ops::commit_files::scope_of_commit;
 use crate::ops::identity::done_by;
 use crate::ops::migrate::PendingMigration;
+use crate::ops::scope::CommitScope;
 use crate::output::Output;
 use crate::state::{IdsState, StateDir};
 use crate::version::RUNNING_VERSION;
@@ -33,7 +35,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "apply",
     summary: "Apply a batch of operations from JSON lines in one locked step",
     kind: CommandKind::Write,
-    details: "Reads JSON lines from `<file>` or `-` (standard input) and applies all operations inside a single write lock: either all operations succeed with one snapshot, or none apply.",
+    details: "Reads JSON lines from `<file>` or `-` (standard input) and applies all operations inside a single write lock: either all operations succeed with one snapshot, or none apply. A `done` with a `commit` is checked against the task's `files` as `todo done` checks it (R-SCOPE-2).",
     examples: &[
         "todo apply ops.jsonl --agent agent-1",
         "Get-Content ops.jsonl | todo apply - --agent agent-1",
@@ -219,6 +221,18 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             _ => None,
         })
         .collect();
+    // Which files each `done` commit changed (R-SCOPE-2), asked of git before the lock, as `done`
+    // asks it. An empty commit is no commit.
+    let done_scopes: Vec<CommitScope> = ops
+        .iter()
+        .map(|op| match op {
+            ApplyOp::Done { commit, .. } => {
+                let commit = commit.as_deref().map(str::trim).filter(|c| !c.is_empty());
+                scope_of_commit(&found.path, &cfg.archive_file, commit)
+            }
+            _ => Ok(CommitScope::NoGit),
+        })
+        .collect::<Result<_>>()?;
 
     let mut lock_warnings = Vec::new();
     let mut stamp_warning: Option<String> = None;
@@ -265,6 +279,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                     ctx.force,
                     ctx.session.as_deref(),
                     done_bys[idx].as_deref(),
+                    &done_scopes[idx],
                     now,
                     &mut highest_id,
                     &mut refs,
@@ -470,6 +485,7 @@ fn apply_one_op(
     force: bool,
     session: Option<&str>,
     done_by: Option<&str>,
+    done_scope: &CommitScope,
     now: chrono::DateTime<chrono::FixedOffset>,
     highest_id: &mut u64,
     refs: &mut BTreeMap<String, String>,
@@ -668,7 +684,9 @@ fn apply_one_op(
                 now,
                 session,
             };
-            apply_task_op(other, op_num, doc, archive, label, &env, refs, done_by)
+            apply_task_op(
+                other, op_num, doc, archive, label, &env, refs, done_by, done_scope,
+            )
         }
     }
 }
@@ -720,6 +738,7 @@ fn apply_task_op(
     env: &OpEnv<'_>,
     refs: &BTreeMap<String, String>,
     done_by: Option<&str>,
+    done_scope: &CommitScope,
 ) -> Result<(&'static str, String, Vec<LineEdit>, TaskChangeIntent)> {
     let mut dep_owned = String::new();
     let mut milestone_owned = String::new();
@@ -734,8 +753,7 @@ fn apply_task_op(
                 note: note.as_deref(),
                 commit: commit.as_deref().map(str::trim),
                 by: done_by,
-                // `apply` does not check the files of a commit yet; only `done` does (R-SCOPE-2).
-                scope: &crate::ops::scope::CommitScope::NoGit,
+                scope: done_scope,
             },
         ),
         ApplyOp::Drop { task, note } => (

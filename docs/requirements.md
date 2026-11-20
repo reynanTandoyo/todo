@@ -1349,6 +1349,9 @@ same checkout.
     compares them with the task's entries, as paths relative to the folder of `TODO.md`. A file
     outside them refuses `done` (exit 1, `OUT_OF_SCOPE`), naming the files. `TODO.md` and the
     archive file are always allowed.
+  - A `done` operation of `apply` is checked the same way, for each of its commits, and one
+    refusal refuses the whole batch and writes nothing (R-WRITE-15). A commit that git does not
+    know is refused (`BAD_VALUE`) by `done` and by `apply` alike.
   - `--force` overrides the file check and adds the note `forced done outside files: <files>`. It
     does not override the `--commit` rule below.
   - A task at or below the target level that has `files` cannot be finished without `--commit`

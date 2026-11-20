@@ -11,7 +11,7 @@ use crate::cli::{
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::TaskOp;
-use crate::ops::commit_files::commit_scope;
+use crate::ops::commit_files::scope_of_commit;
 use crate::ops::identity::done_by;
 use crate::output::Output;
 
@@ -62,18 +62,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let folder = found.path.parent().filter(|p| !p.as_os_str().is_empty());
     // Who did the work (R-WRITE-16); looked up before the lock, left out when git can't say.
     let by = done_by(folder, resolved_commit.as_deref());
-    // Which files the commit changed (R-SCOPE-2), also asked of git before the lock. `TODO.md` and
-    // the archive file are always allowed.
-    let todo_name = found
-        .path
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let scope = commit_scope(
-        folder,
-        resolved_commit.as_deref(),
-        &[todo_name.as_str(), cfg.archive_file.as_str()],
-    )?;
+    // Which files the commit changed (R-SCOPE-2), also asked of git before the lock.
+    let scope = scope_of_commit(&found.path, &cfg.archive_file, resolved_commit.as_deref())?;
     let op = TaskOp::Done {
         note: resolved_note.as_deref(),
         commit: resolved_commit.as_deref(),

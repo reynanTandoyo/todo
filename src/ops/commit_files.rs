@@ -27,10 +27,10 @@ pub fn in_git_repository(dir: Option<&Path>) -> bool {
     git_stdout(dir, &["rev-parse", "--git-dir"]).is_some()
 }
 
-/// What `done` needs from git before the lock (R-SCOPE-2) for the `commit` it was given, already
-/// resolved. Without git the answer is [`CommitScope::NoGit`]; without a commit,
-/// [`CommitScope::NoCommit`]. Otherwise it lists the files the commit changed, except the files that
-/// are always allowed (`always_allowed`, such as `TODO.md` and the archive file).
+/// What `done` needs from git before the lock (R-SCOPE-2) for the `commit` it was given: any name git
+/// knows, such as a hash or `HEAD`. Without git the answer is [`CommitScope::NoGit`]; without a
+/// commit, [`CommitScope::NoCommit`]. Otherwise it lists the files the commit changed, except the
+/// files that are always allowed (`always_allowed`, such as `TODO.md` and the archive file).
 pub fn commit_scope(
     dir: Option<&Path>,
     commit: Option<&str>,
@@ -49,6 +49,21 @@ pub fn commit_scope(
     Ok(CommitScope::Changed(changed))
 }
 
+/// [`commit_scope`] for the TODO.md at `todo_file`, as `done` and the `done` operations of `apply`
+/// ask it (R-SCOPE-2): `TODO.md` itself and the archive file, `archive_file`, are always allowed.
+pub fn scope_of_commit(
+    todo_file: &Path,
+    archive_file: &str,
+    commit: Option<&str>,
+) -> Result<CommitScope> {
+    let folder = todo_file.parent().filter(|p| !p.as_os_str().is_empty());
+    let todo_name = todo_file
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    commit_scope(folder, commit, &[todo_name.as_str(), archive_file])
+}
+
 /// The files that `commit` changed compared with its first parent (for a root commit, the files it
 /// added). Both paths of a rename count. The paths are relative to the folder `dir`, with `/`
 /// separators; a path outside that folder starts with `../`.
@@ -59,16 +74,23 @@ pub fn changed_files(dir: Option<&Path>, commit: &str) -> Result<Vec<String>> {
             format!("could not list the files of git commit '{commit}'"),
         )
     };
+    // The same refusal as `done` gives for a commit git does not know (`R-WRITE-4`).
+    let unknown = || {
+        TodoError::new(
+            ErrorCode::BadValue,
+            format!("unknown git commit '{commit}'"),
+        )
+    };
     if commit.starts_with('-') {
-        return Err(unreadable());
+        return Err(unknown());
     }
     let prefix = git_stdout(dir, &["rev-parse", "--show-prefix"]).ok_or_else(unreadable)?;
     let prefix = String::from_utf8_lossy(&prefix)
         .trim_end_matches(['\r', '\n'])
         .to_string();
     // `commit` then its parents; the first parent is the second word.
-    let parents = git_stdout(dir, &["rev-list", "--parents", "-n", "1", commit, "--"])
-        .ok_or_else(unreadable)?;
+    let parents =
+        git_stdout(dir, &["rev-list", "--parents", "-n", "1", commit, "--"]).ok_or_else(unknown)?;
     let first_parent = String::from_utf8_lossy(&parents)
         .split_whitespace()
         .nth(1)

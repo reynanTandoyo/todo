@@ -1,7 +1,8 @@
-//! CLI tests for the commit check of `done --commit` (R-SCOPE-2, NFR-5). A commit inside the files of
-//! the task finishes it; a commit that changed a file outside them refuses `done` (`OUT_OF_SCOPE`)
-//! unless `--force`, which notes the files; a task at the lowest level that names files needs its
-//! commit while git is there (`MISSING_FIELD`). Every fixture is invented and written into a temporary
+//! CLI tests for the commit check of `done --commit` and of the `done` operations of `apply`
+//! (R-SCOPE-2, NFR-5). A commit inside the files of the task finishes it; a commit that changed a file
+//! outside them refuses `done` (`OUT_OF_SCOPE`) unless `--force`, which notes the files; a task at the
+//! lowest level that names files needs its commit while git is there (`MISSING_FIELD`). `apply`
+//! refuses its whole batch in the same cases. Every fixture is invented and written into a temporary
 //! folder with its own git repository.
 
 mod common;
@@ -432,4 +433,156 @@ fn a_commit_inside_the_folder_of_todo_md_passes_inside_a_larger_repository() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+// The `done` operations of `todo apply` get the same check, for the whole batch (T-174).
+
+/// A TODO.md with T-001, which names `files` when given, and T-002, which names none.
+fn two_tasks_body(files: Option<&str>) -> String {
+    let mut text = format!(
+        "{MARKER}\n## Queue\n\n### T-001 · Scoped task\n- status: open\n- owner: —\n- priority: P1\n- difficulty: 1\n"
+    );
+    if let Some(files) = files {
+        text.push_str(&format!("- files: {files}\n"));
+    }
+    text.push_str(
+        "\n### T-002 · Other task\n- status: open\n- owner: —\n- priority: P1\n- difficulty: 1\n",
+    );
+    text
+}
+
+/// A project folder with the two tasks of [`two_tasks_body`] and the levels of [`LEVELS`].
+fn two_tasks(files: Option<&str>) -> Proj {
+    let tmp = TempDir::new().expect("tempdir");
+    let (home, work, todo) = setup_proj(&tmp, &two_tasks_body(files));
+    write(&work, "todo.toml", LEVELS);
+    Proj {
+        _tmp: tmp,
+        home,
+        work,
+        todo,
+    }
+}
+
+/// A note on T-002, which a batch applies along with the `done` of T-001.
+const NOTE_OP: &str = r#"{"op":"note","task":"T-002","text":"checked"}"#;
+
+/// The `done` operation of T-001, with its `commit` when given.
+fn done_op(commit: Option<&str>) -> String {
+    match commit {
+        Some(c) => format!(r#"{{"op":"done","task":"T-001","commit":"{c}"}}"#),
+        None => r#"{"op":"done","task":"T-001"}"#.to_string(),
+    }
+}
+
+/// Writes `ops` as JSON lines to `ops.jsonl` in the project folder and runs
+/// `todo --json --agent alice [extra] apply ops.jsonl` there.
+fn apply(p: &Proj, ops: &[&str], extra: &[&str]) -> Output {
+    write(&p.work, "ops.jsonl", &format!("{}\n", ops.join("\n")));
+    let mut args = vec!["--json", "--agent", "alice"];
+    args.extend_from_slice(extra);
+    args.extend_from_slice(&["apply", "ops.jsonl"]);
+    run_todo(&p.home, &p.work, &args, &[("TODO_TEST_NOW", NOW)]).expect("run todo")
+}
+
+#[test]
+fn apply_done_inside_the_files_applies_the_whole_batch() {
+    let p = two_tasks(Some("src/"));
+    repo_with_first_commit(&p);
+    write(&p.work, "src/b.rs", "pub fn b() {}\n");
+    commit(&p.work, &["src/b.rs"], "T-001: work");
+
+    let out = apply(&p, &[NOTE_OP, done_op(Some("HEAD")).as_str()], &[]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = read_text(&p.todo);
+    assert!(text.contains("- status: done\n"), "{text}");
+    assert!(
+        text.contains("- note (2026-11-15, alice): checked\n"),
+        "{text}"
+    );
+}
+
+#[test]
+fn apply_done_outside_the_files_refuses_the_batch_and_leaves_the_file_alone() {
+    let p = two_tasks(Some("src/"));
+    repo_with_first_commit(&p);
+    write(&p.work, "src/b.rs", "pub fn b() {}\n");
+    write(&p.work, "other.txt", "outside the task\n");
+    commit(&p.work, &["src/b.rs", "other.txt"], "T-001: work");
+    let before = fs::read(&p.todo).expect("read TODO.md");
+
+    let out = apply(&p, &[NOTE_OP, done_op(Some("HEAD")).as_str()], &[]);
+    assert_eq!(out.status.code(), Some(1));
+    let json = parse_json(&out.stdout);
+    assert_eq!(json["error"]["code"], "OUT_OF_SCOPE", "{json}");
+    assert_eq!(
+        json["error"]["files_outside"],
+        json!(["other.txt"]),
+        "{json}"
+    );
+    // The note before the `done` in the batch is not written either.
+    assert_eq!(fs::read(&p.todo).expect("read TODO.md"), before);
+}
+
+#[test]
+fn apply_done_outside_the_files_with_force_applies_and_notes_the_files() {
+    let p = two_tasks(Some("src/"));
+    repo_with_first_commit(&p);
+    write(&p.work, "src/b.rs", "pub fn b() {}\n");
+    write(&p.work, "other.txt", "outside the task\n");
+    commit(&p.work, &["src/b.rs", "other.txt"], "T-001: work");
+
+    let out = apply(&p, &[NOTE_OP, done_op(Some("HEAD")).as_str()], &["--force"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = read_text(&p.todo);
+    assert!(text.contains("- status: done\n"), "{text}");
+    assert!(
+        text.contains("- note (2026-11-15, alice): forced done outside files: other.txt\n"),
+        "{text}"
+    );
+}
+
+#[test]
+fn apply_done_of_a_lowest_level_task_with_files_needs_its_commit_in_git() {
+    let p = two_tasks(Some("src/"));
+    repo_with_first_commit(&p);
+    let before = fs::read(&p.todo).expect("read TODO.md");
+
+    let out = apply(&p, &[NOTE_OP, done_op(None).as_str()], &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(parse_json(&out.stdout)["error"]["code"], "MISSING_FIELD");
+    assert_eq!(fs::read(&p.todo).expect("read TODO.md"), before);
+}
+
+#[test]
+fn apply_done_without_git_needs_no_commit() {
+    let p = two_tasks(Some("src/"));
+
+    let out = apply(&p, &[NOTE_OP, done_op(None).as_str()], &[]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(read_text(&p.todo).contains("- status: done\n"));
+}
+
+#[test]
+fn apply_done_with_an_unknown_commit_is_refused_as_done_refuses_it() {
+    let p = two_tasks(Some("src/"));
+    repo_with_first_commit(&p);
+    let before = fs::read(&p.todo).expect("read TODO.md");
+
+    let out = apply(&p, &[NOTE_OP, done_op(Some("deadbeef9999")).as_str()], &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(parse_json(&out.stdout)["error"]["code"], "BAD_VALUE");
+    assert_eq!(fs::read(&p.todo).expect("read TODO.md"), before);
 }
