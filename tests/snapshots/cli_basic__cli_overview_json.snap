@@ -47,6 +47,11 @@ expression: ok_json
       },
       {
         "kind": "read",
+        "name": "brief",
+        "summary": "Print the work order of a task: goals above it, files, steps, check, finish commands"
+      },
+      {
+        "kind": "read",
         "name": "check",
         "summary": "Check TODO.md for format, dependency, claim, and state problems"
       },

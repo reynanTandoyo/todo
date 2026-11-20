@@ -3,15 +3,16 @@
 use clap::Args as ClapArgs;
 use serde::Serialize;
 
+use crate::cli::brief::write_brief;
 use crate::cli::{CommandKind, CommandMeta, Context, write_milestone_chain};
 use crate::doc::TaskChangeIntent;
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::lock::current_time;
 use crate::ops::milestone::resolve_milestone;
 use crate::ops::{
-    DocWritePlan, NextFilter, TaskJson, WhereClause, build_claim_edits, build_task_json,
-    check_task_writable, edit_doc_with_found_and_state_and_write, load_for_read_with_found,
-    plan_claim, select_next_task,
+    BriefJson, DocWritePlan, NextFilter, TaskJson, WhereClause, build_brief, build_claim_edits,
+    build_task_json, check_task_writable, edit_doc_with_found_and_state_and_write,
+    load_for_read_with_found, plan_claim, select_next_task,
 };
 use crate::output::Output;
 
@@ -20,7 +21,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "next",
     summary: "Pick the next ready task (optionally claiming it atomically)",
     kind: CommandKind::Read,
-    details: "Selects the highest-priority ready task (open or stale claimed, with all dependencies done or dropped, the dependencies of every milestone above it too, and no milestone above it blocked, done or dropped; a task at or below the target level (`target_difficulty`, by default the lowest level) only when its detail is complete (R-DETAIL-2), and only when no open question is about it; excluding questions, ideas and milestones, and skipping a task whose `files` overlap a task another agent holds). Ties go to tasks in a milestone where work has started, then to file order. `--milestone <task>` keeps only the tasks below that milestone, at any depth. When `--agent` or `TODO_AGENT` is set, returns the agent's own existing claim first unless `--new` is passed. With `--claim`, picks and claims atomically inside a single write lock.",
+    details: "Selects the highest-priority ready task (open or stale claimed, with all dependencies done or dropped, the dependencies of every milestone above it too, and no milestone above it blocked, done or dropped; a task at or below the target level (`target_difficulty`, by default the lowest level) only when its detail is complete (R-DETAIL-2), and only when no open question is about it; excluding questions, ideas and milestones, and skipping a task whose `files` overlap a task another agent holds). Ties go to tasks in a milestone where work has started, then to file order. `--milestone <task>` keeps only the tasks below that milestone, at any depth. When `--agent` or `TODO_AGENT` is set, returns the agent's own existing claim first unless `--new` is passed. With `--claim`, picks and claims atomically inside a single write lock. With `--brief`, prints the work order of the picked task after the claim, as `todo brief` does (R-DETAIL-3).",
     examples: &[
         "todo next",
         "todo next --agent agent-1",
@@ -70,6 +71,10 @@ pub struct Args {
     /// Only tasks below this milestone, at any depth (an ID or a title; `R-MILE-6`).
     #[arg(long, value_name = "TASK")]
     pub milestone: Option<String>,
+
+    /// Print the work order of the picked task after the claim, as `todo brief` does (R-DETAIL-3).
+    #[arg(long)]
+    pub brief: bool,
 }
 
 /// JSON payload emitted by `todo next`.
@@ -78,6 +83,9 @@ struct NextJson {
     task: Option<TaskJson>,
     claimed: bool,
     already_claimed: bool,
+    /// The work order of the task, with `--brief` (R-DETAIL-3); absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    brief: Option<BriefJson>,
 }
 
 /// Runs `todo next`.
@@ -126,6 +134,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                         task: None,
                         claimed: false,
                         already_claimed: false,
+                        brief: None,
                     }));
                 };
 
@@ -138,15 +147,21 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 let (edits, _) = build_claim_edits(doc, task, &plan, ctx.session.as_deref(), now);
                 if edits.is_empty() {
                     let task_json = build_task_json(doc, task, archive, false, now, &cfg);
+                    let brief = args
+                        .brief
+                        .then(|| build_brief(doc, archive, task, &cfg, Some(agent)));
                     return Ok(DocWritePlan::Unchanged(NextJson {
                         task: Some(task_json),
                         claimed: true,
                         already_claimed,
+                        brief,
                     }));
                 }
 
                 let arch_owned = archive.cloned();
                 let cfg_owned = cfg.clone();
+                let agent_owned = agent.to_string();
+                let want_brief = args.brief;
                 let id_str = cfg.id_config.format_id(task_id);
                 let intent = TaskChangeIntent::modify_one(task_id);
                 Ok(DocWritePlan::Edits {
@@ -167,10 +182,21 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                             now,
                             &cfg_owned,
                         );
+                        // The work order is built from the file as the claim left it.
+                        let brief = want_brief.then(|| {
+                            build_brief(
+                                new_doc,
+                                arch_owned.as_ref(),
+                                updated_task,
+                                &cfg_owned,
+                                Some(&agent_owned),
+                            )
+                        });
                         Ok(NextJson {
                             task: Some(task_json),
                             claimed: true,
                             already_claimed,
+                            brief,
                         })
                     }),
                 })
@@ -207,11 +233,21 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 )),
                 claimed: false,
                 already_claimed: sel.already_theirs,
+                brief: args.brief.then(|| {
+                    build_brief(
+                        &loaded.doc,
+                        loaded.archive.as_ref(),
+                        sel.task,
+                        &cfg,
+                        ctx.agent.as_deref(),
+                    )
+                }),
             },
             None => NextJson {
                 task: None,
                 claimed: false,
                 already_claimed: false,
+                brief: None,
             },
         }
     };
@@ -237,7 +273,10 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             ),
         };
         out.write_line(&line);
-        write_milestone_chain(out, &task.id, &task.milestones);
+        match &payload.brief {
+            Some(brief) => write_brief(out, brief),
+            None => write_milestone_chain(out, &task.id, &task.milestones),
+        }
     } else {
         out.write_line("no ready tasks");
     }

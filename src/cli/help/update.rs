@@ -297,8 +297,8 @@ fn linux_platform(exe: &str, version: &str, latest: &str, download: &str) -> Pla
 }
 
 /// Quotes `text` as a PowerShell single-quoted string. PowerShell reads several Unicode quote marks
-/// as single quotes, so each of them is doubled, as an apostrophe is.
-fn powershell_quote(text: &str) -> String {
+/// as single quotes, so each of them is doubled, as an apostrophe is. `todo brief` uses it too.
+pub fn powershell_quote(text: &str) -> String {
     let mut quoted = String::with_capacity(text.len() + 2);
     quoted.push('\'');
     for c in text.chars() {

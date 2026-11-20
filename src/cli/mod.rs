@@ -578,6 +578,7 @@ register_commands! {
     Archive => archive,
     Ask => ask,
     Block => block,
+    Brief => brief,
     Check => check,
     Completions => completions,
     Claim => claim,

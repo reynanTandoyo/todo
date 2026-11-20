@@ -169,6 +169,7 @@ todo note T-012 "reproduced on Windows 11" --agent agent-1
 ### Working through a task
 
 ```powershell
+todo brief T-012 --agent agent-1
 todo claim T-012 --agent agent-1
 todo release T-012 --agent agent-1
 todo release --stale --agent coordinator
