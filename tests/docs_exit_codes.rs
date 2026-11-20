@@ -188,6 +188,27 @@ const NEWER_BODY: &str = "\
 /// `todo.toml` that does not wait for the write lock or a lease.
 const NO_WAIT: &str = "lock_wait_seconds = 0\n";
 
+/// Two open tasks that name the same file, so one claim blocks the other (`FILES_BUSY`, R-SCOPE-1).
+const FILES_BODY: &str = "\
+<!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 2 -->
+# Fixture
+
+## Now
+
+### T-001 · First task
+- status: open
+- owner: —
+- priority: P1
+- files: src/a.c
+
+### T-002 · Second task
+- status: open
+- owner: —
+- priority: P1
+- files: src/a.c
+";
+
 /// `add` of a second task in `Now`, as `agent` (the arguments after `--json --file`).
 const ADD_SECOND_TASK: &[&str] = &[
     "--agent",
@@ -458,6 +479,14 @@ const ERROR_CASES: &[ErrorCase] = &[
         setup: Setup::Plain,
         before: &[],
         args: &["list"],
+    },
+    ErrorCase {
+        code: "FILES_BUSY",
+        todo: Some(FILES_BODY),
+        config: None,
+        setup: Setup::Plain,
+        before: &[&["--agent", "alice", "claim", "T-001"]],
+        args: &["--agent", "bob", "claim", "T-002"],
     },
 ];
 

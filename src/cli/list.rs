@@ -10,6 +10,7 @@ use crate::doc::{EntryKind, Task};
 use crate::error::Result;
 use crate::lock::current_time;
 use crate::ops::milestone::resolve_milestone;
+use crate::ops::scope::files_busy;
 use crate::ops::{
     ListFilter, ListTaskJson, OpsConfig, StatusFilter, WhereClause, build_list_task_json,
     filter_tasks, load_for_read_with_found,
@@ -77,7 +78,7 @@ pub struct Args {
     #[arg(long = "where", value_name = "KEY=VALUE")]
     pub where_clauses: Vec<String>,
 
-    /// Show only tasks that `next` could hand out.
+    /// Show only tasks that `next` could hand out; those held back by the files of other agents are marked.
     #[arg(long)]
     pub ready: bool,
 
@@ -229,6 +230,13 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let mut id_buf = String::with_capacity(16);
 
     for task in &tasks {
+        // `--ready` marks the tasks that the files of other agents hold back (R-SCOPE-1).
+        let held_back = if args.ready {
+            let busy = files_busy(&loaded.doc, task, task.owner.as_deref(), now, &cfg);
+            held_back_mark(&busy, &cfg)
+        } else {
+            String::new()
+        };
         write_task_line_into(
             &mut buf,
             task,
@@ -239,6 +247,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             max_width,
             use_color,
             &mut id_buf,
+            &held_back,
         );
         if buf.len() >= 16_384 {
             out.write_str(&buf);
@@ -288,6 +297,7 @@ fn write_task_line_into(
     max_width: Option<usize>,
     use_color: bool,
     id_buf: &mut String,
+    held_back: &str,
 ) {
     id_buf.clear();
     let _ = write!(
@@ -360,7 +370,21 @@ fn write_task_line_into(
             push_truncated_chars(out, &task.title, avail);
         }
     }
+    out.push_str(held_back);
     out.push('\n');
+}
+
+/// The mark that `list --ready` adds to a task that the files of other agents hold back (`R-SCOPE-1`),
+/// naming the tasks in the way; empty when none holds it back.
+fn held_back_mark(busy: &[&Task], cfg: &OpsConfig) -> String {
+    if busy.is_empty() {
+        return String::new();
+    }
+    let ids: Vec<String> = busy
+        .iter()
+        .map(|t| cfg.id_config.format_id(t.id))
+        .collect();
+    format!("  [held back: files shared with {}]", ids.join(", "))
 }
 
 fn push_truncated_chars(out: &mut String, text: &str, max_chars: usize) {

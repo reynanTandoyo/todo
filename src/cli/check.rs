@@ -19,6 +19,7 @@ use crate::find::fs_path;
 use crate::history::{OutsideEditOutcome, detect_outside_edit};
 use crate::lock::current_time;
 use crate::ops::identity::{mailmap_proper_names, repo_root};
+use crate::ops::scope::{outside_folder_reason, raw_entries};
 use crate::ops::{
     DocWritePlan, OpsConfig, edit_doc_and_write, file_label, read_optional_archive,
     require_known_format,
@@ -178,6 +179,9 @@ pub(crate) fn collect_problems(
             // 3b. `by` names against `.mailmap` (warnings only; R-WRITE-16).
             warn_unmapped_by(&doc, &found.path, &label, out);
 
+            // 3c. `files` entries that leave the folder of TODO.md (warnings only; R-SCOPE-1).
+            warn_files_entries(&doc, &label, out);
+
             // 4. Dependency checks (missing IDs, dropped dependencies, cycles; R-DEP-3).
             check_dependencies(&doc, archive.as_ref(), &label, &mut problems);
 
@@ -328,6 +332,25 @@ pub(crate) fn check_tasks(
                     "{id_str}: difficulty {difficulty:?} is not in configured difficulties"
                 ),
             });
+        }
+    }
+}
+
+/// Warns about each `files` entry that is absolute or leaves the folder of `TODO.md` (`R-SCOPE-1`,
+/// `docs/format.md` §19). A warning only: it never changes the exit code (`R-CHECK-1`).
+fn warn_files_entries(doc: &Document, label: &str, out: &mut Output) {
+    for task in &doc.tasks {
+        let Some(files) = task.files.as_deref() else {
+            continue;
+        };
+        let id_str = doc.id_config.format_id(task.id);
+        for entry in raw_entries(files) {
+            if let Some(reason) = outside_folder_reason(entry) {
+                out.warn(format!(
+                    "{label}:{}: {id_str}: files entry {entry:?} {reason}",
+                    task.heading_line + 1
+                ));
+            }
         }
     }
 }
