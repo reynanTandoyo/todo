@@ -10,7 +10,7 @@ use crate::error::{ExitCode, Result};
 use crate::ops::milestone::resolve_milestone;
 use crate::ops::plan::{Group, build_plan};
 use crate::ops::read::level_problem;
-use crate::ops::waves::detail_gaps;
+use crate::ops::waves::{OpenQuestionTargets, detail_gaps_with};
 use crate::output::Output;
 
 /// Metadata for the `plan` command.
@@ -111,6 +111,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         None => None,
     };
     let plan = build_plan(doc, archive, &cfg, milestone);
+    let questions = OpenQuestionTargets::new(doc, archive, &cfg);
     let id = |t: &Task| doc.id_config.format_id(t.id);
 
     let payload = PlanJson {
@@ -145,7 +146,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 id: id(t),
                 title: t.title.clone(),
                 level: t.difficulty.clone(),
-                missing: detail_gaps(t, doc, archive, &cfg),
+                missing: detail_gaps_with(t, &cfg, &questions),
             })
             .collect(),
         without_level: plan
@@ -179,6 +180,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             })
             .collect(),
     };
+    // Read-only: the output needs nothing from the documents any more (T-186).
+    loaded.leak_for_exit();
 
     if out.is_json() {
         out.emit_json_ok(META.name, &payload);

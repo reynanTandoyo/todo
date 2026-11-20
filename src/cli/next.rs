@@ -221,7 +221,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             ignore_own_claim: args.new,
             milestone,
         };
-        match select_next_task(&loaded.doc, loaded.archive.as_ref(), &filter, now, &cfg) {
+        let payload = match select_next_task(&loaded.doc, loaded.archive.as_ref(), &filter, now, &cfg)
+        {
             Some(sel) => NextJson {
                 task: Some(build_task_json(
                     &loaded.doc,
@@ -249,7 +250,10 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 already_claimed: false,
                 brief: None,
             },
-        }
+        };
+        // Read-only: the work order is built, so the documents are not needed any more (T-186).
+        loaded.leak_for_exit();
+        payload
     };
 
     if out.is_json() {

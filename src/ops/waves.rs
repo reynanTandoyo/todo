@@ -10,7 +10,7 @@
 //! tasks never recurses deeply. Whatever cannot be ordered, because it waits on a blocked entry, a
 //! missing ID or a cycle, is listed apart with the reason.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
 use crate::doc::{DependencyRef, Document, EntryKind, Status, Task, TaskId};
 use crate::find::fs_path;
@@ -210,13 +210,15 @@ pub fn plan_waves<'a>(
     }
 
     let longest = placed.iter().map(|&i| level[i]).max().unwrap_or(0);
+    // The placed tasks of each level, in file order, found in one pass over them rather than one pass
+    // per wave (T-186). A placed task is at level 1 or more.
+    let mut members_of: Vec<Vec<usize>> = vec![Vec::new(); longest + 1];
+    for &i in &placed {
+        members_of[level[i]].push(i);
+    }
     let mut waves: Vec<Wave<'a>> = Vec::with_capacity(longest);
-    for number in 1..=longest {
-        let members: Vec<usize> = placed
-            .iter()
-            .copied()
-            .filter(|&i| level[i] == number)
-            .collect();
+    // Index 0 holds no placed task, so the waves are the levels from 1 to `longest`.
+    for (number, members) in members_of.iter().enumerate().skip(1) {
         let scopes: Vec<Vec<ScopeEntry>> = members
             .iter()
             .map(|&i| {
@@ -412,23 +414,29 @@ pub fn detail_gaps(
     if !detail_rule_applies(task, cfg) {
         return Vec::new();
     }
+    detail_gaps_with(task, cfg, &OpenQuestionTargets::new(doc, archive, cfg))
+}
+
+/// [`detail_gaps`] for `task`, with the open questions taken from `questions`, which a loop over many
+/// tasks builds once (T-186). The list is the same: the fields, the `read` paths on disk, then one
+/// entry for each open question about the task, in file order.
+#[must_use]
+pub fn detail_gaps_with(
+    task: &Task,
+    cfg: &OpsConfig,
+    questions: &OpenQuestionTargets,
+) -> Vec<String> {
+    if !detail_rule_applies(task, cfg) {
+        return Vec::new();
+    }
     let mut missing = field_gaps(task, cfg);
     missing.extend(read_gaps(task, cfg));
-    for question in [Some(doc), archive]
-        .into_iter()
-        .flatten()
-        .flat_map(|d| &d.tasks)
-    {
-        if is_question(question)
-            && !question.status.is_finished()
-            && about_id(question, cfg) == Some(task.id)
-        {
-            missing.push(format!(
-                "open question {}",
-                cfg.id_config.format_id(question.id)
-            ));
-        }
-    }
+    missing.extend(
+        questions
+            .questions_about(task.id)
+            .iter()
+            .map(|&id| format!("open question {}", cfg.id_config.format_id(id))),
+    );
     missing
 }
 
@@ -505,31 +513,44 @@ fn read_gaps(task: &Task, cfg: &OpsConfig) -> Vec<String> {
     missing
 }
 
-/// The entries that open questions of `doc` and `archive` are about, indexed once (R-DETAIL-2). A
+/// The open questions of `doc` and `archive`, indexed by the entry each one is about (R-DETAIL-2). A
 /// loop that judges many tasks against the detail rule asks this index instead of scanning every
-/// entry for each task (T-185).
+/// entry for each task (T-185, T-186).
 pub struct OpenQuestionTargets {
-    targets: HashSet<TaskId>,
+    /// The open questions about each entry, in file order: the document first, then the archive.
+    about: HashMap<TaskId, Vec<TaskId>>,
 }
 
 impl OpenQuestionTargets {
     /// Indexes the open questions of `doc` and `archive` in one pass over both.
     #[must_use]
     pub fn new(doc: &Document, archive: Option<&Document>, cfg: &OpsConfig) -> Self {
-        let targets = [Some(doc), archive]
+        let mut about: HashMap<TaskId, Vec<TaskId>> = HashMap::new();
+        for question in [Some(doc), archive]
             .into_iter()
             .flatten()
             .flat_map(|d| &d.tasks)
-            .filter(|q| is_question(q) && !q.status.is_finished())
-            .filter_map(|q| about_id(q, cfg))
-            .collect();
-        Self { targets }
+        {
+            if !is_question(question) || question.status.is_finished() {
+                continue;
+            }
+            if let Some(target) = about_id(question, cfg) {
+                about.entry(target).or_default().push(question.id);
+            }
+        }
+        Self { about }
     }
 
     /// Whether an open question is about the entry `id`.
     #[must_use]
     pub fn names(&self, id: TaskId) -> bool {
-        self.targets.contains(&id)
+        self.about.contains_key(&id)
+    }
+
+    /// The IDs of the open questions about the entry `id`, in file order.
+    #[must_use]
+    pub fn questions_about(&self, id: TaskId) -> &[TaskId] {
+        self.about.get(&id).map_or(&[], Vec::as_slice)
     }
 }
 
@@ -553,7 +574,9 @@ pub fn open_question_about(
 mod tests {
     use std::path::PathBuf;
 
-    use super::{OpenQuestionTargets, detail_complete, detail_gaps, open_question_about};
+    use super::{
+        OpenQuestionTargets, detail_complete, detail_gaps, detail_gaps_with, open_question_about,
+    };
     use crate::doc::{Document, TaskId};
     use crate::ops::config::OpsConfig;
 
@@ -680,6 +703,13 @@ mod tests {
                     detail_complete(task, &cfg, |id| open_question_about(&doc, scope, &cfg, id));
                 assert_eq!(from_index, from_list, "{:?} with the index", task.id);
                 assert_eq!(from_scan, from_list, "{:?} with the scan", task.id);
+                // The list itself, with the questions indexed once, is the list `detail_gaps` gives.
+                assert_eq!(
+                    detail_gaps_with(task, &cfg, &questions),
+                    detail_gaps(task, &doc, scope, &cfg),
+                    "{:?} with the index",
+                    task.id
+                );
                 if scope.is_none() {
                     let want = expected
                         .iter()
