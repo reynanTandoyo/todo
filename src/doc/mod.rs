@@ -41,11 +41,12 @@ pub use migrate::{
 };
 pub use parser::{
     CANONICAL_FIELD_ORDER, CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER,
-    CURRENT_FORMAT_VERSION, CombinedPart, CombinedPriorityLine, DependencyRef, Document,
-    FieldEntry, FieldLocation, MANAGED_BLOCK_BEGIN, MANAGED_BLOCK_END, ManagedBlock, Note,
-    OLDEST_FORMAT_VERSION, Problem, ProblemKind, ProblemSeverity, Section, SectionLookup, Status,
-    TASK_HEADING_SEPARATORS, Task, ToolStamp, agent_names_equal, canonical_field_rank,
-    inspect_problems, is_nobody_owner, is_valid_agent_name, strip_section_number,
+    COMBINED_PART_SEPARATOR, CURRENT_FORMAT_VERSION, CombinedPart, CombinedPriorityLine,
+    DependencyRef, Document, FieldEntry, FieldLocation, MANAGED_BLOCK_BEGIN, MANAGED_BLOCK_END,
+    ManagedBlock, Note, OLDEST_FORMAT_VERSION, Problem, ProblemKind, ProblemSeverity, Section,
+    SectionLookup, Status, TASK_HEADING_SEPARATORS, Task, ToolStamp, agent_names_equal,
+    canonical_field_rank, inspect_problems, is_nobody_owner, is_valid_agent_name,
+    strip_section_number,
 };
 pub use reason::NO_REASON;
 pub use stamp::{stamp_bytes, tool_line_text};

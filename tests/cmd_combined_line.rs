@@ -458,3 +458,196 @@ fn check_reports_a_part_without_key_value_on_its_line_as_a_warning() {
         "{text}"
     );
 }
+
+// T-178: a value that holds the part separator gets a line of its own, wherever it is written.
+
+/// The `check` output of a project, stdout and stderr together.
+fn check_text(home: &Path, work: &Path) -> String {
+    let out = run_todo(home, work, &["check"], &[]).unwrap();
+    format!("{}{}", stdout_text(&out), stderr_text(&out))
+}
+
+#[test]
+fn set_goal_with_the_separator_moves_out_of_the_combined_line() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Renderer\n- status: open\n- owner: —\n\
+                - priority: P1 · type: milestone · goal: old goal · area: ui\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+
+    ok(
+        &home,
+        &work,
+        &[
+            "--agent",
+            "t-agent",
+            "set",
+            "T-001",
+            "--goal",
+            "lights · shadows",
+        ],
+    );
+    assert_eq!(
+        read_text(&file),
+        written(
+            "### T-001 · Renderer\n- status: open\n- owner: —\n\
+             - priority: P1 · type: milestone · area: ui\n- goal: lights · shadows\n"
+        ),
+        "the goal keeps its whole value, on a line of its own"
+    );
+    let show = parse_json(&ok(&home, &work, &["--json", "show", "T-001"]).stdout);
+    assert_eq!(show["data"]["goal"], "lights · shadows");
+    assert_eq!(show["data"]["type"], "milestone");
+    assert!(!check_text(&home, &work).contains("not key: value"));
+}
+
+#[test]
+fn set_type_and_area_with_the_separator_move_out_of_the_combined_line() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Lighting\n- status: open\n- owner: —\n\
+                - priority: P1 · difficulty: 2 · type: feature · area: ui\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+
+    ok(
+        &home,
+        &work,
+        &[
+            "--agent",
+            "t-agent",
+            "set",
+            "T-001",
+            "--type",
+            "dev · ops",
+            "--area",
+            "web · api",
+        ],
+    );
+    let text = read_text(&file);
+    assert!(
+        text.contains("- priority: P1 · difficulty: 2\n- type: dev · ops\n- area: web · api\n"),
+        "{text}"
+    );
+    let show = parse_json(&ok(&home, &work, &["--json", "show", "T-001"]).stdout);
+    assert_eq!(show["data"]["type"], "dev · ops");
+    assert_eq!(show["data"]["area"], "web · api");
+    assert!(!check_text(&home, &work).contains("not key: value"));
+}
+
+#[test]
+fn a_new_type_with_the_separator_is_not_added_to_the_combined_line() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Lighting\n- status: open\n- owner: —\n- priority: P1 · area: ui\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+
+    ok(
+        &home,
+        &work,
+        &["--agent", "t-agent", "set", "T-001", "--type", "dev · ops"],
+    );
+    assert_eq!(
+        read_text(&file),
+        written(
+            "### T-001 · Lighting\n- status: open\n- owner: —\n\
+             - priority: P1 · area: ui\n- type: dev · ops\n"
+        )
+    );
+    assert!(!check_text(&home, &work).contains("not key: value"));
+}
+
+#[test]
+fn a_priority_with_the_separator_is_refused_and_the_file_stays() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Lighting\n- status: open\n- owner: —\n- priority: P1\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+    let before = read_text(&file);
+
+    let out = run_todo(
+        &home,
+        &work,
+        &[
+            "--json",
+            "--agent",
+            "t-agent",
+            "set",
+            "T-001",
+            "--priority",
+            "P1 · x",
+        ],
+        &[],
+    )
+    .unwrap();
+    assert_eq!(out.status.code(), Some(1), "{}", stdout_text(&out));
+    let json = parse_json(&out.stdout);
+    assert_eq!(json["error"]["code"], "BAD_VALUE", "{json}");
+    assert_eq!(
+        read_text(&file),
+        before,
+        "a refused priority writes nothing"
+    );
+}
+
+#[test]
+fn add_puts_a_type_or_an_area_with_the_separator_on_lines_of_their_own() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Renderer\n- status: open\n- owner: —\n- priority: P1\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+
+    ok(
+        &home,
+        &work,
+        &[
+            "--agent",
+            "t-agent",
+            "add",
+            "--title",
+            "Lighting",
+            "--priority",
+            "P1",
+            "--difficulty",
+            "2",
+            "--type",
+            "dev · ops",
+            "--area",
+            "web · api",
+        ],
+    );
+    let text = read_text(&file);
+    assert!(
+        text.contains(
+            "### T-002 · Lighting\n- status: open\n- owner: —\n\
+             - priority: P1 · difficulty: 2\n- type: dev · ops\n- area: web · api\n"
+        ),
+        "{text}"
+    );
+    let show = parse_json(&ok(&home, &work, &["--json", "show", "T-002"]).stdout);
+    assert_eq!(show["data"]["type"], "dev · ops");
+    assert_eq!(show["data"]["area"], "web · api");
+    assert!(!check_text(&home, &work).contains("not key: value"));
+}
+
+#[test]
+fn ask_puts_an_area_with_the_separator_on_a_line_of_its_own() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Renderer\n- status: open\n- owner: —\n- priority: P1\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+
+    ok(
+        &home,
+        &work,
+        &[
+            "--agent",
+            "t-agent",
+            "ask",
+            "Should it glow?",
+            "--area",
+            "web · api",
+            "--about",
+            "T-001",
+        ],
+    );
+    let text = read_text(&file);
+    assert!(
+        text.contains("- type: question\n- area: web · api\n- about: T-001\n"),
+        "{text}"
+    );
+    assert!(!check_text(&home, &work).contains("not key: value"));
+}

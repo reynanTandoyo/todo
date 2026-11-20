@@ -1,9 +1,7 @@
 //! `todo done` command: mark a task done with optional note and commit (T-024; R-WRITE-4, NFR-5),
 //! after the task's `verify` command passed (T-158; R-VERIFY-1).
 
-use std::io::ErrorKind;
 use std::path::Path;
-use std::process::Command as ProcessCommand;
 
 use clap::Args as ClapArgs;
 
@@ -13,7 +11,9 @@ use crate::cli::{
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, verify_folder};
+use crate::ops::commit_files::{resolve_commit, scope_of_commit};
 use crate::ops::identity::done_by;
+use crate::ops::scope::{CommitScope, check_done_commit};
 use crate::ops::verify::{self, CheckOutcome};
 use crate::ops::{
     DoneCheck, OpsConfig, StatusCommand, TaskOp, VerifyWhen, file_label, parse_doc_for_write,
@@ -27,7 +27,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "done",
     summary: "Mark a task done",
     kind: CommandKind::Write,
-    details: "Marks the task `done`, sets the calling agent as `owner`, removes `claimed`, and appends a `done` note. If the task has a `verify` command, todo runs it first, outside the write lock, in the folder of TODO.md (in a linked worktree, the matching folder of that worktree); a pass also writes `verified: <date>`, and a failure refuses with `VERIFY_FAILED` (exit 1), leaves the task claimed and adds the note `verify failed — <last line>`; after `verify_attempts` failures the task is given back as `stuck`. With `verify_when = \"wave\"` the command runs later, with `todo verify --wave`. `--no-verify` skips the command and needs `--force`. If `--commit` is given, `HEAD` is resolved via `git rev-parse` before the write lock is taken and unknown commits are refused when `git` is available. When git can tell who did the work, records it as `by` (the author of `--commit`, otherwise the configured `user.name`, in both cases after `.mailmap`; never an email address); without git or a name, `by` is left out. Prints the task's `accept` line as a reminder.",
+    details: "Marks the task `done`, sets the calling agent as `owner`, removes `claimed`, and appends a `done` note. If the task has a `verify` command, todo runs it first, outside the write lock, in the folder of TODO.md (in a linked worktree, the matching folder of that worktree); a pass also writes `verified: <date>`, and a failure refuses with `VERIFY_FAILED` (exit 1), leaves the task claimed and adds the note `verify failed — <last line>`; after `verify_attempts` failures the task is given back as `stuck`. With `verify_when = \"wave\"` the command runs later, with `todo verify --wave`. `--no-verify` skips the command and needs `--force`. When the task has `files` and git is available, the files that a `--commit` changed must lie inside them (`TODO.md` and the archive file always may), or `done` is refused with `OUT_OF_SCOPE` before any command runs; `--force` finishes it and records the files in a note. A task at the lowest level with `files` needs `--commit` while git is available. If `--commit` is given, `HEAD` is resolved via `git rev-parse` before the write lock is taken and unknown commits are refused when `git` is available. When git can tell who did the work, records it as `by` (the author of `--commit`, otherwise the configured `user.name`, in both cases after `.mailmap`; never an email address); without git or a name, `by` is left out. Prints the task's `accept` line as a reminder.",
     examples: &[
         "todo done T-012 --agent agent-1",
         "todo done T-012 --agent agent-1 --note \"all checks pass\" --commit HEAD",
@@ -91,10 +91,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         found.path.parent().filter(|p| !p.as_os_str().is_empty()),
         resolved_commit.as_deref(),
     );
+    // Which files the commit changed (R-SCOPE-2), also asked of git before the lock.
+    let scope = scope_of_commit(&found.path, &cfg.archive_file, resolved_commit.as_deref())?;
 
     // The check runs outside the lock (R-LOCK-4); its result is written by the change below.
     let command: String;
-    let check = match plan_check(ctx, &found, &cfg, &args.task, args.no_verify)? {
+    let check = match plan_check(ctx, &found, &cfg, &args.task, args.no_verify, &scope)? {
         PlannedCheck::Recorded(check) => check,
         PlannedCheck::Run { id, command: text } => {
             command = text;
@@ -107,6 +109,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         note: resolved_note.as_deref(),
         commit: resolved_commit.as_deref(),
         by: by.as_deref(),
+        scope: &scope,
         check,
     };
     let res = edit_one_task(ctx, out, META.name, &args.task, &op, &cfg, Some(found))?;
@@ -124,6 +127,7 @@ fn plan_check(
     cfg: &OpsConfig,
     task_input: &str,
     no_verify: bool,
+    scope: &CommitScope,
 ) -> Result<PlannedCheck> {
     let bytes = read_file_with_snapshot(&found.path)?.bytes;
     let label = file_label(&found.path);
@@ -131,6 +135,9 @@ fn plan_check(
     let task = resolve_task_in_doc(&doc, task_input)?;
     let id = cfg.id_config.format_id(task.id);
     validate_transition(task, StatusCommand::Done, ctx.require_agent()?, ctx.force, &id)?;
+    // R-SCOPE-2 before any command: a commit outside the task's files, or a missing commit, is
+    // refused here. The change checks it again under the lock.
+    check_done_commit(task, cfg, scope, ctx.force, &id)?;
 
     let Some(verify_line) = task.verify.as_deref() else {
         return Ok(PlannedCheck::Recorded(DoneCheck::NotChecked));
@@ -192,63 +199,4 @@ fn run_check_before_done(
             Err(verify::failure_error(id, &failure, message))
         }
     }
-}
-
-/// Resolves and verifies a `--commit` argument using `git rev-parse` when `git` is available (`NFR-5`).
-///
-/// If `git` is not on `PATH`, returns the trimmed input unchecked.
-fn resolve_commit(raw: &str, dir: Option<&Path>) -> Result<String> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Err(TodoError::new(
-            ErrorCode::BadValue,
-            "--commit value cannot be empty",
-        ));
-    }
-
-    let mut cmd = ProcessCommand::new("git");
-    if let Some(d) = dir {
-        cmd.current_dir(d);
-    }
-    let spec = format!("{trimmed}^{{commit}}");
-    let output = match cmd.args(["rev-parse", "--short", "--verify", &spec]).output() {
-        Ok(o) => o,
-        Err(e) if e.kind() == ErrorKind::NotFound => {
-            return Ok(trimmed.to_string());
-        }
-        Err(e) => {
-            return Err(TodoError::new(
-                ErrorCode::BadValue,
-                format!("failed to run git rev-parse for '{trimmed}': {e}"),
-            ));
-        }
-    };
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.to_ascii_lowercase().contains("not a git repository")
-            && !trimmed.eq_ignore_ascii_case("HEAD")
-        {
-            return Ok(trimmed.to_string());
-        }
-        return Err(TodoError::new(
-            ErrorCode::BadValue,
-            format!("unknown git commit '{trimmed}'"),
-        ));
-    }
-
-    let resolved = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if trimmed.eq_ignore_ascii_case("HEAD") || !is_hex_hash(trimmed) {
-        if resolved.is_empty() {
-            Ok(trimmed.to_string())
-        } else {
-            Ok(resolved)
-        }
-    } else {
-        Ok(trimmed.to_string())
-    }
-}
-
-fn is_hex_hash(s: &str) -> bool {
-    s.len() >= 4 && s.bytes().all(|b| b.is_ascii_hexdigit())
 }

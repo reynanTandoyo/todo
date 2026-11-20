@@ -54,6 +54,10 @@ pub const TASK_HEADING_SEPARATORS: &[&str] = &[" · ", " - ", " — ", " – ", 
 /// Canonical heading separator written by the tool.
 pub const CANONICAL_HEADING_SEPARATOR: &str = " · ";
 
+/// Separator between the parts of the combined `- priority:` line (`docs/format.md` §8). A value that
+/// contains it cannot stay on that line, because the line is split there when it is read.
+pub const COMBINED_PART_SEPARATOR: &str = " · ";
+
 /// Canonical "nobody" owner value written by the tool.
 pub const CANONICAL_NOBODY_OWNER: &str = "—";
 

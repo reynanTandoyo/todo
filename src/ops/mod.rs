@@ -31,6 +31,7 @@
 //!      `- priority:` lines in place (`docs/format.md` §8), and appends notes after the last line of
 //!      the task block (`docs/format.md` §9).
 
+pub mod commit_files;
 pub mod config;
 pub mod edits;
 pub mod identity;

@@ -223,7 +223,9 @@ first line of the file.
   that field (so `difficulty`, `type` and `area` may live here or on their own lines, but not both).
   The tool edits a part where it is. A new `difficulty`, `type` or `area` goes into the combined
   line when the task has a priority line, after the nearest existing part that comes before it in
-  the order of §10, and onto its own line otherwise.
+  the order of §10, and onto its own line otherwise. A value that contains ` · ` cannot stay on the
+  combined line: the tool writes it on a line of its own, for every part but `priority`, which is
+  refused (`BAD_VALUE`).
   A part that is not `key: value` (for example `· see the design notes`) is never dropped: it is kept
   as written, in its place, and `todo check` reports it as a warning. If the priority is removed, such
   parts stay on one line of their own where the priority line was.

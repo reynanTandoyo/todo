@@ -374,6 +374,9 @@ or with `--json` the task as it is after the change.
   `hooks install`, `skill install` — show what they would do and only do it with `--yes`.
 - **R-WRITE-15 COULD** `apply <file|->` runs several operations given as JSON lines in one locked
   step: all apply or none do, with one snapshot.
+  - A `done` operation's `commit` is resolved as `done --commit` resolves it (R-WRITE-4), before the
+    lock is taken, and checked against the task's `files` as `done` checks it (R-SCOPE-2). The
+    value written is the same one `done` writes for the same commit.
 - **R-WRITE-16 COULD** `done` (and `apply`'s `done` operation) records the person behind the work
   in a `by` field, so a task shows which contributor finished it, not only which agent.
   - With `--commit`, the name is the author of that commit as git shows it with `.mailmap` applied
@@ -1363,10 +1366,18 @@ same checkout.
     compares them with the task's entries, as paths relative to the folder of `TODO.md`. A file
     outside them refuses `done` (exit 1, `OUT_OF_SCOPE`), naming the files. `TODO.md` and the
     archive file are always allowed.
-  - `--force` overrides and adds the note `forced done outside files: <files>`.
+  - A `done` operation of `apply` is checked the same way, for each of its commits, and one
+    refusal refuses the whole batch and writes nothing (R-WRITE-15). A commit that git does not
+    know is refused (`BAD_VALUE`) by `done` and by `apply` alike.
+  - The order with the `verify` command (R-VERIFY-1): the commit scope is checked first, and only
+    then does the command run. A commit outside the files, or a missing commit, runs no command in
+    `done` or in `apply`; the check is repeated under the lock with the document read there.
+  - `--force` overrides the file check and adds the note `forced done outside files: <files>`. It
+    does not override the `--commit` rule below.
   - A task at or below the target level that has `files` cannot be finished without `--commit`
     while git is available (exit 1, `MISSING_FIELD`, naming `--commit HEAD`).
-  - A task without `files`, or a folder where git isn't available (NFR-5), behaves as before v0.8.
+  - git is available when it is on `PATH` and the folder of `TODO.md` is inside a repository. A
+    task without `files`, or a folder where git isn't available (NFR-5), behaves as before v0.8.
   - Tests use a temporary repository with one commit inside the scope and one outside.
 
 ### 5.31 Waves — WAVE

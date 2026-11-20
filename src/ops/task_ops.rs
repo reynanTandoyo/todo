@@ -8,7 +8,7 @@
 use chrono::{DateTime, FixedOffset};
 use serde::Deserialize;
 
-use crate::doc::{Document, EntryKind, LineEdit, Status, Task};
+use crate::doc::{COMBINED_PART_SEPARATOR, Document, EntryKind, LineEdit, Status, Task};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::milestone;
 use crate::ops::pipeline::{build_claim_edits_with_note, build_release_edits};
@@ -16,7 +16,7 @@ use crate::ops::rules::{
     OwnershipDecision, StatusCommand, TaskCommand, check_ownership, check_promotable,
     forced_note_text, plan_claim, plan_release, validate_transition,
 };
-use crate::ops::scope::check_claim_files;
+use crate::ops::scope::{CommitScope, check_claim_files, check_done_commit};
 use crate::ops::verify::failed_checks_since_restart;
 use crate::ops::{OpsConfig, TaskEditBuilder};
 
@@ -78,6 +78,9 @@ pub enum TaskOp<'a> {
         commit: Option<&'a str>,
         /// Optional `by` value: the person behind the work (`R-WRITE-16`).
         by: Option<&'a str>,
+        /// What git said about the commit before the lock (`R-SCOPE-2`), checked against the task's
+        /// `files`.
+        scope: &'a CommitScope,
         /// What the check did, recorded with the change (`R-VERIFY-1`).
         check: DoneCheck<'a>,
     },
@@ -170,6 +173,25 @@ pub enum TaskOp<'a> {
         /// Changes in order.
         changes: &'a [SetChange<'a>],
     },
+}
+
+/// Refuses a `priority` that holds the combined-line separator (`BAD_VALUE`, T-178). The priority is
+/// the first part of the `- priority:` line, so it cannot move to a line of its own: it would split.
+fn check_priority_value(changes: &[SetChange<'_>]) -> Result<()> {
+    for change in changes {
+        if let SetChange::Field(key, value) = *change
+            && key.trim().eq_ignore_ascii_case("priority")
+            && value.contains(COMBINED_PART_SEPARATOR)
+        {
+            return Err(TodoError::new(
+                ErrorCode::BadValue,
+                format!(
+                    "priority {value:?} holds ' · ', which would split the combined priority line"
+                ),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// `verb`, or `verb — text` for a non-empty trimmed `text`.
@@ -446,6 +468,13 @@ impl TaskOp<'_> {
             }
         };
 
+        // R-SCOPE-2: the commit stays inside the task's files, and a task at the target level names
+        // its commit. Checked after the status change is accepted, so a wrong status is reported first.
+        let forced_scope = match self {
+            Self::Done { scope, .. } => check_done_commit(task, cfg, scope, env.force, &id_str)?,
+            _ => None,
+        };
+
         if let Self::Done {
             commit, by, check, ..
         } = self
@@ -478,6 +507,7 @@ impl TaskOp<'_> {
         }
         if let Self::Set { changes } = self {
             refuse_counted_fields(changes, &id_str)?;
+            check_priority_value(changes)?;
             milestone::check_set_changes(doc, cfg, task, changes)?;
             check_final_changes(task, changes, cfg, &id_str)?;
             for change in *changes {
@@ -510,6 +540,9 @@ impl TaskOp<'_> {
                 agent,
                 &format!("forced done ({count} entries below unfinished)"),
             );
+        }
+        if let Some(text) = &forced_scope {
+            builder.add_note(&date, agent, text);
         }
         if let Self::Done {
             check: DoneCheck::Skipped,
@@ -715,18 +748,27 @@ impl NewTask<'_> {
             "- status: open".to_string(),
             format!("- owner: {CANONICAL_NOBODY_OWNER}"),
         ];
-        let combined: Vec<String> = [
+        // A value that holds the part separator cannot share the combined line (`docs/format.md` §8): it
+        // gets a line of its own, right after the combined line.
+        let mut combined = Vec::new();
+        let mut own_lines = Vec::new();
+        for (key, value) in [
             ("priority", self.priority),
             ("difficulty", self.difficulty),
             ("type", self.task_type),
             ("area", self.area),
-        ]
-        .into_iter()
-        .filter_map(|(k, v)| v.map(|v| format!("{k}: {v}")))
-        .collect();
-        if !combined.is_empty() {
-            lines.push(format!("- {}", combined.join(" \u{00b7} ")));
+        ] {
+            let Some(value) = value else { continue };
+            if key != "priority" && value.contains(COMBINED_PART_SEPARATOR) {
+                own_lines.push(format!("- {key}: {value}"));
+            } else {
+                combined.push(format!("{key}: {value}"));
+            }
         }
+        if !combined.is_empty() {
+            lines.push(format!("- {}", combined.join(COMBINED_PART_SEPARATOR)));
+        }
+        lines.extend(own_lines);
         for (key, value) in [
             ("milestone", self.milestone),
             ("goal", self.goal),
