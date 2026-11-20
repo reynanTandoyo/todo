@@ -613,12 +613,15 @@ register_commands! {
     Set => set,
     Show => show,
     Skill => skill,
+    Split => split,
     Status => status,
     Stuck => stuck,
     Summary => summary,
     Tree => tree,
     Unblock => unblock,
     Unlock => unlock,
+    Verify => verify,
+    Waves => waves,
     Where => where_cmd,
 }
 

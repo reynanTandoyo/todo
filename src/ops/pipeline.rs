@@ -21,6 +21,7 @@ use crate::ops::read::{
     require_known_format, waits_on_task,
 };
 use crate::ops::rules::{ClaimPlan, ReleasePlan};
+use crate::ops::scope::files_busy;
 use crate::output::Output;
 use crate::state::StateDir;
 use crate::version::RUNNING_VERSION;
@@ -583,16 +584,19 @@ where
                             now,
                             &cfg_owned,
                         );
+                        // A dependent whose files another agent's live claim holds is not newly
+                        // ready: `next` would not hand it out (R-DEP-4, R-SCOPE-1).
                         let newly_ready = pre_not_ready_dependents
                             .into_iter()
                             .filter_map(|dep_id| {
                                 let t = new_doc.task_by_id(dep_id)?;
-                                is_task_ready(new_doc, t, new_archive, now, &cfg_owned).then(|| {
-                                    NewlyReadyTask {
-                                        id: cfg_owned.id_config.format_id(t.id),
-                                        priority: t.priority.clone(),
-                                        title: t.title.clone(),
-                                    }
+                                let ready = is_task_ready(new_doc, t, new_archive, now, &cfg_owned)
+                                    && files_busy(new_doc, t, t.owner.as_deref(), now, &cfg_owned)
+                                        .is_empty();
+                                ready.then(|| NewlyReadyTask {
+                                    id: cfg_owned.id_config.format_id(t.id),
+                                    priority: t.priority.clone(),
+                                    title: t.title.clone(),
                                 })
                             })
                             .collect();

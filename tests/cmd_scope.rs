@@ -687,3 +687,160 @@ fn summary_next_ready_keeps_a_task_whose_only_holder_is_stale() {
 
     assert_eq!(summary_next_ready_ids(&home, &work), ["T-002", "T-001"]);
 }
+
+/// `T-001` (open) and `T-002` (open, depends on `T-001`, names `dependent_files`), plus `extra`.
+/// Both tasks have a level (R-LEVEL-1): `next` and the newly ready list hand out only leveled tasks,
+/// and this fixture is about files, not levels.
+fn finishing_body(dependent_files: &str, extra: &[String]) -> String {
+    let mut blocks = format!(
+        "### T-001 · First\n- status: open\n- owner: —\n- priority: P1 · difficulty: 2\n\n\
+         ### T-002 · Second\n- status: open\n- owner: —\n- priority: P1 · difficulty: 2\n- depends: T-001\n- files: {dependent_files}\n\n"
+    );
+    blocks.push_str(&extra.concat());
+    format!("{MARKER}\n<!-- todo-format: 3 -->\n## Queue\n\n{blocks}")
+}
+
+/// The `T-…` IDs in `data.newly_ready` of a `--json` write, empty when the key is left out.
+fn newly_ready_ids(out: &Output) -> Vec<String> {
+    parse_json(&out.stdout)["data"]["newly_ready"]
+        .as_array()
+        .map(|list| {
+            list.iter()
+                .map(|r| r["id"].as_str().unwrap().to_string())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn done_leaves_out_a_newly_ready_task_whose_files_another_agent_holds() {
+    let tmp = TempDir::new().unwrap();
+    let holder = block(
+        3,
+        "Holder",
+        "claimed",
+        "carol",
+        "P2",
+        Some(&fresh_claim()),
+        Some("src/a.c"),
+    );
+    let (home, work, _todo) = setup_proj(&tmp, &finishing_body("src/a.c", &[holder]));
+
+    let done = run(
+        &home,
+        &work,
+        &["--json", "--agent", "alice", "done", "T-001"],
+    );
+    assert!(done.status.success(), "stderr: {}", stderr_text(&done));
+    // T-002 has no dependency left, but carol's live claim holds src/a.c, so it is not newly ready.
+    assert!(newly_ready_ids(&done).is_empty(), "{}", stdout_text(&done));
+}
+
+#[test]
+fn done_text_names_no_now_ready_task_whose_files_another_agent_holds() {
+    let tmp = TempDir::new().unwrap();
+    let holder = block(
+        3,
+        "Holder",
+        "claimed",
+        "carol",
+        "P2",
+        Some(&fresh_claim()),
+        Some("src/a.c"),
+    );
+    let (home, work, _todo) = setup_proj(&tmp, &finishing_body("src/a.c", &[holder]));
+
+    let text = run(&home, &work, &["--agent", "alice", "done", "T-001"]);
+    assert!(text.status.success(), "stderr: {}", stderr_text(&text));
+    assert!(
+        !stdout_text(&text).contains("now ready"),
+        "{}",
+        stdout_text(&text)
+    );
+}
+
+#[test]
+fn done_lists_a_newly_ready_task_when_nothing_holds_its_files() {
+    let tmp = TempDir::new().unwrap();
+    // carol's claim names another file, so it does not hold the dependent's src/a.c.
+    let other = block(
+        3,
+        "Elsewhere",
+        "claimed",
+        "carol",
+        "P2",
+        Some(&fresh_claim()),
+        Some("docs/x.md"),
+    );
+    let (home, work, _todo) = setup_proj(&tmp, &finishing_body("src/a.c", &[other]));
+
+    let done = run(
+        &home,
+        &work,
+        &["--json", "--agent", "alice", "done", "T-001"],
+    );
+    assert!(done.status.success(), "stderr: {}", stderr_text(&done));
+    assert_eq!(newly_ready_ids(&done), ["T-002"]);
+}
+
+#[test]
+fn done_text_names_a_now_ready_task_when_nothing_holds_its_files() {
+    let tmp = TempDir::new().unwrap();
+    let other = block(
+        3,
+        "Elsewhere",
+        "claimed",
+        "carol",
+        "P2",
+        Some(&fresh_claim()),
+        Some("docs/x.md"),
+    );
+    let (home, work, _todo) = setup_proj(&tmp, &finishing_body("src/a.c", &[other]));
+
+    let text = run(&home, &work, &["--agent", "alice", "done", "T-001"]);
+    assert!(text.status.success(), "stderr: {}", stderr_text(&text));
+    assert!(
+        stdout_text(&text).contains("now ready: T-002"),
+        "{}",
+        stdout_text(&text)
+    );
+}
+
+#[test]
+fn drop_applies_the_same_file_scope_to_newly_ready_tasks() {
+    let tmp = TempDir::new().unwrap();
+    let holder = block(
+        3,
+        "Holder",
+        "claimed",
+        "carol",
+        "P2",
+        Some(&fresh_claim()),
+        Some("src/a.c"),
+    );
+    let (home, work, _todo) = setup_proj(&tmp, &finishing_body("src/a.c", &[holder]));
+
+    let dropped = run(
+        &home,
+        &work,
+        &[
+            "--json",
+            "--agent",
+            "alice",
+            "drop",
+            "T-001",
+            "--note",
+            "not needed",
+        ],
+    );
+    assert!(
+        dropped.status.success(),
+        "stderr: {}",
+        stderr_text(&dropped)
+    );
+    assert!(
+        newly_ready_ids(&dropped).is_empty(),
+        "{}",
+        stdout_text(&dropped)
+    );
+}

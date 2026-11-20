@@ -17,6 +17,7 @@ use crate::ops::rules::{
     forced_note_text, plan_claim, plan_release, validate_transition,
 };
 use crate::ops::scope::check_claim_files;
+use crate::ops::verify::failed_checks_since_restart;
 use crate::ops::{OpsConfig, TaskEditBuilder};
 
 /// Who performs an operation, when, and with which settings.
@@ -45,6 +46,23 @@ pub enum SetChange<'a> {
     Unset(&'a str),
 }
 
+/// What `done` did about the task's `verify` command (`R-VERIFY-1`), recorded with the done change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DoneCheck<'a> {
+    /// No check ran and none is recorded: the task has no `verify` line, `verify = false`, or
+    /// `verify_when = "wave"`.
+    NotChecked,
+    /// `done --no-verify --force`: the check was skipped; the note `forced done without verify`
+    /// says so.
+    Skipped,
+    /// The command passed; the task gets `verified` with today's date.
+    Passed {
+        /// The command that passed. It must still be the task's `verify` line when the change is
+        /// written, so the pass is for the command that is recorded.
+        command: &'a str,
+    },
+}
+
 /// A single-task edit with its parameters (text already resolved and checked by the caller).
 #[derive(Debug, Clone, Copy)]
 pub enum TaskOp<'a> {
@@ -60,6 +78,31 @@ pub enum TaskOp<'a> {
         commit: Option<&'a str>,
         /// Optional `by` value: the person behind the work (`R-WRITE-16`).
         by: Option<&'a str>,
+        /// What the check did, recorded with the change (`R-VERIFY-1`).
+        check: DoneCheck<'a>,
+    },
+    /// `done` whose `verify` command failed (`R-VERIFY-1`): the task stays claimed, `attempts` is
+    /// raised by one and the note `verify failed — <last line>` is added. When this failure is the
+    /// `verify_attempts`-th since the task last went back to work, the task is given back as `stuck`
+    /// does, with the note `stuck — verify failed <N> times: <last line>`.
+    VerifyFailed {
+        /// The command that failed; it must still be the task's `verify` line.
+        command: &'a str,
+        /// The last line of its output.
+        last_line: &'a str,
+    },
+    /// `verify --wave` on a done task whose command passed (`R-VERIFY-2`): writes `verified`.
+    VerifyPassed {
+        /// The command that passed; it must still be the task's `verify` line.
+        command: &'a str,
+    },
+    /// `verify --wave` on a done task whose command failed (`R-VERIFY-2`): the task is reopened and
+    /// given back as `stuck` does, with the note `stuck — verify failed after done: <last line>`.
+    VerifyWaveFailed {
+        /// The command that failed; it must still be the task's `verify` line.
+        command: &'a str,
+        /// The last line of its output.
+        last_line: &'a str,
     },
     /// Drop the task with a reason. A milestone with unfinished entries below it is refused
     /// (R-MILE-2); `drop --tree` drops those entries first.
@@ -210,6 +253,55 @@ fn check_final_changes(
     Ok(())
 }
 
+/// Refuses `verified` written from a check of a command that is no longer the task's `verify` line
+/// (`R-VERIFY-1`): the check ran on the old command, so the write must not go through.
+fn check_verify_command_unchanged(task: &Task, command: &str, id_str: &str) -> Result<()> {
+    if task.verify.as_deref() == Some(command) {
+        return Ok(());
+    }
+    Err(TodoError::new(
+        ErrorCode::ChangedDuringWrite,
+        format!("the verify line of {id_str} changed while its check ran; run the check again"),
+    )
+    .with_task(id_str))
+}
+
+/// Refuses a `verify --wave` write on a task that is no longer done (`R-VERIFY-2`).
+fn require_done(task: &Task, id_str: &str) -> Result<()> {
+    if task.status == Status::Done {
+        return Ok(());
+    }
+    Err(TodoError::new(
+        ErrorCode::BadTransition,
+        format!(
+            "{id_str} is {}, not done; only done tasks are checked by verify --wave",
+            task.status.as_str()
+        ),
+    )
+    .with_task(id_str))
+}
+
+/// Refuses `set` changes to the fields that only the check commands write (`R-WRITE-8`).
+fn refuse_counted_fields(changes: &[SetChange<'_>], id_str: &str) -> Result<()> {
+    for change in changes {
+        let key = match *change {
+            SetChange::Field(key, _) | SetChange::Unset(key) => key,
+            SetChange::Title(_) => continue,
+        };
+        let key = key.trim();
+        if key.eq_ignore_ascii_case("attempts") || key.eq_ignore_ascii_case("verified") {
+            return Err(TodoError::new(
+                ErrorCode::BadValue,
+                format!(
+                    "cannot change `{key}` with set; it changes only through stuck, done, verify and reopen"
+                ),
+            )
+            .with_task(id_str));
+        }
+    }
+    Ok(())
+}
+
 impl TaskOp<'_> {
     /// Command name, used for forced notes and as the `apply` operation name.
     #[must_use]
@@ -217,7 +309,8 @@ impl TaskOp<'_> {
         match self {
             Self::Claim => "claim",
             Self::Release => "release",
-            Self::Done { .. } => "done",
+            Self::Done { .. } | Self::VerifyFailed { .. } => "done",
+            Self::VerifyPassed { .. } | Self::VerifyWaveFailed { .. } => "verify",
             Self::Drop { .. } | Self::DropTree { .. } | Self::DropWithin { .. } => "drop",
             Self::Block { .. } => "block",
             Self::Unblock { .. } => "unblock",
@@ -255,6 +348,11 @@ impl TaskOp<'_> {
             Self::Release => {
                 let plan = plan_release(task, agent, env.force, cfg)?;
                 return Ok(build_release_edits(doc, task, &plan, agent, now).0);
+            }
+            Self::VerifyFailed { .. }
+            | Self::VerifyPassed { .. }
+            | Self::VerifyWaveFailed { .. } => {
+                return self.build_verify_edits(doc, task, env);
             }
             _ => {}
         }
@@ -339,6 +437,8 @@ impl TaskOp<'_> {
                         builder.set_owner(None);
                         builder.remove_claimed();
                         builder.unset_field("by");
+                        // R-VERIFY-1: a reopened task has not passed its check any more.
+                        builder.unset_field("verified");
                     }
                     _ => {}
                 }
@@ -346,12 +446,19 @@ impl TaskOp<'_> {
             }
         };
 
-        if let Self::Done { commit, by, .. } = self {
+        if let Self::Done {
+            commit, by, check, ..
+        } = self
+        {
             if let Some(c) = commit {
                 builder.set_field("commit", c);
             }
             if let Some(b) = by {
                 builder.set_field("by", b);
+            }
+            if let DoneCheck::Passed { command } = check {
+                check_verify_command_unchanged(task, command, &id_str)?;
+                builder.set_field("verified", &date);
             }
         }
         if let Self::Promote {
@@ -370,6 +477,7 @@ impl TaskOp<'_> {
             }
         }
         if let Self::Set { changes } = self {
+            refuse_counted_fields(changes, &id_str)?;
             milestone::check_set_changes(doc, cfg, task, changes)?;
             check_final_changes(task, changes, cfg, &id_str)?;
             for change in *changes {
@@ -403,6 +511,13 @@ impl TaskOp<'_> {
                 &format!("forced done ({count} entries below unfinished)"),
             );
         }
+        if let Self::Done {
+            check: DoneCheck::Skipped,
+            ..
+        } = self
+        {
+            builder.add_note(&date, agent, "forced done without verify");
+        }
         let note = match *self {
             Self::Done { note, .. } => Some(note_with("done", note)),
             Self::Drop { reason } | Self::DropTree { reason } => {
@@ -422,6 +537,70 @@ impl TaskOp<'_> {
         };
         if let Some(text) = note {
             builder.add_note(&date, agent, &text);
+        }
+        Ok(builder.build().0)
+    }
+
+    /// The edits of the three operations that record a check's result (`R-VERIFY-1`, `R-VERIFY-2`).
+    fn build_verify_edits(
+        &self,
+        doc: &Document,
+        task: &Task,
+        env: &OpEnv<'_>,
+    ) -> Result<Vec<LineEdit>> {
+        let (cfg, agent, now) = (env.cfg, env.agent, env.now);
+        let id_str = cfg.id_config.format_id(task.id);
+        let date = OpsConfig::format_note_date(now);
+        let mut builder = TaskEditBuilder::new(doc, task);
+        match *self {
+            Self::VerifyFailed { command, last_line } => {
+                // `done` ran the check while the task was claimed: the change must still be for
+                // that claim and that command (R-WRITE-9, R-CLAIM-3).
+                check_verify_command_unchanged(task, command, &id_str)?;
+                let (_, ownership) =
+                    validate_transition(task, StatusCommand::Done, agent, env.force, &id_str)?;
+                let attempts = attempts_after_failure(task, &id_str)?;
+                builder.set_field("attempts", &attempts.to_string());
+                if let OwnershipDecision::Forced { previous_owner } = ownership {
+                    builder.add_note(
+                        &date,
+                        agent,
+                        &forced_note_text(self.name(), &previous_owner),
+                    );
+                }
+                let failures = failed_checks_since_restart(task).saturating_add(1);
+                if failures >= cfg.verify_attempts {
+                    // R-VERIFY-1: the task is given back as `stuck` does, with the count.
+                    builder.clear_owner_if_present();
+                    builder.remove_claimed();
+                    builder.set_status(Status::Blocked);
+                    let text =
+                        format!("stuck \u{2014} verify failed {failures} times: {last_line}");
+                    builder.add_note(&date, agent, &text);
+                } else {
+                    builder.add_note(&date, agent, &note_with("verify failed", Some(last_line)));
+                }
+            }
+            Self::VerifyPassed { command } => {
+                check_verify_command_unchanged(task, command, &id_str)?;
+                require_done(task, &id_str)?;
+                builder.set_field("verified", &date);
+            }
+            Self::VerifyWaveFailed { command, last_line } => {
+                // R-VERIFY-2: a failed check after done reopens the task and gives it back.
+                check_verify_command_unchanged(task, command, &id_str)?;
+                require_done(task, &id_str)?;
+                let attempts = attempts_after_failure(task, &id_str)?;
+                builder.set_field("attempts", &attempts.to_string());
+                builder.set_status(Status::Blocked);
+                builder.clear_owner_if_present();
+                builder.remove_claimed();
+                builder.unset_field("verified");
+                builder.unset_field("by");
+                let text = format!("verify failed after done: {last_line}");
+                builder.add_note(&date, agent, &note_with("stuck", Some(&text)));
+            }
+            _ => {}
         }
         Ok(builder.build().0)
     }

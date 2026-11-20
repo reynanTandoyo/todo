@@ -42,10 +42,12 @@ pub mod read;
 pub mod rules;
 pub mod scope;
 pub mod task_ops;
+pub mod verify;
+pub mod waves;
 
 pub use config::{
     CONFIG_FILENAME, DEFAULT_ARCHIVE_FILE, DEFAULT_CLAIM_TTL_HOURS, DEFAULT_IDEA_SECTION,
-    DEFAULT_QUESTION_SECTION, DEFAULT_SNAPSHOTS_KEEP, OpsConfig,
+    DEFAULT_QUESTION_SECTION, DEFAULT_SNAPSHOTS_KEEP, OpsConfig, VerifyWhen,
 };
 pub use edits::TaskEditBuilder;
 pub use pipeline::{
@@ -75,5 +77,5 @@ pub use rules::{
     plan_release, validate_transition,
 };
 pub use task_ops::{
-    NewTask, OpEnv, SetChange, StepsInput, TaskOp, highest_task_number, steps_from_text,
+    DoneCheck, NewTask, OpEnv, SetChange, StepsInput, TaskOp, highest_task_number, steps_from_text,
 };

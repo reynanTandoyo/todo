@@ -124,6 +124,10 @@ pub enum ErrorCode {
     DuplicateProject,
     /// The task's files overlap a task that another agent holds, so the claim is refused (R-SCOPE-1, R-CLAIM-2).
     FilesBusy,
+    /// A task's `verify` command ran and failed, or timed out (R-VERIFY-1, R-VERIFY-2).
+    VerifyFailed,
+    /// A `verify` command could not run: no shell could be started, or `verify = false` (R-VERIFY-1).
+    VerifyNotRun,
 }
 
 impl ErrorCode {
@@ -154,6 +158,8 @@ impl ErrorCode {
             Self::ToolTooOld => "TOOL_TOO_OLD",
             Self::DuplicateProject => "DUPLICATE_PROJECT",
             Self::FilesBusy => "FILES_BUSY",
+            Self::VerifyFailed => "VERIFY_FAILED",
+            Self::VerifyNotRun => "VERIFY_NOT_RUN",
         }
     }
 
@@ -183,6 +189,8 @@ impl ErrorCode {
         Self::ToolTooOld,
         Self::DuplicateProject,
         Self::FilesBusy,
+        Self::VerifyFailed,
+        Self::VerifyNotRun,
     ];
 
     /// Plain-English meaning of this error code, shown by `todo schema`.
@@ -226,6 +234,12 @@ impl ErrorCode {
             Self::FilesBusy => {
                 "The task's files overlap a task that another agent holds. Claim with --force to override."
             }
+            Self::VerifyFailed => {
+                "A task's verify command failed or timed out, so the task was not marked done (or was not verified)."
+            }
+            Self::VerifyNotRun => {
+                "A verify command could not run: no shell could be started, or verify = false in todo.toml."
+            }
         }
     }
 
@@ -247,7 +261,8 @@ impl ErrorCode {
             | Self::DuplicateProject
             | Self::FilesBusy => ExitCode::Refused,
             Self::Busy | Self::LeaseHeld | Self::ChangedDuringWrite => ExitCode::Busy,
-            Self::NoGitHistory => ExitCode::CheckError,
+            Self::VerifyFailed => ExitCode::Refused,
+            Self::NoGitHistory | Self::VerifyNotRun => ExitCode::CheckError,
             Self::NoFile
             | Self::UnsafeFile
             | Self::ReadOnly
@@ -428,6 +443,12 @@ mod tests {
             (ErrorCode::UnsafeFile, "UNSAFE_FILE", ExitCode::FileError),
             (ErrorCode::ReadOnly, "READ_ONLY", ExitCode::FileError),
             (ErrorCode::WriteFailed, "WRITE_FAILED", ExitCode::FileError),
+            (ErrorCode::VerifyFailed, "VERIFY_FAILED", ExitCode::Refused),
+            (
+                ErrorCode::VerifyNotRun,
+                "VERIFY_NOT_RUN",
+                ExitCode::CheckError,
+            ),
         ];
 
         for (code, expected_str, expected_exit) in cases {

@@ -2,7 +2,7 @@
 //! `todo::ops::scope` API: paths, folders, patterns, `**`, separators, case, `:<line>` suffixes,
 //! and the entries that `check` reports.
 
-use todo::ops::scope::{outside_folder_reason, parse_files, scopes_overlap};
+use todo::ops::scope::{outside_folder_reason, overlap_lanes, parse_files, scopes_overlap};
 
 /// Whether the `files` value `a` and the `files` value `b` overlap (a task-level comparison).
 fn overlaps(a: &str, b: &str) -> bool {
@@ -122,4 +122,90 @@ fn ordinary_relative_entries_are_not_reported() {
     assert_eq!(outside_folder_reason("src/a.c:12"), None);
     assert_eq!(outside_folder_reason("docs/"), None);
     assert_eq!(outside_folder_reason("src/*.c"), None);
+}
+
+/// The lanes that compare every pair of items: two items share a lane when their scopes overlap,
+/// through any chain of items. Numbered from 0 in order of first appearance, as `overlap_lanes`.
+fn pairwise_lanes(items: &[&str]) -> Vec<usize> {
+    let scopes: Vec<_> = items.iter().map(|files| parse_files(files)).collect();
+    let mut lane: Vec<usize> = (0..items.len()).collect();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for i in 0..items.len() {
+            for j in 0..items.len() {
+                if lane[i] != lane[j] && scopes_overlap(&scopes[i], &scopes[j]) {
+                    let (from, to) = (lane[j], lane[i]);
+                    for value in &mut lane {
+                        if *value == from {
+                            *value = to;
+                        }
+                    }
+                    changed = true;
+                }
+            }
+        }
+    }
+    let mut numbers: Vec<usize> = Vec::new();
+    lane.iter()
+        .map(|&value| {
+            if let Some(pos) = numbers.iter().position(|&seen| seen == value) {
+                pos
+            } else {
+                numbers.push(value);
+                numbers.len() - 1
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn lanes_join_items_whose_scopes_overlap_directly_or_through_another_item() {
+    let items = [
+        "src/x.rs, src/y.rs",
+        "src/y.rs, src/z.rs",
+        "src/z.rs",
+        "",
+        "src/w.rs",
+    ];
+    assert_eq!(overlap_lanes(&scopes_of(&items)), vec![0, 0, 0, 1, 2]);
+    assert_eq!(overlap_lanes(&scopes_of(&items)), pairwise_lanes(&items));
+}
+
+#[test]
+fn lanes_match_the_pairwise_rule_for_folders_patterns_and_case() {
+    let items = [
+        "docs/",
+        "docs/a.md",
+        "src/*.rs",
+        "*/x.rs",
+        "**/y.rs",
+        "Src/X.RS",
+        "src/x.rs:42",
+        "./src/w.rs",
+        "lib*",
+        "lib/a.rs",
+        "libs/b.rs",
+        "li*/c.rs",
+        "src/",
+        "src/deep/e.rs",
+        "",
+        ".",
+        "tests/**/fixture.txt",
+        "tests/a/fixture.txt",
+        "a b/c d.md",
+        "a b/c d.md, lib/a.rs",
+    ];
+    assert_eq!(overlap_lanes(&scopes_of(&items)), pairwise_lanes(&items));
+}
+
+#[test]
+fn an_item_without_files_is_a_lane_of_its_own() {
+    let items = ["", ".", "src/a.rs", "src/a.rs"];
+    assert_eq!(overlap_lanes(&scopes_of(&items)), vec![0, 1, 2, 2]);
+}
+
+/// The parsed `files` values of `items`, as the planner hands them to `overlap_lanes`.
+fn scopes_of(items: &[&str]) -> Vec<Vec<todo::ops::scope::ScopeEntry>> {
+    items.iter().map(|files| parse_files(files)).collect()
 }

@@ -404,6 +404,30 @@ pub fn find_todo(opts: &FindOptions<'_>) -> Result<FoundTodo> {
     }
 }
 
+/// The folder where a task's `verify` command runs (`R-VERIFY-1`): the folder of `TODO.md`, or, when
+/// the file was found through a linked worktree (`R-FIND-5`), the matching folder of the worktree
+/// that `cwd` is in, so the check sees the worker's own checkout.
+#[must_use]
+pub fn verify_folder(found: &FoundTodo, cwd: &Path) -> PathBuf {
+    let todo_dir = found
+        .path
+        .parent()
+        .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+    if found.found_by != FoundBy::WorktreeMain {
+        return todo_dir;
+    }
+    let Some(main_root) = found.repo_root.as_deref() else {
+        return todo_dir;
+    };
+    let Some(rel) = relative_subpath(&todo_dir, main_root) else {
+        return todo_dir;
+    };
+    match find_git_root_upward(cwd).map(|root| inspect_git_root(&root)) {
+        Some(GitContext::LinkedWorktree { wt_root, .. }) => wt_root.join(rel),
+        _ => todo_dir,
+    }
+}
+
 fn walk_up_bounded(start: &Path, stop_at: &Path) -> Option<PathBuf> {
     walk_up_bounded_file(start, stop_at, TODO_FILENAME)
 }

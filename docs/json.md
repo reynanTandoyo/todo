@@ -382,6 +382,64 @@ ones only for the whole tree (no milestone argument and no `--area`); otherwise 
 }
 ```
 
+### `todo waves --json` (`todo.waves.v1`, `R-WAVE-1`)
+
+```json
+{
+  "schema": "todo.waves.v1",
+  "ok": true,
+  "data": {
+    "file": "TODO.md",
+    "milestone": null,
+    "tasks": 3,
+    "wave_count": 2,
+    "max_workers": 1,
+    "longest_chain": [
+      { "id": "T-001", "title": "Parse the config", "status": "open", "owner": null, "level": "1", "missing": [] },
+      { "id": "T-002", "title": "Load the config", "status": "open", "owner": null, "level": "2", "missing": [] }
+    ],
+    "waves": [
+      {
+        "wave": 1,
+        "size": { "tasks": 1, "lanes": 1 },
+        "lanes": [[{ "id": "T-001", "title": "Parse the config", "status": "open", "owner": null, "level": "1", "missing": [] }]]
+      },
+      {
+        "wave": 2,
+        "size": { "tasks": 1, "lanes": 1 },
+        "lanes": [[{ "id": "T-002", "title": "Load the config", "status": "open", "owner": null, "level": "2", "missing": [] }]]
+      }
+    ],
+    "apart": [
+      { "id": "T-003", "title": "Blocked for now", "status": "blocked", "reason": "blocked: waiting for the key" }
+    ]
+  },
+  "warnings": []
+}
+```
+
+`waves` (`R-WAVE-1`) groups the unfinished tasks (open and claimed) into waves: wave 1 holds every
+task that is ready now, and wave `n` the tasks that become ready when the waves before it are done.
+Each wave lists its `lanes`, and the tasks of one lane share files, so they run one after another.
+`size` gives the `tasks` and `lanes` of the wave. `wave_count` is the number of waves, which is the
+length of `longest_chain`, the longest dependency chain task by task. `max_workers` is the most lanes
+in any wave: the most workers useful at once.
+
+`apart` lists the unfinished tasks that are in no wave, in file order, each with its `reason`:
+`blocked: …` or `given back: …` (`todo stuck`), `below blocked milestone T-…`, `below done milestone
+T-…` or `below dropped milestone T-…` (the milestone above the task that holds it back, `R-MILE-6`),
+`depends on T-…, which does not exist`, `in a dependency cycle: T-… -> T-… -> T-…`, `no level: give it one with
+todo set T-… --difficulty <level>` (`R-LEVEL-1`, the rule of `next`) or `waits on T-…`.
+
+`level` is the task's difficulty as written; a task without one is in `apart`, not in a wave. `missing`
+lists what the task lacks for the detail rule at the lowest level (`R-DETAIL-2`): `why`, `accept`,
+`steps`, `verify`, `files`, `files: more than 3` or `files: folder or pattern`. It is `[]` when the
+task has all of it, and when it is at another level. A task with a missing item is still placed in
+its wave.
+
+`todo waves <milestone>` limits `tasks`, the waves and `apart` to the tasks below the milestone;
+`milestone` then holds its ID, and `null` otherwise. The wave numbers are those of the whole file.
+
 ### `todo where --json` (`todo.where.v1`)
 
 ```json
@@ -705,12 +763,41 @@ When finishing or dropping a task makes other tasks ready, their summaries appea
 ]
 ```
 
+A task whose files another agent's live claim holds is left out, as `next` would not hand it out (`R-SCOPE-1`); the text output's `now ready` lines come from the same list.
+
 When it finishes the last unfinished entry below a milestone, the milestone appears in `"ready_to_close"` (`R-MILE-6`). Nothing closes it; `todo done <id>` does. The key is left out when it is empty.
 
 ```json
 "ready_to_close": [
   { "id": "T-010", "title": "Renderer" }
 ]
+```
+
+### `todo verify <task> --json` and `todo verify --wave --json` (`todo.verify.v1`, `R-VERIFY-1`, `R-VERIFY-2`)
+
+A passing `verify <task>` prints `data` with `task`, `passed: true` and `log` (the path of
+`verify/<ID>.log`). A failing one is the `VERIFY_FAILED` error above. The output of the command never
+reaches the JSON; it is in the log file.
+
+`verify --wave` prints `data` with `checked` (the number of done tasks that were checked), `passed`
+(the IDs that passed), `failed` (one object per failed task: `task`, `exit_code`, `last_line` and
+`log`) and `given_back` (the IDs given back as `stuck`). It is `ok: true` with exit 1 when anything
+failed, as `align` is.
+
+```json
+{
+  "schema": "todo.verify.v1",
+  "ok": true,
+  "data": {
+    "checked": 2,
+    "passed": ["T-001"],
+    "failed": [
+      { "task": "T-002", "exit_code": 1, "last_line": "2 tests failed", "log": "…/verify/T-002.log" }
+    ],
+    "given_back": ["T-002"]
+  },
+  "warnings": []
+}
 ```
 
 ### Sessions: `fields.session`, `todo release --session --json`, `todo session-end --json` (`R-CLAIM-7`)
@@ -923,6 +1010,8 @@ project's `TODO.md`, never searches folders and writes nothing.
 | `TOOL_TOO_OLD` | 4 | `TODO.md`, the archive or the project register names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 3 is newer than this todo 0.7.0 supports; ...","line":1,"file":"TODO.md"}` |
 | `FILES_BUSY` | 1 | `claim` of a task whose `files` overlap a task another agent holds (R-SCOPE-1, R-CLAIM-2); `--force` overrides it | `{"code":"FILES_BUSY","message":"task T-002 shares files with T-001 (claimed by alice); pass --force to claim it anyway","task":"T-002","files_busy":["T-001"]}` |
 | `DUPLICATE_PROJECT` | 1 | `project add` for a file, or a name, that the project register already has (R-PROJ-1) | `{"code":"DUPLICATE_PROJECT","message":"C:\\Projekte\\TODO.md is already registered as renderer"}` |
+| `VERIFY_FAILED` | 1 | A task's `verify` command failed or timed out: `done` is refused (the task stays claimed, or is given back as `stuck`), or `todo verify <task>` failed (R-VERIFY-1) | `{"code":"VERIFY_FAILED","message":"verify of T-012 failed (exit code 1), so T-012 is not done and stays claimed: tests failed","task":"T-012","exit_code":1,"last_line":"tests failed","timed_out":false,"log":"C:\\Projekte\\.git\\todo\\TODO.md\\verify\\T-012.log"}` |
+| `VERIFY_NOT_RUN` | 5 | A `verify` command could not run: no shell could start, or `verify = false` in `todo.toml`; nothing is written (R-VERIFY-1) | `{"code":"VERIFY_NOT_RUN","message":"verify commands are off: verify = false in todo.toml"}` |
 
 ### `TOOL_TOO_OLD` (`R-VER-2`)
 
