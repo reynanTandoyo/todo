@@ -1232,13 +1232,14 @@ todo next --claim --max-difficulty 1 --brief --agent worker-1
   and a crash in between leaves half a split.
   - The children are JSON lines in the shape of `add --from` (R-WRITE-13); they may depend on each
     other with `"@ref"`. Each child is added with `milestone` set to the split task, directly after
-    the split task's block, in the given order; a child that names a `milestone` of its own is
-    refused (`BAD_VALUE`). Children follow the rules of `add`, `required_fields` included.
+    the split task's block, in the given order; a child that names a `milestone` of its own, or a
+    `section` (it goes where the split task is), is refused (`BAD_VALUE`), and so is a child that is
+    a question or an idea (R-MILE-1). Children follow the rules of `add`, `required_fields` included.
   - In the same write the task becomes `type: milestone`, with `goal` from `--goal`, or else from its
     `accept`; without either the split is refused (exit 1, `MISSING_FIELD`). It loses `difficulty`,
-    `files`, `read`, `steps`, `verify`, `final`, `attempts` and its claim (`owner`, `claimed`,
-    `session`); a blocked task — usually one given back (R-STUCK-1) — becomes open, so its children
-    can be handed out (R-MILE-6). Every other line stays, and a note on it names the children
+    `files`, `read`, `steps`, `verify`, `final`, `attempts`, `verified` and its claim (`owner`,
+    `claimed`, `session`); a blocked task — usually one given back (R-STUCK-1) — becomes open, so its
+    children can be handed out (R-MILE-6). Every other line stays, and a note on it names the children
     (`split into T-021, T-022, T-023`, format.md §9).
   - Tasks that depended on the split task still name it, and now wait for the whole milestone
     (R-MILE-6); nothing that depended on it breaks.
