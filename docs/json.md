@@ -206,6 +206,7 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
       { "id": "T-012", "title": "C shader", "kind": "task", "status": "open" }
     ],
     "why": null,
+    "final": null,
     "depends": ["T-003"],
     "dependencies": [
       { "raw": "T-003", "id": "T-003", "exists": true, "archived": false, "status": "done", "title": "Setup", "satisfied": true }
@@ -226,6 +227,8 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
     "steps": [],
     "accept": null,
     "verify": null,
+    "attempts": null,
+    "verified": null,
     "commit": [],
     "fields": {},
     "notes": [
@@ -268,6 +271,7 @@ the output for a fixture with one open task:
       "milestones": [],
       "children": [],
       "why": "the reader needs it first",
+      "final": null,
       "depends": [],
       "dependencies": [],
       "dependents": [],
@@ -282,6 +286,8 @@ the output for a fixture with one open task:
       "steps": [],
       "accept": null,
       "verify": null,
+      "attempts": null,
+      "verified": null,
       "commit": [],
       "fields": {},
       "notes": [
@@ -330,6 +336,8 @@ the output for a fixture with one open task:
 `ready_to_close` (`R-MILE-6`) lists the milestones that are ready to close, as `{ "id", "title" }`; the key is left out when there are none.
 
 `given_back` (`R-STUCK-1`) lists the blocked tasks that `todo stuck` gave back to the planner, each as a `blocked` entry whose `reason` is the problem; the key is left out when there are none.
+
+`kept_on_purpose` (`R-LEVEL-3`) is the number of open or blocked tasks above the target level that keep a `final` reason; the key is left out when there are none.
 
 `counts` covers tasks only: `open`, `claimed`, `blocked`, `done`, `dropped` and `total` (their sum) leave out milestones, which are listed under `milestones`. `questions` and `ideas` count the open ones (not done or dropped) apart from the rest (`R-KIND-3`, `R-KIND-1`); the open questions are listed in `open_questions`.
 
@@ -1008,6 +1016,7 @@ project's `TODO.md`, never searches folders and writes nothing.
 | `NO_GIT_HISTORY` | 5 | `align` without git, outside a repository, in a shallow clone or with no commits | `{"code":"NO_GIT_HISTORY","message":"not inside a git repository"}` |
 | `TOOL_TOO_OLD` | 4 | `TODO.md`, the archive or the project register names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 3 is newer than this todo 0.7.0 supports; ...","line":1,"file":"TODO.md"}` |
 | `FILES_BUSY` | 1 | `claim` of a task whose `files` overlap a task another agent holds (R-SCOPE-1, R-CLAIM-2); `--force` overrides it | `{"code":"FILES_BUSY","message":"task T-002 shares files with T-001 (claimed by alice); pass --force to claim it anyway","task":"T-002","files_busy":["T-001"]}` |
+| `OUT_OF_SCOPE` | 1 | `done --commit` whose commit changed files outside the task's `files` (R-SCOPE-2); `--force` finishes it and notes the files | `{"code":"OUT_OF_SCOPE","message":"T-001 changed files outside its files: other/x.txt; pass --force to finish it anyway","task":"T-001","files_outside":["other/x.txt"]}` |
 | `DUPLICATE_PROJECT` | 1 | `project add` for a file, or a name, that the project register already has (R-PROJ-1) | `{"code":"DUPLICATE_PROJECT","message":"C:\\Projekte\\TODO.md is already registered as renderer"}` |
 | `VERIFY_FAILED` | 1 | A task's `verify` command failed or timed out: `done` is refused (the task stays claimed, or is given back as `stuck`), or `todo verify <task>` failed (R-VERIFY-1) | `{"code":"VERIFY_FAILED","message":"verify of T-012 failed (exit code 1), so T-012 is not done and stays claimed: tests failed","task":"T-012","exit_code":1,"last_line":"tests failed","timed_out":false,"log":"C:\\Projekte\\.git\\todo\\TODO.md\\verify\\T-012.log"}` |
 | `VERIFY_NOT_RUN` | 5 | A `verify` command could not run: no shell could start, or `verify = false` in `todo.toml`; nothing is written (R-VERIFY-1) | `{"code":"VERIFY_NOT_RUN","message":"verify commands are off: verify = false in todo.toml"}` |

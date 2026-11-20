@@ -373,7 +373,7 @@ fn detail_settings_have_their_defaults_and_bad_values_are_refused_with_the_line(
     // Without its own target, a project's target is the first of its difficulties.
     let own = OpsConfig::from_toml_str("difficulties = [\"easy\", \"hard\"]\n").unwrap();
     assert_eq!(own.target_rank(), 0);
-    assert!(own.target_difficulty.is_none());
+    assert!(own.target_set.is_none());
 
     // A target is kept in the spelling of `difficulties`, whatever the case written.
     let raised = OpsConfig::from_toml_str(
@@ -381,7 +381,7 @@ fn detail_settings_have_their_defaults_and_bad_values_are_refused_with_the_line(
     )
     .unwrap();
     assert_eq!(raised.target_rank(), 1);
-    assert_eq!(raised.target_difficulty.as_deref(), Some("hard"));
+    assert_eq!(raised.target_set.as_deref(), Some("hard"));
     assert_eq!(raised.level1_max_files, 5);
 
     // Each bad value is refused, and the error names its line in todo.toml.

@@ -5,7 +5,7 @@ use clap::Args as ClapArgs;
 use crate::cli::add::find_section;
 use crate::cli::move_cmd::section_move_edits;
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::{Document, LineEdit, Task, TaskChangeIntent, sanitize_trimmed_value};
+use crate::doc::{Document, LineEdit, Task, TaskChangeIntent};
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::milestone;
 use crate::ops::{
@@ -53,21 +53,7 @@ pub struct Args {
 /// Runs `todo promote <idea> --priority P [--difficulty D] [--milestone <task>] [--section S]`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let cfg = ctx.load_config()?;
-    let clean_priority = sanitize_trimmed_value(&args.priority);
-    let Some(priority) = cfg
-        .priorities
-        .iter()
-        .find(|p| p.eq_ignore_ascii_case(&clean_priority))
-    else {
-        return Err(TodoError::new(
-            ErrorCode::BadValue,
-            format!(
-                "invalid priority '{clean_priority}'; expected one of: {}",
-                cfg.priorities.join(", ")
-            ),
-        ));
-    };
-    let priority = priority.clone();
+    let priority = cfg.canonical_priority(&args.priority)?;
     // A level given on the command line is checked before anything is read or written (BAD_VALUE).
     let difficulty = match args.difficulty.as_deref() {
         Some(raw) => Some(cfg.canonical_difficulty(raw)?),

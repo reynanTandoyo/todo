@@ -97,9 +97,9 @@ pub struct OpsConfig {
     /// The program and its arguments that run a `verify` line, which is added as the last
     /// argument; empty means the default shell of the platform (`R-VERIFY-1`).
     pub verify_shell: Vec<String>,
-    /// The level the planner splits down to (`target_difficulty`, `R-LEVEL-2`); `None` means the
-    /// first of `difficulties`. A task at or below it needs complete detail (`R-DETAIL-2`).
-    pub target_difficulty: Option<String>,
+    /// The `target_difficulty` of `todo.toml` in the spelling of `difficulties` (`R-LEVEL-2`); `None`
+    /// when the setting is absent, which means the lowest level. Read it through [`Self::target_rank`].
+    pub target_set: Option<String>,
     /// Most `files` entries a task at or below the target level may have (`level1_max_files`,
     /// `R-DETAIL-2`, default `3`).
     pub level1_max_files: usize,
@@ -137,7 +137,7 @@ impl Default for OpsConfig {
             verify_timeout_seconds: DEFAULT_VERIFY_TIMEOUT_SECONDS,
             verify_attempts: DEFAULT_VERIFY_ATTEMPTS,
             verify_shell: Vec::new(),
-            target_difficulty: None,
+            target_set: None,
             level1_max_files: DEFAULT_LEVEL1_MAX_FILES,
             todo_folder: None,
         }
@@ -175,15 +175,39 @@ impl OpsConfig {
             .position(|cfg_d| cfg_d.eq_ignore_ascii_case(d.trim()))
     }
 
-    /// Returns the position of the target level in [`Self::difficulties`] (`R-LEVEL-2`): the value
-    /// of `target_difficulty`, or 0, the lowest level, when it is not set. A task at or below this
-    /// position needs complete detail (`R-DETAIL-2`).
+    /// The position of the target level in [`Self::difficulties`] (`R-LEVEL-2`, `R-LEVEL-3`): the
+    /// configured `target_difficulty`, or 0, the lowest level, when none is set. This is the one place
+    /// the target level is read: `final`, the ready rule (`R-DETAIL-2`), `waves` and `check` all go
+    /// through it.
     #[must_use]
     pub fn target_rank(&self) -> usize {
-        self.target_difficulty
+        self.target_set
             .as_deref()
             .and_then(|target| self.difficulty_rank(Some(target)))
             .unwrap_or(0)
+    }
+
+    /// The target level itself: `target_difficulty` as configured, or the first of
+    /// [`Self::difficulties`] when none is set (`R-LEVEL-2`).
+    #[must_use]
+    pub fn target_difficulty(&self) -> &str {
+        self.difficulties
+            .get(self.target_rank())
+            .map_or("", String::as_str)
+    }
+
+    /// Whether a task at `difficulty` is above the target level, so it may keep a `final`
+    /// (`R-LEVEL-3`). A missing or unconfigured level is not above it.
+    #[must_use]
+    pub fn is_above_target(&self, difficulty: Option<&str>) -> bool {
+        matches!(self.difficulty_rank(difficulty), Some(rank) if rank > self.target_rank())
+    }
+
+    /// Whether a task at `difficulty` is at the target level or below it (`R-LEVEL-3`,
+    /// `R-DETAIL-2`). A missing or unconfigured level is neither.
+    #[must_use]
+    pub fn is_at_or_below_target(&self, difficulty: Option<&str>) -> bool {
+        matches!(self.difficulty_rank(difficulty), Some(rank) if rank <= self.target_rank())
     }
 
     /// Whether `required_fields` names `field`, ignoring case: a task must then have it (`R-LEVEL-1`).
@@ -192,6 +216,28 @@ impl OpsConfig {
         self.required_fields
             .iter()
             .any(|f| f.eq_ignore_ascii_case(field))
+    }
+
+    /// Returns the configured spelling of one `priority` value (`docs/format.md` §8).
+    ///
+    /// An unknown value is refused with `BAD_VALUE` and the list of allowed values. `add`, `ask`,
+    /// `promote` and `set` all check a priority here, so they refuse the same values (T-179).
+    pub fn canonical_priority(&self, raw: &str) -> Result<String> {
+        let value = raw.trim();
+        match self
+            .priorities
+            .iter()
+            .find(|p| p.eq_ignore_ascii_case(value))
+        {
+            Some(canonical) => Ok(canonical.clone()),
+            None => Err(TodoError::new(
+                ErrorCode::BadValue,
+                format!(
+                    "invalid priority '{value}'; expected one of: {}",
+                    self.priorities.join(", ")
+                ),
+            )),
+        }
     }
 
     /// Returns the configured spelling of one `difficulty` value (`R-WRITE-18`).
@@ -495,7 +541,7 @@ impl OpsConfig {
                     ),
                 ));
             };
-            cfg.target_difficulty = Some(canonical);
+            cfg.target_set = Some(canonical);
         }
 
         if cfg.lock.lease_minutes > cfg.lock.lease_max_minutes {

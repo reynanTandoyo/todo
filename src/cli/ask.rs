@@ -4,7 +4,8 @@ use clap::Args as ClapArgs;
 
 use crate::cli::{CommandKind, CommandMeta, Context, resolve_text_arg};
 use crate::doc::{
-    CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER, LineEdit, Status, TaskChangeIntent,
+    CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER, COMBINED_PART_SEPARATOR, LineEdit, Status,
+    TaskChangeIntent,
     TaskId, sanitize_trimmed_value,
 };
 use crate::error::{ErrorCode, Result, TodoError};
@@ -60,23 +61,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     let cfg = ctx.load_config()?;
     let priority_val = match args.priority.as_deref() {
-        Some(raw) => {
-            let clean = sanitize_trimmed_value(raw);
-            let Some(canonical) = cfg
-                .priorities
-                .iter()
-                .find(|p| p.eq_ignore_ascii_case(&clean))
-            else {
-                return Err(TodoError::new(
-                    ErrorCode::BadValue,
-                    format!(
-                        "invalid priority '{clean}'; expected one of: {}",
-                        cfg.priorities.join(", ")
-                    ),
-                ));
-            };
-            Some(canonical.clone())
-        }
+        Some(raw) => Some(cfg.canonical_priority(raw)?),
         None => None,
     };
     let area_val = match args.area.as_deref() {
@@ -208,10 +193,17 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 combined_parts.push(format!("priority: {p}"));
             }
             combined_parts.push("type: question".to_string());
-            if let Some(ref a) = area_val {
+            // An area that holds the part separator gets a line of its own (T-178).
+            let own_area = area_val
+                .as_deref()
+                .filter(|a| a.contains(COMBINED_PART_SEPARATOR));
+            if let Some(a) = area_val.as_deref().filter(|_| own_area.is_none()) {
                 combined_parts.push(format!("area: {a}"));
             }
-            lines.push(format!("- {}", combined_parts.join(" \u{00b7} ")));
+            lines.push(format!("- {}", combined_parts.join(COMBINED_PART_SEPARATOR)));
+            if let Some(a) = own_area {
+                lines.push(format!("- area: {a}"));
+            }
             if let Some(target) = about_val {
                 lines.push(format!("- about: {}", cfg.id_config.format_id(target)));
             }

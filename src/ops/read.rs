@@ -483,6 +483,9 @@ pub struct TaskJson {
     pub children: Vec<ChildJson>,
     /// `- why:` value, if present: what the task is for (R-WRITE-17).
     pub why: Option<String>,
+    /// `- final:` value, if present: why the task stays above the target level (R-LEVEL-3).
+    #[serde(rename = "final")]
+    pub final_reason: Option<String>,
     /// Canonicalized or raw dependency strings from `- depends:`.
     pub depends: Vec<String>,
     /// Detailed dependency statuses (`R-DEP-2`).
@@ -513,6 +516,10 @@ pub struct TaskJson {
     pub accept: Option<String>,
     /// `- verify:` value, if present: the command that checks the task (R-DETAIL-1).
     pub verify: Option<String>,
+    /// `- attempts:` value, if present: how often the task failed (R-STUCK-1).
+    pub attempts: Option<String>,
+    /// `- verified:` value, if present: the date the `verify` command last passed (R-VERIFY-2).
+    pub verified: Option<String>,
     /// Commit hashes from `- commit:`.
     pub commit: Vec<String>,
     /// Unknown `- key: value` fields kept as written (`docs/format.md` §8).
@@ -765,6 +772,7 @@ pub fn build_task_json(
         milestones,
         children,
         why: task.why.clone(),
+        final_reason: task.final_reason.clone(),
         depends: task.depends.iter().map(|d| d.raw.clone()).collect(),
         dependencies,
         dependents,
@@ -779,6 +787,8 @@ pub fn build_task_json(
         steps: task.steps.clone(),
         accept: task.accept.clone(),
         verify: task.verify.clone(),
+        attempts: task.attempts.clone(),
+        verified: task.verified.clone(),
         commit: task.commit.clone(),
         fields,
         notes,

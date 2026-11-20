@@ -3,8 +3,9 @@
 use std::collections::BTreeMap;
 
 use crate::doc::{
-    CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER, CombinedPart, Document, FieldLocation,
-    LineEdit, Status, Task, TaskChangeIntent, canonical_field_rank, sanitize_trimmed_value,
+    CANONICAL_HEADING_SEPARATOR, CANONICAL_NOBODY_OWNER, COMBINED_PART_SEPARATOR, CombinedPart,
+    Document, FieldLocation, LineEdit, Status, Task, TaskChangeIntent, canonical_field_rank,
+    sanitize_trimmed_value,
 };
 use crate::ops::task_ops::steps_from_text;
 
@@ -153,6 +154,9 @@ impl<'a> TaskEditBuilder<'a> {
             "fix" => self.set_line_field("fix", self.task.fix_line, &clean),
             "accept" => self.set_line_field("accept", self.task.accept_line, &clean),
             "verify" => self.set_line_field("verify", self.task.verify_line, &clean),
+            "final" => self.set_line_field("final", self.task.final_line, &clean),
+            "attempts" => self.set_line_field("attempts", self.task.attempts_line, &clean),
+            "verified" => self.set_line_field("verified", self.task.verified_line, &clean),
             "commit" => self.set_line_field("commit", self.task.commit_line, &clean),
             _ => {
                 let existing = self.unknown_line(&lower);
@@ -181,6 +185,9 @@ impl<'a> TaskEditBuilder<'a> {
             "steps" => self.unset_steps(),
             "accept" => self.unset_line_field("accept", self.task.accept_line),
             "verify" => self.unset_line_field("verify", self.task.verify_line),
+            "final" => self.unset_line_field("final", self.task.final_line),
+            "attempts" => self.unset_line_field("attempts", self.task.attempts_line),
+            "verified" => self.unset_line_field("verified", self.task.verified_line),
             "commit" => self.unset_line_field("commit", self.task.commit_line),
             _ => {
                 let existing = self.unknown_line(&lower);
@@ -324,7 +331,7 @@ impl<'a> TaskEditBuilder<'a> {
     /// is read, so a value that contains the separator cannot stay on it: the part then moves to a line
     /// of its own, and the rest of the combined line is kept as it was.
     fn set_combined_part(&mut self, key: &str, value: &str) {
-        if value.contains(" · ") {
+        if value.contains(COMBINED_PART_SEPARATOR) {
             self.combined_part_overrides.insert(key.to_string(), None);
             self.queue_field_insert(key, format!("- {key}: {value}"));
         } else {
@@ -415,6 +422,21 @@ impl<'a> TaskEditBuilder<'a> {
         entries.insert(at, (Some(key.to_string()), format!("{key}: {value}")));
     }
 
+    /// Adds a new part to the combined line, or to `own_lines` when its value holds the separator
+    /// (`docs/format.md` §8): a value that is split at the separator cannot stay on the line.
+    fn place_new_part(
+        entries: &mut Vec<PartEntry>,
+        own_lines: &mut Vec<(String, String)>,
+        key: &str,
+        value: String,
+    ) {
+        if value.contains(COMBINED_PART_SEPARATOR) {
+            own_lines.push((key.to_string(), value));
+        } else {
+            Self::insert_combined_part(entries, key, value);
+        }
+    }
+
     /// The value a field on the combined priority line has after this edit, or `None` when the edit
     /// removes it.
     fn combined_field_value(&self, key: &str, value: &str) -> Option<String> {
@@ -454,6 +476,8 @@ impl<'a> TaskEditBuilder<'a> {
             };
 
             let mut entries: Vec<PartEntry> = Vec::new();
+            // Parts whose new value holds the separator: they get a line of their own (T-178).
+            let mut own_lines: Vec<(String, String)> = Vec::new();
 
             let difficulty_in_combined = matches!(
                 self.task.difficulty_loc,
@@ -473,7 +497,11 @@ impl<'a> TaskEditBuilder<'a> {
                     CombinedPart::Text(text) => entries.push((None, text.clone())),
                     CombinedPart::Field { key, value } => {
                         if let Some(new_value) = self.combined_field_value(key, value) {
-                            entries.push((Some(key.clone()), format!("{key}: {new_value}")));
+                            if new_value.contains(COMBINED_PART_SEPARATOR) {
+                                own_lines.push((key.clone(), new_value));
+                            } else {
+                                entries.push((Some(key.clone()), format!("{key}: {new_value}")));
+                            }
                         }
                     }
                 }
@@ -486,19 +514,19 @@ impl<'a> TaskEditBuilder<'a> {
                     && self.task.difficulty_loc.is_none()
                     && let Some(Some(new_d)) = &self.difficulty_override
                 {
-                    Self::insert_combined_part(&mut entries, "difficulty", new_d.clone());
+                    Self::place_new_part(&mut entries, &mut own_lines, "difficulty", new_d.clone());
                 }
                 if !type_in_combined
                     && self.task.task_type_loc.is_none()
                     && let Some(Some(new_t)) = &self.type_override
                 {
-                    Self::insert_combined_part(&mut entries, "type", new_t.clone());
+                    Self::place_new_part(&mut entries, &mut own_lines, "type", new_t.clone());
                 }
                 if !area_in_combined
                     && self.task.area_loc.is_none()
                     && let Some(Some(new_a)) = &self.area_override
                 {
-                    Self::insert_combined_part(&mut entries, "area", new_a.clone());
+                    Self::place_new_part(&mut entries, &mut own_lines, "area", new_a.clone());
                 }
             }
 
@@ -507,7 +535,7 @@ impl<'a> TaskEditBuilder<'a> {
                 segments.extend(entries.into_iter().map(|(_, text)| text));
                 self.replace_line_if_changed(
                     detail.line,
-                    format!("- priority: {}", segments.join(" · ")),
+                    format!("- priority: {}", segments.join(COMBINED_PART_SEPARATOR)),
                 );
             } else {
                 // Priority was unset: the priority line goes and its fields move to lines of their own.
@@ -521,13 +549,20 @@ impl<'a> TaskEditBuilder<'a> {
                 if texts.is_empty() {
                     self.line_changes.insert(detail.line, None);
                 } else {
-                    self.replace_line_if_changed(detail.line, format!("- {}", texts.join(" · ")));
+                    self.replace_line_if_changed(
+                        detail.line,
+                        format!("- {}", texts.join(COMBINED_PART_SEPARATOR)),
+                    );
                 }
                 for (key, text) in entries {
                     if let Some(key) = key {
                         self.queue_field_insert(&key, format!("- {text}"));
                     }
                 }
+            }
+
+            for (key, value) in own_lines {
+                self.queue_field_insert(&key, format!("- {key}: {value}"));
             }
 
             // If `difficulty`, `type` or `area` lived on its own line, edit/remove it in place
@@ -581,7 +616,7 @@ impl<'a> TaskEditBuilder<'a> {
                     },
                     _ => {
                         if let Some(v) = ov {
-                            if adding_priority {
+                            if adding_priority && !v.contains(COMBINED_PART_SEPARATOR) {
                                 combined_parts.push(format!("difficulty: {v}"));
                             } else {
                                 self.queue_field_insert("difficulty", format!("- difficulty: {v}"));
@@ -601,7 +636,7 @@ impl<'a> TaskEditBuilder<'a> {
                     },
                     _ => {
                         if let Some(v) = ov {
-                            if adding_priority {
+                            if adding_priority && !v.contains(COMBINED_PART_SEPARATOR) {
                                 combined_parts.push(format!("type: {v}"));
                             } else {
                                 self.queue_field_insert("type", format!("- type: {v}"));
@@ -621,7 +656,7 @@ impl<'a> TaskEditBuilder<'a> {
                     },
                     _ => {
                         if let Some(v) = ov {
-                            if adding_priority {
+                            if adding_priority && !v.contains(COMBINED_PART_SEPARATOR) {
                                 combined_parts.push(format!("area: {v}"));
                             } else {
                                 self.queue_field_insert("area", format!("- area: {v}"));
@@ -634,7 +669,10 @@ impl<'a> TaskEditBuilder<'a> {
             if !has_priority_line && !combined_parts.is_empty() {
                 self.queue_field_insert(
                     "priority",
-                    format!("- priority: {}", combined_parts.join(" · ")),
+                    format!(
+                        "- priority: {}",
+                        combined_parts.join(COMBINED_PART_SEPARATOR)
+                    ),
                 );
             }
         }

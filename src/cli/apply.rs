@@ -24,8 +24,10 @@ use crate::ops::{
     highest_task_number, milestone, parse_doc_for_write, read_optional_archive,
     resolve_task_in_doc, steps_from_text,
 };
+use crate::ops::commit_files::{resolve_commit, scope_of_commit};
 use crate::ops::identity::done_by;
 use crate::ops::migrate::PendingMigration;
+use crate::ops::scope::CommitScope;
 use crate::ops::verify::{self, CheckOutcome};
 use crate::output::Output;
 use crate::state::{IdsState, StateDir};
@@ -36,7 +38,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "apply",
     summary: "Apply a batch of operations from JSON lines in one locked step",
     kind: CommandKind::Write,
-    details: "Reads JSON lines from `<file>` or `-` (standard input) and applies all operations inside a single write lock: either all operations succeed with one snapshot, or none apply.",
+    details: "Reads JSON lines from `<file>` or `-` (standard input) and applies all operations inside a single write lock: either all operations succeed with one snapshot, or none apply. A `done` with a `commit` is checked against the task's `files` as `todo done` checks it (R-SCOPE-2).",
     examples: &[
         "todo apply ops.jsonl --agent agent-1",
         "Get-Content ops.jsonl | todo apply - --agent agent-1",
@@ -207,21 +209,54 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let label = file_label(&found.path);
     let archive_path = cfg.archive_path(&found.path);
 
+    // The commit of each `done` operation, resolved as `done` resolves its `--commit` (R-WRITE-4),
+    // before the lock is taken. An empty commit is no commit.
+    let resolve_dir = ctx
+        .file
+        .as_deref()
+        .and_then(Path::parent)
+        .filter(|p| !p.as_os_str().is_empty());
+    let done_commits: Vec<Option<String>> = ops
+        .iter()
+        .map(|op| match op {
+            ApplyOp::Done { commit, .. } => {
+                match commit.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
+                    Some(c) => resolve_commit(c, resolve_dir).map(Some),
+                    None => Ok(None),
+                }
+            }
+            _ => Ok(None),
+        })
+        .collect::<Result<_>>()?;
+
     // Who did the work, per `done` operation (R-WRITE-16); asked of git before the lock is taken.
     let git_dir = found.path.parent().filter(|p| !p.as_os_str().is_empty());
     let mut configured: Option<Option<String>> = None;
     let done_bys: Vec<Option<String>> = ops
         .iter()
-        .map(|op| match op {
-            ApplyOp::Done { commit, .. } => match commit.as_deref().map(str::trim) {
-                Some(c) if !c.is_empty() => done_by(git_dir, Some(c)),
-                _ => configured
+        .zip(&done_commits)
+        .map(|(op, commit)| match op {
+            ApplyOp::Done { .. } => match commit {
+                Some(c) => done_by(git_dir, Some(c.as_str())),
+                None => configured
                     .get_or_insert_with(|| done_by(git_dir, None))
                     .clone(),
             },
             _ => None,
         })
         .collect();
+    // Which files each `done` commit changed (R-SCOPE-2), asked of git before the lock, as `done`
+    // asks it. The scope is checked first: a refusal here runs no verify command.
+    let done_scopes: Vec<CommitScope> = ops
+        .iter()
+        .zip(&done_commits)
+        .map(|(op, commit)| match op {
+            ApplyOp::Done { .. } => {
+                scope_of_commit(&found.path, &cfg.archive_file, commit.as_deref())
+            }
+            _ => Ok(CommitScope::NoGit),
+        })
+        .collect::<Result<_>>()?;
 
     // The `verify` commands of the `done` operations run before the lock is taken, as `done` runs
     // them (T-173, R-LOCK-4). Nothing runs when the verify commands are off or wait for the wave.
@@ -232,6 +267,8 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         force: ctx.force,
         session: ctx.session.as_deref(),
         done_bys: &done_bys,
+        done_commits: &done_commits,
+        done_scopes: &done_scopes,
         now: current_time(),
     };
     let required = cfg.verify_enabled && cfg.verify_when == VerifyWhen::Done;
@@ -453,7 +490,9 @@ fn apply_one_op(
     agent: &str,
     force: bool,
     session: Option<&str>,
+    done_commit: Option<&str>,
     done_by: Option<&str>,
+    done_scope: &CommitScope,
     now: chrono::DateTime<chrono::FixedOffset>,
     highest_id: &mut u64,
     refs: &mut BTreeMap<String, String>,
@@ -581,13 +620,17 @@ fn apply_one_op(
                     "add",
                 ));
             }
+            // The priority is checked as `add` checks it (T-179).
+            let priority = cfg
+                .canonical_priority(priority)
+                .map_err(|e| at_operation(e, op_num, "add"))?;
             let extra: Vec<(String, String)> = fields
                 .iter()
                 .map(|(k, v)| (k.clone(), v.trim().to_string()))
                 .collect();
             let lines = NewTask {
                 title: clean_title,
-                priority: Some(priority.trim()),
+                priority: Some(priority.as_str()),
                 difficulty: difficulty.as_deref(),
                 task_type: trim(task_type),
                 area: trim(area),
@@ -667,7 +710,19 @@ fn apply_one_op(
                 now,
                 session,
             };
-            apply_task_op(other, op_num, doc, archive, label, &env, refs, done_by, passed)
+            apply_task_op(
+                other,
+                op_num,
+                doc,
+                archive,
+                label,
+                &env,
+                refs,
+                done_commit,
+                done_by,
+                done_scope,
+                passed,
+            )
         }
     }
 }
@@ -718,7 +773,9 @@ fn apply_task_op(
     label: &str,
     env: &OpEnv<'_>,
     refs: &BTreeMap<String, String>,
+    done_commit: Option<&str>,
     done_by: Option<&str>,
+    done_scope: &CommitScope,
     passed: Option<&str>,
 ) -> Result<(&'static str, String, Vec<LineEdit>, TaskChangeIntent)> {
     let mut dep_owned = String::new();
@@ -730,12 +787,13 @@ fn apply_task_op(
         ApplyOp::Release { task } => (task, TaskOp::Release),
         // The `verify` command of each `done` ran before the lock was taken, as `done` runs it
         // (T-173); `passed` is the command that passed, which the change checks again.
-        ApplyOp::Done { task, note, commit } => (
+        ApplyOp::Done { task, note, .. } => (
             task,
             TaskOp::Done {
                 note: note.as_deref(),
-                commit: commit.as_deref().map(str::trim),
+                commit: done_commit,
                 by: done_by,
+                scope: done_scope,
                 check: passed.map_or(DoneCheck::NotChecked, |command| DoneCheck::Passed {
                     command,
                 }),
@@ -876,6 +934,10 @@ struct BatchEnv<'a> {
     session: Option<&'a str>,
     /// The person behind each operation (`R-WRITE-16`), by operation index.
     done_bys: &'a [Option<String>],
+    /// The commit of each `done` operation, resolved as `done` resolves it (`R-WRITE-4`).
+    done_commits: &'a [Option<String>],
+    /// What git says about the commit of each `done` operation (`R-SCOPE-2`).
+    done_scopes: &'a [CommitScope],
     now: chrono::DateTime<chrono::FixedOffset>,
 }
 
@@ -926,7 +988,9 @@ fn run_batch(
             env.agent,
             env.force,
             env.session,
+            env.done_commits[idx].as_deref(),
             env.done_bys[idx].as_deref(),
+            &env.done_scopes[idx],
             env.now,
             &mut highest_id,
             &mut refs,

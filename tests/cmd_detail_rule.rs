@@ -8,7 +8,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Output;
 
-use common::{parse_json, run_todo, setup_proj, stderr_text, write_toml};
+use common::{parse_json, run_todo, setup_proj, stderr_text, stdout_text, write_toml};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
@@ -355,4 +355,77 @@ fn waves_list_the_same_missing_parts_as_show() {
         entry["missing"],
         json!(["read: docs/none.md does not exist", "open question T-005"])
     );
+}
+
+#[test]
+fn a_configured_target_moves_the_line_for_final_and_for_the_ready_rule() {
+    // T-153 (R-LEVEL-3, R-DETAIL-2): `final`, the ready rule, `check` and `waves` read the one target
+    // level, so a configured `target_difficulty` changes what each of them accepts.
+    let tmp = TempDir::new().expect("temp dir");
+    let body = [
+        task("T-001", &open_task("2", &["why"])),
+        task("T-002", &open_task("3", &["why"])),
+    ]
+    .concat();
+    let (home, work, _) = setup_proj(&tmp, &doc(&body));
+
+    // With the default target, the lowest level, levels 2 and 3 are above it: T-001 is handed out
+    // without its why, and `final` is accepted for both.
+    assert!(ready_of(&home, &work, "T-001"));
+    for id in ["T-001", "T-002"] {
+        let out = todo(
+            &home,
+            &work,
+            &[
+                "--agent",
+                "alice",
+                "set",
+                id,
+                "--final",
+                "needs more thought",
+            ],
+        );
+        assert!(out.status.success(), "{id}: {}", stderr_text(&out));
+    }
+
+    // With the target at level 2, T-001 is at the target: it needs its why, `final` is refused for
+    // it, and `check` reports the final it already has. T-002, at level 3, keeps its final.
+    write_toml(&work, "target_difficulty = \"2\"\n");
+    assert!(!ready_of(&home, &work, "T-001"));
+    assert_eq!(missing_of(&home, &work, "T-001"), vec!["why"]);
+    assert_eq!(next_id(&home, &work).as_deref(), Some("T-002"));
+
+    let refused = todo(
+        &home,
+        &work,
+        &[
+            "--json",
+            "--agent",
+            "alice",
+            "set",
+            "T-001",
+            "--final",
+            "still above",
+        ],
+    );
+    assert_eq!(refused.status.code(), Some(1), "{}", stdout_text(&refused));
+    let json = parse_json(&refused.stdout);
+    assert_eq!(json["error"]["code"], "BAD_VALUE", "{json}");
+    let message = json["error"]["message"].as_str().expect("message");
+    assert!(message.contains("at the target level 2"), "{message}");
+
+    let kept = todo(
+        &home,
+        &work,
+        &["--agent", "alice", "set", "T-002", "--final", "still above"],
+    );
+    assert!(kept.status.success(), "{}", stderr_text(&kept));
+
+    let check = todo(&home, &work, &["check"]);
+    let report = format!("{}{}", stdout_text(&check), stderr_text(&check));
+    assert!(
+        report.contains("T-001: final on a task at the target level 2"),
+        "{report}"
+    );
+    assert!(!report.contains("T-002: final"), "{report}");
 }

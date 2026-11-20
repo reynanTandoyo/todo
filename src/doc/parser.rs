@@ -45,7 +45,7 @@ pub const CANONICAL_FIELD_ORDER: &[&str] = &[
 ];
 
 /// Number of known fields tracked for repeated-field detection (`known_field_index`).
-const KNOWN_FIELD_SLOTS: usize = 19;
+const KNOWN_FIELD_SLOTS: usize = 22;
 
 /// Accepted heading separators between `<ID>` and `<title>` (`docs/format.md` §6),
 /// canonical separator first.
@@ -53,6 +53,10 @@ pub const TASK_HEADING_SEPARATORS: &[&str] = &[" · ", " - ", " — ", " – ", 
 
 /// Canonical heading separator written by the tool.
 pub const CANONICAL_HEADING_SEPARATOR: &str = " · ";
+
+/// Separator between the parts of the combined `- priority:` line (`docs/format.md` §8). A value that
+/// contains it cannot stay on that line, because the line is split there when it is read.
+pub const COMBINED_PART_SEPARATOR: &str = " · ";
 
 /// Canonical "nobody" owner value written by the tool.
 pub const CANONICAL_NOBODY_OWNER: &str = "—";
@@ -444,6 +448,20 @@ pub struct Task {
     pub verify: Option<String>,
     pub verify_line: Option<usize>,
 
+    /// `- final:` value and line index: why a task stays above the target level on purpose
+    /// (`docs/format.md` §8, `R-LEVEL-3`).
+    pub final_reason: Option<String>,
+    pub final_line: Option<usize>,
+
+    /// `- attempts:` value and line index: how often the task failed, counted by `stuck` and failed
+    /// checks (`docs/format.md` §8, `R-STUCK-1`).
+    pub attempts: Option<String>,
+    pub attempts_line: Option<usize>,
+    /// `- verified:` value and line index: the date the `verify` command last passed after `done`
+    /// (`docs/format.md` §8, `R-VERIFY-2`).
+    pub verified: Option<String>,
+    pub verified_line: Option<usize>,
+
     /// Parsed commit hashes from `- commit:`.
     pub commit: Vec<String>,
     /// Raw `- commit:` value, if present.
@@ -569,6 +587,9 @@ impl Task {
             "fix" => self.fix.as_deref(),
             "accept" => self.accept.as_deref(),
             "verify" => self.verify.as_deref(),
+            "final" => self.final_reason.as_deref(),
+            "attempts" => self.attempts.as_deref(),
+            "verified" => self.verified.as_deref(),
             "commit" => self.commit_raw.as_deref(),
             _ => self
                 .unknown_fields
@@ -1315,6 +1336,12 @@ fn parse_task_block(
         steps_block: None,
         verify: None,
         verify_line: None,
+        final_reason: None,
+        final_line: None,
+        attempts: None,
+        attempts_line: None,
+        verified: None,
+        verified_line: None,
         commit: Vec::new(),
         commit_raw: None,
         commit_line: None,
@@ -1512,6 +1539,18 @@ fn parse_task_block(
                                 task.verify = non_empty_string(part_val);
                                 task.verify_line = Some(idx);
                             }
+                            "attempts" => {
+                                task.attempts = non_empty_string(part_val);
+                                task.attempts_line = Some(idx);
+                            }
+                            "verified" => {
+                                task.verified = non_empty_string(part_val);
+                                task.verified_line = Some(idx);
+                            }
+                            "final" => {
+                                task.final_reason = non_empty_string(part_val);
+                                task.final_line = Some(idx);
+                            }
                             "commit" => {
                                 task.commit = parse_comma_list(part_val);
                                 task.commit_raw = Some(part_val.clone());
@@ -1657,6 +1696,30 @@ fn parse_task_block(
                     };
                     task.verify_line = Some(idx);
                 }
+                "final" => {
+                    task.final_reason = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
+                    task.final_line = Some(idx);
+                }
+                "attempts" => {
+                    task.attempts = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
+                    task.attempts_line = Some(idx);
+                }
+                "verified" => {
+                    task.verified = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
+                    task.verified_line = Some(idx);
+                }
                 "commit" => {
                     task.commit = parse_comma_list(value_str);
                     task.commit_raw = Some(owned_val);
@@ -1700,6 +1763,9 @@ const fn known_field_index(key: &str) -> Option<usize> {
         b"steps" => Some(16),
         b"read" => Some(17),
         b"verify" => Some(18),
+        b"final" => Some(19),
+        b"attempts" => Some(20),
+        b"verified" => Some(21),
         _ => None,
     }
 }

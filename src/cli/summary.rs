@@ -19,7 +19,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "summary",
     summary: "Show a compact session-start overview of TODO.md",
     kind: CommandKind::Read,
-    details: "Prints at most 40 lines summarizing counts by status and open priority, the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, tasks given back to the planner with their problem (`todo stuck`), the next 5 ready tasks (in the order `next` uses, leaving out those whose files another agent holds), milestones ready to close, open questions, and how many ideas are waiting. The status counts and the total count tasks only: milestones are listed apart, and questions and ideas are counted apart (R-KIND-3).",
+    details: "Prints at most 40 lines summarizing counts by status and open priority, the number of tasks kept above the target level on purpose (`final`, R-LEVEL-3), the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, tasks given back to the planner with their problem (`todo stuck`), the next 5 ready tasks (in the order `next` uses, leaving out those whose files another agent holds), milestones ready to close, open questions, and how many ideas are waiting. The status counts and the total count tasks only: milestones are listed apart, and questions and ideas are counted apart (R-KIND-3).",
     examples: &["todo summary", "todo summary --json"],
 };
 
@@ -110,10 +110,18 @@ struct SummaryJson {
     /// the key is left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     given_back: Vec<BlockedSummary>,
+    /// Open or blocked tasks kept above the target level on purpose with `final` (`R-LEVEL-3`); the
+    /// key is left out when there are none.
+    #[serde(skip_serializing_if = "is_zero")]
+    kept_on_purpose: usize,
     next_ready: Vec<ReadySummary>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     ready_to_close: Vec<MilestoneReadySummary>,
     open_questions: Vec<QuestionSummary>,
+}
+
+fn is_zero(count: &usize) -> bool {
+    *count == 0
 }
 
 const MAX_TEXT_LINES: usize = 40;
@@ -142,6 +150,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let mut given_back = Vec::new();
     let mut ready_candidates = Vec::new();
     let mut open_questions = Vec::new();
+    let mut kept_on_purpose = 0;
 
     for task in &doc.tasks {
         // Only tasks are counted by status and handed out as work (R-KIND-3). Milestones are
@@ -211,6 +220,13 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             }
             Status::Done => counts.done += 1,
             Status::Dropped => counts.dropped += 1,
+        }
+        // The same rule `plan` uses for the tasks kept on purpose: not finished, not claimed.
+        if task.final_reason.is_some()
+            && matches!(task.status, Status::Open | Status::Blocked)
+            && cfg.is_above_target(task.difficulty.as_deref())
+        {
+            kept_on_purpose += 1;
         }
 
         if is_task_ready(doc, task, archive, now, &cfg) {
@@ -289,6 +305,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         claimed,
         blocked,
         given_back,
+        kept_on_purpose,
         next_ready,
         ready_to_close,
         open_questions,
@@ -333,6 +350,13 @@ fn format_summary_lines(s: &SummaryJson, project_line: Option<&str>) -> Vec<Stri
             .map(|p| format!("{}={}", p.priority, p.count))
             .collect();
         lines.push(format!("open by priority: {}", parts.join(" ")));
+    }
+    // Counted apart from the work the planner still has to split or detail (R-LEVEL-3).
+    if s.kept_on_purpose > 0 {
+        lines.push(format!(
+            "kept above the target level on purpose: {}",
+            s.kept_on_purpose
+        ));
     }
 
     if !s.milestones.is_empty() {

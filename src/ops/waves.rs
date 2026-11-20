@@ -412,9 +412,8 @@ pub fn detail_gaps(
     if task.kind() != EntryKind::Task {
         return Vec::new();
     }
-    match cfg.difficulty_rank(task.difficulty.as_deref()) {
-        Some(rank) if rank <= cfg.target_rank() => {}
-        _ => return Vec::new(),
+    if !cfg.is_at_or_below_target(task.difficulty.as_deref()) {
+        return Vec::new();
     }
     let blank = |value: Option<&str>| value.is_none_or(|v| v.trim().is_empty());
     let mut missing = Vec::new();
