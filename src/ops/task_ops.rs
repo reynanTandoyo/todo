@@ -8,7 +8,7 @@
 use chrono::{DateTime, FixedOffset};
 
 use crate::doc::{Document, LineEdit, Status, Task};
-use crate::error::Result;
+use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::milestone;
 use crate::ops::pipeline::{build_claim_edits, build_release_edits};
 use crate::ops::rules::{
@@ -88,6 +88,12 @@ pub enum TaskOp<'a> {
         /// Optional note text.
         note: Option<&'a str>,
     },
+    /// Give a claimed task back to the planner with the problem (`R-STUCK-1`): blocked, no owner
+    /// and no claim, one more `attempts`, the note `stuck — <problem>`.
+    Stuck {
+        /// The problem text, required and non-empty.
+        reason: &'a str,
+    },
     /// Reopen a done or dropped task, optionally with a note.
     Reopen {
         /// Optional note text.
@@ -127,6 +133,28 @@ fn note_with(verb: &str, text: Option<&str>) -> String {
     }
 }
 
+/// The `attempts` value after one more failure (`R-STUCK-1`): 1 when the task has no `attempts`
+/// line yet, else the number written plus one. A value that is not a whole number is refused
+/// (`BAD_VALUE`) rather than reset, so no failure count is lost silently.
+fn attempts_after_failure(task: &Task, id_str: &str) -> Result<u64> {
+    let Some(raw) = task.field_value("attempts") else {
+        return Ok(1);
+    };
+    raw.trim()
+        .parse::<u64>()
+        .ok()
+        .and_then(|n| n.checked_add(1))
+        .ok_or_else(|| {
+            TodoError::new(
+                ErrorCode::BadValue,
+                format!(
+                    "attempts of {id_str} is not a whole number ({raw}); fix it by hand before giving the task back"
+                ),
+            )
+            .with_task(id_str)
+        })
+}
+
 impl TaskOp<'_> {
     /// Command name, used for forced notes and as the `apply` operation name.
     #[must_use]
@@ -138,6 +166,7 @@ impl TaskOp<'_> {
             Self::Drop { .. } | Self::DropTree { .. } | Self::DropWithin { .. } => "drop",
             Self::Block { .. } => "block",
             Self::Unblock { .. } => "unblock",
+            Self::Stuck { .. } => "stuck",
             Self::Reopen { .. } => "reopen",
             Self::Answer { .. } => "answer",
             Self::Promote { .. } => "promote",
@@ -217,6 +246,7 @@ impl TaskOp<'_> {
                     }
                     Self::Block { .. } => StatusCommand::Block,
                     Self::Unblock { .. } => StatusCommand::Unblock,
+                    Self::Stuck { .. } => StatusCommand::Stuck,
                     _ => StatusCommand::Reopen,
                 };
                 let (next, ownership) = validate_transition(task, cmd, agent, env.force, &id_str)?;
@@ -234,6 +264,13 @@ impl TaskOp<'_> {
                         builder.set_session(env.session);
                     }
                     Self::Unblock { .. } => builder.remove_claimed(),
+                    Self::Stuck { .. } => {
+                        // R-STUCK-1: the owner and the claim (with its session) go; the level stays.
+                        builder.clear_owner_if_present();
+                        builder.remove_claimed();
+                        let attempts = attempts_after_failure(task, &id_str)?;
+                        builder.set_field("attempts", &attempts.to_string());
+                    }
                     Self::Reopen { .. } => {
                         builder.set_owner(None);
                         builder.remove_claimed();
@@ -307,6 +344,7 @@ impl TaskOp<'_> {
             }
             Self::Block { reason } => Some(note_with("blocked", Some(reason))),
             Self::Unblock { note } => Some(note_with("unblocked", note)),
+            Self::Stuck { reason } => Some(note_with("stuck", Some(reason))),
             Self::Reopen { note } => Some(note_with("reopened", note)),
             Self::Answer { text } => Some(note_with("answer", Some(text))),
             Self::Promote { .. } => Some("promoted from idea".to_string()),

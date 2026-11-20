@@ -18,7 +18,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "summary",
     summary: "Show a compact session-start overview of TODO.md",
     kind: CommandKind::Read,
-    details: "Prints at most 40 lines summarizing counts by status and open priority, the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, the next 5 ready tasks (in the order `next` uses), milestones ready to close, open questions, and how many ideas are waiting. The status counts and the total count tasks only: milestones are listed apart, and questions and ideas are counted apart (R-KIND-3).",
+    details: "Prints at most 40 lines summarizing counts by status and open priority, the top-level milestones that are not done or dropped with their progress, active/stale claims, blocked tasks with their latest reason, tasks given back to the planner with their problem (`todo stuck`), the next 5 ready tasks (in the order `next` uses), milestones ready to close, open questions, and how many ideas are waiting. The status counts and the total count tasks only: milestones are listed apart, and questions and ideas are counted apart (R-KIND-3).",
     examples: &["todo summary", "todo summary --json"],
 };
 
@@ -69,7 +69,7 @@ struct ClaimedSummary {
     stale: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct BlockedSummary {
     id: String,
     title: String,
@@ -105,6 +105,10 @@ struct SummaryJson {
     milestones: Vec<MilestoneSummary>,
     claimed: Vec<ClaimedSummary>,
     blocked: Vec<BlockedSummary>,
+    /// Blocked tasks given back to the planner (`R-STUCK-1`), each with its problem as `reason`;
+    /// the key is left out when there are none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    given_back: Vec<BlockedSummary>,
     next_ready: Vec<ReadySummary>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     ready_to_close: Vec<MilestoneReadySummary>,
@@ -134,6 +138,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let mut prio_map: BTreeMap<String, usize> = BTreeMap::new();
     let mut claimed = Vec::new();
     let mut blocked = Vec::new();
+    let mut given_back = Vec::new();
     let mut ready_candidates = Vec::new();
     let mut open_questions = Vec::new();
 
@@ -193,12 +198,15 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             Status::Blocked => {
                 counts.blocked += 1;
                 // The same reason the HTML report shows (T-140; `Task::blocked_reason`).
-                let reason = task.blocked_reason().map(str::to_string);
-                blocked.push(BlockedSummary {
+                let entry = BlockedSummary {
                     id: doc.id_config.format_id(task.id),
                     title: task.title.clone(),
-                    reason,
-                });
+                    reason: task.blocked_reason().map(str::to_string),
+                };
+                if task.is_given_back() {
+                    given_back.push(entry.clone());
+                }
+                blocked.push(entry);
             }
             Status::Done => counts.done += 1,
             Status::Dropped => counts.dropped += 1,
@@ -276,6 +284,7 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         milestones,
         claimed,
         blocked,
+        given_back,
         next_ready,
         ready_to_close,
         open_questions,
@@ -372,6 +381,20 @@ fn format_summary_lines(s: &SummaryJson, project_line: Option<&str>) -> Vec<Stri
         }
         if s.blocked.len() > 5 {
             lines.push(format!("  ... and {} more blocked", s.blocked.len() - 5));
+        }
+    }
+
+    if !s.given_back.is_empty() {
+        lines.push(format!("given back to the planner ({}):", s.given_back.len()));
+        for g in s.given_back.iter().take(5) {
+            let problem = g.reason.as_deref().unwrap_or(NO_REASON);
+            lines.push(format!("  {} · {} — {}", g.id, g.title, problem));
+        }
+        if s.given_back.len() > 5 {
+            lines.push(format!(
+                "  ... and {} more given back",
+                s.given_back.len() - 5
+            ));
         }
     }
 
