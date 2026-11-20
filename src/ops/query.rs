@@ -420,18 +420,21 @@ pub fn select_next_task<'a>(
     }
 
     let started = doc.started_milestones();
-    // Ready candidates in the order `next` uses. The first one whose files no other agent holds is
-    // the answer (R-READ-3, R-SCOPE-1), so the files are checked only until one passes: a scan of
-    // every task for each ready task costs far more than the sort (T-183). The sort is stable, so
-    // ties keep file order, as `min_by_key` gave them.
-    let mut candidates: Vec<&Task> = doc
+    // Ready candidates in the order `next` uses. Each key is computed once, and the file index
+    // breaks ties, so the order is the one `min_by_key` gave. The first candidate whose files no
+    // other agent holds is the answer (R-READ-3, R-SCOPE-1), so the files are checked only until one
+    // passes: a scan of every task for each ready task costs far more than the sort (T-183).
+    let mut candidates: Vec<((usize, bool, usize), usize, &Task)> = doc
         .tasks
         .iter()
-        .filter(|t| is_task_ready(doc, t, archive, now, cfg) && matches_common_filters(t))
+        .enumerate()
+        .filter(|(_, t)| is_task_ready(doc, t, archive, now, cfg) && matches_common_filters(t))
+        .map(|(index, t)| (ready_sort_key(doc, t, &started, cfg), index, t))
         .collect();
-    candidates.sort_by_key(|t| ready_sort_key(doc, t, &started, cfg));
+    candidates.sort_unstable_by_key(|&(key, index, _)| (key, index));
     let candidate = candidates
         .into_iter()
+        .map(|(_, _, task)| task)
         .find(|t| files_busy(doc, t, filter.agent, now, cfg).is_empty())?;
 
     Some(SelectedNext {
