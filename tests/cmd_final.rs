@@ -408,3 +408,39 @@ fn summary_leaves_the_count_out_when_no_task_is_kept_above_the_target() {
     let json = parse_json(&ok(&home, &work, &["--json", "summary"]).stdout);
     assert!(json["data"].get("kept_on_purpose").is_none(), "{json}");
 }
+
+#[test]
+fn split_removes_final_when_the_task_becomes_a_milestone() {
+    let tmp = TempDir::new().unwrap();
+    let body = "### T-001 · Renderer lighting\n- status: open\n- owner: —\n\
+                - priority: P1 · difficulty: 4\n- final: the design is still open\n\
+                - accept: the scene is lit\n";
+    let (home, work, file) = setup_proj(&tmp, &doc(body));
+    fs::write(
+        work.join("children.jsonl"),
+        "{\"title\":\"Light the floor\",\"priority\":\"P1\",\"difficulty\":\"2\"}\n",
+    )
+    .unwrap();
+
+    ok(
+        &home,
+        &work,
+        &[
+            "--agent",
+            "planner",
+            "split",
+            "T-001",
+            "--from",
+            "children.jsonl",
+        ],
+    );
+    let text = read_text(&file);
+    assert!(
+        text.contains("type: milestone"),
+        "the task became a milestone: {text}"
+    );
+    assert!(
+        !text.contains("- final:"),
+        "split removes final, which belongs to a task: {text}"
+    );
+}

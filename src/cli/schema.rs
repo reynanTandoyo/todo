@@ -217,6 +217,8 @@ fn task_fields() -> TaskFieldsJson {
         steps: Vec::new(),
         accept: Some("the check that proves it is done".to_string()),
         verify: None,
+        attempts: Some("1".to_string()),
+        verified: None,
         commit: Vec::new(),
         fields: BTreeMap::new(),
         notes: Vec::new(),

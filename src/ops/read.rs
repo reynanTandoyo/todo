@@ -506,6 +506,10 @@ pub struct TaskJson {
     pub accept: Option<String>,
     /// `- verify:` value, if present: the command that checks the task (R-DETAIL-1).
     pub verify: Option<String>,
+    /// `- attempts:` value, if present: how often the task failed (R-STUCK-1).
+    pub attempts: Option<String>,
+    /// `- verified:` value, if present: the date the `verify` command last passed (R-VERIFY-2).
+    pub verified: Option<String>,
     /// Commit hashes from `- commit:`.
     pub commit: Vec<String>,
     /// Unknown `- key: value` fields kept as written (`docs/format.md` §8).
@@ -764,6 +768,8 @@ pub fn build_task_json(
         steps: task.steps.clone(),
         accept: task.accept.clone(),
         verify: task.verify.clone(),
+        attempts: task.attempts.clone(),
+        verified: task.verified.clone(),
         commit: task.commit.clone(),
         fields,
         notes,

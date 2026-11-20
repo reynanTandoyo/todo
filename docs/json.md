@@ -225,6 +225,8 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
     "steps": [],
     "accept": null,
     "verify": null,
+    "attempts": null,
+    "verified": null,
     "commit": [],
     "fields": {},
     "notes": [
@@ -281,6 +283,8 @@ the output for a fixture with one open task:
       "steps": [],
       "accept": null,
       "verify": null,
+      "attempts": null,
+      "verified": null,
       "commit": [],
       "fields": {},
       "notes": [

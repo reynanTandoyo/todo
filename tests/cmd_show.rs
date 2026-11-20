@@ -226,3 +226,28 @@ fn show_lists_archived_questions_marked_as_archived() {
     assert_eq!(j["data"]["questions"][0]["id"], "T-009");
     assert_eq!(j["data"]["questions"][0]["archived"], true);
 }
+
+#[test]
+fn show_json_and_schema_list_attempts_and_verified_as_task_fields() {
+    let tmp = TempDir::new().unwrap();
+    let body = "<!-- TEST FIXTURE: invented data, not a real task list -->\n<!-- todo-format: 3 -->\n\n## Tasks\n\n### T-001 · Parse the config\n- status: open\n- owner: —\n- priority: P1 · difficulty: 2\n- attempts: 2\n- verified: 2026-11-15\n- accept: it parses\n";
+    let (home, work, _) = common::setup_proj(&tmp, body);
+
+    let out = common::run_todo(&home, &work, &["--json", "show", "T-001"], &[]).unwrap();
+    assert!(out.status.success(), "{}", stderr_text(&out));
+    let json = parse_json(&out.stdout);
+    assert_eq!(json["data"]["attempts"], "2");
+    assert_eq!(json["data"]["verified"], "2026-11-15");
+    assert!(json["data"]["fields"].get("attempts").is_none(), "{json}");
+    assert!(json["data"]["fields"].get("verified").is_none(), "{json}");
+
+    let schema = common::run_todo(&home, &work, &["--json", "schema"], &[]).unwrap();
+    let fields: Vec<String> = parse_json(&schema.stdout)["data"]["task"]["fields"]
+        .as_array()
+        .expect("task fields")
+        .iter()
+        .filter_map(|f| f.as_str().map(str::to_string))
+        .collect();
+    assert!(fields.contains(&"attempts".to_string()), "{fields:?}");
+    assert!(fields.contains(&"verified".to_string()), "{fields:?}");
+}
