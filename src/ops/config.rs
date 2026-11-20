@@ -34,6 +34,10 @@ pub const DEFAULT_VERIFY_TIMEOUT_SECONDS: u64 = 300;
 /// Default `verify_attempts` from requirements §5.14 (`R-VERIFY-1`).
 pub const DEFAULT_VERIFY_ATTEMPTS: u64 = 3;
 
+/// Default `level1_max_files` from requirements §5.14 (`R-DETAIL-2`): the most `files` entries a task
+/// at or below the target level may have.
+pub const DEFAULT_LEVEL1_MAX_FILES: usize = 3;
+
 /// When the `verify` command of a task runs (`verify_when`, `R-VERIFY-2`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VerifyWhen {
@@ -67,6 +71,12 @@ pub struct OpsConfig {
     /// `true` when `todo.toml` sets `difficulties` itself. The format 2 to 3 migration then keeps
     /// the difficulty values as they are (`R-MIG-1`).
     pub difficulties_set: bool,
+    /// The `target_difficulty` that `todo.toml` sets (`R-LEVEL-2`), one of `difficulties`; `None` when
+    /// it sets none, and the target is then the first of `difficulties` ([`Self::target_difficulty`]).
+    pub target_difficulty_setting: Option<String>,
+    /// The most `files` entries a task at or below [`Self::target_difficulty`] may have
+    /// (`level1_max_files`, `R-DETAIL-2`, default [`DEFAULT_LEVEL1_MAX_FILES`]).
+    pub level1_max_files: usize,
     /// Default section name for `todo add` when `--section` is omitted (`R-WRITE-1`).
     pub default_section: Option<String>,
     /// Section name for `todo ask` (`R-WRITE-11`, default `"Questions"`).
@@ -111,6 +121,8 @@ impl Default for OpsConfig {
             areas: Vec::new(),
             difficulties: ["1", "2", "3", "4", "5"].map(str::to_string).to_vec(),
             difficulties_set: false,
+            target_difficulty_setting: None,
+            level1_max_files: DEFAULT_LEVEL1_MAX_FILES,
             default_section: None,
             question_section: DEFAULT_QUESTION_SECTION.to_string(),
             idea_section: DEFAULT_IDEA_SECTION.to_string(),
@@ -157,6 +169,40 @@ impl OpsConfig {
         self.difficulties
             .iter()
             .position(|cfg_d| cfg_d.eq_ignore_ascii_case(d.trim()))
+    }
+
+    /// The level the planner splits down to (`R-LEVEL-2`, `R-LEVEL-3`): `target_difficulty` from
+    /// `todo.toml`, or else the first of [`Self::difficulties`].
+    #[must_use]
+    pub fn target_difficulty(&self) -> &str {
+        self.target_difficulty_setting
+            .as_deref()
+            .unwrap_or_else(|| self.difficulties.first().map_or("", String::as_str))
+    }
+
+    /// Whether a task at `difficulty` is above the target level, so it may keep a `final` (R-LEVEL-3).
+    /// A missing or unconfigured level is not above it.
+    #[must_use]
+    pub fn is_above_target(&self, difficulty: Option<&str>) -> bool {
+        matches!(
+            (self.difficulty_rank(difficulty), self.target_rank()),
+            (Some(rank), Some(target)) if rank > target
+        )
+    }
+
+    /// Whether a task at `difficulty` is at the target level or below it (`R-DETAIL-2`, `R-LEVEL-3`).
+    /// A missing or unconfigured level is neither.
+    #[must_use]
+    pub fn is_at_or_below_target(&self, difficulty: Option<&str>) -> bool {
+        matches!(
+            (self.difficulty_rank(difficulty), self.target_rank()),
+            (Some(rank), Some(target)) if rank <= target
+        )
+    }
+
+    /// The position of the target level in [`Self::difficulties`].
+    fn target_rank(&self) -> Option<usize> {
+        self.difficulty_rank(Some(self.target_difficulty()))
     }
 
     /// Whether `required_fields` names `field`, ignoring case: a task must then have it (`R-LEVEL-1`).
@@ -283,6 +329,8 @@ impl OpsConfig {
         let mut cfg = Self::default();
         let mut lease_minutes_line: Option<usize> = None;
         let mut lease_max_line: Option<usize> = None;
+        // Checked after the loop, because `difficulties` may come after it in the file.
+        let mut target_setting: Option<(String, usize)> = None;
 
         for (key, spanned_val) in table {
             let line = line_at_offset(content, spanned_val.span().start);
@@ -333,6 +381,15 @@ impl OpsConfig {
                     }
                     cfg.difficulties = items;
                     cfg.difficulties_set = true;
+                }
+                "target_difficulty" => {
+                    let s = expect_string(&key, val, line)?;
+                    target_setting = Some((s, line));
+                }
+                "level1_max_files" => {
+                    let n = expect_u64(&key, val, line, 1)?;
+                    cfg.level1_max_files = usize::try_from(n)
+                        .map_err(|_| toml_err(line, "level1_max_files is too large"))?;
                 }
                 "default_section" => {
                     let s = expect_string(&key, val, line)?;
@@ -439,6 +496,25 @@ impl OpsConfig {
                 }
             }
         }
+
+        // The target is one of the configured levels; without a setting it is the lowest (`R-LEVEL-2`).
+        cfg.target_difficulty_setting = target_setting
+            .map(|(raw, line)| {
+                cfg.difficulties
+                    .iter()
+                    .find(|d| d.eq_ignore_ascii_case(raw.trim()))
+                    .cloned()
+                    .ok_or_else(|| {
+                        toml_err(
+                            line,
+                            format!(
+                                "target_difficulty {raw:?} must be one of difficulties: {}",
+                                cfg.difficulties.join(", ")
+                            ),
+                        )
+                    })
+            })
+            .transpose()?;
 
         if cfg.lock.lease_minutes > cfg.lock.lease_max_minutes {
             let line = lease_minutes_line.or(lease_max_line).unwrap_or(1);

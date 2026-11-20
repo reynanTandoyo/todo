@@ -14,7 +14,7 @@ use std::process::Output;
 use serde_json::json;
 use tempfile::TempDir;
 
-use common::{parse_json, read_text, run_todo, setup_proj};
+use common::{parse_json, read_text, run_todo, setup_proj, write_toml};
 
 const MARKER: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->";
 
@@ -297,6 +297,29 @@ fn a_lowest_level_task_with_files_needs_its_commit_while_git_is_there() {
     assert_eq!(forced.status.code(), Some(1));
     assert_eq!(parse_json(&forced.stdout)["error"]["code"], "MISSING_FIELD");
     assert_eq!(fs::read(&p.todo).expect("read TODO.md"), before);
+}
+
+#[test]
+fn the_target_level_decides_which_task_needs_its_commit() {
+    // By default the target is level 1, so a level-2 task needs no commit (R-SCOPE-2, R-DETAIL-2).
+    let by_default = project("2", Some("src/"));
+    repo_with_first_commit(&by_default);
+    let out = done(&by_default, &[]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // With target_difficulty = "2", the same task is at the target and needs its commit.
+    let raised = project("2", Some("src/"));
+    write_toml(&raised.work, "target_difficulty = \"2\"\n");
+    repo_with_first_commit(&raised);
+    let before = fs::read(&raised.todo).expect("read TODO.md");
+    let out = done(&raised, &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(parse_json(&out.stdout)["error"]["code"], "MISSING_FIELD");
+    assert_eq!(fs::read(&raised.todo).expect("read TODO.md"), before);
 }
 
 #[test]

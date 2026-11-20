@@ -458,10 +458,10 @@ pub enum CommitScope {
     Changed(Vec<String>),
 }
 
-/// Whether `task` is at or below the target level (`R-DETAIL-2`): the lowest level, the first of
-/// `difficulties`, until a `target_difficulty` is set.
+/// Whether `task` is at or below the target level (`R-DETAIL-2`, `target_difficulty`, by default the
+/// lowest level).
 fn at_or_below_target(task: &Task, cfg: &OpsConfig) -> bool {
-    cfg.difficulty_rank(task.difficulty.as_deref()) == Some(0)
+    cfg.is_at_or_below_target(task.difficulty.as_deref())
 }
 
 /// Checks a `done` of `task` against its `files` and the commit it named (`R-SCOPE-2`). A task

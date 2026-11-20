@@ -31,6 +31,7 @@
 //!      `- priority:` lines in place (`docs/format.md` §8), and appends notes after the last line of
 //!      the task block (`docs/format.md` §9).
 
+pub mod brief;
 pub mod commit_files;
 pub mod config;
 pub mod edits;
@@ -46,6 +47,7 @@ pub mod task_ops;
 pub mod verify;
 pub mod waves;
 
+pub use brief::{BriefJson, build_brief};
 pub use config::{
     CONFIG_FILENAME, DEFAULT_ARCHIVE_FILE, DEFAULT_CLAIM_TTL_HOURS, DEFAULT_IDEA_SECTION,
     DEFAULT_QUESTION_SECTION, DEFAULT_SNAPSHOTS_KEEP, OpsConfig, VerifyWhen,

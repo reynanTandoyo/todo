@@ -238,6 +238,56 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
 
 `warnings` holds the warnings that the text output prints on standard error.
 
+### `todo brief <task> --json` (`todo.brief.v1`, `R-DETAIL-3`)
+
+The work order of one task (the text is the same parts, in the order of `R-DETAIL-3`). `milestones`
+is the chain above the task from the top down, as `show` gives it (`R-MILE-4`). `files` is empty
+when no `files` are listed, which means the task may change any file. `verify` is `null` when the
+task has no check; `runs` is `done`, `wave` (`todo verify --wave` runs it) or `never` (`verify = false`).
+`finished_dependencies` lists the dependencies that are done, in the order of `depends`, each with
+the text of its latest `done` note and its commits. `commands.finish` is the three lines that commit
+only the listed files and finish the task, and `commands.give_up` is the command that gives it back.
+`commands.agent` is `null` when no agent name is set; the text then prints `<agent>`.
+
+```json
+{
+  "schema": "todo.brief.v1",
+  "ok": true,
+  "data": {
+    "id": "T-021",
+    "title": "Diffuse term in the C shader",
+    "milestones": [
+      { "id": "T-010", "title": "Develop the renderer", "goal": "the test scene renders with lighting", "status": "open" }
+    ],
+    "why": "lit surfaces need the diffuse term",
+    "read": ["src/light.h", "docs"],
+    "files": ["src/shader.c", "tests/shader test.c"],
+    "steps": ["open src/shader.c", "add the diffuse term"],
+    "verify": { "command": "cargo test shader", "runs": "done" },
+    "finished_dependencies": [
+      { "id": "T-020", "title": "Parse the config file", "note": "the parser reads every key", "commit": ["1a2b3c4d"] }
+    ],
+    "commands": {
+      "agent": "worker-1",
+      "finish": [
+        "git add -- src/shader.c 'tests/shader test.c'",
+        "git commit -m 'T-021: Diffuse term in the C shader'",
+        "todo done T-021 --commit HEAD --agent worker-1"
+      ],
+      "give_up": "todo stuck T-021 --note \"<problem>\" --agent worker-1"
+    }
+  },
+  "warnings": []
+}
+```
+
+The `finish` and `give_up` lines are PowerShell: a word with a space or another character outside
+letters, digits and `- _ . / \ : = +` is in single quotes, with each single quote doubled.
+
+`next --brief` (with or without `--claim`) puts the same object under a `brief` key of the
+`todo.next.v1` data, and `claim --brief` puts it under `brief` next to the task fields of
+`todo.claim.v1`. Without `--brief` there is no `brief` key.
+
 ### `todo next --json` (`todo.next.v1`)
 
 `task` is the Shared `TaskJson` shape (see above) of the task that `next` hands out. The example is

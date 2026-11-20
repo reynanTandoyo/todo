@@ -1212,7 +1212,7 @@ todo next --claim --max-difficulty 1 --brief --agent worker-1
   4. the files it may change (`files`), with the sentence that no other file may be changed;
   5. the numbered steps;
   6. the `verify` command, and whether `done` runs it (`verify_when`, R-VERIFY-1, R-VERIFY-2);
-  7. for each finished dependency, its done note and its commit;
+  7. for each dependency that is done, its done note and its commit (a dropped one has neither, so it is left out);
   8. the exact commands to finish — commit only the listed files, then
      `todo done <ID> --commit HEAD --agent <name>` — and to give up —
      `todo stuck <ID> --note "<problem>" --agent <name>` — with the ID and the agent name filled in

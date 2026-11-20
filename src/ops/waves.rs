@@ -17,10 +17,6 @@ use crate::ops::config::OpsConfig;
 use crate::ops::read::{lacks_level, milestone_holds_back};
 use crate::ops::scope::{ScopeEntry, overlap_lanes, parse_files, raw_entries};
 
-/// The most `files` entries a task at the lowest level may have (`R-DETAIL-2`, the default of
-/// `level1_max_files`).
-pub const LEVEL1_MAX_FILES: usize = 3;
-
 /// One wave: the tasks that become ready in round `number`, grouped into lanes. Each lane lists its
 /// tasks in file order; the tasks of one lane must run one after another.
 pub struct Wave<'a> {
@@ -395,17 +391,17 @@ fn is_unfinished(status: Status) -> bool {
     matches!(status, Status::Open | Status::Claimed | Status::Blocked)
 }
 
-/// What a task at the lowest level lacks for the detail rule (`R-DETAIL-2`), in a fixed order; empty
-/// when it is complete.
+/// What a task at or below the target level lacks for the detail rule (`R-DETAIL-2`), in a fixed
+/// order; empty when it is complete.
 ///
-/// A task at the lowest level (the first of `difficulties`) needs `why`, `accept`, `steps`, `verify`
-/// and `files`, with at most [`LEVEL1_MAX_FILES`] entries, none of them a folder or a pattern. Tasks
-/// at other levels, and tasks without a level (held back by [`plan_waves`]), are not checked here.
-/// The rule's other two checks, the paths of `read` and the open questions about the task, are not
-/// part of this list yet.
+/// A task at or below `target_difficulty` (by default the lowest level) needs `why`, `accept`,
+/// `steps`, `verify` and `files`, with at most `level1_max_files` entries, none of them a folder or a
+/// pattern. Tasks above the target, and tasks without a level (held back by [`plan_waves`]), are not
+/// checked here. The rule's other two checks, the paths of `read` and the open questions about the
+/// task, are not part of this list yet.
 #[must_use]
 pub fn detail_gaps(task: &Task, cfg: &OpsConfig) -> Vec<String> {
-    if cfg.difficulty_rank(task.difficulty.as_deref()) != Some(0) {
+    if !cfg.is_at_or_below_target(task.difficulty.as_deref()) {
         return Vec::new();
     }
     let blank = |value: Option<&str>| value.is_none_or(|v| v.trim().is_empty());
@@ -429,8 +425,8 @@ pub fn detail_gaps(task: &Task, cfg: &OpsConfig) -> Vec<String> {
     if entries.is_empty() {
         missing.push("files".to_string());
     } else {
-        if raw_entries(files).count() > LEVEL1_MAX_FILES {
-            missing.push(format!("files: more than {LEVEL1_MAX_FILES}"));
+        if raw_entries(files).count() > cfg.level1_max_files {
+            missing.push(format!("files: more than {}", cfg.level1_max_files));
         }
         if entries.iter().any(|entry| !entry.is_single_file()) {
             missing.push("files: folder or pattern".to_string());

@@ -1,0 +1,63 @@
+---
+source: tests/cmd_brief.rs
+expression: json
+---
+{
+  "data": {
+    "commands": {
+      "agent": "worker-1",
+      "finish": [
+        "git add -- src/shader.c 'tests/shader test.c'",
+        "git commit -m 'T-021: Diffuse term in the C shader'",
+        "todo done T-021 --commit HEAD --agent worker-1"
+      ],
+      "give_up": "todo stuck T-021 --note \"<problem>\" --agent worker-1"
+    },
+    "files": [
+      "src/shader.c",
+      "tests/shader test.c"
+    ],
+    "finished_dependencies": [
+      {
+        "commit": [
+          "1a2b3c4d"
+        ],
+        "id": "T-020",
+        "note": "the parser reads every key",
+        "title": "Parse the config file"
+      }
+    ],
+    "id": "T-021",
+    "milestones": [
+      {
+        "goal": "the test scene renders with lighting",
+        "id": "T-010",
+        "status": "open",
+        "title": "Develop the renderer"
+      },
+      {
+        "goal": "point and directional lights match the reference images",
+        "id": "T-011",
+        "status": "open",
+        "title": "Lighting"
+      }
+    ],
+    "read": [
+      "src/light.h",
+      "docs"
+    ],
+    "steps": [
+      "open src/shader.c",
+      "add the diffuse term"
+    ],
+    "title": "Diffuse term in the C shader",
+    "verify": {
+      "command": "cargo test shader",
+      "runs": "done"
+    },
+    "why": "lit surfaces need the diffuse term"
+  },
+  "ok": true,
+  "schema": "todo.brief.v1",
+  "warnings": []
+}
