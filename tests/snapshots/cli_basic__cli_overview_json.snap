@@ -251,6 +251,11 @@ expression: ok_json
         "summary": "End a manual editing lease on TODO.md"
       },
       {
+        "kind": "write",
+        "name": "verify",
+        "summary": "Run a task's verify command, or the checks of a finished wave"
+      },
+      {
         "kind": "read",
         "name": "where",
         "summary": "Show resolved TODO.md, repo root, state folder, lock status, and task counts"

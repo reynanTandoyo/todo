@@ -619,6 +619,7 @@ register_commands! {
     Tree => tree,
     Unblock => unblock,
     Unlock => unlock,
+    Verify => verify,
     Where => where_cmd,
 }
 

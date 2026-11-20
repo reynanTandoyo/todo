@@ -709,6 +709,33 @@ When it finishes the last unfinished entry below a milestone, the milestone appe
 ]
 ```
 
+### `todo verify <task> --json` and `todo verify --wave --json` (`todo.verify.v1`, `R-VERIFY-1`, `R-VERIFY-2`)
+
+A passing `verify <task>` prints `data` with `task`, `passed: true` and `log` (the path of
+`verify/<ID>.log`). A failing one is the `VERIFY_FAILED` error above. The output of the command never
+reaches the JSON; it is in the log file.
+
+`verify --wave` prints `data` with `checked` (the number of done tasks that were checked), `passed`
+(the IDs that passed), `failed` (one object per failed task: `task`, `exit_code`, `last_line` and
+`log`) and `given_back` (the IDs given back as `stuck`). It is `ok: true` with exit 1 when anything
+failed, as `align` is.
+
+```json
+{
+  "schema": "todo.verify.v1",
+  "ok": true,
+  "data": {
+    "checked": 2,
+    "passed": ["T-001"],
+    "failed": [
+      { "task": "T-002", "exit_code": 1, "last_line": "2 tests failed", "log": "…/verify/T-002.log" }
+    ],
+    "given_back": ["T-002"]
+  },
+  "warnings": []
+}
+```
+
 ### Sessions: `fields.session`, `todo release --session --json`, `todo session-end --json` (`R-CLAIM-7`)
 
 - A claim made with a session shows it in the task's `fields`: `{"fields":{"session":"6f0c1c2e-…"}}`.
@@ -919,6 +946,8 @@ project's `TODO.md`, never searches folders and writes nothing.
 | `TOOL_TOO_OLD` | 4 | `TODO.md`, the archive or the project register names a format version this todo does not know; update todo first (R-VER-2) | `{"code":"TOOL_TOO_OLD","message":"format version 3 is newer than this todo 0.7.0 supports; ...","line":1,"file":"TODO.md"}` |
 | `FILES_BUSY` | 1 | `claim` of a task whose `files` overlap a task another agent holds (R-SCOPE-1, R-CLAIM-2); `--force` overrides it | `{"code":"FILES_BUSY","message":"task T-002 shares files with T-001 (claimed by alice); pass --force to claim it anyway","task":"T-002","files_busy":["T-001"]}` |
 | `DUPLICATE_PROJECT` | 1 | `project add` for a file, or a name, that the project register already has (R-PROJ-1) | `{"code":"DUPLICATE_PROJECT","message":"C:\\Projekte\\TODO.md is already registered as renderer"}` |
+| `VERIFY_FAILED` | 1 | A task's `verify` command failed or timed out: `done` is refused (the task stays claimed, or is given back as `stuck`), or `todo verify <task>` failed (R-VERIFY-1) | `{"code":"VERIFY_FAILED","message":"verify of T-012 failed (exit code 1), so T-012 is not done and stays claimed: tests failed","task":"T-012","exit_code":1,"last_line":"tests failed","timed_out":false,"log":"C:\\Projekte\\.git\\todo\\TODO.md\\verify\\T-012.log"}` |
+| `VERIFY_NOT_RUN` | 5 | A `verify` command could not run: no shell could start, or `verify = false` in `todo.toml`; nothing is written (R-VERIFY-1) | `{"code":"VERIFY_NOT_RUN","message":"verify commands are off: verify = false in todo.toml"}` |
 
 ### `TOOL_TOO_OLD` (`R-VER-2`)
 

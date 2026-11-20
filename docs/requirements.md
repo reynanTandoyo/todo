@@ -1260,7 +1260,8 @@ the check itself.
     -NonInteractive -Command`, else `powershell.exe` with the same arguments, on Windows; `sh -c`
     elsewhere), with the `verify` line as the last argument and standard input closed. After
     `verify_timeout_seconds` (default 300) the command and the processes it started are stopped, and
-    the check counts as failed. Exit 0 passes; anything else fails.
+    the check counts as failed. Exit 0 passes; anything else fails. A timeout's last line is
+    `timed out after <N> seconds`.
   - **Output.** Standard output and standard error are captured and saved in full in the state
     folder (`verify/<ID>.log`, §7, replaced by each run); they never reach todo's own standard
     output, so `--json` stays one object (R-OUT-1). On a failure the text output shows the last
@@ -1272,7 +1273,8 @@ the check itself.
     task last went back to work (the latest `unblocked`, `reopened` or `stuck` note, or else since it
     was added) reach `verify_attempts` (default 3), that failure gives the task back as `stuck` does
     (R-STUCK-1), with the note `stuck — verify failed <N> times: <last line>` instead, and `attempts`
-    raised once.
+    raised once; that refusal also exits 1 with `VERIFY_FAILED`. A `done` that the rules refuse
+    (R-WRITE-9) is refused before the command runs.
   - **Mode `wave`** is R-VERIFY-2.
   - **In both modes.** `todo verify <task>` runs the one command and changes nothing in `TODO.md`
     (exit 0 pass, 1 `VERIFY_FAILED`). `done --no-verify` needs `--force` and adds the note
@@ -1280,10 +1282,14 @@ the check itself.
     running anything and writes no `verified`, and `todo verify` exits 5 with `VERIFY_NOT_RUN`. A
     command that cannot be started (the shell is missing) is not a failure: `done` and `verify` exit 5
     with `VERIFY_NOT_RUN`, nothing is written, and `attempts` doesn't change. A task without `verify`
-    behaves as before v0.8. `reopen` removes `verified` (R-WRITE-10); `set` cannot write `verified`
-    or `attempts` (R-WRITE-8).
+    behaves as before v0.8. `reopen` removes `verified` (R-WRITE-10); `set`, `--unset` included,
+    cannot write `verified` or `attempts` (R-WRITE-8). `done --no-verify` without `--force` is
+    refused with `USAGE` (exit 2). `apply`'s `done` runs the `verify` command of each done task
+    before the lock is taken, as `done` does (R-LOCK-4). A failing check, or one that cannot start,
+    refuses the whole batch with the same code as `done`, and nothing is written, not even the
+    attempt that `done` would record. With `verify_when = "wave"` or `verify = false` nothing runs.
   - `check` and `plan` list done tasks with a `verify` command and no `verified` line (R-CHECK-1,
-    R-LEVEL-2).
+    R-LEVEL-2). `check` does not list them while `verify = false`, since no check can pass then.
   - Tests use a command that passes, one that fails and one that outlives a short timeout, in each
     mode.
 - **R-VERIFY-2 COULD** Wave mode (`verify_when = "wave"`). In a compiled project one worker's
