@@ -318,8 +318,10 @@ pub(crate) fn check_tasks(
             });
         }
 
-        // `difficulties` always has values (default easy, medium, hard), so there is no empty-list case.
+        // `difficulties` always has values (default 1 to 5), so there is no empty-list case. A done or
+        // dropped entry keeps the difficulty it was finished with, as a record (format.md §18).
         if let Some(ref difficulty) = task.difficulty
+            && !matches!(task.status, Status::Done | Status::Dropped)
             && !cfg
                 .difficulties
                 .iter()

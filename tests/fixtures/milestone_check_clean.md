@@ -20,7 +20,7 @@
 ### T-003 · C shader
 - status: open
 - owner: —
-- priority: P1 · difficulty: hard · type: feature
+- priority: P1 · difficulty: 4 · type: feature
 - milestone: T-002
 - why: the renderer has no shading stage yet
 

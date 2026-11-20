@@ -10,7 +10,7 @@ use crate::version::{RUNNING_VERSION, ToolVersion};
 
 /// The format version this build writes (`docs/format.md` §18). Older versions are read, and
 /// migrated on the first write (R-MIG-1).
-pub const CURRENT_FORMAT_VERSION: u32 = 2;
+pub const CURRENT_FORMAT_VERSION: u32 = 3;
 
 /// The oldest format version. A file without a format line is in this version (`docs/format.md`
 /// §4).

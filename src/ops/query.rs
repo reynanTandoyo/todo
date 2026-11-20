@@ -342,6 +342,10 @@ pub fn select_next_task<'a>(
         if task.kind() != EntryKind::Task {
             return false;
         }
+        // Not even the task an agent already holds is handed out without a level (R-LEVEL-1).
+        if task.difficulty.is_none() {
+            return false;
+        }
         if let Some(ref allowed_sections) = section_matches {
             match task.section {
                 Some(idx) if allowed_sections.contains(&idx) => {}

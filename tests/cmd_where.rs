@@ -125,6 +125,8 @@ fn warns_on_onedrive_and_dropbox_in_where_and_writes() {
             "First",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
         ])
         .output()
         .unwrap();

@@ -34,13 +34,13 @@ fn ok(dir: &std::path::Path, args: &[&str]) -> std::process::Output {
     out
 }
 
-/// `text` with the format 1 line raised to 2 and the tool line added after it: the whole change a
+/// `text` with the format 1 line raised to 3 and the tool line added after it: the whole change a
 /// migration makes to a file whose only other lines stay as they are.
 fn migrated_text(text: &str, eol: &str) -> String {
     let format_1 = format!("<!-- todo-format: 1 -->{eol}");
-    let format_2 = format!("<!-- todo-format: 2 -->{eol}<!-- todo-tool: {RUNNING} -->{eol}");
+    let format_3 = format!("<!-- todo-format: 3 -->{eol}<!-- todo-tool: {RUNNING} -->{eol}");
     assert!(text.contains(&format_1), "no format 1 line in {text:?}");
-    text.replacen(&format_1, &format_2, 1)
+    text.replacen(&format_1, &format_3, 1)
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn the_first_write_migrates_an_lf_file_and_says_so_in_one_stderr_line() {
     );
     let stderr = stderr_text(&out);
     assert_eq!(stderr.lines().count(), 1, "stderr: {stderr:?}");
-    assert_eq!(stderr.trim_end(), "migrated TODO.md: format 1 to 2");
+    assert_eq!(stderr.trim_end(), "migrated TODO.md: format 1 to 3");
 
     // The note is the only line that the write adds; everything else is the migration.
     let after = read_todo(dir.path());
@@ -64,7 +64,7 @@ fn the_first_write_migrates_an_lf_file_and_says_so_in_one_stderr_line() {
         .filter(|line| !line.contains("checked the wicks"))
         .collect();
     assert_eq!(without_note, migrated_text(&before, "\n"));
-    assert!(after.contains("<!-- todo-format: 2 -->\n"));
+    assert!(after.contains("<!-- todo-format: 3 -->\n"));
     assert!(after.contains(&format!("{}\n", stamp_line())));
 }
 
@@ -103,7 +103,7 @@ fn migrate_changes_only_the_format_and_tool_lines_and_a_second_run_changes_nothi
     let out = ok(dir.path(), &["migrate", "--agent", "bob"]);
     assert_eq!(
         stdout_text(&out).trim_end(),
-        "migrated TODO.md: format 1 to 2"
+        "migrated TODO.md: format 1 to 3"
     );
     assert_eq!(read_todo(dir.path()), migrated_text(&before, "\r\n"));
 
@@ -111,7 +111,7 @@ fn migrate_changes_only_the_format_and_tool_lines_and_a_second_run_changes_nothi
     let again = ok(dir.path(), &["migrate", "--agent", "bob"]);
     assert_eq!(
         stdout_text(&again).trim_end(),
-        "TODO.md is already in format 2: nothing to migrate"
+        "TODO.md is already in format 3: nothing to migrate"
     );
     assert_eq!(
         read_todo(dir.path()),
@@ -129,7 +129,7 @@ fn migrate_dry_run_prints_the_diff_and_writes_nothing() {
     let out = ok(dir.path(), &["--dry-run", "migrate", "--agent", "bob"]);
     let shown = stdout_text(&out);
     assert!(shown.contains("-<!-- todo-format: 1 -->"), "{shown}");
-    assert!(shown.contains("+<!-- todo-format: 2 -->"), "{shown}");
+    assert!(shown.contains("+<!-- todo-format: 3 -->"), "{shown}");
     assert!(shown.contains(&format!("+{}", stamp_line())), "{shown}");
     assert_eq!(fs::read(dir.path().join("TODO.md")).expect("read"), before);
     assert!(!dir.path().join(".todo").join("journal.jsonl").exists());
@@ -143,7 +143,7 @@ fn a_file_without_a_format_line_gets_the_format_line_first_and_the_stamp_after_i
 
     ok(dir.path(), &["migrate", "--agent", "bob"]);
 
-    let expected = format!("<!-- todo-format: 2 -->\n{}\n{before}", stamp_line());
+    let expected = format!("<!-- todo-format: 3 -->\n{}\n{before}", stamp_line());
     assert_eq!(read_todo(dir.path()), expected);
 }
 
@@ -203,7 +203,7 @@ fn the_journal_entry_of_a_migrating_write_says_what_was_migrated() {
     let last: serde_json::Value =
         serde_json::from_str(journal.lines().last().expect("an entry")).expect("JSON");
     assert_eq!(last["command"], "note");
-    assert_eq!(last["migrated"], "TODO.md: format 1 to 2");
+    assert_eq!(last["migrated"], "TODO.md: format 1 to 3");
 }
 
 #[test]
@@ -222,7 +222,7 @@ fn migrate_writes_one_journal_entry_naming_the_migration_and_none_for_a_second_r
         .collect();
     assert_eq!(entries.len(), 1, "the second run writes nothing: {journal}");
     assert_eq!(entries[0]["command"], "migrate");
-    assert_eq!(entries[0]["migrated"], "TODO.md: format 1 to 2");
+    assert_eq!(entries[0]["migrated"], "TODO.md: format 1 to 3");
     assert_eq!(entries[0]["tasks"], serde_json::json!([]));
 }
 
@@ -234,11 +234,11 @@ fn json_output_lists_each_migrated_file_with_its_versions() {
     let out = ok(dir.path(), &["--json", "migrate", "--agent", "bob"]);
     let json = parse_json(&out.stdout);
     assert_eq!(json["ok"], true);
-    assert_eq!(json["data"]["current_format"], 2);
+    assert_eq!(json["data"]["current_format"], 3);
     assert_eq!(json["data"]["changed"], true);
     assert_eq!(json["data"]["migrated"][0]["file"], "TODO.md");
     assert_eq!(json["data"]["migrated"][0]["from"], 1);
-    assert_eq!(json["data"]["migrated"][0]["to"], 2);
+    assert_eq!(json["data"]["migrated"][0]["to"], 3);
 }
 
 /// An archive in format 1 that holds one old task.
@@ -350,13 +350,13 @@ fn the_archive_is_migrated_in_the_same_write_as_todo_md() {
     );
     assert_eq!(
         stderr_text(&out).trim_end(),
-        "migrated TODO.md: format 1 to 2; TODO-archive.md: format 1 to 2"
+        "migrated TODO.md: format 1 to 3; TODO-archive.md: format 1 to 3"
     );
     let archive = fs::read_to_string(dir.path().join("TODO-archive.md")).expect("archive");
     let head: Vec<&str> = archive.lines().take(3).collect();
     assert_eq!(
         head,
-        [MARKER, "<!-- todo-format: 2 -->", stamp_line().as_str()]
+        [MARKER, "<!-- todo-format: 3 -->", stamp_line().as_str()]
     );
 }
 
@@ -374,11 +374,11 @@ fn archive_migrates_an_old_archive_in_the_same_write_as_it_moves_tasks() {
     let out = ok(dir.path(), &["archive", "--yes", "--agent", "bob"]);
     assert_eq!(
         stderr_text(&out).trim_end(),
-        "migrated TODO.md: format 1 to 2; TODO-archive.md: format 1 to 2"
+        "migrated TODO.md: format 1 to 3; TODO-archive.md: format 1 to 3"
     );
     let archive = fs::read_to_string(dir.path().join("TODO-archive.md")).expect("archive");
     assert!(
-        archive.starts_with("<!-- todo-format: 2 -->\n"),
+        archive.starts_with("<!-- todo-format: 3 -->\n"),
         "{archive}"
     );
     assert!(archive.contains("### T-000 · Old task"));
@@ -387,7 +387,7 @@ fn archive_migrates_an_old_archive_in_the_same_write_as_it_moves_tasks() {
         "{archive}"
     );
     assert!(read_todo(dir.path()).starts_with(&format!(
-        "{MARKER}\n<!-- todo-format: 2 -->\n{}\n",
+        "{MARKER}\n<!-- todo-format: 3 -->\n{}\n",
         stamp_line()
     )));
 }
@@ -422,5 +422,5 @@ fn restoring_a_snapshot_from_before_the_migration_works_and_the_next_write_migra
         dir.path(),
         &["note", "T-001", "checked the wicks again", "--agent", "bob"],
     );
-    assert!(read_todo(dir.path()).contains("<!-- todo-format: 2 -->\n"));
+    assert!(read_todo(dir.path()).contains("<!-- todo-format: 3 -->\n"));
 }

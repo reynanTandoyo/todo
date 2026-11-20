@@ -102,7 +102,7 @@ fn assert_refused(p: &Proj, args: &[&str], code: &str) -> Output {
 /// them (format.md §18): the format line goes first, then the running tool stamp (R-VER-1).
 fn stamped(text: &str) -> String {
     format!(
-        "<!-- todo-format: 2 -->\n<!-- todo-tool: {} -->\n{text}",
+        "<!-- todo-format: 3 -->\n<!-- todo-tool: {} -->\n{text}",
         env!("CARGO_PKG_VERSION")
     )
 }
@@ -160,6 +160,8 @@ fn add_milestone_needs_a_goal_and_a_parent_must_be_a_milestone() {
             "GPU compiler",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--milestone",
             "T-002",
             "--agent",
@@ -175,6 +177,8 @@ fn add_milestone_needs_a_goal_and_a_parent_must_be_a_milestone() {
             "GPU compiler",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--milestone",
             "T-099",
             "--agent",
@@ -192,6 +196,8 @@ fn add_milestone_needs_a_goal_and_a_parent_must_be_a_milestone() {
             "question",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--milestone",
             "T-001",
             "--agent",
@@ -227,6 +233,8 @@ fn add_milestone_needs_a_goal_and_a_parent_must_be_a_milestone() {
             "Shader compiler",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--type",
             "feature",
             "--area",
@@ -251,7 +259,7 @@ fn add_milestone_needs_a_goal_and_a_parent_must_be_a_milestone() {
 ### T-004 · Shader compiler\n\
 - status: open\n\
 - owner: —\n\
-- priority: P1 · type: feature · area: cli\n\
+- priority: P1 · difficulty: 3 · type: feature · area: cli\n\
 - milestone: T-003\n\
 - note (2026-11-18, planner): added\n"
     );
@@ -270,6 +278,8 @@ fn add_json_lists_the_milestone_chain_top_down() {
             "Shader compiler",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--type",
             "feature",
             "--milestone",
@@ -504,7 +514,14 @@ fn milestone_in_the_combined_priority_line_is_edited_in_place() {
 
 #[test]
 fn next_and_list_never_hand_out_milestones_and_claim_refuses_them() {
-    let p = proj(&tree());
+    let p = proj(
+        &tree()
+            .replace(
+                "- priority: P1 · type: feature · area: cli\n",
+                "- priority: P1 · difficulty: 2 · type: feature · area: cli\n",
+            )
+            .replace("- priority: P2\n", "- priority: P2 · difficulty: 2\n"),
+    );
 
     let next = parse_json(&run(&p, &["--json", "next"]).stdout);
     assert_eq!(next["data"]["task"]["id"], "T-003");
@@ -744,8 +761,8 @@ fn add_from_accepts_milestone_references_and_refuses_bad_ones_whole() {
         concat!(
             "{\"ref\":\"m\",\"title\":\"Shading\",\"type\":\"milestone\",\"priority\":\"P1\",",
             "\"goal\":\"surfaces shade correctly\",\"milestone\":\"T-001\"}\n",
-            "{\"title\":\"Shading pass\",\"priority\":\"P2\",\"milestone\":\"@m\"}\n",
-            "{\"title\":\"Lighting pass\",\"priority\":\"P2\",\"fields\":{\"milestone\":\"T-002\"}}\n",
+            "{\"title\":\"Shading pass\",\"priority\":\"P2\",\"difficulty\":\"3\",\"milestone\":\"@m\"}\n",
+            "{\"title\":\"Lighting pass\",\"priority\":\"P2\",\"difficulty\":\"3\",\"fields\":{\"milestone\":\"T-002\"}}\n",
         ),
     )
     .unwrap();
@@ -767,13 +784,13 @@ fn add_from_accepts_milestone_references_and_refuses_bad_ones_whole() {
         "\n### T-006 · Shading pass\n",
         "- status: open\n",
         "- owner: —\n",
-        "- priority: P2\n",
+        "- priority: P2 · difficulty: 3\n",
         "- milestone: T-005\n",
         "- note (2026-11-18, planner): added\n",
         "\n### T-007 · Lighting pass\n",
         "- status: open\n",
         "- owner: —\n",
-        "- priority: P2\n",
+        "- priority: P2 · difficulty: 3\n",
         "- milestone: T-002\n",
         "- note (2026-11-18, planner): added\n",
     )));
@@ -781,7 +798,7 @@ fn add_from_accepts_milestone_references_and_refuses_bad_ones_whole() {
     // Each batch below is refused as a whole, so nothing is written.
     fs::write(
         &batch,
-        "{\"title\":\"Lost\",\"priority\":\"P2\",\"milestone\":\"@nope\"}\n",
+        "{\"title\":\"Lost\",\"priority\":\"P2\",\"difficulty\":\"3\",\"milestone\":\"@nope\"}\n",
     )
     .unwrap();
     let out = run(
@@ -799,7 +816,7 @@ fn add_from_accepts_milestone_references_and_refuses_bad_ones_whole() {
     let before = read_todo(&p.work);
 
     for line in [
-        "{\"title\":\"Lost\",\"priority\":\"P2\",\"milestone\":\"T-004\"}\n",
+        "{\"title\":\"Lost\",\"priority\":\"P2\",\"difficulty\":\"3\",\"milestone\":\"T-004\"}\n",
         "{\"title\":\"Lost\",\"type\":\"milestone\",\"priority\":\"P2\"}\n",
         "{\"title\":\"Lost\",\"type\":\"question\",\"priority\":\"P2\",\"milestone\":\"T-001\"}\n",
         "{\"ref\":\"a\",\"title\":\"A\",\"type\":\"milestone\",\"goal\":\"g\",\"priority\":\"P1\",\"milestone\":\"@b\"}\n{\"ref\":\"b\",\"title\":\"B\",\"type\":\"milestone\",\"goal\":\"g\",\"priority\":\"P1\",\"milestone\":\"@a\"}\n",
@@ -831,7 +848,7 @@ fn apply_takes_milestone_references_and_refuses_a_cycle_whole() {
         concat!(
             "{\"op\":\"add\",\"ref\":\"m\",\"title\":\"Shading\",\"type\":\"milestone\",\"priority\":\"P1\",",
             "\"goal\":\"surfaces shade correctly\",\"milestone\":\"T-001\"}\n",
-            "{\"op\":\"add\",\"ref\":\"t\",\"title\":\"Shading pass\",\"priority\":\"P2\",\"milestone\":\"@m\"}\n",
+            "{\"op\":\"add\",\"ref\":\"t\",\"title\":\"Shading pass\",\"priority\":\"P2\",\"difficulty\":\"3\",\"milestone\":\"@m\"}\n",
             "{\"op\":\"set\",\"task\":\"T-004\",\"milestone\":\"@m\"}\n",
         ),
     )
@@ -856,7 +873,7 @@ fn apply_takes_milestone_references_and_refuses_a_cycle_whole() {
         "\n### T-006 · Shading pass\n",
         "- status: open\n",
         "- owner: —\n",
-        "- priority: P2\n",
+        "- priority: P2 · difficulty: 3\n",
         "- milestone: T-005\n",
         "- note (2026-11-18, planner): added\n",
     );
@@ -866,7 +883,7 @@ fn apply_takes_milestone_references_and_refuses_a_cycle_whole() {
     fs::write(
         &ops,
         concat!(
-            "{\"op\":\"add\",\"title\":\"Another\",\"priority\":\"P2\",\"milestone\":\"T-002\"}\n",
+            "{\"op\":\"add\",\"title\":\"Another\",\"priority\":\"P2\",\"difficulty\":\"3\",\"milestone\":\"T-002\"}\n",
             "{\"op\":\"set\",\"task\":\"T-001\",\"milestone\":\"T-005\"}\n",
         ),
     )
