@@ -14,7 +14,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::doc::{DependencyRef, Document, EntryKind, Status, Task, TaskId};
 use crate::ops::config::OpsConfig;
-use crate::ops::read::milestone_holds_back;
+use crate::ops::read::{lacks_level, milestone_holds_back};
 use crate::ops::scope::{ScopeEntry, overlap_lanes, parse_files, raw_entries};
 
 /// The most `files` entries a task at the lowest level may have (`R-DETAIL-2`, the default of
@@ -128,6 +128,13 @@ pub fn plan_waves<'a>(
                     ));
                 }
                 deps.extend(above.depends.iter());
+            }
+            // A task without a level is held back as `next` holds it back (R-LEVEL-1).
+            if own.is_none() && lacks_level(node) {
+                own = Some(format!(
+                    "no level: give it one with todo set {} --difficulty <level>",
+                    label(node.id)
+                ));
             }
         }
         reason[i] = own;
@@ -388,20 +395,17 @@ fn is_unfinished(status: Status) -> bool {
     matches!(status, Status::Open | Status::Claimed | Status::Blocked)
 }
 
-/// What a task lacks for its level (`R-LEVEL-1`, `R-DETAIL-2`), in a fixed order; empty when it is
-/// complete.
+/// What a task at the lowest level lacks for the detail rule (`R-DETAIL-2`), in a fixed order; empty
+/// when it is complete.
 ///
-/// A task without a configured difficulty lacks `level`. A task at the lowest level (the first of
-/// `difficulties`) needs `why`, `accept`, `steps`, `verify` and `files`, with at most
-/// [`LEVEL1_MAX_FILES`] entries, none of them a folder or a pattern. Tasks above that level are not
-/// checked. The rule's other two checks, the paths of `read` and the open questions about the task,
-/// are not part of this list yet.
+/// A task at the lowest level (the first of `difficulties`) needs `why`, `accept`, `steps`, `verify`
+/// and `files`, with at most [`LEVEL1_MAX_FILES`] entries, none of them a folder or a pattern. Tasks
+/// at other levels, and tasks without a level (held back by [`plan_waves`]), are not checked here.
+/// The rule's other two checks, the paths of `read` and the open questions about the task, are not
+/// part of this list yet.
 #[must_use]
 pub fn detail_gaps(task: &Task, cfg: &OpsConfig) -> Vec<String> {
-    let Some(rank) = cfg.difficulty_rank(task.difficulty.as_deref()) else {
-        return vec!["level".to_string()];
-    };
-    if rank != 0 {
+    if cfg.difficulty_rank(task.difficulty.as_deref()) != Some(0) {
         return Vec::new();
     }
     let blank = |value: Option<&str>| value.is_none_or(|v| v.trim().is_empty());

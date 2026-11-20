@@ -1,11 +1,16 @@
 ---
 source: tests/cmd_waves.rs
-assertion_line: 283
 expression: json
 ---
 {
   "data": {
     "apart": [
+      {
+        "id": "T-005",
+        "reason": "no level: give it one with todo set T-005 --difficulty <level>",
+        "status": "open",
+        "title": "Pick a colour theme"
+      },
       {
         "id": "T-006",
         "reason": "blocked: waiting for the API key",
@@ -74,7 +79,7 @@ expression: json
         "title": "Write the loader"
       }
     ],
-    "max_workers": 4,
+    "max_workers": 3,
     "milestone": null,
     "tasks": 15,
     "wave_count": 2,
@@ -105,18 +110,6 @@ expression: json
           ],
           [
             {
-              "id": "T-005",
-              "level": null,
-              "missing": [
-                "level"
-              ],
-              "owner": null,
-              "status": "open",
-              "title": "Pick a colour theme"
-            }
-          ],
-          [
-            {
               "id": "T-014",
               "level": "3",
               "missing": [],
@@ -127,8 +120,8 @@ expression: json
           ]
         ],
         "size": {
-          "lanes": 4,
-          "tasks": 4
+          "lanes": 3,
+          "tasks": 3
         },
         "wave": 1
       },

@@ -1370,8 +1370,9 @@ same checkout.
   - It groups the unfinished tasks (open, claimed, and not given back): wave 1 is every task ready
     now (claimed tasks included, as running); wave n is what becomes ready when the waves before it
     are done. Readiness uses each task's dependencies and those inherited from the milestones above
-    it (R-DEP-1, R-MILE-6). A task that isn't ready for lack of detail (R-DETAIL-2) or a level is
-    placed by its dependencies and marked.
+    it (R-DEP-1, R-MILE-6). A task without a level is held back with its reason, as `next` holds it
+    back (R-LEVEL-1). A task at the lowest level that lacks detail (R-DETAIL-2) is placed by its
+    dependencies and marked.
   - Inside a wave, tasks that overlap (R-SCOPE-1) form one lane, because they must run one after
     another.
   - It prints the number of waves, the size of each (tasks and lanes), the largest number of

@@ -35,7 +35,7 @@ fn task(id: &str, title: &str, fields: &str) -> String {
 fn doc(body: &str) -> String {
     format!(
         "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
-         <!-- todo-format: 2 -->\n\
+         <!-- todo-format: 3 -->\n\
          # Waves fixture\n\n\
          ## Work\n\n{body}"
     )
@@ -293,7 +293,7 @@ fn waves_json_has_the_schema_and_the_counts_of_the_fixture() {
     // finished task are not counted.
     assert_eq!(json["data"]["tasks"], 15);
     assert_eq!(json["data"]["wave_count"], 2);
-    assert_eq!(json["data"]["max_workers"], 4);
+    assert_eq!(json["data"]["max_workers"], 3);
     assert!(json["data"]["milestone"].is_null());
 }
 
@@ -305,10 +305,10 @@ fn text_output_shows_the_waves_lanes_chain_and_the_apart_tasks() {
     assert!(out.status.success(), "stderr: {}", stderr_text(&out));
     let text = stdout_text(&out);
     assert!(
-        text.contains("up to 4 workers at once"),
+        text.contains("up to 3 workers at once"),
         "header missing:\n{text}"
     );
-    assert!(text.contains("wave 1: 4 tasks in 4 lanes"), "{text}");
+    assert!(text.contains("wave 1: 3 tasks in 3 lanes"), "{text}");
     assert!(
         text.contains("  lane 1: T-001 Parse the config file [claimed by alice]"),
         "{text}"
@@ -319,12 +319,17 @@ fn text_output_shows_the_waves_lanes_chain_and_the_apart_tasks() {
         "{text}"
     );
     assert!(text.contains("T-004 Render the report [not ready: files: folder or pattern]"));
-    assert!(text.contains("T-005 Pick a colour theme [not ready: level]"));
+    assert!(
+        text.contains(
+            "  T-005 Pick a colour theme: no level: give it one with todo set T-005 --difficulty <level>"
+        ),
+        "{text}"
+    );
     assert!(
         text.contains("longest chain, 2 tasks: T-001 -> T-002"),
         "{text}"
     );
-    assert!(text.contains("not in a wave (8):"), "{text}");
+    assert!(text.contains("not in a wave (9):"), "{text}");
     assert!(
         text.contains("  T-006 Wait for the API key: blocked: waiting for the API key"),
         "{text}"
@@ -685,13 +690,53 @@ fn a_task_that_waits_on_its_own_milestone_is_in_a_cycle() {
 }
 
 #[test]
-fn a_task_without_a_level_is_placed_and_marked() {
+fn a_task_without_a_level_is_held_back_as_next_holds_it_back() {
     let tmp = TempDir::new().expect("tempdir");
-    let body = task("T-001", "No level", "- status: open\n- priority: P1\n");
+    let body = format!(
+        "{}{}",
+        task("T-001", "No level", "- status: open\n- priority: P1\n"),
+        task(
+            "T-002",
+            "Waits on the task without a level",
+            "- status: open\n- priority: P1\n- difficulty: 3\n- depends: T-001\n"
+        ),
+    );
     let (home, work) = project(&tmp, &body);
     let json = waves_json(&home, &work, &[]);
+    // Without a level the task is in no wave, with the reason that says how to give it one.
+    assert_eq!(wave_of(&json, "T-001"), None);
+    assert_eq!(
+        apart_reason(&json, "T-001").as_deref(),
+        Some("no level: give it one with todo set T-001 --difficulty <level>")
+    );
+    assert_eq!(
+        apart_reason(&json, "T-002").as_deref(),
+        Some("waits on T-001")
+    );
+    // `next` and `list --ready` hold the task back too: the same rule (R-LEVEL-1).
+    assert!(ready_ids(&home, &work).is_empty());
+    let next = run_todo(&home, &work, &["next", "--json"], &[]).expect("run next");
+    assert!(next.status.success(), "stderr: {}", stderr_text(&next));
+    assert!(parse_json(&next.stdout)["data"]["task"].is_null());
+    // Once it has a level it is placed in wave 1, as `next` now hands it out.
+    let body = format!(
+        "{}{}",
+        task(
+            "T-001",
+            "No level",
+            "- status: open\n- priority: P1\n- difficulty: 3\n"
+        ),
+        task(
+            "T-002",
+            "Waits on the task without a level",
+            "- status: open\n- priority: P1\n- difficulty: 3\n- depends: T-001\n"
+        ),
+    );
+    fs::write(work.join("TODO.md"), doc(&body)).expect("rewrite TODO.md");
+    let json = waves_json(&home, &work, &[]);
     assert_eq!(wave_of(&json, "T-001"), Some(1));
-    assert_eq!(missing_of(&json, "T-001"), Some(vec!["level".to_string()]));
+    assert_eq!(wave_of(&json, "T-002"), Some(2));
+    assert_eq!(ready_ids(&home, &work), vec!["T-001"]);
 }
 
 #[test]

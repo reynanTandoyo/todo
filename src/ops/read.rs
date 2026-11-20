@@ -283,6 +283,13 @@ pub fn milestone_holds_back(milestone: &Task) -> bool {
     )
 }
 
+/// Whether a task has no level, so `next` and `list --ready` do not hand it out until it has one
+/// (`R-LEVEL-1`). `waves` holds such a task back for the same reason.
+#[must_use]
+pub fn lacks_level(task: &Task) -> bool {
+    task.difficulty.is_none()
+}
+
 /// Returns `true` if `task` is eligible to be handed out by `next` / `list --ready` (`R-READ-3`).
 ///
 /// Only entries of kind task are handed out, so questions, ideas and milestones never are
@@ -306,7 +313,7 @@ pub fn is_task_ready(
         return false;
     }
     // A task without a level is not handed out until it has one (R-LEVEL-1).
-    if task.difficulty.is_none() {
+    if lacks_level(task) {
         return false;
     }
     // Work is handed out along the tree (R-MILE-6): no milestone above the task may hold it back,

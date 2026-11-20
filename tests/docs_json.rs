@@ -633,7 +633,7 @@ fn report_example_in_json_md_has_the_keys_of_report_json() {
 /// Fixture for the `waves` example: one task per wave, and one blocked task apart (T-163).
 const WAVES_FIXTURE: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
-<!-- todo-format: 2 -->
+<!-- todo-format: 3 -->
 # Waves example
 
 ## Work

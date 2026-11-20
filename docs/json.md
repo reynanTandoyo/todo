@@ -424,12 +424,14 @@ in any wave: the most workers useful at once.
 `apart` lists the unfinished tasks that are in no wave, in file order, each with its `reason`:
 `blocked: …` or `given back: …` (`todo stuck`), `below blocked milestone T-…`, `below done milestone
 T-…` or `below dropped milestone T-…` (the milestone above the task that holds it back, `R-MILE-6`),
-`depends on T-…, which does not exist`, `in a dependency cycle: T-… -> T-… -> T-…` or `waits on T-…`.
+`depends on T-…, which does not exist`, `in a dependency cycle: T-… -> T-… -> T-…`, `no level: give it one with
+todo set T-… --difficulty <level>` (`R-LEVEL-1`, the rule of `next`) or `waits on T-…`.
 
-`level` is the task's difficulty as written, or `null`. `missing` lists what the task lacks for its
-level (`R-LEVEL-1`, `R-DETAIL-2`): `level` when it has none; at the lowest level, `why`, `accept`,
+`level` is the task's difficulty as written; a task without one is in `apart`, not in a wave. `missing`
+lists what the task lacks for the detail rule at the lowest level (`R-DETAIL-2`): `why`, `accept`,
 `steps`, `verify`, `files`, `files: more than 3` or `files: folder or pattern`. It is `[]` when the
-task has all of it. A task with a missing item is still placed in its wave.
+task has all of it, and when it is at another level. A task with a missing item is still placed in
+its wave.
 
 `todo waves <milestone>` limits `tasks`, the waves and `apart` to the tasks below the milestone;
 `milestone` then holds its ID, and `null` otherwise. The wave numbers are those of the whole file.
