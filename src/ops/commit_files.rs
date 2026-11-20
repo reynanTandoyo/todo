@@ -5,6 +5,7 @@
 //! git is used only when it is on `PATH`. Without it, or outside a repository, the answer is
 //! [`CommitScope::NoGit`] and nothing is checked.
 
+use std::io::ErrorKind;
 use std::path::Path;
 use std::process::Command;
 
@@ -129,6 +130,69 @@ pub fn changed_files(dir: Option<&Path>, commit: &str) -> Result<Vec<String>> {
         .filter(|path| !path.is_empty())
         .map(|path| relative_to_folder(&prefix, path))
         .collect())
+}
+
+/// Resolves and verifies a commit given to `done` or to an `apply` operation (R-WRITE-4, NFR-5), with
+/// `git rev-parse --short` in `dir`: `HEAD` and names become the short hash of their commit, a hash
+/// is kept as given, and a commit git does not know is refused. Without git on `PATH` the trimmed
+/// input is returned unchecked. Both commands call this, so they write the same value.
+pub fn resolve_commit(raw: &str, dir: Option<&Path>) -> Result<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(TodoError::new(
+            ErrorCode::BadValue,
+            "--commit value cannot be empty",
+        ));
+    }
+
+    let mut cmd = Command::new("git");
+    if let Some(d) = dir {
+        cmd.current_dir(d);
+    }
+    let spec = format!("{trimmed}^{{commit}}");
+    let output = match cmd
+        .args(["rev-parse", "--short", "--verify", &spec])
+        .output()
+    {
+        Ok(o) => o,
+        Err(e) if e.kind() == ErrorKind::NotFound => {
+            return Ok(trimmed.to_string());
+        }
+        Err(e) => {
+            return Err(TodoError::new(
+                ErrorCode::BadValue,
+                format!("failed to run git rev-parse for '{trimmed}': {e}"),
+            ));
+        }
+    };
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.to_ascii_lowercase().contains("not a git repository")
+            && !trimmed.eq_ignore_ascii_case("HEAD")
+        {
+            return Ok(trimmed.to_string());
+        }
+        return Err(TodoError::new(
+            ErrorCode::BadValue,
+            format!("unknown git commit '{trimmed}'"),
+        ));
+    }
+
+    let resolved = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if trimmed.eq_ignore_ascii_case("HEAD") || !is_hex_hash(trimmed) {
+        if resolved.is_empty() {
+            Ok(trimmed.to_string())
+        } else {
+            Ok(resolved)
+        }
+    } else {
+        Ok(trimmed.to_string())
+    }
+}
+
+fn is_hex_hash(s: &str) -> bool {
+    s.len() >= 4 && s.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 /// `path`, a path from the top of the repository with `/` separators, as a path relative to the

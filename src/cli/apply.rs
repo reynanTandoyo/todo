@@ -22,7 +22,7 @@ use crate::ops::{
     check_ownership, check_task_writable, file_label, forced_note_text, highest_task_number,
     milestone, parse_doc_for_write, read_optional_archive, resolve_task_in_doc, steps_from_text,
 };
-use crate::ops::commit_files::scope_of_commit;
+use crate::ops::commit_files::{resolve_commit, scope_of_commit};
 use crate::ops::identity::done_by;
 use crate::ops::migrate::PendingMigration;
 use crate::ops::scope::CommitScope;
@@ -206,15 +206,36 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let label = file_label(&found.path);
     let archive_path = cfg.archive_path(&found.path);
 
+    // The commit of each `done` operation, resolved as `done` resolves its `--commit` (R-WRITE-4),
+    // before the lock is taken. An empty commit is no commit.
+    let resolve_dir = ctx
+        .file
+        .as_deref()
+        .and_then(Path::parent)
+        .filter(|p| !p.as_os_str().is_empty());
+    let done_commits: Vec<Option<String>> = ops
+        .iter()
+        .map(|op| match op {
+            ApplyOp::Done { commit, .. } => {
+                match commit.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
+                    Some(c) => resolve_commit(c, resolve_dir).map(Some),
+                    None => Ok(None),
+                }
+            }
+            _ => Ok(None),
+        })
+        .collect::<Result<_>>()?;
+
     // Who did the work, per `done` operation (R-WRITE-16); asked of git before the lock is taken.
     let git_dir = found.path.parent().filter(|p| !p.as_os_str().is_empty());
     let mut configured: Option<Option<String>> = None;
     let done_bys: Vec<Option<String>> = ops
         .iter()
-        .map(|op| match op {
-            ApplyOp::Done { commit, .. } => match commit.as_deref().map(str::trim) {
-                Some(c) if !c.is_empty() => done_by(git_dir, Some(c)),
-                _ => configured
+        .zip(&done_commits)
+        .map(|(op, commit)| match op {
+            ApplyOp::Done { .. } => match commit {
+                Some(c) => done_by(git_dir, Some(c.as_str())),
+                None => configured
                     .get_or_insert_with(|| done_by(git_dir, None))
                     .clone(),
             },
@@ -222,13 +243,13 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         })
         .collect();
     // Which files each `done` commit changed (R-SCOPE-2), asked of git before the lock, as `done`
-    // asks it. An empty commit is no commit.
+    // asks it.
     let done_scopes: Vec<CommitScope> = ops
         .iter()
-        .map(|op| match op {
-            ApplyOp::Done { commit, .. } => {
-                let commit = commit.as_deref().map(str::trim).filter(|c| !c.is_empty());
-                scope_of_commit(&found.path, &cfg.archive_file, commit)
+        .zip(&done_commits)
+        .map(|(op, commit)| match op {
+            ApplyOp::Done { .. } => {
+                scope_of_commit(&found.path, &cfg.archive_file, commit.as_deref())
             }
             _ => Ok(CommitScope::NoGit),
         })
@@ -278,6 +299,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                     &agent,
                     ctx.force,
                     ctx.session.as_deref(),
+                    done_commits[idx].as_deref(),
                     done_bys[idx].as_deref(),
                     &done_scopes[idx],
                     now,
@@ -484,6 +506,7 @@ fn apply_one_op(
     agent: &str,
     force: bool,
     session: Option<&str>,
+    done_commit: Option<&str>,
     done_by: Option<&str>,
     done_scope: &CommitScope,
     now: chrono::DateTime<chrono::FixedOffset>,
@@ -699,7 +722,16 @@ fn apply_one_op(
                 session,
             };
             apply_task_op(
-                other, op_num, doc, archive, label, &env, refs, done_by, done_scope,
+                other,
+                op_num,
+                doc,
+                archive,
+                label,
+                &env,
+                refs,
+                done_commit,
+                done_by,
+                done_scope,
             )
         }
     }
@@ -751,6 +783,7 @@ fn apply_task_op(
     label: &str,
     env: &OpEnv<'_>,
     refs: &BTreeMap<String, String>,
+    done_commit: Option<&str>,
     done_by: Option<&str>,
     done_scope: &CommitScope,
 ) -> Result<(&'static str, String, Vec<LineEdit>, TaskChangeIntent)> {
@@ -761,11 +794,11 @@ fn apply_task_op(
     let (raw_task, task_op) = match op {
         ApplyOp::Claim { task } => (task, TaskOp::Claim),
         ApplyOp::Release { task } => (task, TaskOp::Release),
-        ApplyOp::Done { task, note, commit } => (
+        ApplyOp::Done { task, note, .. } => (
             task,
             TaskOp::Done {
                 note: note.as_deref(),
-                commit: commit.as_deref().map(str::trim),
+                commit: done_commit,
                 by: done_by,
                 scope: done_scope,
             },

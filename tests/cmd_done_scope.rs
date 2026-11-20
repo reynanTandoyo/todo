@@ -587,3 +587,109 @@ fn apply_done_with_an_unknown_commit_is_refused_as_done_refuses_it() {
     assert_eq!(parse_json(&out.stdout)["error"]["code"], "BAD_VALUE");
     assert_eq!(fs::read(&p.todo).expect("read TODO.md"), before);
 }
+
+/// The `- commit:` line of a TODO.md text, or an empty string when there is none.
+fn commit_line(text: &str) -> String {
+    text.lines()
+        .find(|line| line.starts_with("- commit: "))
+        .unwrap_or_default()
+        .to_string()
+}
+
+#[test]
+fn apply_writes_the_commit_the_way_done_writes_it() {
+    let p = two_tasks(Some("src/"));
+    repo_with_first_commit(&p);
+    write(&p.work, "src/b.rs", "pub fn b() {}\n");
+    commit(&p.work, &["src/b.rs"], "T-001: work");
+    let before = fs::read(&p.todo).expect("read TODO.md");
+    let short = git(&p.work, &["rev-parse", "--short", "HEAD"]);
+
+    // `done` writes the commit of HEAD as its short hash (R-WRITE-4).
+    let done_out = run_todo(
+        &p.home,
+        &p.work,
+        &[
+            "--json", "--agent", "alice", "done", "T-001", "--commit", "HEAD",
+        ],
+        &[("TODO_TEST_NOW", NOW)],
+    )
+    .expect("run todo");
+    assert!(
+        done_out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&done_out.stderr)
+    );
+    let by_done = commit_line(&read_text(&p.todo));
+    assert_eq!(by_done, format!("- commit: {short}"));
+
+    // `apply` of the same operation, from the same TODO.md, writes the same line.
+    fs::write(&p.todo, &before).expect("restore TODO.md");
+    let out = apply(&p, &[done_op(Some("HEAD")).as_str()], &[]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(commit_line(&read_text(&p.todo)), by_done);
+}
+
+#[test]
+fn apply_keeps_a_full_hash_and_resolves_names_as_done_does() {
+    let p = two_tasks(Some("src/"));
+    repo_with_first_commit(&p);
+    write(&p.work, "src/b.rs", "pub fn b() {}\n");
+    commit(&p.work, &["src/b.rs"], "T-001: work");
+    let before = fs::read(&p.todo).expect("read TODO.md");
+    let full = git(&p.work, &["rev-parse", "HEAD"]);
+    let parent_short = git(&p.work, &["rev-parse", "--short", "HEAD~1"]);
+
+    // A full hash is kept as it was given, as `done` keeps it.
+    let out = apply(&p, &[done_op(Some(&full)).as_str()], &[]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        commit_line(&read_text(&p.todo)),
+        format!("- commit: {full}")
+    );
+
+    // A name such as HEAD~1 is resolved to the short hash of its commit.
+    fs::write(&p.todo, &before).expect("restore TODO.md");
+    let out = apply(&p, &[done_op(Some("HEAD~1")).as_str()], &[]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        commit_line(&read_text(&p.todo)),
+        format!("- commit: {parent_short}")
+    );
+}
+
+#[test]
+fn apply_without_git_keeps_the_commit_as_given() {
+    let p = two_tasks(Some("src/"));
+    write(
+        &p.work,
+        "ops.jsonl",
+        &format!("{}\n", done_op(Some("cafebabe"))),
+    );
+
+    let out = run_todo(
+        &p.home,
+        &p.work,
+        &["--json", "--agent", "alice", "apply", "ops.jsonl"],
+        &[("PATH", ""), ("TODO_TEST_NOW", NOW)],
+    )
+    .expect("run todo");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(commit_line(&read_text(&p.todo)), "- commit: cafebabe");
+}

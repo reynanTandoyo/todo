@@ -374,6 +374,9 @@ or with `--json` the task as it is after the change.
   `hooks install`, `skill install` — show what they would do and only do it with `--yes`.
 - **R-WRITE-15 COULD** `apply <file|->` runs several operations given as JSON lines in one locked
   step: all apply or none do, with one snapshot.
+  - A `done` operation's `commit` is resolved as `done --commit` resolves it (R-WRITE-4), before the
+    lock is taken, and checked against the task's `files` as `done` checks it (R-SCOPE-2). The
+    value written is the same one `done` writes for the same commit.
 - **R-WRITE-16 COULD** `done` (and `apply`'s `done` operation) records the person behind the work
   in a `by` field, so a task shows which contributor finished it, not only which agent.
   - With `--commit`, the name is the author of that commit as git shows it with `.mailmap` applied

@@ -1,17 +1,15 @@
 //! `todo done` command: mark a task done with optional note and commit (T-024; R-WRITE-4, NFR-5).
 
-use std::io::ErrorKind;
 use std::path::Path;
-use std::process::Command as ProcessCommand;
 
 use clap::Args as ClapArgs;
 
 use crate::cli::{
     CommandKind, CommandMeta, Context, edit_one_task, report_task_with_ready, resolve_opt_text_arg,
 };
-use crate::error::{ErrorCode, Result, TodoError};
+use crate::error::Result;
 use crate::ops::TaskOp;
-use crate::ops::commit_files::scope_of_commit;
+use crate::ops::commit_files::{resolve_commit, scope_of_commit};
 use crate::ops::identity::done_by;
 use crate::output::Output;
 
@@ -73,63 +71,4 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let res = edit_one_task(ctx, out, META.name, &args.task, &op, &cfg, Some(found))?;
     report_task_with_ready(out, META.name, &res, true);
     Ok(())
-}
-
-/// Resolves and verifies a `--commit` argument using `git rev-parse` when `git` is available (`NFR-5`).
-///
-/// If `git` is not on `PATH`, returns the trimmed input unchecked.
-fn resolve_commit(raw: &str, dir: Option<&Path>) -> Result<String> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Err(TodoError::new(
-            ErrorCode::BadValue,
-            "--commit value cannot be empty",
-        ));
-    }
-
-    let mut cmd = ProcessCommand::new("git");
-    if let Some(d) = dir {
-        cmd.current_dir(d);
-    }
-    let spec = format!("{trimmed}^{{commit}}");
-    let output = match cmd.args(["rev-parse", "--short", "--verify", &spec]).output() {
-        Ok(o) => o,
-        Err(e) if e.kind() == ErrorKind::NotFound => {
-            return Ok(trimmed.to_string());
-        }
-        Err(e) => {
-            return Err(TodoError::new(
-                ErrorCode::BadValue,
-                format!("failed to run git rev-parse for '{trimmed}': {e}"),
-            ));
-        }
-    };
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.to_ascii_lowercase().contains("not a git repository")
-            && !trimmed.eq_ignore_ascii_case("HEAD")
-        {
-            return Ok(trimmed.to_string());
-        }
-        return Err(TodoError::new(
-            ErrorCode::BadValue,
-            format!("unknown git commit '{trimmed}'"),
-        ));
-    }
-
-    let resolved = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if trimmed.eq_ignore_ascii_case("HEAD") || !is_hex_hash(trimmed) {
-        if resolved.is_empty() {
-            Ok(trimmed.to_string())
-        } else {
-            Ok(resolved)
-        }
-    } else {
-        Ok(trimmed.to_string())
-    }
-}
-
-fn is_hex_hash(s: &str) -> bool {
-    s.len() >= 4 && s.bytes().all(|b| b.is_ascii_hexdigit())
 }
