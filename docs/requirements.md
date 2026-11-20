@@ -1,6 +1,7 @@
 # todo — requirements
 
-Version 1, 2026-11-15. **Complete:** every decision is made (§3) and nothing waits on an answer.
+Version 1, 2026-11-15; v0.8 added 2026-11-20. **Complete:** every decision is made (§3) and nothing
+waits on an answer.
 Companion documents: [format.md](format.md) (the exact file format), [research.md](research.md)
 (what was studied and why), and the work plan [`../TODO.md`](../TODO.md). Changing a requirement is
 itself a task in `TODO.md`.
@@ -25,13 +26,25 @@ it instead of editing `TODO.md` themselves, and get plain text or JSON back.
 - One `TODO.md` per repository or folder. Windows is the target platform.
 - Entries are kept apart by kind (R-KIND-3): tasks; milestones, which are pieces of work with a goal,
   divided into tasks and nested to any depth (R-MILE-1); questions; and ideas.
+- Every task has a level from 1 to 5 (R-LEVEL-1). A planner splits the work until every task is
+  level 1; then any number of workers, even the weakest agents, finish those tasks at the same time,
+  without touching each other's files (R-SCOPE-1) and without a false done (R-VERIFY-1).
 
 ## 2. Who uses it, and the situations it must handle
 
-- **Coordinator**: usually a main agent session. Plans work, adds tasks in bulk, hands tasks to
-  other agents, reviews and closes them.
-- **Worker agents**: Claude Code, Codex, opencode, Gemini and others, several at once, often in
-  linked git worktrees. Short-lived; may crash or be cancelled mid-task.
+Agents work in one of two roles. Each role has its own rules text (R-AGENT-1), so no agent carries
+rules it doesn't need.
+
+- **Planner**: usually one strong agent session (called the coordinator before v0.8). It plans the
+  work as milestones and tasks, gives every task a level, splits tasks (R-SPLIT-1) and writes the
+  detail a level-1 task needs (R-DETAIL-1) until `todo plan` is empty (R-LEVEL-2), reads
+  `todo waves` (R-WAVE-1) to decide how many workers to start, takes back tasks workers gave up on
+  (R-STUCK-1), runs the checks of a finished wave (R-VERIFY-2), and closes milestones.
+- **Workers**: any coding agent (Claude Code, Codex, opencode and others), many at once, usually all
+  in one checkout, sometimes in linked git worktrees. Short-lived; may crash or be cancelled
+  mid-task. A worker takes a level-1 task with its work order (`todo next --claim --brief`,
+  R-DETAIL-3), changes only the task's files, commits them, and finishes with `todo done`, or gives
+  the task back with `todo stuck`. It decides nothing about the plan.
 - **People**: look at the HTML report, read `TODO.md` in an editor or on GitHub, sometimes edit it
   by hand, and answer questions agents raise.
 
@@ -49,19 +62,27 @@ by hand under a lease (R-LOCK-6).
 | S5 | An agent abandons a claim: the task becomes available again | R-CLAIM-4 |
 | S6 | A person edits `TODO.md` by hand while agents work | R-LOCK-6, R-IO-2, R-HIST-3 |
 | S7 | An agent works in a linked git worktree | R-FIND-5 |
-| S8 | The coordinator adds 30 tasks at once | R-WRITE-13 |
+| S8 | The planner adds 30 tasks at once | R-WRITE-13 |
 | S9 | Finished tasks pile up | R-ARCH-1 |
 | S10 | Antivirus or an editor holds `TODO.md` open while it is being replaced | R-IO-3 |
 | S11 | A task needs another task finished first | R-DEP-1 |
 | S12 | A question only a person can answer | R-WRITE-11 |
 | S13 | An agent passes text with quotes, backticks or `$` through PowerShell | R-WRITE-12 |
 | S14 | An agent takes a task and needs to know what larger piece of work it serves, and why | R-MILE-4, R-WRITE-17 |
-| S15 | A coordinator plans a piece of work ("Develop the renderer") as tasks and nested milestones | R-MILE-1, R-MILE-3, R-MILE-6 |
+| S15 | The planner plans a piece of work ("Develop the renderer") as tasks and nested milestones | R-MILE-1, R-MILE-3, R-MILE-6 |
 | S16 | A person wants to see the state of the work without reading `TODO.md` | R-REPORT-1 |
 | S17 | A person wants one overview of all their projects | R-PROJ-1, R-PROJ-2, R-REPORT-2 |
 | S18 | todo is updated: each `TODO.md` and the installed rules, skill and hooks must follow | R-VER-1, R-MIG-1, R-MIG-2 |
 | S19 | An older todo meets a `TODO.md` written in a newer format | R-VER-2, R-OUT-11 |
-| S20 | A small model should take only easy tasks | R-WRITE-18 |
+| S20 | A weak agent should take only level-1 tasks | R-WRITE-18, R-LEVEL-1 |
+| S21 | The planner needs to see which tasks still have to be rated, split or detailed | R-LEVEL-2 |
+| S22 | A weak worker must start from one text, without exploring or guessing | R-DETAIL-1 to R-DETAIL-3 |
+| S23 | The planner replaces one hard task with several smaller ones | R-SPLIT-1 |
+| S24 | A worker says a task is finished, but its check fails | R-VERIFY-1 |
+| S25 | In a compiled project one worker's half-finished edit breaks every other worker's check | R-VERIFY-2 |
+| S26 | A worker cannot finish its task | R-STUCK-1 |
+| S27 | Ten workers in one checkout must never edit the same file | R-SCOPE-1, R-SCOPE-2 |
+| S28 | The planner wants to know how many workers are useful now, and which chain of tasks limits the speed | R-WAVE-1 |
 
 ---
 
@@ -82,7 +103,7 @@ by hand under a lease (R-LOCK-6).
 | D11 | Settings are optional: one `todo.toml` next to `TODO.md`, no per-user settings. The one per-user file is the project register (R-PROJ-1), which lists the user's projects and holds no settings. *(Amended by the owner's decision of 2026-11-18.)* | New projects need no setup; projects that want rules can have them. The register is per user because it spans that user's projects in different folders, and it lets todo show all of them without searching the PC. |
 | D12 | Windows 10/11 x64 is the target. Linux is built and tested in CI to keep the code portable. No macOS builds. | The tool is wanted as a Windows `.exe`; Linux CI is cheap; nothing is available to test macOS. |
 | D13 | Distributed as a single unsigned `todo.exe`, from GitHub Releases or built from source, copied into a folder on `PATH`. No installer. | Needs no administrator rights. |
-| D14 | Every agent learns the tool from one rules text (`todo help agents`, `AGENTS.md`). Claude Code hooks and a skill are extras. No MCP server. | Every agent reads `AGENTS.md`; hooks only exist in Claude Code; an MCP server is another protocol to maintain. |
+| D14 | Every agent learns the tool from one rules text (`todo help agents`, `AGENTS.md`). Claude Code hooks and a skill are extras. No MCP server. *(Amended by the owner's decision of 2026-11-19: the rules text is a short common part plus one part per role, `todo help worker` and `todo help planner`; R-AGENT-1.)* | Every agent reads `AGENTS.md`; hooks only exist in Claude Code; an MCP server is another protocol to maintain. |
 | D15 | No network access, background process, database or index. git is optional. | Fewer ways to fail; works offline and in any folder. |
 | D16 | Rust 1.89 or newer, edition 2024, a short list of approved crates (NFR-9). | `File::try_lock` is in the standard library from Rust 1.89. |
 | D17 | MIT licence. | Simple and permissive, like most comparable tools. |
@@ -95,8 +116,8 @@ by hand under a lease (R-LOCK-6).
 The full grammar is in [format.md](format.md). In short:
 
 ```markdown
-<!-- todo-format: 2 -->
-<!-- todo-tool: 0.6.0 -->
+<!-- todo-format: 3 -->
+<!-- todo-tool: 0.8.0 -->
 # Example project — tasks
 
 ## Now
@@ -106,22 +127,30 @@ The full grammar is in [format.md](format.md). In short:
 - owner: —
 - priority: P1 · type: milestone · area: renderer
 - goal: the test scene renders with lighting at 60 frames per second
-- note (2026-11-15, coordinator): added
+- note (2026-11-15, planner): added
 
-### T-002 · C shader
+### T-002 · Diffuse term in the C shader
 - status: claimed
-- owner: agent-ui-1
+- owner: worker-3
 - claimed: 2026-11-15T14:03+01:00
-- priority: P1 · difficulty: hard · type: feature · area: renderer
+- priority: P1 · difficulty: 1 · type: feature · area: renderer
 - milestone: T-001
 - why: the renderer has no shading stage yet
+- files: src/shader.c, tests/shader_test.c
+- read: src/light.h
+- steps:
+  1. In src/shader.c, add the function diffuse() that returns max(dot(n, l), 0) times the light colour.
+  2. Call diffuse() from shade() for every light.
+  3. In tests/shader_test.c, add a test: a light straight above a flat surface gives full brightness.
 - accept: the test scene shows lit surfaces
-- note (2026-11-15, coordinator): added
+- verify: make test
+- note (2026-11-15, planner): added
 ```
 
 (Invented example.) Known fields: `status`, `owner`, `claimed`, `session`, `priority`,
-`difficulty`, `type`, `area`, `milestone`, `about`, `goal`, `why`, `depends`, `files`, `problem`,
-`fix`, `accept`, `commit`, `by`, and dated `note` lines. Any other `- key: value` line is kept and
+`difficulty`, `type`, `area`, `milestone`, `about`, `goal`, `why`, `final`, `depends`, `files`,
+`read`, `problem`, `fix`, `steps`, `accept`, `verify`, `attempts`, `verified`, `commit`, `by`, and
+dated `note` lines. Any other `- key: value` line is kept and
 shown in JSON. Everything outside task blocks — the preamble, prose, tables, code — is never changed
 by task commands; only the format and tool lines are kept up to date (R-VER-1, R-MIG-1).
 
@@ -162,7 +191,8 @@ by task commands; only the format and tool lines are kept up to date (R-VER-1, R
   code fences and HTML comments are never taken as tasks or sections.
 - **R-EDIT-4 MUST** Added lines use the file's usual line ending; a missing final newline stays
   missing; a byte-order mark stays (format.md §2).
-- **R-EDIT-5 MUST** Values the tool writes are single lines: line breaks in input become spaces.
+- **R-EDIT-5 MUST** Values the tool writes are single lines: line breaks in input become spaces. The
+  one exception is `steps` (R-DETAIL-1): each input line becomes one numbered step line.
 - **R-EDIT-6 MUST** A command that changes nothing doesn't write the file.
 - **R-EDIT-7 MUST** Before writing, the tool checks its own result: every byte outside the changed
   lines equals the original, and the new text parses to the same tasks apart from the intended
@@ -253,7 +283,10 @@ by task commands; only the format and tool lines are kept up to date (R-VER-1, R
   (R-MILE-6), `--difficulty` and `--max-difficulty` (R-WRITE-18). With an agent name, if
   that agent already has a claimed task, `next` returns it first, marked as already theirs (`--new`
   skips this). `next --claim --agent X` chooses and claims in one locked step, so agents asking at
-  the same moment get different tasks.
+  the same moment get different tasks. From v0.8: a task without a difficulty is never handed out
+  (R-LEVEL-1); a task at or below the target level is handed out only when its detail is complete
+  (R-DETAIL-2); a task whose files overlap another agent's claimed task is held back (R-SCOPE-1);
+  and `--brief` prints the work order after the claim (R-DETAIL-3).
 - **R-READ-4 MUST** Every read command supports `--json` (R-OUT-1).
 - **R-READ-5 SHOULD** `summary` prints a session-start overview of at most 40 lines: tasks per
   status; open tasks per priority; claimed tasks with owner and age, stale ones marked; blocked
@@ -262,7 +295,9 @@ by task commands; only the format and tool lines are kept up to date (R-VER-1, R
   file was edited outside the tool. From v0.6 it also shows the top-level milestones that are open or blocked, with
   progress (R-MILE-3), milestones ready to close (R-MILE-6), the number of ideas apart from open
   tasks (R-KIND-1), and a line naming `todo migrate --yes` while project files are out of date
-  (R-MIG-2), still within 40 lines.
+  (R-MIG-2), still within 40 lines. From v0.8 it also shows the planner's line (R-LEVEL-2) and the
+  number of tasks given back (R-STUCK-1), still within 40 lines. A task given back shows the problem
+  of its latest `stuck — <problem>` note as its reason.
 - **R-READ-6 COULD** `search <text>` finds text in titles, fields and notes, printing each match
   with its task ID; `--archive` searches the archive file.
 - **R-READ-7 COULD** `log <task>` shows the journal entries about one task (R-HIST-4).
@@ -280,8 +315,10 @@ or with `--json` the task as it is after the change.
   (exit 1, `AMBIGUOUS_SECTION`), both with the list of sections. Without `--section` the tool uses
   `default_section`, or the only section if there is just one; with several sections and no
   `default_section` it is refused (exit 1, `UNKNOWN_SECTION`) with the list of sections. Fields in
-  `required_fields` (default `priority`) must be given; values must be in the configured lists. A
-  title equal to that of a task that isn't done or dropped is refused.
+  `required_fields` (default `priority` and `difficulty` from v0.8, R-LEVEL-1) must be given;
+  values must be in the configured lists. A title equal to that of a task that isn't done or dropped
+  is refused. `add` also takes `--difficulty` (R-WRITE-18), `--why` (R-WRITE-17), the milestone
+  options (R-MILE-1) and the detail options `--steps`, `--read` and `--verify` (R-DETAIL-1).
 - **R-WRITE-2 MUST** `claim <task>` claims a task (R-CLAIM-1 to R-CLAIM-4).
 - **R-WRITE-3 MUST** `release <task>` gives a task back: a claimed task becomes open; a blocked task
   stays blocked. The owner and claim time are removed. Only the owner may release, or another agent
@@ -289,7 +326,9 @@ or with `--json` the task as it is after the change.
 - **R-WRITE-4 MUST** `done <task> [--note T] [--commit HASH|HEAD]` marks the task done, makes the
   agent its owner, and adds the note `done — T`. `--commit` goes into the `commit` field; when git is
   available, the commit must exist and `HEAD` is replaced by the current commit's hash (asked before
-  the lock is taken). The output repeats the task's `accept` line as a reminder.
+  the lock is taken). The output repeats the task's `accept` line as a reminder. From v0.8, before
+  the lock is taken, `done` checks that the commit stayed inside the task's files (R-SCOPE-2) and
+  runs the task's `verify` command (R-VERIFY-1).
 - **R-WRITE-5 MUST** `block <task> --note T` marks the task blocked, with the reason as a note.
   `unblock <task> [--note T]` makes it claimed again if it has an owner (refreshing the claim time),
   open otherwise.
@@ -300,22 +339,28 @@ or with `--json` the task as it is after the change.
 - **R-WRITE-8 MUST** `set <task>` changes `--title`, `--priority`, `--type`, `--area`, `--depends`,
   `--files`, `--problem`, `--fix` and `--accept`, any other field with `--field key=value`, and
   removes a field with `--unset key`. `status`, `owner` and `claimed` change only through the status
-  commands.
+  commands. From v0.8 `set` also takes `--difficulty`, `--steps`, `--read`, `--verify` and
+  `--final` (R-DETAIL-1, R-LEVEL-3); `attempts` and `verified` change only through `stuck`, `done`,
+  `verify` and `reopen` (R-STUCK-1, R-VERIFY-1, R-VERIFY-2), and `set` refuses them (exit 1,
+  `BAD_VALUE`), so no agent can write a passed check by hand.
 - **R-WRITE-9 MUST** Status changes follow this table. Anything else is refused (exit 1,
   `BAD_TRANSITION`) with the current status and the commands allowed from it.
 
-  | Current | `claim` | `release` | `block` | `unblock` | `done` | `drop` | `reopen` |
-  |---|---|---|---|---|---|---|---|
-  | `open` | → claimed | refused | → blocked | refused | → done | → dropped | refused |
-  | `claimed` | owner: refreshes the claim; others: refused unless stale | → open | → blocked | refused | → done | → dropped | refused |
-  | `blocked` | only with `--force` | stays blocked, owner removed | refused | → claimed or open | only with `--force` | → dropped | refused |
-  | `done` | refused | refused | refused | refused | refused | refused | → open |
-  | `dropped` | refused | refused | refused | refused | refused | refused | → open |
+  | Current | `claim` | `release` | `block` | `unblock` | `done` | `drop` | `reopen` | `stuck` |
+  |---|---|---|---|---|---|---|---|---|
+  | `open` | → claimed | refused | → blocked | refused | → done | → dropped | refused | refused |
+  | `claimed` | owner: refreshes the claim; others: refused unless stale | → open | → blocked | refused | → done | → dropped | refused | → blocked, owner removed |
+  | `blocked` | only with `--force` | stays blocked, owner removed | refused | → claimed or open | only with `--force` | → dropped | refused | refused |
+  | `done` | refused | refused | refused | refused | refused | refused | → open | refused |
+  | `dropped` | refused | refused | refused | refused | refused | refused | → open | refused |
 
   The `claimed` time is kept while a task is claimed or blocked, and removed when it is released,
-  done, dropped or reopened. Ownership rules (R-CLAIM-3) apply on top, and milestones have rules of
-  their own (R-MILE-2).
-- **R-WRITE-10 SHOULD** `reopen <task> --note T` puts a done or dropped task back to open.
+  done, dropped, reopened or given back. Ownership rules (R-CLAIM-3) apply on top, and milestones
+  have rules of their own (R-MILE-2). From v0.8, `done` on a task with a `verify` command first runs
+  it (R-VERIFY-1); a failed check in wave mode moves a done task to blocked, as `stuck` does
+  (R-VERIFY-2); and `split` turns a task into a milestone (R-SPLIT-1).
+- **R-WRITE-10 SHOULD** `reopen <task> --note T` puts a done or dropped task back to open, and
+  removes its `verified` line (R-VERIFY-1).
   `move <task> --section S` moves a task with all its lines to the end of another section.
 - **R-WRITE-11 SHOULD** `ask <question>` adds a task of type `question` to the section named by
   `question_section` (default `Questions`, added at the end of the file if missing). `next` never
@@ -350,21 +395,24 @@ or with `--json` the task as it is after the change.
   work (R-WRITE-12). `show --json` and `schema` list it. A `why` field written by hand before v0.6
   was an unknown field and is now read as this field, with nothing to change.
 - **R-WRITE-18 COULD** The `difficulty` field says how hard a task is, for choosing who takes it: a
-  small model takes the easy tasks and leaves the hard ones to a stronger one. `priority` says how
-  urgent a task is, not how hard.
+  weak agent takes the easiest tasks and leaves the hard ones to a stronger one. `priority` says how
+  urgent a task is, not how hard. From v0.8 the values are the levels of R-LEVEL-1.
   - `add --difficulty D`, `set --difficulty D` and `"difficulty"` in `add --from` and `apply` write
     it into the combined priority line, like `type` and `area` (format.md §8).
-  - Allowed values come from `difficulties` in `todo.toml` (default `easy`, `medium`, `hard`,
-    easiest first); anything else is refused (exit 1, `BAD_VALUE`).
+  - Allowed values come from `difficulties` in `todo.toml` (default `1`, `2`, `3`, `4`, `5` from
+    v0.8, easiest first; `easy`, `medium`, `hard` before); anything else is refused (exit 1,
+    `BAD_VALUE`).
   - `list --difficulty <list>` filters. `next --difficulty <list>` hands out only tasks with one of
     those values, and `next --max-difficulty D` only tasks of difficulty D or easier, in the order
-    of `difficulties`. A task without a difficulty is handed out only when no difficulty option is
-    given.
+    of `difficulties`. A task without a difficulty is never handed out (R-LEVEL-1; before v0.8 it was
+    handed out when no difficulty option was given).
   - `tree` and `list` show it; `show --json` and `schema` list it.
-  - It is a plain field: nothing is computed from it, and it doesn't change the order of `next`.
+  - It doesn't change the order of `next`. What depends on it is said in R-LEVEL-2 (the planner's
+    list), R-DETAIL-2 (the detail a task at the target level needs) and R-SCOPE-1; no score is
+    computed from it, and todo never changes it by itself.
 
   ```powershell
-  todo next --claim --max-difficulty medium --agent small-model-1
+  todo next --claim --max-difficulty 1 --brief --agent worker-1
   ```
 
 ### 5.8 Claims — CLAIM
@@ -372,7 +420,8 @@ or with `--json` the task as it is after the change.
 - **R-CLAIM-1 MUST** `claim <task>` sets `status: claimed`, the owner, and the claim time.
 - **R-CLAIM-2 MUST** A task claimed by another agent is refused (exit 1, `ALREADY_CLAIMED`) with the
   owner and the claim's age. Claiming a task one already holds succeeds and refreshes the claim
-  time, which is how long-running work keeps its claim.
+  time, which is how long-running work keeps its claim. A task whose files overlap another agent's
+  claimed task is refused too (exit 1, `FILES_BUSY`, R-SCOPE-1).
 - **R-CLAIM-3 MUST** On a task claimed by another agent, every command except `note` needs
   `--force`; a forced change adds a note saying who forced it (format.md §9).
 - **R-CLAIM-4 MUST** A claim older than `claim_ttl_hours` (default 24) is stale. Another agent may
@@ -418,8 +467,9 @@ or with `--json` the task as it is after the change.
   `AMBIGUOUS`, `ALREADY_CLAIMED`, `NOT_OWNER`, `BAD_TRANSITION`, `DUPLICATE_TITLE`,
   `UNKNOWN_SECTION`, `AMBIGUOUS_SECTION`, `MISSING_FIELD`, `BAD_VALUE`, `BUSY`, `LEASE_HELD`,
   `CHANGED_DURING_WRITE`, `UNSAFE_FILE`, `READ_ONLY`, `WRITE_FAILED`, `NO_GIT_HISTORY`,
-  `TOOL_TOO_OLD` (R-VER-2), `DUPLICATE_PROJECT` (R-PROJ-1). New codes may be added; existing ones
-  never change meaning. Each code always exits with the same code: the table in `docs/json.md`
+  `TOOL_TOO_OLD` (R-VER-2), `DUPLICATE_PROJECT` (R-PROJ-1), and from v0.8 `VERIFY_FAILED` (exit 1)
+  and `VERIFY_NOT_RUN` (exit 5, R-VERIFY-1), `OUT_OF_SCOPE` (exit 1, R-SCOPE-2) and `FILES_BUSY`
+  (exit 1, R-SCOPE-1). New codes may be added; existing ones never change meaning. Each code always exits with the same code: the table in `docs/json.md`
   gives it, `todo schema` reports it, and a test checks both. `BAD_VALUE` exits 1, as R-WRITE-18 and
   R-MILE-1 say for an invalid value.
 - **R-OUT-4 MUST** Problems in the file are reported as `TODO.md:123: message`.
@@ -430,7 +480,8 @@ or with `--json` the task as it is after the change.
 - **R-OUT-7 MUST** When the reader of the output goes away (`todo list | Select-Object -First 3`),
   the command ends quietly with exit 0 instead of crashing.
 - **R-OUT-8 MUST** `todo` without arguments prints a short overview; `todo help <command>` explains
-  one command with examples; `todo help agents` prints the agent rules (R-AGENT-1);
+  one command with examples; `todo help agents` prints the common agent rules, and
+  `todo help worker` and `todo help planner` the rules of each role (R-AGENT-1);
   `todo --version` prints the version.
 - **R-OUT-9 COULD** Colour on a terminal only: never when piped, never with `NO_COLOR` set.
 - **R-OUT-10 COULD** `todo completions <shell>` prints a tab-completion script for powershell, bash,
@@ -450,8 +501,8 @@ or with `--json` the task as it is after the change.
   - the same steps for Linux, with `todo-linux-x86_64` and `todo-linux-x86_64.sha256`.
 
   A test checks the printed asset names against the release workflow (REL-6). The `TOOL_TOO_OLD`
-  message (R-VER-2), the warning that the tool is behind the file (R-VER-1) and the agent rules
-  (R-AGENT-1) all name `todo help update`.
+  message (R-VER-2), the warning that the tool is behind the file (R-VER-1) and the planner's rules
+  (`todo help planner`, R-AGENT-1) all name `todo help update`.
 
 ### 5.11 History and recovery — HIST
 
@@ -478,6 +529,13 @@ or with `--json` the task as it is after the change.
   (the reason R-READ-5 and R-REPORT-1 show; T-142); values outside
   the configured lists; leftover temporary files; an outdated rules block (R-AGENT-3). Exit 0 if
   clean, 1 if anything was found.
+  From v0.8: a `stuck — <problem>` note counts as the reason of a blocked task (R-STUCK-1); a
+  difficulty outside `difficulties` is not reported on a done or dropped entry, which keeps the
+  value it was finished with (format.md §18); `check` also reports a `final` that R-LEVEL-3 doesn't
+  allow, and a `files` or `read` entry that is absolute or leaves the folder of `TODO.md`
+  (R-SCOPE-1). These are reported as warnings that don't change the exit code: a task at or below
+  the target level that lacks detail, with what is missing (R-DETAIL-2), and a done task with a
+  `verify` command and no `verified` line (R-VERIFY-2).
 - **R-CHECK-2 COULD** `check --fix` makes mechanical repairs only — canonical IDs and separators, a
   missing `status: open`, leftover temporary files, an outdated rules block — and reports the rest.
 
@@ -512,13 +570,20 @@ or with `--json` the task as it is after the change.
   | `id_prefix` | `"T"` | prefix of task IDs |
   | `id_width` | `3` | digits in new IDs |
   | `priorities` | `["P0", "P1", "P2", "P3"]` | allowed priorities, most urgent first |
-  | `required_fields` | `["priority"]` | fields `add` requires |
+  | `required_fields` | `["priority", "difficulty"]` | fields `add` requires of a task; milestones, questions and ideas need none of them (R-LEVEL-1); `["priority"]` before v0.8 |
   | `types` | `[]` | allowed types; empty allows any |
   | `areas` | `[]` | allowed areas; empty allows any |
   | `default_section` | `""` | section for `add` without `--section` |
   | `question_section` | `"Questions"` | section for `ask` |
   | `idea_section` | `"Ideas"` | section for `idea` (R-KIND-1) |
-  | `difficulties` | `["easy", "medium", "hard"]` | allowed difficulties, easiest first (R-WRITE-18) |
+  | `difficulties` | `["1", "2", "3", "4", "5"]` | allowed difficulties, easiest first (R-WRITE-18, R-LEVEL-1); `["easy", "medium", "hard"]` before v0.8 |
+  | `target_difficulty` | the first of `difficulties` | the level the planner splits down to; tasks at or below it need complete detail (R-LEVEL-2, R-DETAIL-2) |
+  | `level1_max_files` | `3` | most `files` entries a task at or below the target level may have (R-DETAIL-2) |
+  | `verify` | `true` | `false`: todo never runs a task's `verify` command (R-VERIFY-1) |
+  | `verify_when` | `"done"` | `"done"`: `done` runs the command; `"wave"`: `todo verify --wave` runs it after the wave (R-VERIFY-2) |
+  | `verify_timeout_seconds` | `300` | how long a `verify` command may run before it is stopped and counts as failed |
+  | `verify_attempts` | `3` | failed checks after which `done` gives the task back (R-VERIFY-1) |
+  | `verify_shell` | `[]` | the program and arguments that run a `verify` line, which is added as the last argument; empty: `pwsh -NoProfile -NonInteractive -Command` (else `powershell.exe` with the same arguments) on Windows, `sh -c` elsewhere |
   | `archive_file` | `"TODO-archive.md"` | archive file name |
   | `claim_ttl_hours` | `24` | when a claim becomes stale |
   | `lock_wait_seconds` | `30` | how long a write waits for the lock or a lease |
@@ -545,6 +610,31 @@ or with `--json` the task as it is after the change.
   its last task is finished; record ideas with `idea`, and questions about an entry with
   `ask --about`; run `todo migrate --yes` after todo is updated; and when todo is too old for a
   file, follow `todo help update`. `todo help agents` prints it.
+  From v0.8 the rules text is split by role (§2), so no agent carries rules it doesn't need:
+  - The **common rules** are at most 15 lines. They are what `todo help agents` prints and what goes
+    between the managed-block markers in `AGENTS.md`, `TODO.md` (R-AGENT-2) and the skill
+    (R-AGENT-5). They say: never edit `TODO.md` or the archive file directly; use one unique agent
+    name per agent; exit 1 means someone else has it or a rule refused it, so pick another task;
+    exit 3 means try again; start commit messages with the task ID. They end with one line per
+    role naming its text: workers run `todo help worker`, the planner runs `todo help planner`.
+  - **`todo help worker`** is at most 10 lines: take work with
+    `todo next --claim --max-difficulty 1 --brief`; change only the files the task lists; commit
+    only those files; finish with `todo done <id> --commit HEAD`; when it cannot finish, give the
+    task back with `todo stuck <id> --note "<problem>"`. The work order (R-DETAIL-3) repeats the
+    last three with the task's ID and the agent name filled in, so a worker needs no other text.
+  - **`todo help planner`** holds the planner's rules: start with `summary` and `plan`; put each
+    new task under a milestone with a `--why`, and give every task a level; split with `todo split`
+    until `todo plan` is empty; write `files`, `steps` and `verify` for every task at the target
+    level; keep a higher level only with `--final` and a reason; read `todo waves` and break long
+    chains; take back tasks given back (`unblock` or `split`); in wave mode run `todo verify --wave`
+    when every worker of the wave has finished and before starting the next wave, otherwise run the
+    full test suite; close a milestone with `done` when its last task is finished; add notes as you
+    learn things; `add` problems you find instead of fixing them silently; record ideas with
+    `idea`, and questions with `ask` and `ask --about`; run `todo migrate --yes` after todo is
+    updated; when todo is too old for a file, follow `todo help update`.
+  - The lines moved out of the common block in v0.8 (milestones, ideas, questions, migrate, update)
+    live only in the planner's text, or in the refusal message that already names the command.
+  - A test fails when the common rules grow past 15 lines or the worker's text past 10.
 - **R-AGENT-2 SHOULD** `todo init` creates `TODO.md` with the format line, the tool line (R-VER-1),
   a title, the rules text between the managed-block markers (format.md §12) and a `## Tasks`
   section, and refuses if `TODO.md` already exists. It then prints the lines to add to `AGENTS.md`,
@@ -571,7 +661,7 @@ or with `--json` the task as it is after the change.
 ### 5.16 Import — IMP
 
 - **R-IMP-1 COULD** `todo import --from checkbox <source> [--out <path>] [--yes]` converts a Markdown
-  checkbox task list into the current format version (2, format.md §18). Without `--yes` it prints the converted text (or a diff
+  checkbox task list into the current format version (format.md §18). Without `--yes` it prints the converted text (or a diff
   when the target exists) and writes nothing.
   - Only top-level checkbox lines (`- [ ]`, `- [~]`, `- [!]`, `- [x]`) under `##` sections become
     tasks. Checkboxes in the preamble, in code fences, or indented stay as text.
@@ -627,6 +717,9 @@ or with `--json` the task as it is after the change.
     that changed them. When both sides changed them differently, when any input fails to parse,
     or when the format versions differ, the driver falls back to a plain three-way line merge
     (`git merge-file`) of the whole file, which is what git would have done without it.
+  - From format 3, the `steps` field with its numbered lines (R-DETAIL-1) counts as one field of
+    the task block: changed on one side it takes that side's lines; changed differently on both
+    sides it is a conflict.
   - Every output line is copied byte for byte from one of the inputs, line endings included
     (R-EDIT-1, D18). The one exception: a last line without a line ending that is no longer last
     gets one.
@@ -677,8 +770,8 @@ version label such as "v0.6". Milestones nest to any depth, and todo manages the
 
 ```powershell
 todo add --type milestone --title "Develop the renderer" --goal "the test scene renders with lighting at 60 frames per second" --priority P1 --agent planner
-todo add --title "C shader" --milestone T-010 --why "the renderer has no shading stage yet" --priority P1 --difficulty hard --agent planner
-todo add --title "GPU compiler" --milestone T-010 --priority P1 --agent planner
+todo add --title "C shader" --milestone T-010 --why "the renderer has no shading stage yet" --priority P1 --difficulty 4 --agent planner
+todo add --title "GPU compiler" --milestone T-010 --priority P1 --difficulty 3 --agent planner
 todo tree T-010
 ```
 
@@ -834,7 +927,11 @@ todo tree T-010
   - Migration steps are an ordered list in the code, each from one format version to the next, and
     each changes whole lines only (R-EDIT-1). The first step, format 1 to 2, raises the format line
     (adding it at the top of the file when it is missing) and adds the tool line; task lines stay as
-    they are (format.md §18).
+    they are (format.md §18). The second step, format 2 to 3 (v0.8), raises the format line and,
+    only when `todo.toml` sets no `difficulties` of its own, rewrites the difficulty `easy` to `2`,
+    `medium` to `3` and `hard` to `4` on entries that are not done or dropped; entries without a
+    difficulty are left for the planner's list (R-LEVEL-2); every other line stays as it is
+    (format.md §18).
   - A write command on a file in an older format first applies every pending step, under the same
     lock (R-LOCK-1) and in the same write, after the usual snapshot (R-HIST-2), then makes its own
     change; the format line and the stamp are raised. The archive file is migrated in the same step,
@@ -919,6 +1016,16 @@ for it, never automatically.
   - An empty register gives a page that says in words how a project is registered (by asking an
     agent to register it), without a copy-ready command.
   - A snapshot test uses two invented projects.
+- **R-REPORT-3 COULD** From v0.8 the report shows the planning state (R-LEVEL-2, R-WAVE-1), so the
+  owner sees how far the planner is and where workers failed.
+  - Each project page shows the open tasks per level (R-LEVEL-1); how many tasks are not ready for
+    lack of detail (R-DETAIL-2); the tasks given back (R-STUCK-1), each with its problem and its
+    `attempts`; the tasks kept above the target level, each with the reason of its `final` line
+    (R-LEVEL-3); and the number of waves and the size of wave 1 (R-WAVE-1).
+  - A task, when opened, shows its level, its `files` and its `verify` command, and whether it was
+    verified.
+  - The all-projects page (R-REPORT-2) shows the open tasks per level on each project's card.
+  - Snapshot tests are updated; the page still has no button, form or command (§13).
 
 ```powershell
 todo report --html --open
@@ -976,6 +1083,299 @@ todo project list
 todo overview
 ```
 
+### 5.25 Levels — LEVEL
+
+From v0.8 the work is planned so that weak agents can do it. The planner (§2) splits each task
+until it is level 1, writes down everything a level-1 task needs, and starts as many workers as
+`todo waves` says are useful; each worker takes one level-1 task, follows its work order, and
+either finishes it with a passing check or gives it back. todo never splits, details or rates a
+task by itself, and never starts an agent (§13): it shows the planner what is left and refuses to
+hand out what isn't ready.
+
+```powershell
+todo plan
+todo split T-020 --from "C:\Users\Example\Grafik Engine\split-T-020.jsonl" --agent planner
+todo set T-021 --files "src/shader.c, tests/shader_test.c" --steps "@steps-T-021.txt" --verify "cargo test shader" --agent planner
+todo waves
+todo next --claim --max-difficulty 1 --brief --agent worker-1
+```
+
+- **R-LEVEL-1 COULD** Every task has a level: its `difficulty`, from `1` to `5` with the default
+  `difficulties`. The level says how much of the work is still open — what the agent has to find
+  out, guess or decide — not how urgent the task is (`priority`) and not how long it takes.
+
+  | Level | Meaning |
+  |---|---|
+  | `1` | Everything is written down: the files to change (`files`), the files to look at (`read`), numbered steps (`steps`), the check (`verify`) and the result (`accept`). Nothing is left to explore, guess or decide, so the weakest agent finishes it without a mistake. |
+  | `2` | Small and clear and inside one part of the code, but the agent has to find the exact places and work out the steps itself. |
+  | `3` | Needs an understanding of one part of the code and a few decisions that stay inside the task. |
+  | `4` | Spans several parts of the code, or needs design decisions that affect other tasks. |
+  | `5` | Open: needs research, a design, or decisions only a person can make; it is split before anyone works on it. |
+
+  - `todo help add` and `todo help set` print this table. Levels are described only by what they
+    mean; no agent, model or product is named.
+  - `required_fields` defaults to `priority` and `difficulty` and applies to tasks only:
+    milestones, questions and ideas need neither, whatever the setting says. `add` and `add --from`
+    of a task without a difficulty are refused (exit 1, `MISSING_FIELD`), and the file stays
+    byte-identical.
+  - `next` never hands out a task without a difficulty, with or without a difficulty option.
+  - The lowest level is the first value of `difficulties`; a project that sets its own
+    `difficulties` keeps them, and the rules of this section use its first value.
+  - Files written before v0.8 are moved to the levels by the format 2 to 3 migration (R-MIG-1,
+    format.md §18); open tasks without a difficulty are left for the planner's list (R-LEVEL-2).
+  - todo never changes a level by itself; only `add`, `set` and `split` write it (`stuck` keeps it,
+    R-STUCK-1).
+- **R-LEVEL-2 COULD** `todo plan [<milestone>]` lists what the planner still has to do before
+  every task can go to a worker. It lists, in this order:
+  1. tasks a worker gave back (R-STUCK-1), each with its problem and its `attempts`;
+  2. tasks above `target_difficulty` (default: the lowest level), hardest first, then in file order;
+  3. tasks at or below the target level that are not ready for lack of detail, each with what is
+     missing (R-DETAIL-2);
+  4. tasks without a difficulty;
+  5. counted apart: tasks kept above the target level on purpose (R-LEVEL-3), each with its reason;
+  6. counted apart: done tasks with a `verify` command and no `verified` line (R-VERIFY-2).
+
+  - Done, dropped and claimed entries, milestones, ideas and questions are left out, apart from
+    the done tasks of group 6. A task in groups 2 to 4 is listed whether or not its dependencies
+    are finished.
+  - With `<milestone>` only entries below that milestone, at any depth, are listed; a task that is
+    not a milestone is refused (exit 1, `BAD_VALUE`), as for `list --milestone` (R-MILE-3).
+  - `target_difficulty` must be one of `difficulties`; anything else is a `todo.toml` error (R-CFG-2).
+  - Exit 0 when groups 1 to 4 are empty, 1 otherwise; groups 5 and 6 don't change the exit code.
+  - It reads only and takes no lock (R-LOCK-5). `plan --json` (`todo.plan.v1`) carries each group
+    as a list; it matches its snapshot.
+  - `summary` shows one line with the three counts the planner works down — to split (group 2), to
+    detail (group 3) and without a level (group 4) — and the number kept on purpose, within its 40
+    lines; the tasks given back are counted on their own line (R-STUCK-1).
+- **R-LEVEL-3 COULD** The `final` field keeps a task above the target level on purpose. Splitting is
+  the intended way; `final` is the planner's last resort, and it needs a reason.
+  - `set <task> --final <reason>` writes `- final: <reason>` (`-` and `@path` work, R-WRITE-12);
+    `set --unset final` removes it.
+  - Refused (exit 1, `BAD_VALUE`, file byte-identical): an empty reason; a task at or below the
+    target level; a milestone, question or idea.
+  - `plan` and `summary` count such tasks apart (R-LEVEL-2), so they stop reminding the planner.
+  - `check` reports a `final` on a milestone, question or idea, or on a task at or below the target
+    level (written by hand, or left after the level was lowered).
+  - `show --json` and `schema` list the field; `split` removes it (R-SPLIT-1).
+
+### 5.26 Detail for level 1 — DETAIL
+
+- **R-DETAIL-1 COULD** Three fields carry the detail a weak agent needs, next to `files`
+  (R-SCOPE-1), `why` (R-WRITE-17) and `accept`:
+  - `steps`: numbered steps, written as indented lines under `- steps:` (format.md §8). `--steps`
+    takes text, `-` or `@path` (R-WRITE-12); each non-empty input line is one step; a number such as
+    `1.` or `2)` at the start of an input line is removed, because todo numbers the steps itself.
+    In `add --from` and `apply`, `"steps"` is a list of strings or one string with line breaks.
+  - `read`: the paths the worker should look at but not change, separated by commas, relative to
+    the folder of `TODO.md`.
+  - `verify`: one command line that checks the task (R-VERIFY-1), kept as given; line breaks become
+    spaces (R-EDIT-5).
+  - `add`, `set`, `add --from` and `apply` take all three. `set --steps` replaces the whole list;
+    `set --unset steps` removes the field with all its lines.
+  - The parser reads the numbered lines directly under `- steps:` as the value of `steps`; every
+    other indented line stays text, as before. Changes replace, insert or remove whole lines only
+    (R-EDIT-1), and the verified write (R-EDIT-7) covers the step lines. LF, CRLF and byte-order-mark
+    fixtures read and write back byte-identical.
+  - The fields go in the order of format.md §10. `show --json` returns `steps` as a list of strings
+    without their numbers, and `read` as a list; `schema` lists the three fields. The merge driver
+    treats the list as part of the task block (R-GIT-2).
+- **R-DETAIL-2 COULD** A task at or below the target level (`target_difficulty`, by default the
+  lowest level) is ready only when its detail is complete. Calling a task level 1 is only a claim;
+  todo checks at least that the detail a weak agent needs is there:
+  - it has `why`, `accept`, `steps`, `verify` and `files`;
+  - `files` has at most `level1_max_files` entries (default 3), and none is a pattern or a folder
+    (R-SCOPE-1);
+  - every path in `read` exists, as a file or a folder, relative to the folder of `TODO.md`;
+  - no open question is about it (a question that isn't done or dropped with `about` naming it,
+    R-KIND-2).
+
+  `next` and `list --ready` never hand out or list a task that fails the rule; `claim` of it by ID
+  still works. `check` reports each such task with what is missing, as a warning that doesn't change
+  the exit code. `show --json` carries `ready` (whether `next` could hand the task out now) and
+  `missing` (what this rule lacks, empty when complete). Tasks above the target level are not
+  affected; `plan` lists the failing ones (R-LEVEL-2).
+- **R-DETAIL-3 COULD** `todo brief <task>` prints one work order, so a worker reads one text and
+  starts. In this order:
+  1. the goals of the milestones above the task, from the top down (R-MILE-4);
+  2. the ID, the title and the `why`;
+  3. the files to read (`read`);
+  4. the files it may change (`files`), with the sentence that no other file may be changed;
+  5. the numbered steps;
+  6. the `verify` command, and whether `done` runs it (`verify_when`, R-VERIFY-1, R-VERIFY-2);
+  7. for each finished dependency, its done note and its commit;
+  8. the exact commands to finish — commit only the listed files, then
+     `todo done <ID> --commit HEAD --agent <name>` — and to give up —
+     `todo stuck <ID> --note "<problem>" --agent <name>` — with the ID and the agent name filled in
+     (from `--agent` or `TODO_AGENT`; a placeholder when there is none).
+
+  `next --claim --brief` and `claim --brief` print the same after claiming. `brief` reads only and
+  takes no lock (R-LOCK-5). `brief --json` (`todo.brief.v1`) matches its snapshot.
+
+  ```powershell
+  todo next --claim --max-difficulty 1 --brief --agent worker-1
+  git add -- src/shader.c tests/shader_test.c
+  git commit -m "T-021: diffuse term in the C shader"
+  todo done T-021 --commit HEAD --agent worker-1
+  ```
+
+### 5.27 Splitting — SPLIT
+
+- **R-SPLIT-1 COULD** `todo split <task> --from <file|-> [--goal T]` replaces one task with several
+  smaller ones in one step: splitting by hand takes a command per child plus a change of the parent,
+  and a crash in between leaves half a split.
+  - The children are JSON lines in the shape of `add --from` (R-WRITE-13); they may depend on each
+    other with `"@ref"`. Each child is added with `milestone` set to the split task, directly after
+    the split task's block, in the given order; a child that names a `milestone` of its own is
+    refused (`BAD_VALUE`). Children follow the rules of `add`, `required_fields` included.
+  - In the same write the task becomes `type: milestone`, with `goal` from `--goal`, or else from its
+    `accept`; without either the split is refused (exit 1, `MISSING_FIELD`). It loses `difficulty`,
+    `files`, `read`, `steps`, `verify`, `final`, `attempts` and its claim (`owner`, `claimed`,
+    `session`); a blocked task — usually one given back (R-STUCK-1) — becomes open, so its children
+    can be handed out (R-MILE-6). Every other line stays, and a note on it names the children
+    (`split into T-021, T-022, T-023`, format.md §9).
+  - Tasks that depended on the split task still name it, and now wait for the whole milestone
+    (R-MILE-6); nothing that depended on it breaks.
+  - One locked write with one snapshot, all or nothing: one bad child changes nothing, and the
+    file stays byte-identical.
+  - Refused (exit 1): a done or dropped task (`BAD_TRANSITION`); a milestone, question or idea
+    (`BAD_VALUE`); a task claimed by another agent, unless `--force` (R-CLAIM-3).
+  - `--dry-run` prints the diff. The output lists the new IDs.
+
+### 5.28 Verify — VERIFY
+
+Asking a worker whether its test passed relies on the one thing that can't be trusted; todo runs
+the check itself.
+
+- **R-VERIFY-1 COULD** todo runs a task's `verify` command and trusts only its exit code.
+  - **How it runs.** Outside the write lock (R-LOCK-4), in the folder of `TODO.md`; when the command
+    is given in a linked worktree (R-FIND-5), in the matching folder of that worktree, so the check
+    sees the worker's own checkout. Through `verify_shell` (default `pwsh -NoProfile
+    -NonInteractive -Command`, else `powershell.exe` with the same arguments, on Windows; `sh -c`
+    elsewhere), with the `verify` line as the last argument and standard input closed. After
+    `verify_timeout_seconds` (default 300) the command and the processes it started are stopped, and
+    the check counts as failed. Exit 0 passes; anything else fails.
+  - **Output.** Standard output and standard error are captured and saved in full in the state
+    folder (`verify/<ID>.log`, §7, replaced by each run); they never reach todo's own standard
+    output, so `--json` stays one object (R-OUT-1). On a failure the text output shows the last
+    lines on standard error; the JSON carries the exit code, the last line and the path of the log.
+  - **Mode `done`** (`verify_when = "done"`, the default). `done` runs the command before taking the
+    lock. A pass marks the task done and writes `- verified: <date>`. A failure refuses `done` (exit 1,
+    `VERIFY_FAILED`): the task stays claimed, `attempts` is raised by one, and the note
+    `verify failed — <last line of the output>` is added, in one write. When the failures since the
+    task last went back to work (the latest `unblocked`, `reopened` or `stuck` note, or else since it
+    was added) reach `verify_attempts` (default 3), that failure gives the task back as `stuck` does
+    (R-STUCK-1), with the note `stuck — verify failed <N> times: <last line>` instead, and `attempts`
+    raised once.
+  - **Mode `wave`** is R-VERIFY-2.
+  - **In both modes.** `todo verify <task>` runs the one command and changes nothing in `TODO.md`
+    (exit 0 pass, 1 `VERIFY_FAILED`). `done --no-verify` needs `--force` and adds the note
+    `forced done without verify`. `verify = false` turns running off: `done` finishes without
+    running anything and writes no `verified`, and `todo verify` exits 5 with `VERIFY_NOT_RUN`. A
+    command that cannot be started (the shell is missing) is not a failure: `done` and `verify` exit 5
+    with `VERIFY_NOT_RUN`, nothing is written, and `attempts` doesn't change. A task without `verify`
+    behaves as before v0.8. `reopen` removes `verified` (R-WRITE-10); `set` cannot write `verified`
+    or `attempts` (R-WRITE-8).
+  - `check` and `plan` list done tasks with a `verify` command and no `verified` line (R-CHECK-1,
+    R-LEVEL-2).
+  - Tests use a command that passes, one that fails and one that outlives a short timeout, in each
+    mode.
+- **R-VERIFY-2 COULD** Wave mode (`verify_when = "wave"`). In a compiled project one worker's
+  half-finished edit breaks the build for every other worker's check, so the planner checks all
+  tasks when the wave is finished instead.
+  - `done` doesn't run the command; the task is done without `verified`.
+  - `todo verify --wave` runs the command of every done task in `TODO.md` that has `verify` and no
+    `verified`, one after another in file order. After each command its result is written under the
+    lock in its own write, so a crash keeps the results so far. A pass writes `verified`. A failure
+    reopens the task and gives it back as `stuck` does: status blocked, no owner, the `verified` and
+    `by` lines removed, `attempts` raised by one, and the note
+    `stuck — verify failed after done: <last line of the output>`.
+  - It prints the tasks that passed, the tasks that failed and the tasks given back; exit 0 only when
+    all passed, 1 otherwise.
+  - It refuses to start while any task is claimed (exit 1, `ALREADY_CLAIMED`, listing them), since
+    a worker may still be editing; `--force` runs anyway.
+  - It works in mode `done` as well, for tasks finished before v0.8, with `--no-verify`, or while
+    `verify = false` was set; with `verify = false` it exits 5 with `VERIFY_NOT_RUN`.
+
+  ```powershell
+  todo verify --wave --agent planner
+  ```
+
+### 5.29 Giving a task back — STUCK
+
+- **R-STUCK-1 COULD** `todo stuck <task> --note <problem>` gives a task back to the planner. A weak
+  agent that cannot finish must have a clean way out, and the planner must learn what went wrong.
+  - In one write it sets the task to blocked, removes the owner, the claim time and the session, adds
+    the note `stuck — <problem>`, and raises `attempts` by one (written as `- attempts: 1` the first
+    time). The level is not changed.
+  - The note is required (exit 2, `USAGE`, without it). Only a claimed task can be given back
+    (R-WRITE-9: anything else is refused, exit 1, `BAD_TRANSITION`); only its owner may do it,
+    others need `--force` (R-CLAIM-3).
+  - A task is *given back* when it is blocked and its latest note of the kinds `blocked — …` and
+    `stuck — …` is a `stuck — …` note; that problem is its reason in `summary`, `check`, `plan` and
+    the report. Such a task is never handed out by `next` until the planner runs `unblock` (which
+    makes it open, since it has no owner) or `split` (R-SPLIT-1) on it.
+  - `summary` counts the tasks given back and lists them with their problem (R-READ-5); `plan`
+    lists them first (R-LEVEL-2).
+  - A test covers each case and each refusal.
+
+### 5.30 File scopes — SCOPE
+
+Worktrees per agent cost disk space and a serial merge; file scopes let every worker work in the
+same checkout.
+
+- **R-SCOPE-1 COULD** A task's `files` field is the list of what it may change, and `next` never hands
+  out tasks that share a file.
+  - `files` is a comma-separated list of paths, folders (ending in `/`) and patterns with `*`,
+    relative to the folder of `TODO.md` (format.md §19). `/` and `\` are the same; case is ignored on
+    Windows. A trailing `:<line>` (as `scan` writes, R-DISC-1) is ignored when comparing.
+  - Two tasks overlap when an entry of one equals an entry of the other, lies under a folder of the
+    other, or can match a pattern of the other. Two patterns overlap unless their fixed parts (the
+    text before the first `*`) differ before either ends, so todo errs towards overlap.
+  - A task *holds* its files while it is claimed, or blocked with an owner, and its claim is not
+    stale (R-CLAIM-4). `next` and `next --claim` skip a ready task that overlaps a task another agent
+    holds. `claim <task>` on such a task is refused (exit 1, `FILES_BUSY`) naming the task in the
+    way, unless `--force`, which adds a note (format.md §9). A task without `files` is handed out as
+    before v0.8 and holds nothing.
+  - `list --ready` marks tasks held back for this reason; `show --json` lists the overlapping tasks
+    held by others (`files_busy`).
+  - Locking: 10 parallel `next --claim` on tasks that pairwise share files hand out tasks that never
+    overlap (TEST-5).
+  - `check` reports an entry that is absolute or leaves the folder of `TODO.md` (`..`).
+- **R-SCOPE-2 COULD** `done` checks that the commit stayed inside the task's files: in one shared
+  checkout a worker that edits a file outside its task breaks another worker's task without anyone
+  noticing.
+  - `done --commit` on a task with `files` asks git, before the lock is taken, which files each
+    given commit changed (both paths of a rename; a merge commit against its first parent), and
+    compares them with the task's entries, as paths relative to the folder of `TODO.md`. A file
+    outside them refuses `done` (exit 1, `OUT_OF_SCOPE`), naming the files. `TODO.md` and the
+    archive file are always allowed.
+  - `--force` overrides and adds the note `forced done outside files: <files>`.
+  - A task at or below the target level that has `files` cannot be finished without `--commit`
+    while git is available (exit 1, `MISSING_FIELD`, naming `--commit HEAD`).
+  - A task without `files`, or a folder where git isn't available (NFR-5), behaves as before v0.8.
+  - Tests use a temporary repository with one commit inside the scope and one outside.
+
+### 5.31 Waves — WAVE
+
+- **R-WAVE-1 COULD** `todo waves [<milestone>]` shows how much work can run in parallel. The number
+  of waves is the fewest rounds the work needs however many workers are started, so it is the
+  number the planner should shrink.
+  - It groups the unfinished tasks (open, claimed, and not given back): wave 1 is every task ready
+    now (claimed tasks included, as running); wave n is what becomes ready when the waves before it
+    are done. Readiness uses each task's dependencies and those inherited from the milestones above
+    it (R-DEP-1, R-MILE-6). A task that isn't ready for lack of detail (R-DETAIL-2) or a level is
+    placed by its dependencies and marked.
+  - Inside a wave, tasks that overlap (R-SCOPE-1) form one lane, because they must run one after
+    another.
+  - It prints the number of waves, the size of each (tasks and lanes), the largest number of
+    workers useful at once (the most lanes in any wave), and the longest dependency chain, task by
+    task.
+  - Tasks that wait on a missing ID or sit in a cycle (R-DEP-3), blocked tasks and tasks below a
+    blocked milestone are listed apart.
+  - With `<milestone>`, only the tasks below it, at any depth; a task that is not a milestone is
+    refused (exit 1, `BAD_VALUE`).
+  - It reads only and takes no lock. `waves --json` (`todo.waves.v1`) matches its snapshot.
+
 ---
 
 ## 6. Commands at a glance
@@ -1006,6 +1406,14 @@ todo overview
 | `help update` | how to update the todo executable | — | COULD |
 | `report --html`, `report --html --all` | the HTML page for people, for one project or all registered ones | read | COULD |
 | `project add`, `project remove`, `project list`, `overview` | the per-user project register and an overview of it | register | COULD |
+| `plan` | what the planner still has to give back, split, detail or rate | read | COULD |
+| `set --final` | keep a task above the target level on purpose | write | COULD |
+| `brief`, `next --claim --brief`, `claim --brief` | one work order for the worker | read / write | COULD |
+| `split` | turn a task into a milestone with child tasks | write | COULD |
+| `verify`, `verify --wave` | run a task's check, or the checks of a finished wave | read / write | COULD |
+| `stuck` | give a task back to the planner with the problem | write | COULD |
+| `waves` | how much can run in parallel, and the longest chain | read | COULD |
+| `help worker`, `help planner` | the rules of each role | — | MUST |
 
 Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write commands), `--yes`
 (bulk commands), `--force` (where allowed).
@@ -1025,6 +1433,7 @@ Options used by many commands: `--file`, `--json`, `--agent`, `--dry-run` (write
   history/000001.md …      snapshots
   journal.jsonl            (COULD, R-HIST-4)
   report.html              the HTML report, when built (R-REPORT-1)
+  verify/T-012.log …       full output of the latest verify run per task (R-VERIFY-1)
 ```
 
 The one per-user folder (D11), outside every project:
@@ -1049,11 +1458,20 @@ With `TODO_REGISTER`, the lock and `report-all.html` sit next to the file it nam
   plus any lock wait (measured on a generated 5,000-task file). On a variant of that file with a
   milestone tree four levels deep, `tree`, `next`, `list --milestone` and `show` also take under
   100 ms and a write under 200 ms; `report --html` takes under 500 ms and writes a page under 5 MB;
-  `report --html --all` with ten such projects takes under 5 s (release build).
+  `report --html --all` with ten such projects takes under 5 s (release build). On that tree file,
+  extended so every task has `files` and a third of them share one, `next`, `plan`, `waves` and
+  `brief` each take under 100 ms and `next --claim` under 200 ms (release build).
 - **NFR-4 MUST** No network access, telemetry, background process, database or installer.
 - **NFR-5 MUST** git is optional and used only when it is on `PATH`: by `done` (`git rev-parse`
-  for `--commit`, the `by` name of R-WRITE-16), `align` (R-GIT-1), `merge-driver` (R-GIT-2, R-GIT-3) and `scan` (R-DISC-1, file
+  for `--commit`, the `by` name of R-WRITE-16, the files a commit changed for R-SCOPE-2), `align`
+  (R-GIT-1), `merge-driver` (R-GIT-2, R-GIT-3) and `scan` (R-DISC-1, file
   list). Everything else, including worktree detection, works without it.
+  Besides git, the editor of `todo edit` (R-LOCK-8) and the program that opens the report
+  (`--open`, R-REPORT-1), todo runs exactly one more kind of command: a task's `verify` line, through
+  `verify_shell`, by `done`, `verify` and `verify --wave` (R-VERIFY-1, R-VERIFY-2), and never when
+  `verify = false`. It runs nothing else: no command from any other field, no script, hook or build
+  tool of its own. A `verify` line runs with the rights of the agent that runs todo, so it is as
+  trusted as the `TODO.md` it comes from.
 - **NFR-6 MUST** No crashes: every failure ends with a message and an exit code. `unwrap`, `expect`
   and `panic!` are not used outside tests (enforced by Clippy).
 - **NFR-7 MUST** Paths with spaces, non-ASCII characters and more than 260 characters work.
@@ -1079,7 +1497,8 @@ With `TODO_REGISTER`, the lock and `report-all.html` sit next to the file it nam
   never touch this repository's own `TODO.md`.
 - **TEST-2 MUST** Parser tests cover every rule in format.md: code fences, comments, preamble,
   unknown fields, the combined priority line, notes, CRLF, byte-order mark, no final newline, mixed
-  line endings, non-ASCII text, every lenient form, and every refusal in format.md §13.
+  line endings, non-ASCII text, every lenient form, and every refusal in format.md §13; from format
+  3 also the `steps` list (format.md §8) with LF, CRLF and byte-order-mark fixtures.
 - **TEST-3 MUST** Round trip: every fixture reads and writes back byte-identical. A property test
   applies random sequences of edits to generated files and checks that bytes outside the edits never
   change, and that a change followed by its reverse restores the original bytes. A deliberately messy
@@ -1090,8 +1509,9 @@ With `TODO_REGISTER`, the lock and `report-all.html` sit next to the file it nam
   IDs; 20 parallel claims of one task have exactly one winner; 10 parallel `next --claim`s get 10
   different tasks; a process killed while holding the lock delays the others by less than
   2 seconds; a held lock makes a command exit 3 without writing; a lease stops other agents but not
-  its holder, and expires. A test-only hook, behind the cargo feature `test-hooks`, makes a command
-  pause while holding the lock.
+  its holder, and expires; 10 parallel `next --claim`s on tasks that pairwise share files get tasks
+  that never overlap (R-SCOPE-1). A test-only hook, behind the cargo feature `test-hooks`, makes a
+  command pause while holding the lock.
 - **TEST-6 MUST** File search: from the root and from a subfolder; a repository without `TODO.md`
   under a parent folder that has one (the search must stop at the repository root); `--file`;
   `TODO_FILE`; a real linked worktree created with git in a temporary folder (resolves to the main
@@ -1104,7 +1524,8 @@ With `TODO_REGISTER`, the lock and `report-all.html` sit next to the file it nam
   `XDG_DATA_HOME` and `TODO_REGISTER`) pointing at a temporary folder. JSON output is
   checked against snapshots, and a test checks that `todo help` lists every command.
 - **TEST-9 MUST** A performance test on a generated 5,000-task file (NFR-3) runs in CI but not in
-  every local `cargo test`. The milestone-tree and report limits of NFR-3 are tested the same way.
+  every local `cargo test`. The milestone-tree, report, plan, waves and file-scope limits of NFR-3
+  are tested the same way.
 
 ---
 
@@ -1155,6 +1576,14 @@ With `TODO_REGISTER`, the lock and `report-all.html` sit next to the file it nam
 - **v0.7** — decided by the owner on 2026-11-18: the HTML report for people (R-REPORT-1), the
   project register and `overview` (R-PROJ-1, R-PROJ-2), and the report for all registered projects
   (R-REPORT-2).
+- **v0.8** — decided by the owner on 2026-11-19, so that many weak agents finish level-1 tasks in
+  parallel: format version 3; levels 1 to 5 as the default difficulties, difficulty required, and
+  the planner's list `todo plan` (R-LEVEL-1 to R-LEVEL-3); the detail fields `steps`, `read` and
+  `verify`, the ready rule and the work order `todo brief` (R-DETAIL-1 to R-DETAIL-3); `todo split`
+  (R-SPLIT-1); the verify command, at `done` or for the whole wave (R-VERIFY-1, R-VERIFY-2);
+  `todo stuck` (R-STUCK-1); file scopes for `next` and `done` (R-SCOPE-1, R-SCOPE-2); `todo waves`
+  (R-WAVE-1); the planning state in the HTML report (R-REPORT-3); and the agent rules split into a
+  common part, `todo help worker` and `todo help planner` (R-AGENT-1).
 
 ---
 
@@ -1196,7 +1625,8 @@ Recorded so they aren't lost; each becomes a requirement only by a decision reco
   stays an idea.*
 - **I-13** Rewrite the HTML report after every write, and let the page reload itself.
   *Dropped by the owner's decision of 2026-11-18: the report is built only when someone asks for
-  it. The ID R-REPORT-3 that was planned for it stays unused.*
+  it. The ID R-REPORT-3 that was planned for it stayed unused until the owner's plan of 2026-11-19
+  gave it to the planning state in the report (v0.8).*
 
 ---
 
@@ -1205,7 +1635,14 @@ Recorded so they aren't lost; each becomes a requirement only by a decision reco
 - A terminal UI, desktop app or web server. A generated HTML file, written only on request
   (R-REPORT-1, R-REPORT-2), is allowed; any control on that page (buttons, forms, scripts that
   change something, copy-ready commands) stays out, and so does rewriting it automatically.
-- Due dates, recurrence and computed priority scores; nothing is computed from `difficulty`.
+- Due dates, recurrence and computed priority scores. No score is computed from `difficulty`, and
+  todo never sets or changes a level by itself (R-LEVEL-1); the format 2 to 3 migration only
+  renames the old values.
+- Planning by itself: todo never splits, details or rates a task; the planner does, and todo shows
+  what is left (R-LEVEL-2). todo never starts, chooses or stops agents.
+- Running commands: apart from git, the editor of `todo edit` and the program that opens the
+  report, todo runs one more kind of command, a task's `verify` line (R-VERIFY-1), and nothing else
+  (NFR-5).
 - A database or index next to the file.
 - Other record types (decision records, plans, issues). Milestones, questions and ideas are kinds
   of entry in `TODO.md` (R-KIND-3), not separate records.
