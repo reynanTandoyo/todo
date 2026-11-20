@@ -18,8 +18,8 @@ use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{fs_path, synced_folder_warning};
 use crate::lock::{WriteOutcomeFull, current_time, locked_read_modify_write_full};
 use crate::ops::{
-    NewTask, OpEnv, OpsConfig, OwnershipDecision, SetChange, StepsInput, TaskCommand, TaskOp,
-    check_ownership, check_task_writable, file_label, forced_note_text, highest_task_number,
+    DoneCheck, NewTask, OpEnv, OpsConfig, OwnershipDecision, SetChange, StepsInput, TaskCommand,
+    TaskOp, check_ownership, check_task_writable, file_label, forced_note_text, highest_task_number,
     milestone, parse_doc_for_write, read_optional_archive, resolve_task_in_doc, steps_from_text,
 };
 use crate::ops::identity::done_by;
@@ -728,12 +728,15 @@ fn apply_task_op(
     let (raw_task, task_op) = match op {
         ApplyOp::Claim { task } => (task, TaskOp::Claim),
         ApplyOp::Release { task } => (task, TaskOp::Release),
+        // `apply` writes every change under one lock, where no command may run (R-LOCK-4), so its
+        // `done` runs no `verify` command; `verify --wave` checks such tasks afterwards.
         ApplyOp::Done { task, note, commit } => (
             task,
             TaskOp::Done {
                 note: note.as_deref(),
                 commit: commit.as_deref().map(str::trim),
                 by: done_by,
+                check: DoneCheck::NotChecked,
             },
         ),
         ApplyOp::Drop { task, note } => (

@@ -28,6 +28,22 @@ pub const DEFAULT_IDEA_SECTION: &str = "Ideas";
 /// Default `snapshots_keep` count from requirements §5.14 (`R-HIST-2`).
 pub const DEFAULT_SNAPSHOTS_KEEP: u64 = 200;
 
+/// Default `verify_timeout_seconds` from requirements §5.14 (`R-VERIFY-1`).
+pub const DEFAULT_VERIFY_TIMEOUT_SECONDS: u64 = 300;
+
+/// Default `verify_attempts` from requirements §5.14 (`R-VERIFY-1`).
+pub const DEFAULT_VERIFY_ATTEMPTS: u64 = 3;
+
+/// When the `verify` command of a task runs (`verify_when`, `R-VERIFY-2`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum VerifyWhen {
+    /// `done` runs the command before it marks the task done (`R-VERIFY-1`).
+    #[default]
+    Done,
+    /// `done` doesn't run it; `todo verify --wave` runs it for the whole wave (`R-VERIFY-2`).
+    Wave,
+}
+
 /// Effective configuration for task operations (defaults from requirements §5.14).
 ///
 /// Built with defaults when no `todo.toml` is present (`R-CFG-1`), or loaded from `todo.toml`
@@ -62,6 +78,17 @@ pub struct OpsConfig {
     pub snapshots_keep: u64,
     /// How linked git worktrees resolve `TODO.md` (`R-FIND-5`, `R-CFG-2`).
     pub worktree: WorktreeMode,
+    /// Whether todo runs `verify` commands at all (`verify`, `R-VERIFY-1`).
+    pub verify_enabled: bool,
+    /// When the `verify` commands run (`verify_when`, `R-VERIFY-2`).
+    pub verify_when: VerifyWhen,
+    /// Seconds a `verify` command may run before it is stopped and counts as failed.
+    pub verify_timeout_seconds: u64,
+    /// Failed checks after which `done` gives the task back (`verify_attempts`, `R-VERIFY-1`).
+    pub verify_attempts: u64,
+    /// The program and its arguments that run a `verify` line, which is added as the last
+    /// argument; empty means the default shell of the platform (`R-VERIFY-1`).
+    pub verify_shell: Vec<String>,
 }
 
 impl Default for OpsConfig {
@@ -86,6 +113,11 @@ impl Default for OpsConfig {
             lock: LockConfig::default(),
             snapshots_keep: DEFAULT_SNAPSHOTS_KEEP,
             worktree: WorktreeMode::Shared,
+            verify_enabled: true,
+            verify_when: VerifyWhen::Done,
+            verify_timeout_seconds: DEFAULT_VERIFY_TIMEOUT_SECONDS,
+            verify_attempts: DEFAULT_VERIFY_ATTEMPTS,
+            verify_shell: Vec::new(),
         }
     }
 }
@@ -362,6 +394,31 @@ impl OpsConfig {
                         }
                     };
                 }
+                "verify" => {
+                    cfg.verify_enabled = expect_bool(&key, val, line)?;
+                }
+                "verify_when" => {
+                    let s = expect_string(&key, val, line)?;
+                    cfg.verify_when = match s.as_str() {
+                        "done" => VerifyWhen::Done,
+                        "wave" => VerifyWhen::Wave,
+                        _ => {
+                            return Err(toml_err(
+                                line,
+                                format!("invalid verify_when {s:?}; expected \"done\" or \"wave\""),
+                            ));
+                        }
+                    };
+                }
+                "verify_timeout_seconds" => {
+                    cfg.verify_timeout_seconds = expect_u64(&key, val, line, 1)?;
+                }
+                "verify_attempts" => {
+                    cfg.verify_attempts = expect_u64(&key, val, line, 1)?;
+                }
+                "verify_shell" => {
+                    cfg.verify_shell = expect_string_list(&key, val, line, false)?;
+                }
                 _ => {
                     return Err(toml_err(line, format!("unknown setting `{key}`")));
                 }
@@ -402,6 +459,13 @@ fn expect_string(key: &str, val: toml::Value, line: usize) -> Result<String> {
     match val {
         toml::Value::String(s) => Ok(s),
         _ => Err(toml_err(line, format!("{key} must be a string"))),
+    }
+}
+
+fn expect_bool(key: &str, val: toml::Value, line: usize) -> Result<bool> {
+    match val {
+        toml::Value::Boolean(b) => Ok(b),
+        _ => Err(toml_err(line, format!("{key} must be true or false"))),
     }
 }
 

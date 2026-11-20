@@ -182,6 +182,9 @@ pub(crate) fn collect_problems(
             // 3c. `files` entries that leave the folder of TODO.md (warnings only; R-SCOPE-1).
             warn_files_entries(&doc, &label, out);
 
+            // 3d. Done tasks whose `verify` command has not passed yet (warnings only; R-VERIFY-2).
+            warn_unverified_done(&doc, &cfg, &label, out);
+
             // 4. Dependency checks (missing IDs, dropped dependencies, cycles; R-DEP-3).
             check_dependencies(&doc, archive.as_ref(), &label, &mut problems);
 
@@ -374,6 +377,28 @@ fn warn_unmapped_by(doc: &Document, todo_path: &Path, label: &str, out: &mut Out
         }
         out.warn(format!(
             "{label}:{}: {}: by {by:?} is not a name in .mailmap",
+            task.heading_line + 1,
+            doc.id_config.format_id(task.id)
+        ));
+    }
+}
+
+/// Warns about each done task that has a `verify` command and no `verified` line (`R-VERIFY-2`).
+/// Nothing is warned about while `verify = false`, since no check can pass then. Never changes the
+/// exit code.
+fn warn_unverified_done(doc: &Document, cfg: &OpsConfig, label: &str, out: &mut Output) {
+    if !cfg.verify_enabled {
+        return;
+    }
+    for task in &doc.tasks {
+        if task.status != Status::Done
+            || task.verify.is_none()
+            || task.field_value("verified").is_some()
+        {
+            continue;
+        }
+        out.warn(format!(
+            "{label}:{}: {}: done, but its verify command has not passed (todo verify --wave)",
             task.heading_line + 1,
             doc.id_config.format_id(task.id)
         ));

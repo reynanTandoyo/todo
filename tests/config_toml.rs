@@ -319,3 +319,37 @@ fn worktree_local_in_todo_toml_uses_worktrees_own_todo() {
     let json: Value = parse_json(&out.stdout);
     assert_eq!(json["data"]["tasks"][0]["id"], "T-099");
 }
+
+#[test]
+fn verify_settings_have_their_defaults_and_bad_values_are_refused_with_the_line() {
+    // T-158 (R-VERIFY-1, R-VERIFY-2): the defaults of the verify settings.
+    let def = OpsConfig::default();
+    assert!(def.verify_enabled);
+    assert_eq!(def.verify_when, todo::ops::VerifyWhen::Done);
+    assert_eq!(def.verify_timeout_seconds, 300);
+    assert_eq!(def.verify_attempts, 3);
+    assert!(def.verify_shell.is_empty());
+
+    let set = OpsConfig::from_toml_str(
+        "verify = false\nverify_when = \"wave\"\nverify_timeout_seconds = 5\nverify_attempts = 2\nverify_shell = [\"sh\", \"-c\"]\n",
+    )
+    .unwrap();
+    assert!(!set.verify_enabled);
+    assert_eq!(set.verify_when, todo::ops::VerifyWhen::Wave);
+    assert_eq!(set.verify_timeout_seconds, 5);
+    assert_eq!(set.verify_attempts, 2);
+    assert_eq!(set.verify_shell, vec!["sh", "-c"]);
+
+    // Each bad value is refused, and the error names its line in todo.toml.
+    for (text, line) in [
+        ("verify = 1\n", 1),
+        ("verify_when = \"later\"\n", 1),
+        ("\nverify_timeout_seconds = 0\n", 2),
+        ("verify_attempts = 0\n", 1),
+        ("verify_shell = \"sh\"\n", 1),
+    ] {
+        let err = OpsConfig::from_toml_str(text).unwrap_err();
+        assert_eq!(err.code, todo::error::ErrorCode::BadValue, "{text:?}");
+        assert_eq!(err.details.line, Some(line), "{text:?}: {}", err.message);
+    }
+}
