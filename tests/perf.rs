@@ -1,4 +1,4 @@
-//! Performance tests on a generated 5,000-entry `TODO.md` (T-065, T-105, T-106; NFR-3, TEST-9).
+//! Performance tests on a generated 5,000-entry `TODO.md` (T-065, T-105, T-106, T-165; NFR-3, TEST-9).
 //!
 //! Two files are generated: the flat 5,000-task file (T-065) and a variant of it whose entries
 //! form a milestone tree four levels deep (T-105). The HTML report is timed on the milestone tree
@@ -83,10 +83,23 @@ fn push_milestone(out: &mut String, id: usize, parent: Option<usize>) {
     let _ = writeln!(out, "- goal: generated goal for milestone {id}");
 }
 
-/// The variant of [`generate_5000_task_file`] (T-105): the same 5,000 entries, but the first
-/// 370 are milestones in three nested levels and the other 4,630 are tasks at depth 4. IDs follow
-/// the file order: top-level milestones, then depth 2, then depth 3, then the tasks.
+/// The milestone-tree file of T-105: the same 5,000 entries as [`generate_5000_task_file`], but the
+/// first 370 are milestones in three nested levels and the other 4,630 are tasks at depth 4. IDs
+/// follow the file order: top-level milestones, then depth 2, then depth 3, then the tasks.
 fn generate_milestone_tree_file() -> String {
+    generate_milestone_tree(false)
+}
+
+/// The planning file of T-165: the milestone tree of [`generate_milestone_tree_file`], extended so
+/// that every task is a level-1 task with its files and detail, and a third of the tasks share one
+/// file. The detail makes the file about three times larger, so the T-105 budgets keep their own
+/// file.
+fn generate_planned_milestone_tree_file() -> String {
+    generate_milestone_tree(true)
+}
+
+/// Builds the milestone tree; `extended` adds the level, the files and the detail of T-165.
+fn generate_milestone_tree(extended: bool) -> String {
     let middle_count = TOP_MILESTONES * MIDDLE_PER_TOP;
     let lower_count = middle_count * LOWER_PER_MIDDLE;
     let milestone_count = TOP_MILESTONES + middle_count + lower_count;
@@ -97,9 +110,13 @@ fn generate_milestone_tree_file() -> String {
     let lower_id = |j: usize| TOP_MILESTONES + middle_count + 1 + j;
     let task_id = |t: usize| milestone_count + 1 + t;
 
-    let mut out = String::with_capacity(950 * 1024);
+    let mut out = String::with_capacity(1400 * 1024);
     out.push_str(FIXTURE);
-    out.push_str("<!-- todo-format: 2 -->\n");
+    if extended {
+        out.push_str("<!-- todo-format: 3 -->\n");
+    } else {
+        out.push_str("<!-- todo-format: 2 -->\n");
+    }
     out.push_str("## Now\n");
 
     for top in 0..TOP_MILESTONES {
@@ -131,6 +148,23 @@ fn generate_milestone_tree_file() -> String {
 - priority: {prio} · type: task · area: core\n\
 - milestone: T-{parent:04}"
         );
+        if extended {
+            // A third of the tasks share one file, and every other task names its own (T-165).
+            let files = if t % 3 == 0 {
+                "src/shared/common.rs".to_string()
+            } else {
+                format!("src/gen/t{id:04}.rs")
+            };
+            let _ = writeln!(
+                out,
+                "- difficulty: 1\n\
+- files: {files}\n\
+- why: the benchmark task is part of the timed tree\n\
+- verify: cargo test --release --test perf"
+            );
+            // Level 1 needs the steps as indented numbered lines (T-152, R-DETAIL-1).
+            out.push_str("- steps:\n  1. open the file\n  2. make the change\n");
+        }
         if id > milestone_count + 1 && id % 5 == 0 {
             let _ = writeln!(out, "- depends: T-{:04}", id - 1);
         }
@@ -498,5 +532,110 @@ fn perf_ten_milestone_tree_projects_report_html_all_meets_nfr3_budget() {
     assert!(
         all_time < REPORT_ALL_BUDGET,
         "report --html --all took {all_time:?} (budget < 5 s)"
+    );
+}
+
+/// The planning budgets of T-165 (NFR-3): `next`, `plan`, `waves` and `brief` each under 100 ms,
+/// and `next --claim` under 200 ms, on the milestone-tree file. Every task is a level-1 task with
+/// its files and detail, and a third of them share one file, so `waves` has to find the lanes of
+/// a large wave.
+#[test]
+#[ignore = "Performance benchmark (NFR-3, TEST-9, T-165); run with: cargo test --release --test perf -- --ignored"]
+fn perf_5000_entry_milestone_tree_next_plan_waves_brief_meet_budgets() {
+    let body = generate_planned_milestone_tree_file();
+    let milestone_count = TOP_MILESTONES + TOP_MILESTONES * MIDDLE_PER_TOP * (1 + LOWER_PER_MIDDLE);
+    let task_count = TOTAL_ENTRIES - milestone_count;
+    assert_eq!(
+        body.matches("- difficulty: 1\n").count(),
+        task_count,
+        "every task must have a level"
+    );
+    assert_eq!(
+        body.matches("- files: ").count(),
+        task_count,
+        "every task must have files"
+    );
+    assert_eq!(
+        body.matches("- files: src/shared/common.rs\n").count(),
+        task_count.div_ceil(3),
+        "a third of the tasks must share one file"
+    );
+    let (_tmp, home, work) = project_with(&body);
+
+    // Untimed warm-up of every command, so the first run does not pay the file-system cache.
+    for args in [
+        &["next"][..],
+        &["plan"],
+        &["waves"],
+        &["brief", DEEP_TASK],
+        &["next", "--claim", "--new", "--agent", "perf-bot"],
+    ] {
+        let _ = run_todo(&home, &work, args);
+    }
+
+    let next_time = median(
+        (0..5)
+            .map(|_| run_todo(&home, &work, &["next"]).1)
+            .collect(),
+    );
+    let plan_time = median(
+        (0..5)
+            .map(|_| run_todo(&home, &work, &["plan"]).1)
+            .collect(),
+    );
+    let waves_time = median(
+        (0..5)
+            .map(|_| run_todo(&home, &work, &["waves"]).1)
+            .collect(),
+    );
+    let brief_time = median(
+        (0..5)
+            .map(|_| run_todo(&home, &work, &["brief", DEEP_TASK]).1)
+            .collect(),
+    );
+    let claim_time = median(
+        (0..5)
+            .map(|_| {
+                run_todo(
+                    &home,
+                    &work,
+                    &["next", "--claim", "--new", "--agent", "perf-bot"],
+                )
+                .1
+            })
+            .collect(),
+    );
+
+    eprintln!(
+        "NFR-3 planning timings (5,000 entries, four levels, {} tasks at level 1, {} bytes): \
+         next={:?}, plan={:?}, waves={:?}, brief={:?}, next --claim={:?}",
+        task_count,
+        body.len(),
+        next_time,
+        plan_time,
+        waves_time,
+        brief_time,
+        claim_time
+    );
+
+    assert!(
+        next_time < Duration::from_millis(100),
+        "next took {next_time:?} (budget < 100 ms)"
+    );
+    assert!(
+        plan_time < Duration::from_millis(100),
+        "plan took {plan_time:?} (budget < 100 ms)"
+    );
+    assert!(
+        waves_time < Duration::from_millis(100),
+        "waves took {waves_time:?} (budget < 100 ms)"
+    );
+    assert!(
+        brief_time < Duration::from_millis(100),
+        "brief took {brief_time:?} (budget < 100 ms)"
+    );
+    assert!(
+        claim_time < Duration::from_millis(200),
+        "next --claim took {claim_time:?} (budget < 200 ms)"
     );
 }
