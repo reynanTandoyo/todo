@@ -322,6 +322,8 @@ the output for a fixture with one open task:
 }
 ```
 
+`next_ready` lists up to five tasks that `next` could hand out now, in its order. A task whose files another agent holds is left out, as its `ready` is `false` in `show --json` (`R-SCOPE-1`).
+
 `ready_to_close` (`R-MILE-6`) lists the milestones that are ready to close, as `{ "id", "title" }`; the key is left out when there are none.
 
 `given_back` (`R-STUCK-1`) lists the blocked tasks that `todo stuck` gave back to the planner, each as a `blocked` entry whose `reason` is the problem; the key is left out when there are none.
