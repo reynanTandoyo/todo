@@ -41,7 +41,7 @@ error is in the table under "Error Codes".
 
 ## Shared `TaskJson` Shape
 
-Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, `idea`, `promote`, and as `next.task`. The example is the `show` output under "`todo show <task> --json`" below, which lists every key. Every key is always present: a value that is not set is `null`, and a list or an object with nothing in it is `[]` or `{}`.
+Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `stuck`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, `idea`, `promote`, and as `next.task`. The example is the `show` output under "`todo show <task> --json`" below, which lists every key. Every key is always present: a value that is not set is `null`, and a list or an object with nothing in it is `[]` or `{}`.
 
 - `type` is the `type` field as written; `section` is the `##` section the entry is under, or `null`.
 - `archived` is `true` for an entry read from `TODO-archive.md`.
@@ -314,6 +314,8 @@ the output for a fixture with one open task:
 
 `ready_to_close` (`R-MILE-6`) lists the milestones that are ready to close, as `{ "id", "title" }`; the key is left out when there are none.
 
+`given_back` (`R-STUCK-1`) lists the blocked tasks that `todo stuck` gave back to the planner, each as a `blocked` entry whose `reason` is the problem; the key is left out when there are none.
+
 `counts` covers tasks only: `open`, `claimed`, `blocked`, `done`, `dropped` and `total` (their sum) leave out milestones, which are listed under `milestones`. `questions` and `ideas` count the open ones (not done or dropped) apart from the rest (`R-KIND-3`, `R-KIND-1`); the open questions are listed in `open_questions`.
 
 ### `todo tree --json` (`todo.tree.v1`)
@@ -472,7 +474,7 @@ Problems found (`exit 1`): `ok: false`, `error.code: "BAD_VALUE"`, `error.count`
 }
 ```
 
-### Single-task write commands (`add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, `idea`, `promote`)
+### Single-task write commands (`add`, `claim`, `release`, `done`, `drop`, `block`, `unblock`, `stuck`, `note`, `set`, `reopen`, `move`, `ask`, `answer`, `idea`, `promote`)
 
 Each emits `"schema": "todo.<command>.v1"` with `data` equal to the post-edit `TaskJson`.
 

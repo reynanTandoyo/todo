@@ -2,11 +2,12 @@
 //! R-REPORT-1, R-READ-5).
 //!
 //! `block` and `drop` write a note such as `blocked — <reason>` or `dropped — <reason>`. The reason
-//! is the text after the em dash of the latest note that names the state. Every command that shows
-//! a reason (`summary`, the HTML report) calls [`Task::blocked_reason`] or [`Task::dropped_reason`],
-//! so they cannot disagree.
+//! is the text after the em dash of the latest note that names the state. `stuck` writes
+//! `stuck — <problem>` and gives a task back to the planner (R-STUCK-1); that problem is the reason
+//! of the blocked task too. Every command that shows a reason (`summary`, the HTML report) calls
+//! [`Task::blocked_reason`] or [`Task::dropped_reason`], so they cannot disagree.
 
-use crate::doc::parser::Task;
+use crate::doc::parser::{Status, Task};
 
 /// The em dash that separates a reason from the words before it.
 const DASH: &str = "\u{2014}";
@@ -15,12 +16,40 @@ const DASH: &str = "\u{2014}";
 pub const NO_REASON: &str = "no reason recorded";
 
 impl Task {
-    /// The reason the task is blocked: the reason of the latest `blocked — <reason>` note that
-    /// gives one. A later note that is not a block note does not count, and neither does a
-    /// `blocked` note with no reason after the dash. `None` when no note gives a reason.
+    /// The reason the task is blocked: the reason of the latest `blocked — <reason>` or
+    /// `stuck — <problem>` note that gives one. A later note that is not a block note does not
+    /// count, and neither does a `blocked` note with no reason after the dash. `None` when no note
+    /// gives a reason.
     #[must_use]
     pub fn blocked_reason(&self) -> Option<&str> {
-        self.latest_reason("blocked")
+        self.notes.iter().rev().find_map(|note| {
+            reason_in_text(&note.text, "blocked").or_else(|| reason_in_text(&note.text, "stuck"))
+        })
+    }
+
+    /// Whether the task was given back to the planner (R-STUCK-1): it is blocked, and its latest
+    /// `blocked — …` or `stuck — …` note is a `stuck — …` note that gives a problem.
+    #[must_use]
+    pub fn is_given_back(&self) -> bool {
+        self.status == Status::Blocked && self.latest_block_note_is_stuck()
+    }
+
+    /// Whether the latest note that gives a block reason (`blocked — …` or `stuck — …`) is a
+    /// `stuck — …` note.
+    fn latest_block_note_is_stuck(&self) -> bool {
+        self.notes
+            .iter()
+            .rev()
+            .find_map(|note| {
+                if reason_in_text(&note.text, "blocked").is_some() {
+                    Some(false)
+                } else if reason_in_text(&note.text, "stuck").is_some() {
+                    Some(true)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(false)
     }
 
     /// The reason the task was dropped: the reason of the latest `dropped — <reason>` note, or of
@@ -130,5 +159,56 @@ mod tests {
             doc.tasks[0].blocked_reason(),
             Some("waiting — for the second review")
         );
+    }
+
+    #[test]
+    fn a_stuck_note_is_the_reason_and_gives_the_task_back() {
+        let doc = task_with_notes(&["stuck — the schema file is missing"]);
+        assert_eq!(
+            doc.tasks[0].blocked_reason(),
+            Some("the schema file is missing")
+        );
+        assert!(doc.tasks[0].is_given_back());
+    }
+
+    #[test]
+    fn the_latest_block_or_stuck_note_decides_whether_a_task_is_given_back() {
+        let stuck_then_blocked =
+            task_with_notes(&["stuck — first problem", "blocked — waiting for the review"]);
+        assert_eq!(
+            stuck_then_blocked.tasks[0].blocked_reason(),
+            Some("waiting for the review")
+        );
+        assert!(!stuck_then_blocked.tasks[0].is_given_back());
+
+        let blocked_then_stuck = task_with_notes(&[
+            "blocked — waiting for the review",
+            "stuck — the review never came",
+            "checked the inbox",
+        ]);
+        assert_eq!(
+            blocked_then_stuck.tasks[0].blocked_reason(),
+            Some("the review never came")
+        );
+        assert!(blocked_then_stuck.tasks[0].is_given_back());
+    }
+
+    #[test]
+    fn a_stuck_note_without_a_problem_gives_no_reason_and_no_give_back() {
+        let doc = task_with_notes(&["stuck — ", "stuck"]);
+        assert_eq!(doc.tasks[0].blocked_reason(), None);
+        assert!(!doc.tasks[0].is_given_back());
+    }
+
+    #[test]
+    fn only_a_blocked_task_is_given_back() {
+        let doc = Document::parse_bytes(
+            "### T-003 · Open with a stuck note\n\
+- status: open\n\
+- note (2026-11-18, bob): stuck — the schema file is missing\n"
+                .as_bytes(),
+        )
+        .unwrap();
+        assert!(!doc.tasks[0].is_given_back());
     }
 }

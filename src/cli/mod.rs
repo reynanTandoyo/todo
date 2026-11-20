@@ -614,6 +614,7 @@ register_commands! {
     Show => show,
     Skill => skill,
     Status => status,
+    Stuck => stuck,
     Summary => summary,
     Tree => tree,
     Unblock => unblock,
