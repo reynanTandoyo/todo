@@ -701,6 +701,8 @@ When finishing or dropping a task makes other tasks ready, their summaries appea
 ]
 ```
 
+A task whose files another agent's live claim holds is left out, as `next` would not hand it out (`R-SCOPE-1`); the text output's `now ready` lines come from the same list.
+
 When it finishes the last unfinished entry below a milestone, the milestone appears in `"ready_to_close"` (`R-MILE-6`). Nothing closes it; `todo done <id>` does. The key is left out when it is empty.
 
 ```json
