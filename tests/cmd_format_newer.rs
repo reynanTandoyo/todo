@@ -97,6 +97,8 @@ fn every_command_that_interprets_or_changes_tasks_refuses_a_newer_format() {
             "New lantern task",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--type",
             "chore",
             "--area",
@@ -137,7 +139,7 @@ fn milestone_commands_refuse_a_newer_format_too() {
         concat!(
             "{\"ref\":\"m\",\"title\":\"Shelves\",\"type\":\"milestone\",\"priority\":\"P1\",",
             "\"goal\":\"shelves are sorted\"}\n",
-            "{\"title\":\"Shelf pass\",\"priority\":\"P2\",\"milestone\":\"@m\"}\n",
+            "{\"title\":\"Shelf pass\",\"priority\":\"P2\",\"difficulty\":\"3\",\"milestone\":\"@m\"}\n",
         ),
     )
     .expect("write batch");
@@ -148,6 +150,8 @@ fn milestone_commands_refuse_a_newer_format_too() {
             "Shade the shelves",
             "--priority",
             "P2",
+            "--difficulty",
+            "3",
             "--type",
             "chore",
             "--area",
@@ -163,6 +167,8 @@ fn milestone_commands_refuse_a_newer_format_too() {
             "Shelf milestone",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
             "--type",
             "milestone",
             "--goal",

@@ -12,7 +12,7 @@ use similar::TextDiff;
 use crate::cli::add::resolve_target_section;
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::doc::{
-    Document, LineEdit, TaskChangeIntent, TaskId, verify_task_edits,
+    Document, EntryKind, LineEdit, TaskChangeIntent, TaskId, verify_task_edits,
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{fs_path, synced_folder_warning};
@@ -598,6 +598,20 @@ fn apply_one_op(
                 Some(raw) => Some(cfg.canonical_difficulty(raw)?),
                 None => None,
             };
+            // A task needs a level as `add` requires one (R-LEVEL-1); the whole batch is refused.
+            if difficulty.is_none()
+                && cfg.requires_field("difficulty")
+                && EntryKind::from_type(task_type.as_deref()) == EntryKind::Task
+            {
+                return Err(at_operation(
+                    TodoError::new(
+                        ErrorCode::MissingField,
+                        "missing required field `difficulty`; give \"difficulty\" in the add operation",
+                    ),
+                    op_num,
+                    "add",
+                ));
+            }
             let extra: Vec<(String, String)> = fields
                 .iter()
                 .map(|(k, v)| (k.clone(), v.trim().to_string()))

@@ -58,7 +58,7 @@ fn init_writes_the_stamp_directly_after_the_format_line() {
 
     let created = read_todo(dir.path());
     let lines: Vec<&str> = created.lines().collect();
-    assert_eq!(lines[0], "<!-- todo-format: 2 -->");
+    assert_eq!(lines[0], "<!-- todo-format: 3 -->");
     assert_eq!(lines[1], stamp_line(RUNNING));
     assert_eq!(lines[2], "# Sample Project");
 }
@@ -74,13 +74,15 @@ fn a_write_adds_the_missing_stamp_and_changes_no_other_line() {
         &["note", "T-001", "checked the lanterns", "--agent", "bob"],
     );
 
+    // The write also raises the format line from 2 to 3 (R-MIG-1); no other line is removed.
     let (added, removed) = added_and_removed(&before, &after);
-    assert_eq!(removed, 0, "a write must not remove any line");
-    assert_eq!(added.len(), 2, "added lines: {added:?}");
-    assert_eq!(added[0], stamp_line(RUNNING));
-    assert!(added[1].starts_with("- note ("), "added: {:?}", added[1]);
+    assert_eq!(removed, 1, "only the format line is replaced");
+    assert_eq!(added.len(), 3, "added lines: {added:?}");
+    assert_eq!(added[0], "<!-- todo-format: 3 -->");
+    assert_eq!(added[1], stamp_line(RUNNING));
+    assert!(added[2].starts_with("- note ("), "added: {:?}", added[2]);
     assert!(after.contains(&format!(
-        "<!-- todo-format: 2 -->\n{}\n",
+        "<!-- todo-format: 3 -->\n{}\n",
         stamp_line(RUNNING)
     )));
 }
@@ -98,8 +100,16 @@ fn a_write_raises_an_older_stamp_to_the_running_version() {
 
     assert!(after.contains(&stamp_line(RUNNING)), "{after}");
     assert!(!after.contains("<!-- todo-tool: 0.4.0 -->"));
+    // The old stamp and the format line (raised from 2 to 3, R-MIG-1) are replaced, nothing else.
     let (added, removed) = added_and_removed(&before, &after);
-    assert_eq!(removed, 1, "only the old stamp line is replaced");
+    assert_eq!(
+        removed, 2,
+        "only the old stamp and the format line are replaced"
+    );
+    assert!(
+        added.contains(&"<!-- todo-format: 3 -->".to_string()),
+        "{added:?}"
+    );
     assert!(added.contains(&stamp_line(RUNNING)));
 }
 
@@ -196,7 +206,7 @@ fn a_file_without_a_format_line_gets_the_format_line_first_and_the_stamp_after_i
     // The first write migrates a file without a format line (format.md §18): the format line goes
     // first, and the stamp directly after it.
     let lines: Vec<&str> = after.lines().collect();
-    assert_eq!(lines[0], "<!-- todo-format: 2 -->");
+    assert_eq!(lines[0], "<!-- todo-format: 3 -->");
     assert_eq!(lines[1], stamp_line(RUNNING));
 }
 
@@ -297,7 +307,7 @@ fn archive_stamps_both_files() {
     let head: Vec<&str> = archive.lines().take(2).collect();
     assert_eq!(
         head,
-        ["<!-- todo-format: 2 -->", stamp_line(RUNNING).as_str()]
+        ["<!-- todo-format: 3 -->", stamp_line(RUNNING).as_str()]
     );
 }
 

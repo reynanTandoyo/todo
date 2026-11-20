@@ -18,7 +18,7 @@ fn init_creates_valid_todo_that_passes_check_and_refuses_overwrite() {
     assert!(stdout.contains("<!-- todo:end -->"));
 
     let created = read_todo(dir.path());
-    assert!(created.starts_with("<!-- todo-format: 2 -->"));
+    assert!(created.starts_with("<!-- todo-format: 3 -->"));
     assert!(created.contains("# Sample Project"));
     assert!(created.contains("<!-- todo:begin -->"));
     assert!(created.contains("<!-- todo:end -->"));

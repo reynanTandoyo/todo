@@ -42,19 +42,19 @@ fn tree() -> String {
 ### T-003 · C shader\n\
 - status: open\n\
 - owner: —\n\
-- priority: P1 · type: feature · area: cli\n\
+- priority: P1 · difficulty: 2 · type: feature · area: cli\n\
 - milestone: T-002\n\
 - note (2026-11-15, planner): added\n\n\
 ### T-004 · GPU compiler\n\
 - status: open\n\
 - owner: —\n\
-- priority: P2\n\
+- priority: P2 · difficulty: 2\n\
 - milestone: T-001\n\
 - note (2026-11-15, planner): added\n\n\
 ### T-005 · Write the README\n\
 - status: open\n\
 - owner: —\n\
-- priority: P2\n\
+- priority: P2 · difficulty: 2\n\
 - note (2026-11-15, planner): added\n"
     )
 }
@@ -124,7 +124,7 @@ fn show_prints_the_chain_after_the_block_of_a_task_below_milestones() {
         "### T-003 · C shader\n\
 - status: open\n\
 - owner: —\n\
-- priority: P1 · type: feature · area: cli\n\
+- priority: P1 · difficulty: 2 · type: feature · area: cli\n\
 - milestone: T-002\n\
 - note (2026-11-15, planner): added\n\n\
 {}",
@@ -144,7 +144,7 @@ fn show_prints_questions_before_the_chain() {
         "### T-003 · C shader\n\
 - status: open\n\
 - owner: —\n\
-- priority: P1 · type: feature · area: cli\n\
+- priority: P1 · difficulty: 2 · type: feature · area: cli\n\
 - milestone: T-002\n\
 - note (2026-11-15, planner): added\n\n\
 Questions about T-003:\n\
@@ -160,7 +160,7 @@ fn show_of_an_entry_without_a_milestone_prints_exactly_the_block() {
     let p = proj(&tree());
     assert_eq!(
         text(&p, &["show", "T-005"]),
-        "### T-005 · Write the README\n- status: open\n- owner: —\n- priority: P2\n- note (2026-11-15, planner): added\n"
+        "### T-005 · Write the README\n- status: open\n- owner: —\n- priority: P2 · difficulty: 2\n- note (2026-11-15, planner): added\n"
     );
     assert!(!text(&p, &["show", "T-001"]).contains("Milestones above"));
 }
@@ -199,7 +199,7 @@ fn next_prints_the_chain_after_the_task_line() {
 #[test]
 fn next_of_an_entry_without_a_milestone_prints_one_line() {
     let body = format!(
-        "{FIXTURE}## Now\n\n### T-001 · Write the README\n- status: open\n- owner: —\n- priority: P2\n- note (2026-11-15, planner): added\n"
+        "{FIXTURE}## Now\n\n### T-001 · Write the README\n- status: open\n- owner: —\n- priority: P2 · difficulty: 2\n- note (2026-11-15, planner): added\n"
     );
     let p = proj(&body);
     assert_eq!(
@@ -272,14 +272,14 @@ fn a_milestone_without_a_goal_prints_a_dash() {
 ### T-002 · Write the changelog\n\
 - status: open\n\
 - owner: —\n\
-- priority: P2\n\
+- priority: P2 · difficulty: 2\n\
 - milestone: T-001\n\
 - note (2026-11-15, planner): added\n"
     );
     let p = proj(&body);
     assert_eq!(
         text(&p, &["show", "T-002"]),
-        "### T-002 · Write the changelog\n- status: open\n- owner: —\n- priority: P2\n- milestone: T-001\n- note (2026-11-15, planner): added\n\nMilestones above T-002, from the top down:\n- T-001 · Release notes\n  goal: -\n"
+        "### T-002 · Write the changelog\n- status: open\n- owner: —\n- priority: P2 · difficulty: 2\n- milestone: T-001\n- note (2026-11-15, planner): added\n\nMilestones above T-002, from the top down:\n- T-001 · Release notes\n  goal: -\n"
     );
     let shown = json(&p, &["show", "T-002"]);
     assert!(shown["data"]["milestones"][0]["goal"].is_null());

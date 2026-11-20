@@ -21,17 +21,17 @@ fn add_from_adds_30_tasks_with_at_refs_in_one_step() {
     for i in 1..=30 {
         if i == 1 {
             lines.push(
-                r#"{"ref":"step1","title":"Task 1","priority":"P0","section":"Tasks"}"#.to_string(),
+                r#"{"ref":"step1","title":"Task 1","priority":"P0","difficulty":"3","section":"Tasks"}"#.to_string(),
             );
         } else if i == 30 {
             lines.push(
-                r#"{"title":"Task 30","priority":"P2","section":"Later","depends":["@step1","@step29"]}"#
+                r#"{"title":"Task 30","priority":"P2","difficulty":"3","section":"Later","depends":["@step1","@step29"]}"#
                     .to_string(),
             );
         } else {
             let prev = i - 1;
             lines.push(format!(
-                r#"{{"ref":"step{i}","title":"Task {i}","priority":"P1","section":"Tasks","depends":"@step{prev}"}}"#
+                r#"{{"ref":"step{i}","title":"Task {i}","priority":"P1","difficulty":"3","section":"Tasks","depends":"@step{prev}"}}"#
             ));
         }
     }
@@ -76,8 +76,8 @@ fn add_from_rejects_whole_batch_on_one_bad_entry() {
     let batch_file = dir.path().join("batch.jsonl");
     fs::write(
         &batch_file,
-        "{\"ref\":\"a\",\"title\":\"Good task\",\"priority\":\"P1\"}\n\
-         {\"title\":\"Bad ref task\",\"priority\":\"P1\",\"depends\":\"@missing\"}\n",
+        "{\"ref\":\"a\",\"title\":\"Good task\",\"priority\":\"P1\",\"difficulty\":\"3\"}\n\
+         {\"title\":\"Bad ref task\",\"priority\":\"P1\",\"difficulty\":\"3\",\"depends\":\"@missing\"}\n",
     )
     .unwrap();
 
@@ -108,6 +108,8 @@ fn add_from_rejects_whole_batch_on_one_bad_entry() {
             "First real task",
             "--priority",
             "P1",
+            "--difficulty",
+            "3",
         ])
         .output()
         .unwrap();

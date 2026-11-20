@@ -34,7 +34,8 @@ fn entry(
     if milestone {
         s.push_str(&format!("- priority: {priority} · type: milestone\n"));
     } else {
-        s.push_str(&format!("- priority: {priority}\n"));
+        // Every task has a level (R-LEVEL-1); `next` and `list --ready` hand out only leveled tasks.
+        s.push_str(&format!("- priority: {priority} · difficulty: 2\n"));
     }
     if let Some(p) = parent {
         s.push_str(&format!("- milestone: {p}\n"));
