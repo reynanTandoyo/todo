@@ -235,7 +235,7 @@ fn drop_lists_tasks_that_became_ready() {
          - priority: P1\n\n\
          ### T-002 · Waiting on T-001\n\
          - status: open\n\
-         - priority: P1\n\
+         - priority: P1 · difficulty: 2\n\
          - depends: T-001\n",
     )
     .unwrap();

@@ -161,7 +161,7 @@ register. A project that is gone or cannot be read shows its problem instead of 
 ### Adding and editing tasks
 
 ```powershell
-todo add --title "Fix login timeout" --priority P1 --type bug --area auth --section Now --agent agent-1
+todo add --title "Fix login timeout" --priority P1 --difficulty 2 --type bug --area auth --section Now --agent agent-1
 todo set T-012 --priority P0 --area cli --field reqs=R-WRITE-8 --unset fix --agent agent-1
 todo note T-012 "reproduced on Windows 11" --agent agent-1
 ```
@@ -189,8 +189,8 @@ Milestones nest to any depth, and every entry names its parent with `milestone`.
 
 ```powershell
 todo add --type milestone --title "Develop the renderer" --goal "the test scene renders with lighting at 60 frames per second" --priority P1 --section Now --agent planner
-todo add --title "C shader" --milestone T-001 --why "the renderer has no shading stage yet" --priority P1 --difficulty hard --section Now --agent planner
-todo add --title "GPU compiler" --milestone T-001 --priority P1 --section Now --agent planner
+todo add --title "C shader" --milestone T-001 --why "the renderer has no shading stage yet" --priority P1 --difficulty 4 --section Now --agent planner
+todo add --title "GPU compiler" --milestone T-001 --priority P1 --difficulty 4 --section Now --agent planner
 todo tree T-001
 todo list --milestone T-001
 ```
@@ -466,7 +466,7 @@ for defaults.
    ### T-002 · Write the tokenizer
    - status: open
    - owner: —
-   - priority: P1 · difficulty: easy · type: feature
+   - priority: P1 · difficulty: 2 · type: feature
    - milestone: T-001
    - why: the parser needs tokens first
    - note (2026-11-18, planner): added

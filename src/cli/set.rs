@@ -39,7 +39,7 @@ pub struct Args {
     #[arg(long, value_name = "VALUE")]
     pub priority: Option<String>,
 
-    /// New difficulty: one of the configured `difficulties` (e.g. `easy`, `hard`).
+    /// New difficulty: one of the configured `difficulties` (the levels `1` to `5`; `todo help set`).
     #[arg(long, value_name = "VALUE")]
     pub difficulty: Option<String>,
 

@@ -239,6 +239,8 @@ fn perf_5000_tasks_list_show_and_write_meet_nfr3_budgets() {
                     &title,
                     "--priority",
                     "P1",
+                    "--difficulty",
+                    "3",
                     "--agent",
                     "perf-bot",
                 ])
@@ -345,6 +347,8 @@ fn perf_5000_entry_milestone_tree_meets_nfr3_budgets() {
                     &title,
                     "--priority",
                     "P1",
+                    "--difficulty",
+                    "3",
                     "--milestone",
                     DEEP_MILESTONE,
                     "--agent",

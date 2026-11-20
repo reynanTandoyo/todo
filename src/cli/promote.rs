@@ -19,10 +19,10 @@ pub const META: CommandMeta = CommandMeta {
     name: "promote",
     summary: "Turn an idea into a task",
     kind: CommandKind::Write,
-    details: "Turns an idea (`type: idea`) into an ordinary task: removes `type: idea`, sets `--priority` (required) and `--milestone` (a milestone, format.md §17), keeps `about` and adds the note `promoted from idea`. `--section` also moves the task to the end of that section, as `move` does. Refuses an entry that is not an idea.",
+    details: "Turns an idea (`type: idea`) into an ordinary task: removes `type: idea`, sets `--priority` (required) and `--milestone` (a milestone, format.md §17), keeps `about` and adds the note `promoted from idea`. The task needs a level like any task: `--difficulty` sets it, and an idea that has one keeps it; without either, a refusal with MISSING_FIELD leaves the file as it was (R-LEVEL-1). `--section` also moves the task to the end of that section, as `move` does. Refuses an entry that is not an idea.",
     examples: &[
-        "todo promote T-020 --priority P2 --agent agent-1",
-        "todo promote T-020 --priority P1 --milestone T-011 --section Backlog --agent agent-1",
+        "todo promote T-020 --priority P2 --difficulty 2 --agent agent-1",
+        "todo promote T-020 --priority P1 --difficulty 3 --milestone T-011 --section Backlog --agent agent-1",
     ],
 };
 
@@ -41,12 +41,16 @@ pub struct Args {
     #[arg(long, value_name = "TASK")]
     pub milestone: Option<String>,
 
+    /// Level for the new task: one of the configured `difficulties` (`1` to `5` by default).
+    #[arg(long, value_name = "LEVEL")]
+    pub difficulty: Option<String>,
+
     /// Section to move the task to, at its end (exact or unique substring match).
     #[arg(long, value_name = "NAME")]
     pub section: Option<String>,
 }
 
-/// Runs `todo promote <idea> --priority P [--milestone <task>] [--section S]`.
+/// Runs `todo promote <idea> --priority P [--difficulty D] [--milestone <task>] [--section S]`.
 pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let cfg = ctx.load_config()?;
     let clean_priority = sanitize_trimmed_value(&args.priority);
@@ -64,6 +68,11 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         ));
     };
     let priority = priority.clone();
+    // A level given on the command line is checked before anything is read or written (BAD_VALUE).
+    let difficulty = match args.difficulty.as_deref() {
+        Some(raw) => Some(cfg.canonical_difficulty(raw)?),
+        None => None,
+    };
 
     let cfg_clone = cfg.clone();
     let res = edit_doc_and_write(
@@ -89,6 +98,16 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 None => None,
             };
 
+            // The promoted task is a task, so it needs a level as `add` requires one (R-LEVEL-1):
+            // the one given here, or the one the idea already has. Refused before anything is written.
+            if difficulty.is_none() && task.difficulty.is_none() && cfg.requires_field("difficulty") {
+                return Err(TodoError::new(
+                    ErrorCode::MissingField,
+                    "missing required field `difficulty`; pass --difficulty <level>",
+                )
+                .with_detail("field", serde_json::Value::String("difficulty".to_string())));
+            }
+
             // Field edits first (the same edits every single-task command uses), then the move, if
             // any, of the block as those edits leave it.
             let env = OpEnv {
@@ -101,6 +120,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             let field_edits = TaskOp::Promote {
                 priority: &priority,
                 milestone: milestone.as_deref(),
+                difficulty: difficulty.as_deref(),
             }
             .build_edits(doc, task, &env)?;
 
