@@ -13,9 +13,10 @@
 use std::collections::{HashMap, VecDeque};
 
 use crate::doc::{DependencyRef, Document, EntryKind, Status, Task, TaskId};
+use crate::find::fs_path;
 use crate::ops::config::OpsConfig;
-use crate::ops::read::{lacks_level, milestone_holds_back};
-use crate::ops::scope::{ScopeEntry, overlap_lanes, parse_files, raw_entries};
+use crate::ops::read::{about_id, is_question, lacks_level, milestone_holds_back};
+use crate::ops::scope::{ScopeEntry, overlap_lanes, parse_files, raw_entries, strip_line_suffix};
 
 /// One wave: the tasks that become ready in round `number`, grouped into lanes. Each lane lists its
 /// tasks in file order; the tasks of one lane must run one after another.
@@ -394,13 +395,23 @@ fn is_unfinished(status: Status) -> bool {
 /// What a task at or below the target level lacks for the detail rule (`R-DETAIL-2`), in a fixed
 /// order; empty when it is complete.
 ///
-/// A task at or below `target_difficulty` (by default the lowest level) needs `why`, `accept`,
-/// `steps`, `verify` and `files`, with at most `level1_max_files` entries, none of them a folder or a
-/// pattern. Tasks above the target, and tasks without a level (held back by [`plan_waves`]), are not
-/// checked here. The rule's other two checks, the paths of `read` and the open questions about the
-/// task, are not part of this list yet.
+/// The target level is `target_difficulty`, by default the lowest level. Such a task needs `why`,
+/// `accept`, `steps`, `verify` and `files`, with at most `level1_max_files` entries, none of them a
+/// folder or a pattern; every path in `read` must exist in the folder of `TODO.md`; and no open
+/// question may be about it. Tasks at other levels, tasks without a level and entries that are not
+/// tasks (milestones, questions, ideas) are not checked, so the list is empty for them.
+///
+/// `next`, `list --ready`, `show --json`, `check` and `waves` all read this one list.
 #[must_use]
-pub fn detail_gaps(task: &Task, cfg: &OpsConfig) -> Vec<String> {
+pub fn detail_gaps(
+    task: &Task,
+    doc: &Document,
+    archive: Option<&Document>,
+    cfg: &OpsConfig,
+) -> Vec<String> {
+    if task.kind() != EntryKind::Task {
+        return Vec::new();
+    }
     if !cfg.is_at_or_below_target(task.difficulty.as_deref()) {
         return Vec::new();
     }
@@ -430,6 +441,29 @@ pub fn detail_gaps(task: &Task, cfg: &OpsConfig) -> Vec<String> {
         }
         if entries.iter().any(|entry| !entry.is_single_file()) {
             missing.push("files: folder or pattern".to_string());
+        }
+    }
+    if let Some(folder) = cfg.todo_folder.as_deref() {
+        for path in task.read_paths() {
+            // A `:<line>` suffix names a line of the file and is not part of its path.
+            if !fs_path(&folder.join(strip_line_suffix(&path))).exists() {
+                missing.push(format!("read: {path} does not exist"));
+            }
+        }
+    }
+    for question in [Some(doc), archive]
+        .into_iter()
+        .flatten()
+        .flat_map(|d| &d.tasks)
+    {
+        if is_question(question)
+            && !question.status.is_finished()
+            && about_id(question, cfg) == Some(task.id)
+        {
+            missing.push(format!(
+                "open question {}",
+                cfg.id_config.format_id(question.id)
+            ));
         }
     }
     missing

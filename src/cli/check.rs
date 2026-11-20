@@ -13,13 +13,16 @@ use crate::agents::{
 };
 use crate::atomic::{atomic_write_bytes, read_file_with_snapshot, validate_utf8};
 use crate::cli::{CommandKind, CommandMeta, Context};
-use crate::doc::{Document, FieldLocation, LineEdit, Status, Task, TaskChangeIntent, TaskId};
+use crate::doc::{
+    Document, EntryKind, FieldLocation, LineEdit, Status, Task, TaskChangeIntent, TaskId,
+};
 use crate::error::{ErrorCode, ExitCode, Result, TodoError};
 use crate::find::fs_path;
 use crate::history::{OutsideEditOutcome, detect_outside_edit};
 use crate::lock::current_time;
 use crate::ops::identity::{mailmap_proper_names, repo_root};
 use crate::ops::scope::{outside_folder_reason, raw_entries};
+use crate::ops::waves::detail_gaps;
 use crate::ops::{
     DocWritePlan, OpsConfig, edit_doc_and_write, file_label, read_optional_archive,
     require_known_format,
@@ -32,7 +35,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "check",
     summary: "Check TODO.md for format, dependency, claim, and state problems",
     kind: CommandKind::Read,
-    details: "Reports problems as `file:line: message` and exits 1 if any are found, or 0 when clean. Pass `--fix` (with `--agent`) to make mechanical repairs only: canonical IDs and separators, missing `status: open`, leftover temporary files, and outdated rules blocks.",
+    details: "Reports problems as `file:line: message` and exits 1 if any are found, or 0 when clean. Pass `--fix` (with `--agent`) to make mechanical repairs only: canonical IDs and separators, missing `status: open`, leftover temporary files, and outdated rules blocks. A warning that does not change the exit code: each unfinished task at or below the target level whose detail is incomplete, with what it lacks (R-DETAIL-2).",
     examples: &[
         "todo check",
         "todo check --fix --agent agent-1",
@@ -184,6 +187,10 @@ pub(crate) fn collect_problems(
 
             // 3d. Done tasks whose `verify` command has not passed yet (warnings only; R-VERIFY-2).
             warn_unverified_done(&doc, &cfg, &label, out);
+
+            // 3e. Unfinished tasks at or below the target level whose detail is incomplete (warnings
+            //     only; R-DETAIL-2).
+            warn_detail_gaps(&doc, archive.as_ref(), &cfg, &label, out);
 
             // 4. Dependency checks (missing IDs, dropped dependencies, cycles; R-DEP-3).
             check_dependencies(&doc, archive.as_ref(), &label, &mut problems);
@@ -338,6 +345,31 @@ pub(crate) fn check_tasks(
                 ),
             });
         }
+
+        // `final` keeps a task above the target level on purpose (R-LEVEL-3). A milestone, question or
+        // idea cannot carry one, and neither can a task at the target level: written by hand, or left
+        // behind when the level was lowered.
+        if task.final_reason.is_some() {
+            if task.kind() != EntryKind::Task {
+                problems.push(CheckProblem {
+                    file: label.to_string(),
+                    line,
+                    message: format!(
+                        "{id_str}: final on {} entry; only a task can stay above the target level",
+                        task.kind().as_str()
+                    ),
+                });
+            } else if cfg.is_at_or_below_target(task.difficulty.as_deref()) {
+                problems.push(CheckProblem {
+                    file: label.to_string(),
+                    line,
+                    message: format!(
+                        "{id_str}: final on a task at the target level {}; split it or give it a higher level",
+                        cfg.target_difficulty()
+                    ),
+                });
+            }
+        }
     }
 }
 
@@ -403,6 +435,33 @@ fn warn_unverified_done(doc: &Document, cfg: &OpsConfig, label: &str, out: &mut 
             "{label}:{}: {}: done, but its verify command has not passed (todo verify --wave)",
             task.heading_line + 1,
             doc.id_config.format_id(task.id)
+        ));
+    }
+}
+
+/// Warns about each unfinished task at or below the target level whose detail is incomplete, with
+/// what it lacks (`R-DETAIL-2`): such a task is not handed out until the detail is there. Finished
+/// entries are not checked, since no worker is handed them. Never changes the exit code.
+fn warn_detail_gaps(
+    doc: &Document,
+    archive: Option<&Document>,
+    cfg: &OpsConfig,
+    label: &str,
+    out: &mut Output,
+) {
+    for task in &doc.tasks {
+        if task.status.is_finished() {
+            continue;
+        }
+        let missing = detail_gaps(task, doc, archive, cfg);
+        if missing.is_empty() {
+            continue;
+        }
+        out.warn(format!(
+            "{label}:{}: {}: not ready, its detail is incomplete: {}",
+            task.heading_line + 1,
+            doc.id_config.format_id(task.id),
+            missing.join(", ")
         ));
     }
 }

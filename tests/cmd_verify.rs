@@ -1273,3 +1273,79 @@ fn apply_done_runs_no_check_in_wave_mode_and_none_with_verify_false() {
         assert!(!text.contains("verified:"), "{settings:?}: {text}");
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// The processes a check starts are stopped with it (T-172)
+// ---------------------------------------------------------------------------------------------
+
+/// A check that starts a child process, which writes `hb.txt` every tenth of a second, and then
+/// waits `wait_seconds` in the shell itself. The child is a process of the check, not of the shell.
+fn heartbeat_check(wait_seconds: u32) -> String {
+    if cfg!(windows) {
+        format!(
+            r#"Start-Process -NoNewWindow -FilePath powershell.exe -ArgumentList '-NoProfile -Command "while ($true) {{ Add-Content -Path hb.txt -Value beat; Start-Sleep -Milliseconds 100 }}"'; Start-Sleep -Seconds {wait_seconds}"#
+        )
+    } else {
+        format!("(while true; do echo beat >> hb.txt; sleep 0.1; done) & sleep {wait_seconds}")
+    }
+}
+
+/// The size of `hb.txt` in the folder, or 0 while it does not exist.
+fn heartbeat_len(work: &Path) -> u64 {
+    fs::metadata(work.join("hb.txt"))
+        .map(|m| m.len())
+        .unwrap_or(0)
+}
+
+#[test]
+fn a_timeout_stops_the_child_processes_of_the_check_and_not_only_the_shell() {
+    let tmp = TempDir::new().unwrap();
+    let body = claimed_with_verify(&heartbeat_check(30));
+    let (home, work, _todo_file) = setup_proj(&tmp, &body);
+    write_toml(&work, "verify_timeout_seconds = 5\n");
+
+    let out = todo(
+        &home,
+        &work,
+        &["--json", "verify", "T-001", "--agent", "planner"],
+    );
+    let json = assert_json_error(&out, "VERIFY_FAILED", 1);
+    assert_eq!(json["error"]["timed_out"], true, "{json}");
+
+    // The child wrote before the timeout; after the stop it must write no more.
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    let before = heartbeat_len(&work);
+    assert!(
+        before > 0,
+        "the child process wrote nothing before the timeout"
+    );
+    std::thread::sleep(std::time::Duration::from_secs(2));
+    assert_eq!(
+        heartbeat_len(&work),
+        before,
+        "the child process kept running after the timeout"
+    );
+}
+
+#[test]
+fn a_check_that_ends_normally_leaves_no_child_process_running() {
+    let tmp = TempDir::new().unwrap();
+    let body = claimed_with_verify(&heartbeat_check(2));
+    let (home, work, _todo_file) = setup_proj(&tmp, &body);
+
+    let out = todo(&home, &work, &["verify", "T-001", "--agent", "planner"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    let before = heartbeat_len(&work);
+    assert!(
+        before > 0,
+        "the child process wrote nothing during the check"
+    );
+    std::thread::sleep(std::time::Duration::from_secs(2));
+    assert_eq!(
+        heartbeat_len(&work),
+        before,
+        "the child process outlived the check"
+    );
+}

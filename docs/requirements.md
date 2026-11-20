@@ -342,7 +342,8 @@ or with `--json` the task as it is after the change.
   commands. From v0.8 `set` also takes `--difficulty`, `--steps`, `--read`, `--verify` and
   `--final` (R-DETAIL-1, R-LEVEL-3); `attempts` and `verified` change only through `stuck`, `done`,
   `verify` and `reopen` (R-STUCK-1, R-VERIFY-1, R-VERIFY-2), and `set` refuses them (exit 1,
-  `BAD_VALUE`), so no agent can write a passed check by hand.
+  `BAD_VALUE`), so no agent can write a passed check by hand. A `--priority` must be one of the
+  configured priorities, as `add` requires, and is refused otherwise (`BAD_VALUE`, nothing written).
 - **R-WRITE-9 MUST** Status changes follow this table. Anything else is refused (exit 1,
   `BAD_TRANSITION`) with the current status and the commands allowed from it.
 
@@ -536,8 +537,8 @@ or with `--json` the task as it is after the change.
   difficulty outside `difficulties` is not reported on a done or dropped entry, which keeps the
   value it was finished with (format.md §18); `check` also reports a `final` that R-LEVEL-3 doesn't
   allow, and a `files` or `read` entry that is absolute or leaves the folder of `TODO.md`
-  (R-SCOPE-1). These are reported as warnings that don't change the exit code: a task at or below
-  the target level that lacks detail, with what is missing (R-DETAIL-2), and a done task with a
+  (R-SCOPE-1). These are reported as warnings that don't change the exit code: an unfinished task at
+  or below the target level that lacks detail, with what is missing (R-DETAIL-2), and a done task with a
   `verify` command and no `verified` line (R-VERIFY-2).
 - **R-CHECK-2 COULD** `check --fix` makes mechanical repairs only — canonical IDs and separators, a
   missing `status: open`, leftover temporary files, an outdated rules block — and reports the rest.
@@ -1200,10 +1201,11 @@ todo next --claim --max-difficulty 1 --brief --agent worker-1
     R-KIND-2).
 
   `next` and `list --ready` never hand out or list a task that fails the rule; `claim` of it by ID
-  still works. `check` reports each such task with what is missing, as a warning that doesn't change
-  the exit code. `show --json` carries `ready` (whether `next` could hand the task out now) and
-  `missing` (what this rule lacks, empty when complete). Tasks above the target level are not
-  affected; `plan` lists the failing ones (R-LEVEL-2).
+  still works. `check` reports each such task that is not finished (open, claimed or blocked) with
+  what is missing, as a warning that doesn't change the exit code; a done or dropped task is not
+  handed out, so it is not reported. `show --json` carries `ready` (whether `next` could hand the
+  task out now) and `missing` (what this rule lacks, empty when complete). Tasks above the target
+  level are not affected; `plan` lists the failing ones (R-LEVEL-2).
 - **R-DETAIL-3 COULD** `todo brief <task>` prints one work order, so a worker reads one text and
   starts. In this order:
   1. the goals of the milestones above the task, from the top down (R-MILE-4);
@@ -1265,7 +1267,10 @@ the check itself.
     elsewhere), with the `verify` line as the last argument and standard input closed. After
     `verify_timeout_seconds` (default 300) the command and the processes it started are stopped, and
     the check counts as failed. Exit 0 passes; anything else fails. A timeout's last line is
-    `timed out after <N> seconds`.
+    `timed out after <N> seconds`. The processes are stopped as a whole: on Unix the shell leads its
+    own process group, which `killpg` ends; on Windows the shell is in a Job Object that kills its
+    processes when it closes. The same happens when the shell ends normally, so a check leaves no
+    process behind (T-172).
   - **Output.** Standard output and standard error are captured and saved in full in the state
     folder (`verify/<ID>.log`, §7, replaced by each run); they never reach todo's own standard
     output, so `--json` stays one object (R-OUT-1). On a failure the text output shows the last
@@ -1508,7 +1513,10 @@ With `TODO_REGISTER`, the lock and `report-all.html` sit next to the file it nam
   `CHANGELOG.md`; the file format has its own version line.
 - **NFR-9 SHOULD** Few, well-known dependencies: `clap`, `serde`, `serde_json`, `toml`, `sha2`,
   `similar`, `chrono` and `clap_complete`; for tests `assert_cmd`, `predicates`, `tempfile`, `proptest` and `insta`.
-  Anything else needs a reason in its commit message. The release `todo.exe` stays under 5 MB.
+  Also `libc` (Unix only) and `windows-sys` (Windows only), which stop the processes a `verify`
+  command starts (R-VERIFY-1): a process group killed with `killpg`, and a Job Object (T-172). Both
+  were already in `Cargo.lock`. Anything else needs a reason in its commit message. The release
+  `todo.exe` stays under 5 MB.
 - **NFR-10 MUST** Builds with stable Rust 1.89 or newer, edition 2024.
 - **NFR-11 SHOULD** The README explains that the lock protects one machine, that folders synced by
   OneDrive or Dropbox aren't safe for parallel agents, and the SmartScreen warning for a self-built

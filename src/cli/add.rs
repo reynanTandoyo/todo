@@ -392,22 +392,7 @@ fn resolve_priority(
 ) -> Result<Option<String>> {
     let raw = resolve_opt(flag, extra, "priority");
     match raw {
-        Some(val) => {
-            let Some(canonical) = cfg
-                .priorities
-                .iter()
-                .find(|p| p.eq_ignore_ascii_case(&val))
-            else {
-                return Err(TodoError::new(
-                    ErrorCode::BadValue,
-                    format!(
-                        "invalid priority '{val}'; expected one of: {}",
-                        cfg.priorities.join(", ")
-                    ),
-                ));
-            };
-            Ok(Some(canonical.clone()))
-        }
+        Some(val) => Ok(Some(cfg.canonical_priority(&val)?)),
         None => {
             if required
                 .iter()

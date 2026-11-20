@@ -6,6 +6,7 @@
 
 use serde::Serialize;
 
+use crate::cli::help::update::powershell_quote;
 use crate::doc::{Document, Status, Task};
 use crate::ops::config::{OpsConfig, VerifyWhen};
 use crate::ops::read::{MilestoneRefJson, milestone_chain_json};
@@ -191,26 +192,18 @@ fn commands_of(id: &str, title: &str, files: &[String], agent: Option<&str>) -> 
 }
 
 /// One word as PowerShell reads it (`AGENTS.md`: examples are in PowerShell). Plain when it holds only
-/// letters, digits and `- _ . / \ : = +`; otherwise in single quotes, where a single-quote character
-/// is doubled. PowerShell also reads the typographic single quotes as quotes, so those are doubled.
+/// letters, digits and `- _ . / \ : = +`, as the work order of R-DETAIL-3 prints paths; otherwise it
+/// is quoted by [`powershell_quote`], the quoting `todo help update` uses.
 fn powershell_word(text: &str) -> String {
     let plain = !text.is_empty()
         && text.chars().all(|c| {
             c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/' | '\\' | ':' | '=' | '+')
         });
     if plain {
-        return text.to_string();
+        text.to_string()
+    } else {
+        powershell_quote(text)
     }
-    let mut quoted = String::with_capacity(text.len() + 2);
-    quoted.push('\'');
-    for c in text.chars() {
-        if matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}') {
-            quoted.push(c);
-        }
-        quoted.push(c);
-    }
-    quoted.push('\'');
-    quoted
 }
 
 #[cfg(test)]

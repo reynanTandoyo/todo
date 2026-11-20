@@ -818,6 +818,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "insta",
+ "libc",
  "predicates",
  "proptest",
  "serde",
@@ -826,6 +827,7 @@ dependencies = [
  "similar 3.2.1",
  "tempfile",
  "toml",
+ "windows-sys",
 ]
 
 [[package]]

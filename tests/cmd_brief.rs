@@ -5,6 +5,7 @@
 
 mod common;
 
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Output;
 
@@ -67,6 +68,11 @@ const WORK: &str = "\
 /// Sets up a project folder with `body` as its TODO.md, and returns the home and work folders.
 fn project(tmp: &TempDir, body: &str) -> (PathBuf, PathBuf) {
     let (home, work, _file) = setup_proj(tmp, body);
+    // The paths that `read` names must exist for the task to be ready (R-DETAIL-2): `next` hands it out
+    // only then.
+    fs::create_dir_all(work.join("src")).expect("create src");
+    fs::write(work.join("src").join("light.h"), "").expect("write src/light.h");
+    fs::create_dir_all(work.join("docs")).expect("create docs");
     (home, work)
 }
 

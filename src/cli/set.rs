@@ -14,10 +14,11 @@ pub const META: CommandMeta = CommandMeta {
     name: "set",
     summary: "Edit fields or title of a task",
     kind: CommandKind::Write,
-    details: "Updates task fields (`--title`, `--priority`, `--difficulty`, `--type`, `--area`, `--milestone`, `--goal`, `--why`, `--depends`, `--files`, `--read`, `--problem`, `--fix`, `--steps`, `--accept`, `--verify`), arbitrary `--field key=value` pairs, or removes fields with `--unset key`. `--steps` takes one step per line and replaces the whole list. `--milestone` moves the entry, with everything below it, under another milestone; `--unset milestone` makes it top-level. Edits combined `- priority:` lines in place. Refuses changing or unsetting `status`, `owner`, or `claimed`.",
+    details: "Updates task fields (`--title`, `--priority`, `--difficulty`, `--type`, `--area`, `--milestone`, `--goal`, `--why`, `--final`, `--depends`, `--files`, `--read`, `--problem`, `--fix`, `--steps`, `--accept`, `--verify`), arbitrary `--field key=value` pairs, or removes fields with `--unset key`. `--steps` takes one step per line and replaces the whole list. `--final <reason>` keeps a task above the target level on purpose; it is refused for a task at the target level, a milestone, question or idea, and `--unset final` removes it. `--milestone` moves the entry, with everything below it, under another milestone; `--unset milestone` makes it top-level. Edits combined `- priority:` lines in place. Refuses changing or unsetting `status`, `owner`, or `claimed`.",
     examples: &[
         "todo set T-012 --priority P0 --area cli --agent agent-1",
         "todo set T-012 --verify \"cargo test\" --steps @steps.txt --agent agent-1",
+        "todo set T-012 --final \"the design of the renderer is still open\" --agent planner",
         "todo set T-012 --milestone T-010 --agent agent-1",
         "todo set T-012 --field reqs=R-WRITE-8 --unset fix --agent agent-1",
         "todo set T-012 --title \"New title\" --agent coordinator --force",
@@ -62,6 +63,10 @@ pub struct Args {
     /// New `why` field value: what the task is for.
     #[arg(long, value_name = "TEXT")]
     pub why: Option<String>,
+
+    /// Keep the task above the target level on purpose, with the reason (`--unset final` removes it).
+    #[arg(long = "final", value_name = "TEXT")]
+    pub final_reason: Option<String>,
 
     /// New dependencies (comma-separated task IDs).
     #[arg(long, value_name = "IDS")]
@@ -117,6 +122,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         || args.milestone.is_some()
         || args.goal.is_some()
         || args.why.is_some()
+        || args.final_reason.is_some()
         || args.depends.is_some()
         || args.files.is_some()
         || args.read.is_some()
@@ -137,6 +143,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let resolved_title = resolve_opt_text_arg(args.title.as_deref())?;
     let resolved_goal = resolve_opt_text_arg(args.goal.as_deref())?;
     let resolved_why = resolve_opt_text_arg(args.why.as_deref())?;
+    let resolved_final = resolve_opt_text_arg(args.final_reason.as_deref())?;
     let resolved_files = resolve_opt_text_arg(args.files.as_deref())?;
     let resolved_read = resolve_opt_text_arg(args.read.as_deref())?;
     let resolved_problem = resolve_opt_text_arg(args.problem.as_deref())?;
@@ -167,6 +174,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         ("milestone", args.milestone.as_ref()),
         ("goal", resolved_goal.as_ref()),
         ("why", resolved_why.as_ref()),
+        ("final", resolved_final.as_ref()),
         ("depends", args.depends.as_ref()),
         ("files", resolved_files.as_ref()),
         ("read", resolved_read.as_ref()),
