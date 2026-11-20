@@ -6,6 +6,7 @@
 //! `show --json` and `list` report them as `files_busy`.
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 use chrono::{DateTime, Duration, FixedOffset};
 use serde_json::json;
@@ -110,13 +111,6 @@ impl ScopeEntry {
     pub fn is_single_file(&self) -> bool {
         self.kind == Kind::Path
     }
-
-    /// The first part of the entry, unless it holds a `*`. Two entries whose first parts differ
-    /// never overlap, so [`overlap_lanes`] compares only entries that share one.
-    fn first_part(&self) -> Option<&str> {
-        let first = self.text.split('/').next().unwrap_or_default();
-        (!first.contains('*')).then_some(first)
-    }
 }
 
 /// Removes a trailing `:<digits>` line number, as `todo scan` writes it (`src/main.rs:42`). The
@@ -187,41 +181,41 @@ pub fn same_path(a: &str, b: &str) -> bool {
 /// of each item, in order. The result gives the lane of each item, numbered from 0 in order of first
 /// appearance; an item without files is a lane of its own.
 ///
-/// The result is the one a comparison of every pair of items gives (see [`scopes_overlap`]). Entries
-/// are compared only with entries that can overlap them: those with the same first part, and those
-/// whose first part holds a `*`.
+/// The result is the one a comparison of every pair of items gives (see [`scopes_overlap`]), found
+/// faster: two single files overlap only when they are equal, so each is looked up by its text, and
+/// only folders and patterns are compared with the entries before them. A wave of thousands of
+/// tasks with files under one folder therefore costs about one lookup per file (T-182).
 #[must_use]
 pub fn overlap_lanes(scopes: &[Vec<ScopeEntry>]) -> Vec<usize> {
-    let entries: Vec<(usize, &ScopeEntry)> = scopes
-        .iter()
-        .enumerate()
-        .flat_map(|(item, list)| list.iter().map(move |entry| (item, entry)))
-        .collect();
     let mut parent: Vec<usize> = (0..scopes.len()).collect();
-    let mut by_part: HashMap<&str, Vec<usize>> = HashMap::new();
-    let mut wildcard: Vec<usize> = Vec::new();
-    for (g, &(item, entry)) in entries.iter().enumerate() {
-        let earlier: Vec<usize> = match entry.first_part() {
-            Some(part) => by_part
-                .get(part)
-                .into_iter()
-                .flatten()
-                .chain(wildcard.iter())
-                .copied()
-                .collect(),
-            None => (0..g).collect(),
-        };
-        for h in earlier {
-            let (other, other_entry) = entries[h];
-            let root_a = find_root(&mut parent, item);
-            let root_b = find_root(&mut parent, other);
-            if root_a != root_b && entries_overlap(entry, other_entry) {
-                parent[root_a] = root_b;
+    // The first item that names each single file, by its text.
+    let mut first_owner: HashMap<&str, usize> = HashMap::new();
+    // Every entry seen so far, with its item, and the folders and patterns among them.
+    let mut seen: Vec<(usize, &ScopeEntry)> = Vec::new();
+    let mut wide: Vec<(usize, &ScopeEntry)> = Vec::new();
+    for (item, list) in scopes.iter().enumerate() {
+        for entry in list {
+            if entry.is_single_file() {
+                match first_owner.entry(entry.text.as_str()) {
+                    Entry::Occupied(owner) => union_items(&mut parent, item, *owner.get()),
+                    Entry::Vacant(slot) => {
+                        slot.insert(item);
+                    }
+                }
+                for &(other, other_entry) in &wide {
+                    if entries_overlap(entry, other_entry) {
+                        union_items(&mut parent, item, other);
+                    }
+                }
+            } else {
+                for &(other, other_entry) in &seen {
+                    if entries_overlap(entry, other_entry) {
+                        union_items(&mut parent, item, other);
+                    }
+                }
+                wide.push((item, entry));
             }
-        }
-        match entry.first_part() {
-            Some(part) => by_part.entry(part).or_default().push(g),
-            None => wildcard.push(g),
+            seen.push((item, entry));
         }
     }
     let mut lane_of_root: HashMap<usize, usize> = HashMap::new();
@@ -232,6 +226,15 @@ pub fn overlap_lanes(scopes: &[Vec<ScopeEntry>]) -> Vec<usize> {
             *lane_of_root.entry(root).or_insert(next)
         })
         .collect()
+}
+
+/// Joins the sets of items `a` and `b` (`parent` is the forest of [`find_root`]).
+fn union_items(parent: &mut [usize], a: usize, b: usize) {
+    let root_a = find_root(parent, a);
+    let root_b = find_root(parent, b);
+    if root_a != root_b {
+        parent[root_a] = root_b;
+    }
 }
 
 /// The root of `x` in a forest of items, with path halving.
