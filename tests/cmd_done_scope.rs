@@ -21,13 +21,14 @@ const MARKER: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->
 /// The clock of the notes that `done` writes.
 const NOW: &str = "2026-11-15T14:30:00+01:00";
 
-/// The difficulty levels `1` to `5` (R-LEVEL-1), with `1` the lowest.
-const LEVELS: &str = "difficulties = [\"1\", \"2\", \"3\", \"4\", \"5\"]\n";
+/// The format line of the fixtures: format 3, the current one (`docs/format.md` §18).
+const FORMAT_LINE: &str = "<!-- todo-format: 3 -->";
 
-/// A TODO.md with one open task, T-001, at `difficulty`, naming `files` when given.
+/// A TODO.md with one open task, T-001, at the level `difficulty` (`1` to `5`, R-LEVEL-1), naming
+/// `files` when given.
 fn body(difficulty: &str, files: Option<&str>) -> String {
     let mut text = format!(
-        "{MARKER}\n## Queue\n\n### T-001 · Scoped task\n- status: open\n- owner: —\n- priority: P1\n- difficulty: {difficulty}\n"
+        "{MARKER}\n{FORMAT_LINE}\n## Queue\n\n### T-001 · Scoped task\n- status: open\n- owner: —\n- priority: P1\n- difficulty: {difficulty}\n"
     );
     if let Some(files) = files {
         text.push_str(&format!("- files: {files}\n"));
@@ -85,11 +86,9 @@ struct Proj {
 }
 
 /// A project folder whose TODO.md holds T-001 at `difficulty`, naming `files` when given. No git yet.
-/// Its todo.toml sets the levels `1` to `5`, so the lowest level is `1` whatever the default is.
 fn project(difficulty: &str, files: Option<&str>) -> Proj {
     let tmp = TempDir::new().expect("tempdir");
     let (home, work, todo) = setup_proj(&tmp, &body(difficulty, files));
-    write(&work, "todo.toml", LEVELS);
     Proj {
         _tmp: tmp,
         home,
@@ -117,7 +116,11 @@ fn a_commit_inside_the_files_finishes_the_task() {
     let p = project("1", Some("src/"));
     repo_with_first_commit(&p);
     write(&p.work, "src/b.rs", "pub fn b() {}\n");
-    write(&p.work, "TODO-archive.md", MARKER);
+    write(
+        &p.work,
+        "TODO-archive.md",
+        &format!("{MARKER}\n{FORMAT_LINE}\n"),
+    );
     fs::write(&p.todo, format!("{}\n", read_text(&p.todo))).expect("rewrite TODO.md");
     // TODO.md and the archive file may change in the commit as well (R-SCOPE-2).
     commit(
@@ -378,7 +381,6 @@ fn nested_project(difficulty: &str, files: &str) -> (TempDir, PathBuf, PathBuf) 
     let proj = repo.join("proj");
     fs::create_dir_all(&home).expect("create home");
     write(&proj, "TODO.md", &body(difficulty, Some(files)));
-    write(&proj, "todo.toml", LEVELS);
     write(&proj, "src/a.rs", "pub fn a() {}\n");
     git(&repo, &["init", "-q"]);
     commit(&repo, &["proj/TODO.md", "proj/src/a.rs"], "T-001: start");
@@ -440,7 +442,7 @@ fn a_commit_inside_the_folder_of_todo_md_passes_inside_a_larger_repository() {
 /// A TODO.md with T-001, which names `files` when given, and T-002, which names none.
 fn two_tasks_body(files: Option<&str>) -> String {
     let mut text = format!(
-        "{MARKER}\n## Queue\n\n### T-001 · Scoped task\n- status: open\n- owner: —\n- priority: P1\n- difficulty: 1\n"
+        "{MARKER}\n{FORMAT_LINE}\n## Queue\n\n### T-001 · Scoped task\n- status: open\n- owner: —\n- priority: P1\n- difficulty: 1\n"
     );
     if let Some(files) = files {
         text.push_str(&format!("- files: {files}\n"));
@@ -451,11 +453,10 @@ fn two_tasks_body(files: Option<&str>) -> String {
     text
 }
 
-/// A project folder with the two tasks of [`two_tasks_body`] and the levels of [`LEVELS`].
+/// A project folder with the two tasks of [`two_tasks_body`].
 fn two_tasks(files: Option<&str>) -> Proj {
     let tmp = TempDir::new().expect("tempdir");
     let (home, work, todo) = setup_proj(&tmp, &two_tasks_body(files));
-    write(&work, "todo.toml", LEVELS);
     Proj {
         _tmp: tmp,
         home,

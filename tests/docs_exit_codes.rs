@@ -194,6 +194,7 @@ const NO_WAIT: &str = "lock_wait_seconds = 0\n";
 /// Task T-001 names the folder `src/`, so a commit that changes `other.txt` is outside it.
 const SCOPE_BODY: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
+<!-- todo-format: 3 -->
 ## Queue
 
 ### T-001 · Scoped task
