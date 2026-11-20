@@ -45,7 +45,7 @@ pub const CANONICAL_FIELD_ORDER: &[&str] = &[
 ];
 
 /// Number of known fields tracked for repeated-field detection (`known_field_index`).
-const KNOWN_FIELD_SLOTS: usize = 19;
+const KNOWN_FIELD_SLOTS: usize = 20;
 
 /// Accepted heading separators between `<ID>` and `<title>` (`docs/format.md` §6),
 /// canonical separator first.
@@ -444,6 +444,11 @@ pub struct Task {
     pub verify: Option<String>,
     pub verify_line: Option<usize>,
 
+    /// `- final:` value and line index: why a task stays above the target level on purpose
+    /// (`docs/format.md` §8, `R-LEVEL-3`).
+    pub final_reason: Option<String>,
+    pub final_line: Option<usize>,
+
     /// Parsed commit hashes from `- commit:`.
     pub commit: Vec<String>,
     /// Raw `- commit:` value, if present.
@@ -569,6 +574,7 @@ impl Task {
             "fix" => self.fix.as_deref(),
             "accept" => self.accept.as_deref(),
             "verify" => self.verify.as_deref(),
+            "final" => self.final_reason.as_deref(),
             "commit" => self.commit_raw.as_deref(),
             _ => self
                 .unknown_fields
@@ -1315,6 +1321,8 @@ fn parse_task_block(
         steps_block: None,
         verify: None,
         verify_line: None,
+        final_reason: None,
+        final_line: None,
         commit: Vec::new(),
         commit_raw: None,
         commit_line: None,
@@ -1512,6 +1520,10 @@ fn parse_task_block(
                                 task.verify = non_empty_string(part_val);
                                 task.verify_line = Some(idx);
                             }
+                            "final" => {
+                                task.final_reason = non_empty_string(part_val);
+                                task.final_line = Some(idx);
+                            }
                             "commit" => {
                                 task.commit = parse_comma_list(part_val);
                                 task.commit_raw = Some(part_val.clone());
@@ -1657,6 +1669,14 @@ fn parse_task_block(
                     };
                     task.verify_line = Some(idx);
                 }
+                "final" => {
+                    task.final_reason = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
+                    task.final_line = Some(idx);
+                }
                 "commit" => {
                     task.commit = parse_comma_list(value_str);
                     task.commit_raw = Some(owned_val);
@@ -1700,6 +1720,7 @@ const fn known_field_index(key: &str) -> Option<usize> {
         b"steps" => Some(16),
         b"read" => Some(17),
         b"verify" => Some(18),
+        b"final" => Some(19),
         _ => None,
     }
 }

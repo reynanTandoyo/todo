@@ -153,6 +153,7 @@ impl<'a> TaskEditBuilder<'a> {
             "fix" => self.set_line_field("fix", self.task.fix_line, &clean),
             "accept" => self.set_line_field("accept", self.task.accept_line, &clean),
             "verify" => self.set_line_field("verify", self.task.verify_line, &clean),
+            "final" => self.set_line_field("final", self.task.final_line, &clean),
             "commit" => self.set_line_field("commit", self.task.commit_line, &clean),
             _ => {
                 let existing = self.unknown_line(&lower);
@@ -181,6 +182,7 @@ impl<'a> TaskEditBuilder<'a> {
             "steps" => self.unset_steps(),
             "accept" => self.unset_line_field("accept", self.task.accept_line),
             "verify" => self.unset_line_field("verify", self.task.verify_line),
+            "final" => self.unset_line_field("final", self.task.final_line),
             "commit" => self.unset_line_field("commit", self.task.commit_line),
             _ => {
                 let existing = self.unknown_line(&lower);
