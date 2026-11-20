@@ -283,7 +283,7 @@ by task commands; only the format and tool lines are kept up to date (R-VER-1, R
   (R-MILE-6), `--difficulty` and `--max-difficulty` (R-WRITE-18). With an agent name, if
   that agent already has a claimed task, `next` returns it first, marked as already theirs (`--new`
   skips this). `next --claim --agent X` chooses and claims in one locked step, so agents asking at
-  the same moment get different tasks. From v0.8: a task without a difficulty is never handed out
+  the same moment get different tasks. From v0.8: a task without a usable level is never handed out
   (R-LEVEL-1); a task at or below the target level is handed out only when its detail is complete
   (R-DETAIL-2); a task whose files overlap another agent's claimed task is held back (R-SCOPE-1);
   and `--brief` prints the work order after the claim (R-DETAIL-3).
@@ -1129,7 +1129,9 @@ todo next --claim --max-difficulty 1 --brief --agent worker-1
     byte-identical. So are an `add` operation of `apply` and a `promote` that would leave a task
     without one: `promote --difficulty D` sets the level, and an idea that already has one keeps it
     (R-KIND-1).
-  - `next` never hands out a task without a difficulty, with or without a difficulty option.
+  - `next` never hands out a task without a usable level, with or without a difficulty option. A
+    level is usable when it is one of the configured `difficulties`: a difficulty that is not
+    configured counts as no level (`check` reports the value; `plan` lists the task with its reason).
   - The lowest level is the first value of `difficulties`; a project that sets its own
     `difficulties` keeps them, and the rules of this section use its first value.
   - Files written before v0.8 are moved to the levels by the format 2 to 3 migration (R-MIG-1,
@@ -1143,7 +1145,8 @@ todo next --claim --max-difficulty 1 --brief --agent worker-1
   2. tasks above `target_difficulty` (default: the lowest level), hardest first, then in file order;
   3. tasks at or below the target level that are not ready for lack of detail, each with what is
      missing (R-DETAIL-2);
-  4. tasks without a difficulty;
+  4. tasks without a usable level (no difficulty, or one that is not configured), each with its
+     reason;
   5. counted apart: tasks kept above the target level on purpose (R-LEVEL-3), each with its reason;
   6. counted apart: done tasks with a `verify` command and no `verified` line (R-VERIFY-2).
 

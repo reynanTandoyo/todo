@@ -200,7 +200,7 @@ fn where_example_in_json_md_has_the_keys_of_where_json() {
 /// Fixture for the `next` example: one open task, which `next` hands out.
 const NEXT_FIXTURE: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
-<!-- todo-format: 2 -->
+<!-- todo-format: 3 -->
 # Fixture
 
 ## Tasks
@@ -208,7 +208,7 @@ const NEXT_FIXTURE: &str = "\
 ### T-001 · Write the parser
 - status: open
 - owner: —
-- priority: P1 · difficulty: easy · type: feature · area: cli
+- priority: P1 · difficulty: 2 · type: feature · area: cli
 - why: the reader needs it first
 - note (2026-11-15, planner): added
 ";
@@ -313,7 +313,7 @@ fn tree_example_in_json_md_has_the_keys_of_tree_json() {
 /// task, an open task, a question and an idea.
 const SUMMARY_FIXTURE: &str = "\
 <!-- TEST FIXTURE: invented data, not a real task list -->
-<!-- todo-format: 2 -->
+<!-- todo-format: 3 -->
 # Fixture
 
 ## Now
@@ -329,7 +329,7 @@ const SUMMARY_FIXTURE: &str = "\
 - status: claimed
 - owner: alice
 - claimed: 2026-11-15T18:00+01:00
-- priority: P1 · difficulty: hard · type: feature
+- priority: P1 · difficulty: 2 · type: feature
 - milestone: T-001
 - note (2026-11-15, planner): added
 

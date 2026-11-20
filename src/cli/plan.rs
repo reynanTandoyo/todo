@@ -9,6 +9,7 @@ use crate::doc::{NO_REASON, Task};
 use crate::error::{ExitCode, Result};
 use crate::ops::milestone::resolve_milestone;
 use crate::ops::plan::{Group, build_plan};
+use crate::ops::read::level_problem;
 use crate::ops::waves::detail_gaps;
 use crate::output::Output;
 
@@ -56,13 +57,15 @@ struct DetailEntry {
     missing: Vec<String>,
 }
 
-/// A task without a difficulty (group 4).
+/// A task without a usable difficulty, with the reason (group 4).
 #[derive(Debug, Serialize)]
 struct LevelessEntry {
     id: String,
     title: String,
     priority: Option<String>,
     status: &'static str,
+    /// Why the level is not usable: no difficulty, or one that is not configured (`R-LEVEL-1`).
+    reason: Option<String>,
 }
 
 /// A task kept above the target level on purpose, with its reason (group 5).
@@ -149,6 +152,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             .without_level
             .iter()
             .map(|t| LevelessEntry {
+                reason: level_problem(t, &cfg),
                 id: id(t),
                 title: t.title.clone(),
                 priority: t.priority.clone(),
@@ -253,7 +257,7 @@ fn text_lines(list: &PlanJson) -> Vec<String> {
     let rows = list
         .without_level
         .iter()
-        .map(|t| format!("{} · {}", t.id, t.title))
+        .map(|t| format!("{} · {} — {}", t.id, t.title, t.reason.as_deref().unwrap_or(NO_REASON)))
         .collect();
     push_section(&mut lines, Group::WithoutLevel, "without a level", rows);
 

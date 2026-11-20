@@ -284,11 +284,29 @@ pub fn milestone_holds_back(milestone: &Task) -> bool {
     )
 }
 
-/// Whether a task has no level, so `next` and `list --ready` do not hand it out until it has one
-/// (`R-LEVEL-1`). `waves` holds such a task back for the same reason.
+/// Whether a task has no usable level (`R-LEVEL-1`): no difficulty at all, or one that is not one of
+/// the configured `difficulties`. `next`, `list --ready`, `plan` and `waves` all hold such a task back
+/// by this one rule; `check` reports the value itself.
 #[must_use]
-pub fn lacks_level(task: &Task) -> bool {
-    task.difficulty.is_none()
+pub fn lacks_level(task: &Task, cfg: &OpsConfig) -> bool {
+    cfg.difficulty_rank(task.difficulty.as_deref()).is_none()
+}
+
+/// The reason `task` has no usable level, as `plan` and `waves` say it (`R-LEVEL-1`), or `None` when
+/// it has one. [`lacks_level`] decides; this only words the reason.
+#[must_use]
+pub fn level_problem(task: &Task, cfg: &OpsConfig) -> Option<String> {
+    if !lacks_level(task, cfg) {
+        return None;
+    }
+    let id = cfg.id_config.format_id(task.id);
+    Some(match task.difficulty.as_deref() {
+        None => format!("no level: give it one with todo set {id} --difficulty <level>"),
+        Some(level) => format!(
+            "level {level} is not configured (configured: {}); give it one with todo set {id} --difficulty <level>",
+            cfg.difficulties.join(", ")
+        ),
+    })
 }
 
 /// Returns `true` if `task` is eligible to be handed out by `next` / `list --ready` (`R-READ-3`).
@@ -313,8 +331,8 @@ pub fn is_task_ready(
     if task.kind() != EntryKind::Task {
         return false;
     }
-    // A task without a level is not handed out until it has one (R-LEVEL-1).
-    if lacks_level(task) {
+    // A task without a usable level is not handed out until it has one (R-LEVEL-1).
+    if lacks_level(task, cfg) {
         return false;
     }
     // Work is handed out along the tree (R-MILE-6): no milestone above the task may hold it back,
