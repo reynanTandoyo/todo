@@ -16,7 +16,7 @@ use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, fs_path};
 use crate::ops::config::OpsConfig;
 use crate::ops::scope::files_busy;
-use crate::ops::waves::detail_gaps;
+use crate::ops::waves::{detail_complete, detail_gaps, open_question_about};
 use crate::output::Output;
 use crate::version::RUNNING_VERSION;
 
@@ -321,6 +321,24 @@ pub fn is_task_ready(
     now: DateTime<FixedOffset>,
     cfg: &OpsConfig,
 ) -> bool {
+    is_task_ready_with(doc, task, archive, now, cfg, |id| {
+        open_question_about(doc, archive, cfg, id)
+    })
+}
+
+/// [`is_task_ready`], with the open questions answered by `names_open_question` (see
+/// [`OpenQuestionTargets`](crate::ops::waves::OpenQuestionTargets)). A loop over many tasks indexes
+/// the questions once and passes the index, so each task costs no scan of the file (T-185). The
+/// result is the same for every `names_open_question` that answers the same way.
+#[must_use]
+pub fn is_task_ready_with(
+    doc: &Document,
+    task: &Task,
+    archive: Option<&Document>,
+    now: DateTime<FixedOffset>,
+    cfg: &OpsConfig,
+    names_open_question: impl Fn(TaskId) -> bool,
+) -> bool {
     let status_eligible = task.status == Status::Open
         || (task.status == Status::Claimed && cfg.is_claim_stale(task, now));
     if !status_eligible {
@@ -342,10 +360,10 @@ pub fn is_task_ready(
         return false;
     }
     // A task at or below the target level is handed out only with its detail complete, and no open
-    // question about it (R-DETAIL-2); the same list `show`, `check` and `waves` report.
+    // question about it (R-DETAIL-2); the same rule `show`, `check` and `waves` report.
     doc.dependencies_satisfied(task, archive)
         && above.iter().all(|m| doc.dependencies_satisfied(m, archive))
-        && detail_gaps(task, doc, archive, cfg).is_empty()
+        && detail_complete(task, cfg, names_open_question)
 }
 
 /// Returns `true` if the readiness of `waiting` can change when `changed` changes state: it names

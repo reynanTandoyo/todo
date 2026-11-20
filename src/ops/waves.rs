@@ -10,7 +10,7 @@
 //! tasks never recurses deeply. Whatever cannot be ordered, because it waits on a blocked entry, a
 //! missing ID or a cycle, is listed apart with the reason.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::doc::{DependencyRef, Document, EntryKind, Status, Task, TaskId};
 use crate::find::fs_path;
@@ -400,7 +400,8 @@ fn is_unfinished(status: Status) -> bool {
 /// question may be about it. Tasks at other levels, tasks without a level and entries that are not
 /// tasks (milestones, questions, ideas) are not checked, so the list is empty for them.
 ///
-/// `next`, `list --ready`, `show --json`, `check` and `waves` all read this one list.
+/// `next`, `list --ready`, `show --json`, `check` and `waves` all read this one list. [`detail_complete`]
+/// answers the same rule as "the list is empty" without building it.
 #[must_use]
 pub fn detail_gaps(
     task: &Task,
@@ -408,12 +409,57 @@ pub fn detail_gaps(
     archive: Option<&Document>,
     cfg: &OpsConfig,
 ) -> Vec<String> {
-    if task.kind() != EntryKind::Task {
+    if !detail_rule_applies(task, cfg) {
         return Vec::new();
     }
-    if !cfg.is_at_or_below_target(task.difficulty.as_deref()) {
-        return Vec::new();
+    let mut missing = field_gaps(task, cfg);
+    missing.extend(read_gaps(task, cfg));
+    for question in [Some(doc), archive]
+        .into_iter()
+        .flatten()
+        .flat_map(|d| &d.tasks)
+    {
+        if is_question(question)
+            && !question.status.is_finished()
+            && about_id(question, cfg) == Some(task.id)
+        {
+            missing.push(format!(
+                "open question {}",
+                cfg.id_config.format_id(question.id)
+            ));
+        }
     }
+    missing
+}
+
+/// Whether [`detail_gaps`] is empty for `task` (R-DETAIL-2): the same rule, answered without building
+/// the list. The checks run from the cheapest to the costliest: the fields of the task first, then the
+/// open questions that `names_open_question` reports (see [`OpenQuestionTargets`] and
+/// [`open_question_about`]), and the `read` paths on disk last, so a task that fails earlier never
+/// touches the disk (T-185).
+#[must_use]
+pub fn detail_complete(
+    task: &Task,
+    cfg: &OpsConfig,
+    names_open_question: impl Fn(TaskId) -> bool,
+) -> bool {
+    if !detail_rule_applies(task, cfg) {
+        return true;
+    }
+    field_gaps(task, cfg).is_empty()
+        && !names_open_question(task.id)
+        && read_gaps(task, cfg).is_empty()
+}
+
+/// Whether the detail rule applies to `task`: it is a task at or below the target level. Other
+/// entries and tasks without a usable level have no detail to check.
+fn detail_rule_applies(task: &Task, cfg: &OpsConfig) -> bool {
+    task.kind() == EntryKind::Task && cfg.is_at_or_below_target(task.difficulty.as_deref())
+}
+
+/// The fields of the detail rule that `task` lacks, in the order [`detail_gaps`] lists them: `why`,
+/// `accept`, `steps`, `verify`, then `files`. Nothing is read from disk.
+fn field_gaps(task: &Task, cfg: &OpsConfig) -> Vec<String> {
     let blank = |value: Option<&str>| value.is_none_or(|v| v.trim().is_empty());
     let mut missing = Vec::new();
     for (name, value) in [
@@ -442,6 +488,12 @@ pub fn detail_gaps(
             missing.push("files: folder or pattern".to_string());
         }
     }
+    missing
+}
+
+/// The `read` paths of `task` that do not exist in the folder of `TODO.md`, in order (R-DETAIL-2).
+fn read_gaps(task: &Task, cfg: &OpsConfig) -> Vec<String> {
+    let mut missing = Vec::new();
     if let Some(folder) = cfg.todo_folder.as_deref() {
         for path in task.read_paths() {
             // A `:<line>` suffix names a line of the file and is not part of its path.
@@ -450,20 +502,205 @@ pub fn detail_gaps(
             }
         }
     }
-    for question in [Some(doc), archive]
+    missing
+}
+
+/// The entries that open questions of `doc` and `archive` are about, indexed once (R-DETAIL-2). A
+/// loop that judges many tasks against the detail rule asks this index instead of scanning every
+/// entry for each task (T-185).
+pub struct OpenQuestionTargets {
+    targets: HashSet<TaskId>,
+}
+
+impl OpenQuestionTargets {
+    /// Indexes the open questions of `doc` and `archive` in one pass over both.
+    #[must_use]
+    pub fn new(doc: &Document, archive: Option<&Document>, cfg: &OpsConfig) -> Self {
+        let targets = [Some(doc), archive]
+            .into_iter()
+            .flatten()
+            .flat_map(|d| &d.tasks)
+            .filter(|q| is_question(q) && !q.status.is_finished())
+            .filter_map(|q| about_id(q, cfg))
+            .collect();
+        Self { targets }
+    }
+
+    /// Whether an open question is about the entry `id`.
+    #[must_use]
+    pub fn names(&self, id: TaskId) -> bool {
+        self.targets.contains(&id)
+    }
+}
+
+/// Whether an open question of `doc` or `archive` is about the entry `id`: the scan that
+/// [`OpenQuestionTargets`] indexes, for one task at a time.
+#[must_use]
+pub fn open_question_about(
+    doc: &Document,
+    archive: Option<&Document>,
+    cfg: &OpsConfig,
+    id: TaskId,
+) -> bool {
+    [Some(doc), archive]
         .into_iter()
         .flatten()
         .flat_map(|d| &d.tasks)
-    {
-        if is_question(question)
-            && !question.status.is_finished()
-            && about_id(question, cfg) == Some(task.id)
-        {
-            missing.push(format!(
-                "open question {}",
-                cfg.id_config.format_id(question.id)
-            ));
+        .any(|q| is_question(q) && !q.status.is_finished() && about_id(q, cfg) == Some(id))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::{OpenQuestionTargets, detail_complete, detail_gaps, open_question_about};
+    use crate::doc::{Document, TaskId};
+    use crate::ops::config::OpsConfig;
+
+    /// Invented entries for the detail rule: a complete task (T-001), one with an open question about
+    /// it (T-002) and that question (T-003), one with a closed question (T-004 and T-005), a level above
+    /// the target (T-006), a task whose `read` path is missing (T-007) and one whose path exists (T-008).
+    const DETAIL: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->
+## Now
+
+### T-001 · Complete task
+- status: open
+- owner: —
+- priority: P1 · difficulty: 1
+- why: invented reason
+- files: src/a.rs
+- accept: invented check
+- steps:
+  1. open the file
+- verify: invented command
+
+### T-002 · Task with an open question
+- status: open
+- owner: —
+- priority: P1 · difficulty: 1
+- why: invented reason
+- files: src/b.rs
+- accept: invented check
+- steps:
+  1. open the file
+- verify: invented command
+
+### T-003 · Open question about T-002
+- status: open
+- owner: —
+- priority: P2 · type: question
+- about: T-002
+
+### T-004 · Task with a closed question
+- status: open
+- owner: —
+- priority: P1 · difficulty: 1
+- why: invented reason
+- files: src/c.rs
+- accept: invented check
+- steps:
+  1. open the file
+- verify: invented command
+
+### T-005 · Closed question about T-004
+- status: done
+- owner: —
+- priority: P2 · type: question
+- about: T-004
+
+### T-006 · Level above the target
+- status: open
+- owner: —
+- priority: P1 · difficulty: 4
+
+### T-007 · Task with a missing read path
+- status: open
+- owner: —
+- priority: P1 · difficulty: 1
+- why: invented reason
+- files: src/d.rs
+- accept: invented check
+- steps:
+  1. open the file
+- verify: invented command
+- read: invented/missing.md
+
+### T-008 · Task with a read path that exists
+- status: open
+- owner: —
+- priority: P1 · difficulty: 1
+- why: invented reason
+- files: src/e.rs
+- accept: invented check
+- steps:
+  1. open the file
+- verify: invented command
+- read: Cargo.toml
+";
+
+    /// An archived open question (invented) about T-001.
+    const ARCHIVE: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->
+## Archive
+
+### T-009 · Archived open question about T-001
+- status: open
+- owner: —
+- priority: P2 · type: question
+- about: T-001
+";
+
+    #[test]
+    fn detail_complete_agrees_with_the_list_of_detail_gaps() {
+        let doc = Document::parse_bytes(DETAIL.as_bytes()).expect("the fixture is UTF-8");
+        let archived = Document::parse_bytes(ARCHIVE.as_bytes()).expect("the fixture is UTF-8");
+        // The `read` paths are looked up in the crate folder, where `Cargo.toml` exists.
+        let cfg = OpsConfig {
+            todo_folder: Some(PathBuf::from(env!("CARGO_MANIFEST_DIR"))),
+            ..OpsConfig::default()
+        };
+        // Whether each task is complete with no archive: T-002 has an open question about it, T-004
+        // only a closed one.
+        let expected = [
+            (1, true),
+            (2, false),
+            (3, true),
+            (4, true),
+            (5, true),
+            (6, true),
+            (7, false),
+            (8, true),
+        ];
+
+        for scope in [None, Some(&archived)] {
+            let questions = OpenQuestionTargets::new(&doc, scope, &cfg);
+            for task in &doc.tasks {
+                let from_list = detail_gaps(task, &doc, scope, &cfg).is_empty();
+                let from_index = detail_complete(task, &cfg, |id| questions.names(id));
+                let from_scan =
+                    detail_complete(task, &cfg, |id| open_question_about(&doc, scope, &cfg, id));
+                assert_eq!(from_index, from_list, "{:?} with the index", task.id);
+                assert_eq!(from_scan, from_list, "{:?} with the scan", task.id);
+                if scope.is_none() {
+                    let want = expected
+                        .iter()
+                        .find(|(n, _)| TaskId(*n) == task.id)
+                        .map(|(_, ok)| *ok)
+                        .expect("every fixture task has an expectation");
+                    assert_eq!(from_list, want, "{:?}", task.id);
+                }
+            }
         }
+
+        // An open question in the archive is about T-001 too, so T-001 is no longer complete.
+        let questions = OpenQuestionTargets::new(&doc, Some(&archived), &cfg);
+        assert!(questions.names(TaskId(1)));
+        assert!(!questions.names(TaskId(4)));
+        let t1 = doc.task_by_id(TaskId(1)).expect("T-001 is in the fixture");
+        assert!(!detail_complete(t1, &cfg, |id| questions.names(id)));
+        assert!(
+            detail_gaps(t1, &doc, Some(&archived), &cfg)
+                .iter()
+                .any(|gap| gap == "open question T-009")
+        );
     }
-    missing
 }

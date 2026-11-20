@@ -10,8 +10,9 @@ use crate::doc::{
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::ops::config::OpsConfig;
-use crate::ops::read::{is_task_ready, lacks_level};
+use crate::ops::read::{is_task_ready, is_task_ready_with, lacks_level};
 use crate::ops::scope::files_busy;
+use crate::ops::waves::OpenQuestionTargets;
 
 /// Parsed `--status` filter for `todo list` (`R-READ-1`).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -420,22 +421,26 @@ pub fn select_next_task<'a>(
     }
 
     let started = doc.started_milestones();
-    // Ready candidates in the order `next` uses. Each key is computed once, and the file index
-    // breaks ties, so the order is the one `min_by_key` gave. The first candidate whose files no
-    // other agent holds is the answer (R-READ-3, R-SCOPE-1), so the files are checked only until one
-    // passes: a scan of every task for each ready task costs far more than the sort (T-183).
+    // The open questions are indexed once, so the detail rule of each task is answered without a
+    // scan of the file (T-185).
+    let questions = OpenQuestionTargets::new(doc, archive, cfg);
+    // Candidates are the tasks that pass the cheap filters, in the order `next` uses. Each key is
+    // computed once, and the file index breaks ties, so the order is the one `min_by_key` gave. The
+    // first candidate that is ready and whose files no other agent holds is the answer (R-READ-3,
+    // R-SCOPE-1). Readiness is judged in that order and stops at the answer, so most tasks are never
+    // judged, and the files are checked only for the ready ones (T-183, T-185).
     let mut candidates: Vec<((usize, bool, usize), usize, &Task)> = doc
         .tasks
         .iter()
         .enumerate()
-        .filter(|(_, t)| is_task_ready(doc, t, archive, now, cfg) && matches_common_filters(t))
+        .filter(|(_, t)| matches_common_filters(t))
         .map(|(index, t)| (ready_sort_key(doc, t, &started, cfg), index, t))
         .collect();
     candidates.sort_unstable_by_key(|&(key, index, _)| (key, index));
-    let candidate = candidates
-        .into_iter()
-        .map(|(_, _, task)| task)
-        .find(|t| files_busy(doc, t, filter.agent, now, cfg).is_empty())?;
+    let candidate = candidates.into_iter().map(|(_, _, task)| task).find(|t| {
+        is_task_ready_with(doc, t, archive, now, cfg, |id| questions.names(id))
+            && files_busy(doc, t, filter.agent, now, cfg).is_empty()
+    })?;
 
     Some(SelectedNext {
         task: candidate,
