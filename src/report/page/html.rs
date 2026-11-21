@@ -3,8 +3,9 @@
 //!
 //! [`render`] writes the page. The entries and the tree come from [`super::tree_html`], and the
 //! planner's part from [`crate::report::html`], which writes the planning state and the counts per
-//! area as the v0.8 page did. The stylesheet is [`STYLE`]. The page has no script yet (T-203 adds
-//! it); its buttons are hidden until the page has the class `js`. Every text from the file is escaped.
+//! area as the v0.8 page did. The stylesheet is [`STYLE`] and the one small script is [`SCRIPT`]
+//! (T-203); the view buttons are hidden until the script adds the class `js`. Every text from the
+//! file is escaped.
 
 use std::fmt::Write as _;
 
@@ -22,6 +23,10 @@ use crate::report::html::{SINGLE, escape, push_areas, push_planning};
 /// narrow windows, print).
 pub const STYLE: &str = include_str!("style.css");
 
+/// The one small script, copied into the page inline (`script.js`, R-REPORT-6): the mode and colour
+/// buttons, the view filter, and Expand all and Collapse all. It names no address and loads nothing.
+pub const SCRIPT: &str = include_str!("script.js");
+
 /// The mark of a done event in Last 7 days (✓).
 const MARK_DONE: char = '\u{2713}';
 
@@ -31,7 +36,7 @@ const MARK_CANCELLED: char = '\u{2715}';
 /// The mark of an event that added entries (＋), as the mockup draws it.
 const MARK_ADDED: char = '\u{FF0B}';
 
-/// Writes the whole page (R-REPORT-1): one document with the stylesheet inline and no script.
+/// Writes the whole page (R-REPORT-1): one document with the stylesheet and the script inline.
 #[must_use]
 pub fn render(page: &PageData) -> String {
     let mut h = String::with_capacity(64 * 1024);
@@ -51,7 +56,9 @@ pub fn render(page: &PageData) -> String {
     push_recent(&mut h, page);
     push_all_work(&mut h, page);
     push_more(&mut h, page);
-    h.push_str("</div>\n</body>\n</html>\n");
+    h.push_str("</div>\n<script>\n");
+    h.push_str(SCRIPT);
+    h.push_str("</script>\n</body>\n</html>\n");
     h
 }
 
