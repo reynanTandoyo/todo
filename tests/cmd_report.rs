@@ -389,19 +389,20 @@ fn text_from_the_task_list_is_escaped() {
     assert!(html.contains("Harbour &lt;i&gt;lights&lt;/i&gt;"));
     // The area of the open task is shown in its technical details, escaped.
     assert!(html.contains("<dt>Area</dt><dd>&lt;b&gt;ui&lt;/b&gt;</dd>"));
-    assert!(!html.contains("<script"));
+    // The page's own script is the only script element; the one in the title is escaped above.
+    assert_eq!(html.matches("<script").count(), 1);
+    assert!(!html.contains("<script>alert"));
     assert!(!html.contains("<img"));
     assert!(!html.contains("<i>"));
     assert!(!html.contains("<b>ui</b>"));
 }
 
 #[test]
-fn page_has_no_script_no_network_load_and_its_buttons_are_hidden_without_js() {
+fn page_loads_nothing_from_the_network_and_its_buttons_are_hidden_without_js() {
     let tmp = TempDir::new().unwrap();
     let (_work, html) = fixture_report(&tmp);
 
     for banned in [
-        "<script",
         "<link",
         "<img",
         "<iframe",
@@ -424,6 +425,72 @@ fn page_has_no_script_no_network_load_and_its_buttons_are_hidden_without_js() {
     // The buttons are there, and the stylesheet hides them until the page has the class `js`.
     assert!(html.contains("<div class=\"controls\">"));
     assert!(html.contains(".page:not(.js) .controls{display:none}"));
+}
+
+/// The page with its line endings as LF, so that the checks below read the same on every checkout.
+fn lf(html: &str) -> String {
+    html.replace("\r\n", "\n")
+}
+
+#[test]
+fn the_page_has_one_inline_script_that_names_no_address_and_makes_no_network_call() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    let html = lf(&html);
+    assert_eq!(html.matches("<script").count(), 1, "one script element");
+    assert_eq!(html.matches("</script>").count(), 1, "one closing tag");
+
+    let open = "<script>\n";
+    let start = html.find(open).unwrap() + open.len();
+    let end = html.find("</script>").unwrap();
+    let script = &html[start..end];
+    for banned in [
+        "http",
+        "//",
+        "fetch",
+        "XMLHttpRequest",
+        "import",
+        "WebSocket",
+        "sendBeacon",
+        "eval(",
+        "document.write",
+    ] {
+        assert!(!script.contains(banned), "the script contains {banned:?}");
+    }
+    // The first thing the script does is to mark the page as scripted, so the buttons appear.
+    let marked = script.find("page.classList.add('js')").unwrap();
+    assert!(script.find("addEventListener").unwrap() > marked);
+    // Both choices are remembered under their keys, and every storage call is inside a try block.
+    assert!(script.contains("'todo-report-theme'"));
+    assert!(script.contains("'todo-report-cb'"));
+    assert_eq!(script.matches("window.localStorage.").count(), 2);
+    assert!(script.contains("try {\n      return window.localStorage.getItem(key);"));
+    assert!(script.contains("try {\n      window.localStorage.setItem(key, value);"));
+    // Without a choice the mode follows the system setting.
+    assert!(script.contains("(prefers-color-scheme: dark)"));
+}
+
+#[test]
+fn the_view_and_mode_buttons_are_in_order_and_left_out_when_printed() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    let html = lf(&html);
+    in_order(
+        &html,
+        &[
+            "<button id=\"theme\" type=\"button\">Dark mode</button>",
+            "<button id=\"cb\" type=\"button\" aria-pressed=\"false\"",
+            "<button data-f=\"all\" aria-pressed=\"true\">Everything</button>",
+            "<button data-f=\"left\" aria-pressed=\"false\">Still to do</button>",
+            "<button data-f=\"done\" aria-pressed=\"false\">Done</button>",
+            "<button data-f=\"drop\" aria-pressed=\"false\">Cancelled</button>",
+            "<button id=\"exp\" type=\"button\">Expand all</button>",
+            "<button id=\"col\" type=\"button\">Collapse all</button>",
+            "<div id=\"tree\">",
+        ],
+    );
+    assert!(html.contains("Colour-blind colours</button>"));
+    assert!(html.contains("@media print{ .controls{display:none}"));
 }
 
 #[test]
