@@ -22,14 +22,16 @@ A planner splits the work until every task is level 1, the level the weakest mod
 without a mistake. Workers then take those tasks at the same time, in one checkout.
 
 ### T-145 · Weak models finish the work in parallel
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P1 · type: milestone
 - goal: A planner splits the work until every task is level 1; any number of cheap agents then finish those tasks at the same time, without touching each other's files and without a false done
 - why: the owner wants work finished faster by spawning many cheap agents (Haiku, DeepSeek flash) instead of a few strong ones
+- by: Reynan Henry Tandoyo
 - note (2026-11-19, claude-main): added
 - note (2026-11-20, claude-main): done — v0.8 released as 0.8.0: levels 1 to 5, detailed level-1 tasks, split, verify, stuck, commit scope, file scopes, waves, plan and brief.
 - note (2026-11-20, claude-main): reopened — Reopened: CI shows next at 156 ms (Linux) and 185 ms (Windows) on the T-165 milestone-tree perf test, budget 100 ms.
+- note (2026-11-21, claude-main): done — v0.8 complete: 0.8.0 released; CI speed fixes T-185 to T-188 on main, CI green on Linux and Windows.
 
 ### T-146 · v0.8 requirements: levels, detailed tasks, split, verify, stuck, file scopes, waves
 - status: done
@@ -572,12 +574,18 @@ without a mistake. Workers then take those tasks at the same time, in one checko
 - note (2026-11-21, claude-main): done — next --claim keeps its documents until exit; CI windows-latest 135/117 ms (budget 200).
 
 ### T-188 · waves has no headroom on windows-latest CI: 99.3 ms of 100 ms
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · difficulty: 4 · type: bug · area: core
 - milestone: T-145
 - why: After T-187 CI is green, but one windows-latest run measured waves at 99.3 ms (the other 52.6 ms), so the perf test can fail by chance; waves takes about 43 ms locally and needs to get under about 30 ms
+- commit: ae3902b26443692d17de15d10013d9f8d5bc7353
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, t188-haiku): Commit ae3902b (branch reynanTandoyo/t188), not marked done: waves 46.6 ms before and 39-40 ms after in the T-165 perf test (medians of 5; HEAD re-run 41.6 and 43.0 ms, same PC). Parsing takes about 19 ms and each planning command pays about 21 ms of load before any planning, so the 30 ms target needs waves' own work under about 3 ms; it is now about 6-8 ms. Left: flat planner arrays, readiness without re-parsing milestone IDs, text rendered from the plan, parsed file scopes reused for the gaps (about 3-4 ms in all). The larger lever is the parser: about 3 Strings per field line and one per line, which needs Task storage to borrow from the document (a redesign).
+- note (2026-11-21, claude-main): Coordinator 2026-11-21: accepted at 39-40 ms locally. CI after 511ba0d is green on both runners, waves at most 71 ms (budget 100). The 30 ms target needs a parser redesign (borrowed lines and fields), left for the owner to decide.
+- note (2026-11-21, claude-main): forced done (owner was t188-haiku)
+- note (2026-11-21, claude-main): done — waves 46.6 to about 40 ms locally; CI waves at most 71 ms.
 
 ## Questions
 
