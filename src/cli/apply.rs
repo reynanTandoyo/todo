@@ -526,7 +526,8 @@ fn apply_one_op(
             verify,
             fields,
         } => {
-            let clean_title = title.trim();
+            // Free-text values: line breaks become spaces, as `add` makes them (`docs/format.md` §10).
+            let clean_title = sanitize_trimmed_value(title);
             if clean_title.is_empty() {
                 return Err(TodoError::new(
                     ErrorCode::Usage,
@@ -542,13 +543,13 @@ fn apply_one_op(
             let goal_src = goal
                 .as_deref()
                 .or_else(|| fields.get("goal").map(String::as_str))
-                .map(str::trim)
+                .map(sanitize_trimmed_value)
                 .filter(|g| !g.is_empty());
             // `why` may also come from `fields`; left in `extra` it would be dropped (known field).
             let why_src = why
                 .as_deref()
                 .or_else(|| fields.get("why").map(String::as_str))
-                .map(str::trim)
+                .map(sanitize_trimmed_value)
                 .filter(|w| !w.is_empty());
             // `summary` may also come from `fields`; line breaks become spaces (R-WRITE-19).
             let summary_src = summary
@@ -559,12 +560,12 @@ fn apply_one_op(
             let read_src = read
                 .as_deref()
                 .or_else(|| fields.get("read").map(String::as_str))
-                .map(str::trim)
+                .map(sanitize_trimmed_value)
                 .filter(|r| !r.is_empty());
             let verify_src = verify
                 .as_deref()
                 .or_else(|| fields.get("verify").map(String::as_str))
-                .map(str::trim)
+                .map(sanitize_trimmed_value)
                 .filter(|v| !v.is_empty());
             let steps_list = match steps {
                 Some(input) => steps_from_text(&input.text()),
@@ -585,7 +586,7 @@ fn apply_one_op(
             milestone::check_new_entry_fields(
                 task_type.as_deref(),
                 milestone_id.as_deref(),
-                goal_src,
+                goal_src.as_deref(),
             )
             .map_err(|e| at_operation(e, op_num, "add"))?;
             let section_idx = resolve_target_section(doc, section.as_deref(), cfg)?;
@@ -636,26 +637,26 @@ fn apply_one_op(
                 .map_err(|e| at_operation(e, op_num, "add"))?;
             let extra: Vec<(String, String)> = fields
                 .iter()
-                .map(|(k, v)| (k.clone(), v.trim().to_string()))
+                .map(|(k, v)| (k.clone(), sanitize_trimmed_value(v)))
                 .collect();
             let lines = NewTask {
-                title: clean_title,
+                title: &clean_title,
                 priority: Some(priority.as_str()),
                 difficulty: difficulty.as_deref(),
-                task_type: trim(task_type),
-                area: trim(area),
+                task_type: trim(task_type).as_deref(),
+                area: trim(area).as_deref(),
                 milestone: milestone_id.as_deref(),
-                goal: goal_src,
-                why: why_src,
+                goal: goal_src.as_deref(),
+                why: why_src.as_deref(),
                 summary: summary_src.as_deref(),
                 depends: dep_str.as_deref(),
-                files: trim(files),
-                read: read_src,
-                problem: trim(problem),
-                fix: trim(fix),
+                files: trim(files).as_deref(),
+                read: read_src.as_deref(),
+                problem: trim(problem).as_deref(),
+                fix: trim(fix).as_deref(),
                 steps: &steps_list,
-                accept: trim(accept),
-                verify: verify_src,
+                accept: trim(accept).as_deref(),
+                verify: verify_src.as_deref(),
                 extra: &extra,
             }
             .lines(&id_str, &date, agent);
@@ -744,9 +745,9 @@ fn at_operation(mut err: TodoError, op_num: usize, name: &str) -> TodoError {
     err
 }
 
-/// A field value trimmed, if present.
-fn trim(v: &Option<String>) -> Option<&str> {
-    v.as_deref().map(str::trim)
+/// A field value with its line breaks turned into spaces and trimmed, if present (R-EDIT-5).
+fn trim(v: &Option<String>) -> Option<String> {
+    v.as_deref().map(sanitize_trimmed_value)
 }
 
 /// Trimmed `text`, or the `operation #N (name)` usage error when it is empty.
