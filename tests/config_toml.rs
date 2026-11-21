@@ -444,7 +444,8 @@ fn description_is_one_line_and_a_blank_or_missing_value_is_none() {
         assert_eq!(blank.description, None, "{text:?}");
     }
 
-    // Each CR or LF becomes a space, whether written as an escape or as a real line break.
+    // Each line break becomes a single space, whether written as an escape or as a real line
+    // break. A CRLF is one line break, so it gives one space too (format.md §10).
     let escaped = OpsConfig::from_toml_str(r#"description = "first line\nsecond\rthird""#).unwrap();
     assert_eq!(
         escaped.description.as_deref(),
@@ -453,6 +454,14 @@ fn description_is_one_line_and_a_blank_or_missing_value_is_none() {
     let multi =
         OpsConfig::from_toml_str("description = \"\"\"first line\nsecond line\"\"\"\n").unwrap();
     assert_eq!(multi.description.as_deref(), Some("first line second line"));
+    let crlf = OpsConfig::from_toml_str(r#"description = "first line\r\nsecond line""#).unwrap();
+    assert_eq!(crlf.description.as_deref(), Some("first line second line"));
+    let multi_crlf =
+        OpsConfig::from_toml_str("description = \"\"\"first line\r\nsecond line\"\"\"\n").unwrap();
+    assert_eq!(
+        multi_crlf.description.as_deref(),
+        Some("first line second line")
+    );
 
     // A value that is not a string is the usual todo.toml error, with its line.
     let err = OpsConfig::from_toml_str("id_prefix = \"T\"\ndescription = 42\n").unwrap_err();

@@ -491,8 +491,9 @@ impl OpsConfig {
                 }
                 "description" => {
                     let s = expect_string(&key, val, line)?;
-                    // Each CR or LF becomes a space, so the value stays on one line (R-CFG-2).
-                    let flat = s.replace(['\r', '\n'], " ");
+                    // A CRLF is one line break and each other CR or LF is one too; each becomes a
+                    // single space, so the value stays on one line (R-CFG-2, format.md §10).
+                    let flat = s.replace("\r\n", " ").replace(['\r', '\n'], " ");
                     let trimmed = flat.trim();
                     cfg.description = if trimmed.is_empty() {
                         None
