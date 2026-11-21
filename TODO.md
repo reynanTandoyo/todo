@@ -555,14 +555,35 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t217-haiku): forced done outside files: tests/snapshots/cli_basic__cli_overview_json.snap
 - note (2026-11-21, t217-haiku): done — Planner help has a Writing for people section, the report help and README describe the one-project page with its buttons, script and no-script fallback, and --all keeps its v0.8 form; cargo test passes with 1036 tests (fmt, clippy and Linux clippy clean). tests/snapshots/cli_basic__cli_overview_json.snap was changed outside files for the new report summary.
 
+### T-218 · Last 7 days shows an entry's summary instead of its title
+- status: open
+- owner: —
+- priority: P1 · difficulty: 2 · type: feature · area: report
+- milestone: T-195
+- why: the owner reviewed the page on this project (T-206): titles are written by agents for agents, so a week's list of them is hard to read for a person
+- summary: The list of what changed this week reads in plain words, using the text written for people where there is one.
+- final: One small change in one module with its requirement and snapshot; Haiku 5.5 at xhigh finishes it from these steps.
+- files: src/report/page/recent.rs, docs/requirements.md, tests/snapshots/cmd_report__report_html.snap, tests/cmd_report.rs
+- read: src/report/page/entry.rs, src/report/page/html.rs
+- steps:
+  1. In docs/requirements.md, R-REPORT-5 (section 5.23), first bullet: add the sentence 'A task done, a task cancelled and a single entry added are named by their summary (R-WRITE-19) when they have one, else by their title; a milestone finished, and the milestone in N tasks added to <milestone>, are named by their title.'
+  2. In src/report/page/recent.rs, where the Done, Cancelled and Added events take the entry's title, take the summary when the task has one (task.summary, trimmed and not empty), else the title. MilestoneFinished and the milestone name of a grouped Added row keep the title. Update the doc comments of Event to say so.
+  3. Add unit tests in recent.rs: a done task with a summary shows the summary; one without shows the title; a cancelled task with a summary shows the summary and the reason; a single added entry with a summary shows 'Added: <summary>'; a finished milestone with a summary still shows its title.
+  4. Run cargo test --all-features; if the report snapshot changes, review the diff (only Last 7 days rows may change) and accept it with cargo insta accept.
+  5. Run the four checks of AGENTS.md.
+- accept: Last 7 days names a task done, a task cancelled and a single added entry by its summary when it has one, else by its title; finished milestones and grouped milestone names keep their titles; R-REPORT-5 says so; unit tests cover each case; all tests pass
+- verify: cargo test --all-features --lib report::page
+- note (2026-11-21, claude-main): added
+
 ## Questions
 
 ### T-206 · When the new page is built from a real project: can you and your colleague each say within a minute what is done, what was cancelled, what is left and what needs you? Answer after T-203, before the 1.0.0 release (T-205).
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - type: question
 - about: T-195
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): answer — Owner 2026-11-21: yes, the page built from this project looks ok for now. Change: Last 7 days shows an entry's summary instead of its title when it has one (T-218).
 
 ## Ideas
 
