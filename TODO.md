@@ -1,5 +1,5 @@
 <!-- todo-format: 3 -->
-<!-- todo-tool: 0.8.0 -->
+<!-- todo-tool: 0.8.1 -->
 # todo — task list
 
 The work plan for building `todo`. What each task must achieve is in
@@ -586,6 +586,16 @@ without a mistake. Workers then take those tasks at the same time, in one checko
 - note (2026-11-21, claude-main): Coordinator 2026-11-21: accepted at 39-40 ms locally. CI after 511ba0d is green on both runners, waves at most 71 ms (budget 100). The 30 ms target needs a parser redesign (borrowed lines and fields), left for the owner to decide.
 - note (2026-11-21, claude-main): forced done (owner was t188-haiku)
 - note (2026-11-21, claude-main): done — waves 46.6 to about 40 ms locally; CI waves at most 71 ms.
+
+### T-189 · Release 0.8.1: CI speed fixes
+- status: done
+- owner: claude-main
+- priority: P1 · difficulty: 2 · type: release · area: release
+- why: the speed fixes T-185 to T-188 and the CI dependency list fix are on main but not in a release; the owner asked for 0.8.1 on 2026-11-21
+- commit: 84c225b434d7141306a679b567e2ef309cf83bdd
+- by: Reynan Henry Tandoyo
+- note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): done — Released 2026-11-21: tag v0.8.1 on 84c225b, published by the Release workflow; installed on this PC with todo help update (SHA-256 matched, todo 0.8.1 (84c225b)); stamp raised to 0.8.1.
 
 ## Questions
 
