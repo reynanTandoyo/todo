@@ -28,6 +28,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - goal: Every problem found while using todo on real work is recorded here and fixed, and todo's own checks (check, align, plan) stay clean on this repository
 - why: the tool is only trusted when its own reports have no false alarms
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): Seen by t209-haiku 2026-11-21: apply only trims why (line breaks are not turned into spaces as format.md section 10 says); check and add a task if confirmed.
 
 ### T-191 · align reports every done milestone as DONE_WITHOUT_COMMIT
 - status: done
@@ -114,8 +115,8 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t208-haiku): done — Added the summary field to the parser, show --json and schema, with 7 new tests in tests/field_summary.rs; cargo test passes 926 tests, and fmt and clippy are clean for Windows and Linux.
 
 ### T-209 · summary field: write it with add, add --from, apply, set and split
-- status: open
-- owner: —
+- status: done
+- owner: t209-haiku
 - priority: P1 · difficulty: 2 · type: feature · area: cli
 - milestone: T-197
 - why: planners and agents must be able to write the summary through todo, never by hand
@@ -133,17 +134,23 @@ and what needs them. Problems found while using todo are fixed along the way.
   7. Run the four checks of AGENTS.md.
 - accept: `add`, `add --from`, `apply`, `set` and the children of `split` take `--summary` (text, `-` or `@path`) and write `- summary:` after `why`; it is allowed on tasks, milestones, questions and ideas; `set --unset summary` removes it; tests cover each command
 - verify: cargo test --test field_summary_write
+- attempts: 1
+- verified: 2026-11-21
+- commit: aed90b7
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, t209-haiku): verify failed — error: test failed, to rerun pass `--test field_summary_write`
+- note (2026-11-21, t209-haiku): done — The summary field is written by add (--summary, --from), apply (add and set), set (--summary, --unset summary, --field) and the children of split, with -, @path and line breaks turned into spaces, after why and on every kind of entry; 15 new tests in tests/field_summary_write.rs, which pass with and without the test-hooks feature, and cargo test passes 942 tests with 0 failed, with fmt and clippy clean for Windows and Linux.
 
 ### T-210 · summary field: check warns about unfinished work without one; brief leaves it out; docs/json.md
-- status: open
-- owner: —
+- status: done
+- owner: t210-haiku
 - priority: P1 · difficulty: 2 · type: feature · area: cli
 - milestone: T-197
 - why: the page is only readable when every unfinished task and milestone has a summary, so check must point at the ones missing
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
 - depends: T-208
-- files: src/cli/check.rs, src/ops/brief.rs, docs/json.md, tests/field_summary_check.rs
+- files: src/cli/check.rs, src/ops/brief.rs, docs/json.md, tests/field_summary_check.rs, tests/cmd_final.rs, tests/cmd_difficulty.rs
 - read: docs/requirements.md
 - steps:
   1. Read R-WRITE-19 and R-CHECK-1 (the sentence that starts `From v1.0`) in docs/requirements.md.
@@ -154,7 +161,12 @@ and what needs them. Problems found while using todo are fixed along the way.
   6. Run the four checks of AGENTS.md.
 - accept: `check` warns, without changing the exit code, about each task or milestone that is not done or dropped and has no summary; brief does not print it; docs/json.md lists summary next to why; tests cover each case
 - verify: cargo test --test field_summary_check
+- verified: 2026-11-21
+- commit: 980ed08
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): forced set (owner was t210-haiku)
+- note (2026-11-21, t210-haiku): done — check warns, without changing its exit code, about each open, claimed or blocked task or milestone without a summary; brief leaves the summary out and docs/json.md lists it next to why; cargo test --all-features passes 931 tests with 0 failed, and fmt and clippy are clean for Windows and Linux.
 
 ### T-198 · Page data: states in plain words, counts, dates and the full tree
 - status: open
@@ -171,8 +183,8 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, claude-main): split into T-211, T-212
 
 ### T-211 · Page data: one entry with its state, date, second line and details
-- status: open
-- owner: —
+- status: done
+- owner: t211-haiku
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-198
 - why: every part of the new page shows entries the same way, so one function must decide an entry's state and texts
@@ -191,11 +203,17 @@ and what needs them. Problems found while using todo are fixed along the way.
   8. Run the four checks of AGENTS.md. Items that nothing uses yet may need #[allow(dead_code)] on the module with a comment `// used by the page renderer (T-202)`; prefer making them pub.
 - accept: src/report/page/entry.rs turns any task into an EntryView with one of the five states (and Waiting for an open task that depends on an unanswered question), its done or cancelled date, its second line (in progress with since and stale, waiting with given back, question or blocked reason, cancelled with reason), summary, why, result and technical details; unit tests cover each rule; model.rs, html.rs and all.rs are unchanged
 - verify: cargo test --lib report::page
+- verified: 2026-11-21
+- commit: 910cd04
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, t211-haiku): done — Added report::page::entry: entry_view turns a task into an EntryView with its state in words, date, second line and details, unit-tested with 23 tests passing in report::page; fmt and clippy clean on Windows and Linux, full suite 950 passing.
 
 ### T-212 · Page data: the work tree with counts, order, Other work and Earlier work
-- status: open
-- owner: —
+- status: claimed
+- owner: t212-haiku
+- claimed: 2026-11-21T15:20+01:00
+- session: d96c59df-0436-40f9-9e4c-a60d3f320cc7
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-198
 - why: the page keeps finished work in its place only if the data is one tree with every entry and the right counts
@@ -213,12 +231,14 @@ and what needs them. Problems found while using todo are fixed along the way.
   7. Unit tests (#[cfg(test)], invented data from a string, fixed now): overall counts leave cancelled out of the total and milestones, questions and ideas out entirely; a milestone's N of M over nested milestones; each milestone state; the order of top-level milestones; nested order is file order; Other work; an archive gives Earlier with its numbers.
   8. Run the four checks of AGENTS.md.
 - accept: src/report/page/tree.rs builds one tree with every task and milestone of a document (done and cancelled included), milestone states with dates, N of M per milestone (cancelled left out), overall counts per state over tasks only, the order in progress / not started / finished at the top level, Other work, and Earlier work from the archive; unit tests cover each rule
-- verify: cargo test --lib report::page
+- verify: cargo test --all-features --lib report::page
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, t212-haiku): forced claim (files held by T-199)
+- note (2026-11-21, claude-main): forced set (owner was t212-haiku)
 
 ### T-199 · Needs you: questions, tasks given back and work without activity
-- status: open
-- owner: —
+- status: done
+- owner: t199-haiku
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-195
 - why: the first thing a person asks is whether anything waits for them, and today that is spread over three sections
@@ -234,9 +254,14 @@ and what needs them. Problems found while using todo are fixed along the way.
   5. Unit tests with invented data and a fixed now: each kind, the order, a question with about and two waiting tasks, a reclaimed task that is no longer given back, an empty list.
   6. Run the four checks of AGENTS.md.
 - accept: src/report/page/needs.rs lists, in the order of R-REPORT-4: every open question with its date, the entry it is about and the tasks that wait for it; every task given back with the date and problem; every task whose claim is stale with owner and days; rows carry titles, not only IDs; the heading gives the count and an empty list reads Nothing needs you.; unit tests cover each kind and the empty case
-- verify: cargo test --lib report::page
+- verify: cargo test --all-features --lib report::page
+- verified: 2026-11-21
+- commit: be145fb
 - reqs: R-REPORT-4
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): forced set (owner was t199-haiku)
+- note (2026-11-21, t199-haiku): done — Added report::page::needs: build_needs lists open questions, tasks given back and stale claims in R-REPORT-4 order, with heading, waiting_text and EMPTY; 13 new unit tests, 963 tests passing in the full suite, fmt and clippy clean on Windows and Linux.
 
 ### T-200 · Last 7 days: what was finished, cancelled and added
 - status: open
@@ -258,7 +283,7 @@ and what needs them. Problems found while using todo are fixed along the way.
   7. Unit tests with a fixed now: each event, grouping of added rows, the 7-day edge (day 7 back is out), the order within a day, archive entries included, more than 15 rows split into rows and earlier, the empty case.
   8. Run the four checks of AGENTS.md.
 - accept: src/report/page/recent.rs lists the events of the last 7 days from note dates of TODO.md and the archive, newest first: task done, task cancelled with its reason, milestone finished with its task count, entries added grouped per milestone and day; the order within a day is fixed; at most 15 rows, the rest in earlier; the empty text is Nothing changed in the last 7 days.; tests use a fixed clock
-- verify: cargo test --lib report::page
+- verify: cargo test --all-features --lib report::page
 - reqs: R-REPORT-5
 - note (2026-11-21, claude-main): added
 
@@ -320,7 +345,7 @@ and what needs them. Problems found while using todo are fixed along the way.
   7. Unit tests: an entry of each state gives its mark, class and second line; done shows date and Result; an entry without summary shows Why; technical details leave out missing fields; a finished milestone is closed and an unfinished one open; N of M and bar width; Other work appears only when there are top-level tasks; a title with <script> is escaped.
   8. Run the four checks of AGENTS.md.
 - accept: src/report/page/tree_html.rs writes the All work tree in the markup of docs/report-mockup.html: milestones with title, state, N of M done, bar and goal, open unless finished or cancelled; one line per entry with mark, title, date for done and cancelled, and ID; the second line only for in progress, waiting and cancelled, naming the state in words; details with Summary or Why, Result for done, and closed Technical details; Other work last; all text escaped; unit tests cover each rule
-- verify: cargo test --lib report::page
+- verify: cargo test --all-features --lib report::page
 - note (2026-11-21, claude-main): added
 
 ### T-214 · Page HTML: the whole page, wired into report --html, with snapshot
@@ -343,7 +368,7 @@ and what needs them. Problems found while using todo are fixed along the way.
   7. Update tests/cmd_report.rs for the single-project page: the snapshot test uses the new fixture with the fixed clock (accept the new snapshot with cargo insta accept or by INSTA_UPDATE; review it); replace assertions that check the v0.8 single page with checks for: the five state words in the legend, Needs you rows, Last 7 days, a done entry still in its milestone, Other work, the closed parts under More, escaping of a <script> title, no external URL (no 'http' in src or href attributes). Keep every --all test (tests/cmd_report_all.rs) passing unchanged.
   8. Run the four checks of AGENTS.md.
 - accept: `todo report --html` writes the page of R-REPORT-1 with the structure, wording and order of docs/report-mockup.html: header with description; overall line, five-part bar and legend; Needs you; Last 7 days; All work as one tree; More with Ideas, Earlier work and For the planner (the v0.8 planning state and per-area counts); the v0.8 sections Done and Dropped and the raw field lists are gone from the single-project page; one column at most 820 px, system font, readable narrow and printed; all text escaped; the snapshot uses the new invented fixture; report --html --all still passes its tests
-- verify: cargo test --test cmd_report --test cmd_report_all
+- verify: cargo test --all-features --test cmd_report --test cmd_report_all
 - note (2026-11-21, claude-main): added
 
 ### T-203 · View buttons, light or dark mode, and colour-blind colours
@@ -364,7 +389,7 @@ and what needs them. Problems found while using todo are fixed along the way.
   5. In tests/cmd_report.rs add checks: the page has exactly one script element; the script contains no 'http', no '//' URL, no fetch, no XMLHttpRequest, no import; the buttons Everything, Still to do, Done, Cancelled, Expand all, Collapse all, Dark mode and Colour-blind colours are present; the print rule hides .controls. Update the snapshot.
   6. Run the four checks of AGENTS.md.
 - accept: the page has the buttons of R-REPORT-6 (Everything, Still to do, Done, Cancelled, Expand all, Collapse all, light or dark mode, Colour-blind colours) driven by one small inline script with no network access; four colour sets with exactly the colours of the R-REPORT-6 table, each state colour at least 3 to 1 against its background, computed by a test; the mode follows the system until the button is used and both choices are remembered (failures ignored); without scripts every entry shows in the system mode with the normal colours and the buttons are hidden; the buttons are left out when printing; nothing on the page writes a file or runs a command; the snapshot covers the markup and a test checks that the script names no address
-- verify: cargo test --test cmd_report --test report_colours
+- verify: cargo test --all-features --test cmd_report --test report_colours
 - reqs: R-REPORT-6, NFR-4
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): Owner 2026-11-21: the owner is red-green colour blind. A button switches the colour scheme only; light and dark mode each need their own colours that fit a white or a black background, in the normal and in the colour-blind scheme.
@@ -385,7 +410,7 @@ and what needs them. Problems found while using todo are fixed along the way.
   4. If the page is over a limit, do not raise the limit: report the numbers with `todo stuck`.
   5. Run the four checks of AGENTS.md, and put the numbers in the done note.
 - accept: on the generated 5,000-entry milestone-tree file `report --html` finishes in under 500 ms in a release build and the page stays under 5 MB; the existing report performance test asserts both and runs in CI; the measured numbers are recorded in the done note
-- verify: cargo test --release --test perf
+- verify: cargo test --release --all-features --test perf
 - reqs: NFR-3, TEST-9
 - note (2026-11-21, claude-main): added
 
@@ -401,6 +426,28 @@ and what needs them. Problems found while using todo are fixed along the way.
 - reqs: R-AGENT-1, REL-2, REL-5
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): Review 2026-11-21: depends on the question T-206 so 1.0.0 is not released before the owner has judged the page; this repository has no todo.toml yet.
+
+### T-215 · apply refuses a line break in why, goal, read or verify instead of turning it into a space
+- status: done
+- owner: t215-haiku
+- priority: P2 · difficulty: 2 · type: bug · area: cli
+- milestone: T-190
+- why: add and set turn line breaks in a value into single spaces (format.md section 10), but apply only trims these values and then refuses the write, so the same input works with add and fails with apply
+- final: One small fix in one file plus its test; Haiku 5.5 at xhigh finishes it from these steps.
+- files: src/cli/apply.rs, tests/cmd_apply_line_breaks.rs
+- read: docs/format.md, src/cli/add.rs
+- steps:
+  1. Read the rule 'Values are single lines; line breaks in input become single spaces' in docs/format.md section 10, and how src/cli/add.rs uses sanitize_trimmed_value for every value except steps.
+  2. In src/cli/apply.rs, in the add operation (near the comment about `why` may also come from `fields`, around line 547), the values goal, why, read and verify use .map(str::trim). Change each to the pattern summary_src already uses: .map(sanitize_trimmed_value).filter(|s| !s.is_empty()), then pass .as_deref() where a &str is needed. Do the same for every other free-text value of the add and set operations that is only trimmed (the helper fn trim near line 747 and its callers), except steps, which keeps its line breaks.
+  3. Write tests/cmd_apply_line_breaks.rs (invented data in a temporary folder, helpers from tests/common): apply add with why, goal (on a milestone), read, verify and accept containing a line break writes each as one line with a single space; apply set with a why containing a CRLF does the same; steps given as text with line breaks still become separate steps.
+  4. Run the four checks of AGENTS.md.
+- accept: every free-text value of an apply add or set operation except steps turns line breaks into single spaces, as add and set do; nothing that worked before changes; tests in tests/cmd_apply_line_breaks.rs cover why, goal, read, verify, accept, a CRLF, and steps
+- verify: cargo test --all-features --test cmd_apply_line_breaks
+- verified: 2026-11-21
+- commit: fb0c8b4
+- by: Reynan Henry Tandoyo
+- note (2026-11-21, claude-main): added
+- note (2026-11-21, t215-haiku): done — apply add now turns line breaks in title, goal, why, read, verify, files, type, area, problem, fix, accept and extra fields into single spaces, as add does; 4 new tests in tests/cmd_apply_line_breaks.rs and 973 tests pass in the full run.
 
 ## Questions
 
