@@ -89,13 +89,13 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, claude-main): split into T-208, T-209, T-210
 
 ### T-208 · summary field: read it, show it and list it in schema
-- status: open
-- owner: —
+- status: done
+- owner: t208-haiku
 - priority: P1 · difficulty: 2 · type: feature · area: core
 - milestone: T-197
 - why: every other part of the summary field needs the parser to know it first
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
-- files: src/doc/parser.rs, src/doc/verify.rs, src/ops/read.rs, src/cli/schema.rs, src/cli/show.rs, tests/field_summary.rs
+- files: src/doc/parser.rs, src/doc/verify.rs, src/ops/read.rs, src/cli/schema.rs, src/cli/show.rs, tests/field_summary.rs, docs/json.md, tests/doc_parser.rs
 - read: docs/requirements.md, docs/format.md
 - steps:
   1. Read R-WRITE-19 in docs/requirements.md and the summary row of docs/format.md section 8 and the field order in section 10.
@@ -106,7 +106,12 @@ and what needs them. Problems found while using todo are fixed along the way.
   6. Run the four checks of AGENTS.md.
 - accept: a `- summary:` line is a known field placed after `why` in the field order; `show` and `show --json` carry it (not under `fields`); `schema` lists it; a repeated summary is a repeated field; a file without summary is unchanged; tests in tests/field_summary.rs cover each case
 - verify: cargo test --test field_summary
+- verified: 2026-11-21
+- commit: 75b1603
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): forced set (owner was t208-haiku)
+- note (2026-11-21, t208-haiku): done — Added the summary field to the parser, show --json and schema, with 7 new tests in tests/field_summary.rs; cargo test passes 926 tests, and fmt and clippy are clean for Windows and Linux.
 
 ### T-209 · summary field: write it with add, add --from, apply, set and split
 - status: open
@@ -258,8 +263,8 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, claude-main): added
 
 ### T-201 · description setting: one sentence about the project for the page header
-- status: open
-- owner: —
+- status: done
+- owner: t201-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: config
 - milestone: T-195
 - why: a colleague who opens the page needs to know what the project is before reading its tasks
@@ -273,9 +278,14 @@ and what needs them. Problems found while using todo are fixed along the way.
   5. Run the four checks of AGENTS.md.
 - accept: `description = "..."` in todo.toml is read into OpsConfig as `description: Option<String>` (line breaks become spaces, an empty or blank value is None, a value that is not a string is the usual todo.toml error); without the key it is None; the README settings table lists the key with its meaning (one sentence shown under the title of the HTML report); tests in tests/config_toml.rs cover set, missing, blank and multi-line values; showing it on the page is part of T-214
 - verify: cargo test --test config_toml
+- verified: 2026-11-21
+- commit: 78bf83a
 - reqs: R-CFG-2, R-REPORT-1
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): Review 2026-11-21: `report --json` only returns path, bytes and opened (docs/json.md), so the description is not added there; removed from accept.
+- note (2026-11-21, t201-haiku): done — Added the description setting (R-CFG-2): read from todo.toml into OpsConfig, line breaks become spaces, blank is None, a non-string is refused; README row added; cargo test --test config_toml 8 passed (1 new), full cargo test --all-features 920 passed, 0 failed.
+- note (2026-11-21, t201-haiku): CRLF in description gives one space (commit 1eabde8)
 
 ### T-202 · Page layout: header, overall bar, tree, one line per entry, details on click
 - status: open
