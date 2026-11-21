@@ -6,3 +6,4 @@
 //! [`super::model`] and [`super::html`] are not changed by this module.
 
 pub mod entry;
+pub mod needs;
