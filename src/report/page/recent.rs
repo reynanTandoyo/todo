@@ -126,9 +126,19 @@ pub fn build_recent(doc: &Document, archive: Option<&Document>, ctx: &Ctx<'_>) -
 #[must_use]
 pub fn row_text(event: &Event) -> String {
     match event {
+        Event::MilestoneFinished {
+            title,
+            done: 1,
+            total: 1,
+        } => format!("{title} finished {DASH} its 1 task done"),
         Event::MilestoneFinished { title, done, total } if done == total => {
             format!("{title} finished {DASH} all {total} tasks done")
         }
+        Event::MilestoneFinished {
+            title,
+            done,
+            total: 1,
+        } => format!("{title} finished {DASH} {done} of 1 task done"),
         Event::MilestoneFinished { title, done, total } => {
             format!("{title} finished {DASH} {done} of {total} tasks done")
         }
@@ -613,6 +623,60 @@ mod tests {
             "- note (2026-11-20, bob): added",
         ]);
         assert!(recent_of(&fixture, None).rows.is_empty());
+    }
+
+    #[test]
+    fn a_count_of_one_is_never_written_as_tasks() {
+        for done in 0..=3 {
+            for total in done..=3 {
+                let text = row_text(&Event::MilestoneFinished {
+                    title: "Shader C".to_string(),
+                    done,
+                    total,
+                });
+                assert!(!text.contains("1 tasks"), "{text}");
+            }
+        }
+        let finished = |done, total| {
+            row_text(&Event::MilestoneFinished {
+                title: "Shader C".to_string(),
+                done,
+                total,
+            })
+        };
+        assert_eq!(finished(1, 1), "Shader C finished — its 1 task done");
+        assert_eq!(finished(0, 1), "Shader C finished — 0 of 1 task done");
+        assert_eq!(finished(1, 2), "Shader C finished — 1 of 2 tasks done");
+        assert_eq!(finished(2, 2), "Shader C finished — all 2 tasks done");
+    }
+
+    #[test]
+    fn a_milestone_with_one_task_reads_its_one_task_in_the_rows() {
+        let fixture = text(&[
+            "### T-001 · Shader",
+            "- status: done",
+            "- type: milestone",
+            "- note (2026-11-20, bob): done — all in",
+            "### T-002 · Parse source",
+            "- status: done",
+            "- milestone: T-001",
+            "- note (2026-11-20, bob): done",
+            "### T-003 · Lamp",
+            "- status: done",
+            "- type: milestone",
+            "- note (2026-11-20, bob): done",
+            "### T-004 · Wick",
+            "- status: open",
+            "- milestone: T-003",
+        ]);
+        assert_eq!(
+            shown(&recent_of(&fixture, None)),
+            [
+                "Shader finished — its 1 task done",
+                "Lamp finished — 0 of 1 task done",
+                "Parse source",
+            ]
+        );
     }
 
     #[test]
