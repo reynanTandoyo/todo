@@ -1,6 +1,8 @@
 //! `todo waves` command: how much unfinished work can run in parallel, and the longest chain (T-163;
 //! R-WAVE-1, R-READ-4).
 
+use std::fmt::Write as _;
+
 use clap::Args as ClapArgs;
 use serde::Serialize;
 
@@ -28,15 +30,16 @@ pub struct Args {
     pub milestone: Option<String>,
 }
 
-/// A task in a wave or in the longest chain, as `waves --json` returns it.
+/// A task in a wave or in the longest chain, as `waves --json` returns it. The title, owner and level
+/// are borrowed from the document, so that listing thousands of tasks copies fewer strings (T-188).
 #[derive(Debug, Clone, Serialize)]
-struct TaskEntry {
+struct TaskEntry<'a> {
     id: String,
-    title: String,
+    title: &'a str,
     status: &'static str,
-    owner: Option<String>,
+    owner: Option<&'a str>,
     /// The difficulty as written, which is the task's level; `null` when it has none.
-    level: Option<String>,
+    level: Option<&'a str>,
     /// What the task lacks at or below the target level (`R-DETAIL-2`); `[]` when it has all of it,
     /// or is above the target level.
     missing: Vec<String>,
@@ -44,11 +47,11 @@ struct TaskEntry {
 
 /// A task that is not placed in a wave, with the reason.
 #[derive(Debug, Serialize)]
-struct ApartEntry {
+struct ApartEntry<'a> {
     id: String,
-    title: String,
+    title: &'a str,
     status: &'static str,
-    reason: String,
+    reason: &'a str,
 }
 
 /// The size of a wave: its tasks and its lanes.
@@ -60,15 +63,15 @@ struct WaveSize {
 
 /// One wave: its size, and its lanes, each listing its tasks in the order they run.
 #[derive(Debug, Serialize)]
-struct WaveEntry {
+struct WaveEntry<'a> {
     wave: usize,
     size: WaveSize,
-    lanes: Vec<Vec<TaskEntry>>,
+    lanes: Vec<Vec<TaskEntry<'a>>>,
 }
 
 /// The payload of `todo waves --json` (`todo.waves.v1`).
 #[derive(Debug, Serialize)]
-struct WavesJson {
+struct WavesJson<'a> {
     file: String,
     /// The milestone the view is limited to, by canonical ID; `null` for the whole file.
     milestone: Option<String>,
@@ -79,10 +82,10 @@ struct WavesJson {
     /// The most workers useful at once: the most lanes in any wave.
     max_workers: usize,
     /// The longest chain of placed tasks, the first one first.
-    longest_chain: Vec<TaskEntry>,
-    waves: Vec<WaveEntry>,
+    longest_chain: Vec<TaskEntry<'a>>,
+    waves: Vec<WaveEntry<'a>>,
     /// Tasks not placed in a wave, in file order.
-    apart: Vec<ApartEntry>,
+    apart: Vec<ApartEntry<'a>>,
 }
 
 /// Runs `todo waves [<milestone>]`.
@@ -134,51 +137,63 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             .iter()
             .map(|apart| ApartEntry {
                 id: doc.id_config.format_id(apart.task.id),
-                title: apart.task.title.clone(),
+                title: apart.task.title.as_str(),
                 status: apart.task.status.as_str(),
-                reason: apart.reason.clone(),
+                reason: apart.reason.as_str(),
             })
             .collect(),
     };
-    loaded.leak_for_exit();
 
     if out.is_json() {
         out.emit_json_ok(META.name, &payload);
-        return Ok(());
+    } else {
+        out.write_str(&render_text(&payload));
     }
-    out.write_str(&render_text(&payload));
+    // The process exits right after this command prints, so the plan, the payload and the parsed file
+    // are not freed one by one (see `LoadedRead::leak_for_exit`, T-186). The payload borrows from both.
+    std::mem::forget(payload);
+    std::mem::forget(plan);
+    loaded.leak_for_exit();
     Ok(())
 }
 
-fn task_entry(
+fn task_entry<'a>(
     doc: &Document,
     questions: &OpenQuestionTargets,
     cfg: &OpsConfig,
-    task: &Task,
-) -> TaskEntry {
+    task: &'a Task,
+) -> TaskEntry<'a> {
     TaskEntry {
         id: doc.id_config.format_id(task.id),
-        title: task.title.clone(),
+        title: task.title.as_str(),
         status: task.status.as_str(),
-        owner: task.owner.clone(),
-        level: task.difficulty.clone(),
+        owner: task.owner.as_deref(),
+        level: task.difficulty.as_deref(),
         missing: detail_gaps_with(task, cfg, questions),
     }
 }
 
-/// One task as the text output shows it: its ID and title, then who holds it and what it lacks.
-fn task_text(entry: &TaskEntry) -> String {
-    let mut text = format!("{} {}", entry.id, entry.title);
+/// Appends one task as the text output shows it: its ID and title, then who holds it and what it
+/// lacks.
+fn push_task_text(text: &mut String, entry: &TaskEntry) {
+    text.push_str(&entry.id);
+    text.push(' ');
+    text.push_str(entry.title);
     if entry.status == "claimed" {
-        match entry.owner.as_deref() {
-            Some(owner) => text.push_str(&format!(" [claimed by {owner}]")),
+        match entry.owner {
+            Some(owner) => {
+                text.push_str(" [claimed by ");
+                text.push_str(owner);
+                text.push(']');
+            }
             None => text.push_str(" [claimed]"),
         }
     }
     if !entry.missing.is_empty() {
-        text.push_str(&format!(" [not ready: {}]", entry.missing.join(", ")));
+        text.push_str(" [not ready: ");
+        text.push_str(&entry.missing.join(", "));
+        text.push(']');
     }
-    text
 }
 
 /// `count` with the singular or the plural word, such as `1 lane` or `2 lanes`.
@@ -187,53 +202,69 @@ fn counted(count: usize, singular: &str, plural: &str) -> String {
     format!("{count} {word}")
 }
 
+/// The text output: one line per line of the report, each ending in a newline. It is built in one
+/// buffer, without a string per task (T-188).
 fn render_text(payload: &WavesJson) -> String {
-    let scope = match &payload.milestone {
-        Some(id) => format!("{}, below {id}", payload.file),
-        None => payload.file.clone(),
-    };
-    let mut lines = Vec::new();
+    let mut text = String::new();
+    match &payload.milestone {
+        Some(id) => {
+            let _ = write!(text, "{}, below {id}", payload.file);
+        }
+        None => text.push_str(&payload.file),
+    }
     if payload.tasks == 0 {
-        lines.push(format!("{scope}: no unfinished task"));
+        text.push_str(": no unfinished task\n");
     } else {
-        lines.push(format!(
-            "{scope}: {} in {}; up to {} at once",
+        let _ = writeln!(
+            text,
+            ": {} in {}; up to {} at once",
             counted(payload.tasks, "unfinished task", "unfinished tasks"),
             counted(payload.wave_count, "wave", "waves"),
             counted(payload.max_workers, "worker", "workers"),
-        ));
+        );
     }
     for wave in &payload.waves {
         if wave.size.tasks == 0 {
-            lines.push(format!("wave {}: no task", wave.wave));
+            let _ = writeln!(text, "wave {}: no task", wave.wave);
             continue;
         }
-        lines.push(format!(
+        let _ = writeln!(
+            text,
             "wave {}: {} in {}",
             wave.wave,
             counted(wave.size.tasks, "task", "tasks"),
             counted(wave.size.lanes, "lane", "lanes"),
-        ));
+        );
         for (number, lane) in wave.lanes.iter().enumerate() {
-            let tasks: Vec<String> = lane.iter().map(task_text).collect();
-            lines.push(format!("  lane {}: {}", number + 1, tasks.join(" then ")));
+            let _ = write!(text, "  lane {}: ", number + 1);
+            for (position, task) in lane.iter().enumerate() {
+                if position > 0 {
+                    text.push_str(" then ");
+                }
+                push_task_text(&mut text, task);
+            }
+            text.push('\n');
         }
     }
     if !payload.longest_chain.is_empty() {
-        let ids: Vec<&str> = payload.longest_chain.iter().map(|t| t.id.as_str()).collect();
-        lines.push(format!(
-            "longest chain, {}: {}",
+        let _ = write!(
+            text,
+            "longest chain, {}: ",
             counted(payload.longest_chain.len(), "task", "tasks"),
-            ids.join(" -> ")
-        ));
+        );
+        for (position, task) in payload.longest_chain.iter().enumerate() {
+            if position > 0 {
+                text.push_str(" -> ");
+            }
+            text.push_str(&task.id);
+        }
+        text.push('\n');
     }
     if !payload.apart.is_empty() {
-        lines.push(format!("not in a wave ({}):", payload.apart.len()));
+        let _ = writeln!(text, "not in a wave ({}):", payload.apart.len());
         for apart in &payload.apart {
-            lines.push(format!("  {} {}: {}", apart.id, apart.title, apart.reason));
+            let _ = writeln!(text, "  {} {}: {}", apart.id, apart.title, apart.reason);
         }
     }
-    let mut text = lines.join("\n");
-    text.push('\n');
     text
 }
