@@ -155,7 +155,7 @@ fn no_activity_need(task: &Task, ctx: &Ctx<'_>) -> Need {
     Need::NoActivity {
         title: task.title.clone(),
         owner: task.owner.clone().unwrap_or_else(|| NO_OWNER.to_string()),
-        days: ctx.cfg.claim_age(task, ctx.now).map(|age| age.num_days()),
+        days: crate::report::page::entry::claim_days(task, ctx),
     }
 }
 
@@ -165,6 +165,7 @@ mod tests {
 
     use super::*;
     use crate::ops::OpsConfig;
+    use crate::report::page::entry::{SecondLine, Since, entry_view};
 
     /// The clock of every test: 21 Nov 2026, 15:00, in the +01:00 offset.
     const NOW: &str = "2026-11-21T15:00:00+01:00";
@@ -470,6 +471,42 @@ mod tests {
         assert_eq!(
             waiting_text(&["A".to_string(), "B".to_string(), "C".to_string()]).as_deref(),
             Some("the tasks “A”, “B” and “C” wait for this answer")
+        );
+    }
+
+    #[test]
+    fn needs_you_and_the_entry_count_the_days_of_one_claim_the_same_way() {
+        // Claimed at 23:00 on 7 Nov, read at 01:00 on 21 Nov: 13 days and 2 hours have passed, but
+        // the calendar has 14 days between the two dates. Both places must say 14, not 13.
+        let fixture = text(&[
+            "### T-006 · Update the build instructions",
+            "- status: claimed",
+            "- owner: worker-1",
+            "- claimed: 2026-11-07T23:00+01:00",
+        ]);
+        let doc = Document::parse_bytes(fixture.as_bytes()).unwrap();
+        let cfg = OpsConfig::default();
+        let ctx = Ctx {
+            doc: &doc,
+            archive: None,
+            cfg: &cfg,
+            now: DateTime::parse_from_rfc3339("2026-11-21T01:00:00+01:00").unwrap(),
+        };
+        assert_eq!(
+            build_needs(&doc, &ctx),
+            vec![Need::NoActivity {
+                title: "Update the build instructions".to_string(),
+                owner: "worker-1".to_string(),
+                days: Some(14),
+            }]
+        );
+        assert_eq!(
+            entry_view(&doc.tasks[0], &ctx).second,
+            Some(SecondLine::InProgress {
+                owner: "worker-1".to_string(),
+                since: Some(Since::Days(14)),
+                stale: true,
+            })
         );
     }
 }
