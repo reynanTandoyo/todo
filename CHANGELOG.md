@@ -4,6 +4,29 @@ All notable changes to `todo` are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-21
+
+Faster planning commands on large task lists. No change to the file format (still version 3), to
+any command's output or to any default.
+
+### Changed
+
+- `next` judges readiness in the order it hands tasks out and stops at the first ready task, and
+  indexes open questions once instead of once per task (T-185).
+- `plan` and `waves` index open questions once, and `plan_waves` groups the levels in one pass;
+  read-only commands no longer free their parsed file before they exit (T-186).
+- `next --claim` keeps its documents until it exits instead of freeing them one by one (T-187).
+- `waves` builds the children of each milestone in one pass, numbers lanes without a hash map and
+  writes its output in one buffer (T-188).
+
+On the generated 5,000-task milestone tree (release build), `next` went from about 72 to 36 ms,
+`plan` from 78 to 36 ms, `waves` from 81 to 40 ms and `next --claim` from 129 to about 85 ms.
+
+### Fixed
+
+- CI's dependency check now allows `libc` and `windows-sys`, which 0.8.0 made direct,
+  target-specific dependencies (NFR-9, T-172).
+
 ## [0.8.0] - 2026-11-20
 
 The file format is version 3. todo 0.8 writes it, and todo 0.7 can no longer write such a file: it
