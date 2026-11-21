@@ -7,6 +7,7 @@
 pub mod all;
 pub mod html;
 pub mod model;
+pub mod page;
 
 pub use all::{AllPage, build_all_page};
 pub use html::{render_all_page, render_page};
