@@ -16,10 +16,10 @@ A milestone is a piece of work with a goal, divided into tasks or further milest
 "Develop the renderer" with "C shader" and "GPU compiler"); it is not a release label. The HTML
 report is the one view meant for people; command output is written for agents.
 
-## v1.x
+## v1.0: a status page for people
 
-A planner splits the work until every task is level 1, the level the weakest model finishes
-without a mistake. Workers then take those tasks at the same time, in one checkout.
+The owner and a colleague see on one page what is done, what was cancelled, what is still to do
+and what needs them. Problems found while using todo are fixed along the way.
 
 ### T-190 · Problems found while using todo are fixed
 - status: open
