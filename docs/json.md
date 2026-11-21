@@ -1015,9 +1015,9 @@ command.
 when `--open` started the program). The page itself is HTML, not part of the JSON. The `--all` page
 (R-REPORT-2), written with `todo report --html --all --json`, has the same `data`.
 
-The page shows the planning state (`R-REPORT-3`) next to the work: the open tasks per level, the tasks not
-ready for lack of detail, the tasks given back with their attempts, the tasks kept above the target level, and
-the number of waves. The JSON does not repeat these counts; `todo plan --json` and `todo summary --json` do.
+The page shows the planning state (`R-REPORT-3`) in the closed part *For the planner*, under More: the open
+tasks per level, the tasks not ready for lack of detail, the tasks given back with their attempts, the tasks kept
+above the target level, and the number of waves. The JSON does not repeat these counts; `todo plan --json` and `todo summary --json` do.
 
 ```json
 {

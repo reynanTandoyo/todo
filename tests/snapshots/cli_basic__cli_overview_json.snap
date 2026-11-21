@@ -188,7 +188,7 @@ expression: ok_json
       {
         "kind": "read",
         "name": "report",
-        "summary": "Write one HTML page for people: the work, questions, ideas, done and dropped"
+        "summary": "Write one HTML page for people: what is done, cancelled, still to do, and what needs you"
       },
       {
         "kind": "write",

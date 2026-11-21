@@ -83,9 +83,10 @@ the page they build from it.
    every registered project to `report-all.html` next to the register.
 3. **Open the page** in your browser, or ask the agent to open it: `todo report --html --all --open`.
    The page has a card per project, then each project's lists. A project that cannot be read shows
-   its problem instead of its lists.
-4. **Every change goes through an agent.** The page is read-only: it has no buttons, forms or
-   commands. To change a task, ask an agent.
+   its problem instead of its lists. For one project alone, the agent runs `todo report --html`; the
+   page is described in [HTML report for people](#html-report-for-people).
+4. **Every change goes through an agent.** The pages are read-only. Their buttons only change what
+   you see, and nothing on a page changes `TODO.md`. To change a task, ask an agent.
 
 ```powershell
 todo project add --name renderer
@@ -149,19 +150,37 @@ todo report --html --out "$env:USERPROFILE\Desktop\tasks.html"
 todo report --html --all
 ```
 
-`todo report --html` writes one read-only page: the planning state (open tasks per level, tasks not
-ready for lack of detail, tasks given back with their attempts, tasks kept above the target level,
-and the waves), the work as a tree of milestones with their goals and progress, the unfinished tasks
-per area, open questions, ideas, and the done and dropped entries. An opened task shows its level,
-files, check and whether the check passed.
-It prints the path of `report.html` in the state folder, which git never sees. It takes no lock,
-never changes `TODO.md`, and needs no network. `--out` writes the page elsewhere, and `--open` opens
-it with the system's default program for HTML files.
+`todo report --html` writes one read-only page for the current project, from top to bottom:
 
-`todo report --html --all` writes one page for every project in the project register (see
-`todo project list`): a card per project with its task counts, open tasks per level, top-level
-milestones, blocked tasks and open questions, then each project's lists. It prints the path of `report-all.html` next to the
-register. A project that is gone or cannot be read shows its problem instead of its lists.
+- the header: the title, the description from `todo.toml`, the time of the status, and two buttons,
+  Dark mode (or Light mode) and Colour-blind colours;
+- the overall line: how many tasks are done, and one bar in five parts (done, in progress, waiting,
+  to do, cancelled);
+- Needs you: open questions, tasks a worker gave back, and tasks in progress without activity;
+- Last 7 days: the tasks done or cancelled, the milestones finished and the tasks added in the last
+  seven days;
+- All work: the milestones and tasks as one tree, with done and cancelled entries in place. A click
+  opens an entry's summary (or why), its result and its technical details: level, files, check and
+  whether the check passed. Above the tree, the buttons Everything, Still to do (to do, in progress
+  and waiting), Done and Cancelled choose what is shown, and Expand all and Collapse all open or close
+  the whole tree;
+- More, in closed parts: Ideas, Earlier work from `TODO-archive.md`, and For the planner (levels,
+  parallel waves and tasks that still need detail).
+
+Light or dark mode follows the system setting until you press the button. Colour-blind colours
+switches to a colour set for red-green colour blindness. Both choices are remembered in the browser.
+The page works without scripts too: it shows every entry in the system's mode, and its buttons are
+hidden.
+
+The page prints the path of `report.html` in the state folder, which git never sees. It takes no
+lock, never changes `TODO.md`, and needs no network. `--out` writes the page elsewhere, and `--open`
+opens it with the system's default program for HTML files.
+
+`todo report --html --all` keeps its earlier form: one page for every project in the project register
+(see `todo project list`), with no script and no buttons. It has a card per project with its task
+counts, open tasks per level, top-level milestones, blocked tasks and open questions, then each
+project's lists. It prints the path of `report-all.html` next to the register. A project that is gone
+or cannot be read shows its problem instead of its lists.
 
 ### Adding and editing tasks
 
