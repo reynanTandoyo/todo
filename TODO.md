@@ -8,7 +8,7 @@ covers, and `accept:` is the check that proves it is finished. The file follows
 [`docs/format.md`](docs/format.md).
 
 The file is changed only through `todo`, like any other project that uses it. Everything finished
-up to v0.7 is in [`TODO-archive.md`](TODO-archive.md).
+up to v0.8.1 is in [`TODO-archive.md`](TODO-archive.md).
 
 Priorities say how urgent a task is: P0 = now, P1 = planned, P2 = wanted, P3 = someday.
 
@@ -16,593 +16,199 @@ A milestone is a piece of work with a goal, divided into tasks or further milest
 "Develop the renderer" with "C shader" and "GPU compiler"); it is not a release label. The HTML
 report is the one view meant for people; command output is written for agents.
 
-## v0.8: level-1 tasks and parallel work
+## v1.x
 
 A planner splits the work until every task is level 1, the level the weakest model finishes
 without a mistake. Workers then take those tasks at the same time, in one checkout.
 
-### T-145 · Weak models finish the work in parallel
-- status: done
-- owner: claude-main
-- priority: P1 · type: milestone
-- goal: A planner splits the work until every task is level 1; any number of cheap agents then finish those tasks at the same time, without touching each other's files and without a false done
-- why: the owner wants work finished faster by spawning many cheap agents (Haiku, DeepSeek flash) instead of a few strong ones
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, claude-main): done — v0.8 released as 0.8.0: levels 1 to 5, detailed level-1 tasks, split, verify, stuck, commit scope, file scopes, waves, plan and brief.
-- note (2026-11-20, claude-main): reopened — Reopened: CI shows next at 156 ms (Linux) and 185 ms (Windows) on the T-165 milestone-tree perf test, budget 100 ms.
-- note (2026-11-21, claude-main): done — v0.8 complete: 0.8.0 released; CI speed fixes T-185 to T-188 on main, CI green on Linux and Windows.
+### T-190 · Problems found while using todo are fixed
+- status: open
+- owner: —
+- priority: P2 · type: milestone
+- goal: Every problem found while using todo on real work is recorded here and fixed, and todo's own checks (check, align, plan) stay clean on this repository
+- why: the tool is only trusted when its own reports have no false alarms
+- note (2026-11-21, claude-main): added
 
-### T-146 · v0.8 requirements: levels, detailed tasks, split, verify, stuck, file scopes, waves
-- status: done
-- owner: t146-opus
-- priority: P0 · difficulty: hard · type: docs · area: docs
-- milestone: T-145
-- why: every other v0.8 task builds what this one writes down; the owner's decisions of 2026-11-19 must be in the requirements first
-- accept: docs/requirements.md defines R-LEVEL-1 to R-LEVEL-3, R-DETAIL-1 to R-DETAIL-3, R-SPLIT-1, R-VERIFY-1, R-VERIFY-2, R-STUCK-1, R-SCOPE-1, R-SCOPE-2, R-WAVE-1 and R-REPORT-3 as the v0.8 tasks describe them; section 2 describes the two roles, planner and worker; NFR-5 and section 13 say that todo runs one more kind of command, a task's `verify` line, and nothing else; the settings table gains `target_difficulty`, `level1_max_files`, `verify`, `verify_timeout_seconds`, `verify_attempts` and `verify_shell`, and the defaults of `difficulties` (`1` to `5`) and `required_fields` (`priority`, `difficulty`) change; no model name appears anywhere, only what each level means; section 11 lists v0.8; docs/format.md becomes format version 3: the fields `steps` (a numbered list on indented lines under `- steps:`), `read`, `verify`, `final` and `attempts`, `files` as the list of paths and patterns a task may change, and the migration step from format 2
-- commit: f1d87c1a4a96e476e7bd7d897905a0b4a2511e73
+### T-191 · align reports every done milestone as DONE_WITHOUT_COMMIT
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: bug · area: git
+- milestone: T-190
+- why: a milestone is closed, not committed, so align exits 1 on a clean list (six false findings on this repository at v0.8.1)
+- files: src/cli/align.rs, tests/cmd_align.rs, docs/requirements.md
+- steps:
+  1. Open src/cli/align.rs and find the comment `// Questions are answered, not committed (R-GIT-1).` (near line 85). The `if` under it skips a task whose `task_type` equals "question".
+  2. Change that condition so it also skips a task whose `task_type` equals "milestone", compared with `eq_ignore_ascii_case` in the same way. Change the comment to `// Questions are answered and milestones are closed, not committed (R-GIT-1).`
+  3. Open tests/cmd_align.rs and find the test `answered_questions_are_ignored` (near line 112). Directly after it, add a test `done_milestones_are_ignored` that is a copy of it with one change: the task line is `task("T-001", "done", "- type: milestone\n- goal: Example goal\n")`.
+  4. Open docs/requirements.md and find the sentence "`dropped` tasks and questions are ignored." inside R-GIT-1 (near line 701). Change it to "`dropped` tasks, questions and milestones are ignored."
+  5. Run `cargo fmt --all`, then `cargo test --test cmd_align`. Every test must pass.
+- accept: `todo align` gives no finding for an entry of type milestone, whatever its status; the new test done_milestones_are_ignored passes with the existing align tests; R-GIT-1 says milestones are ignored
+- verify: cargo test --test cmd_align
+- reqs: R-GIT-1
+- note (2026-11-21, claude-main): added
+
+### T-195 · A status page made for people
+- status: open
+- owner: —
+- priority: P1 · type: milestone
+- goal: The owner and a colleague open one page and see within a minute what is done, what was cancelled and why, what is still to do, and what needs them
+- why: the v0.7 page shows what the tool knows instead of what a reader asks: too much text, too little context, and a tree that loses finished work
+- note (2026-11-21, claude-main): added
+
+### T-196 · Requirements for the new status page
+- status: open
+- owner: —
+- priority: P0 · difficulty: 3 · type: docs · area: docs
+- milestone: T-195
+- why: the v0.7 page was specified in words only and came out wrong; this time the approved mockup is the reference and the requirements must describe exactly that page
+- read: docs/report-mockup.html, docs/requirements.md, docs/format.md
+- accept: docs/requirements.md describes the page shown in docs/report-mockup.html (approved by the owner on 2026-11-21): R-REPORT-1 is rewritten for the new layout (header, overall line and bar, the tree with done and cancelled entries in place, one line per entry, the second line, summary and technical details, Other work, and the closed parts Ideas, Earlier work and For the planner); R-REPORT-4 (Needs you), R-REPORT-5 (Last 7 days) and R-REPORT-6 (view buttons and light or dark mode) are new; R-WRITE-19 defines the `summary` field; the settings table gains `description`; the five words for people are fixed: to do (open), in progress (claimed), waiting (blocked), done, cancelled (dropped); the rule "no control that changes TODO.md" stays and view controls are allowed; a small inline script is allowed and the page must be readable without it; R-REPORT-3 says the planning state moves into For the planner; `report --html --all` keeps its v0.8 content and is out of scope; docs/format.md lists `summary` with its place in the field order and the format stays version 3; section 11 lists v1.0
 - reqs: REL-4, NFR-8
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-19, claude-main): Also specify `verify_when` (`done` or `wave`, T-158), the `verified` field and `todo verify --wave`.
-- note (2026-11-19, claude-main): R-AGENT-1 changes: the one rules text becomes a short common block (at most 15 lines) plus `todo help worker` and `todo help planner` (T-166).
-- note (2026-11-20, t146-opus): done — requirements.md: R-LEVEL-1..3, R-DETAIL-1..3, R-SPLIT-1, R-VERIFY-1/2, R-STUCK-1, R-SCOPE-1/2, R-WAVE-1, R-REPORT-3 added; R-AGENT-1 split by role; section 2 planner/worker; NFR-5 and section 13 limit runs to the verify line; new settings and changed defaults; v0.8 in section 11; amended R-EDIT-5, R-READ-3/5, R-WRITE-1/4/8/9/10/18, R-CLAIM-2, R-OUT-3/8/11, R-CHECK-1, R-GIT-2, R-MIG-1, NFR-3, TEST-2/5/9, D14, I-13. format.md: version 3, new fields, steps list, notes, section 19 paths, migration 2 to 3. Decisions recorded on T-148..T-166.
+- note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): Owner 2026-11-21: R-REPORT-6 also covers the colour-blind colours button and the four colour sets (light, dark, each normal and colour-blind); R-REPORT-1 says a state is never shown by colour alone. docs/report-mockup.html was updated to show both.
+- note (2026-11-21, claude-main): Review 2026-11-21: (1) R-REPORT-2 says the --all page shows each project's lists "as in R-REPORT-1"; when R-REPORT-1 is rewritten, copy the v0.8 list description into R-REPORT-2 so --all keeps its content. (2) Define how a task waits for a question (Needs you, T-199; the mockup's "waits for this answer"): a task whose depends names the question. (3) Define the page's words for a task given back with stuck (waiting, with "given back" on its second line, as in the mockup).
 
-### T-147 · Difficulty levels 1 to 5 and the planner's list
-- status: done
-- owner: claude-main
-- priority: P1 · type: milestone
-- milestone: T-145
-- goal: Every task has a level from 1 (the weakest model finishes it without a mistake) to 5, and the planner sees at a glance what still has to be split or detailed
-- why: the planner can only drive everything to level 1 if nothing is unrated and the remaining hard tasks are listed for it
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, claude-main): done — Levels 1 to 5 (T-148), todo plan (T-149) and final (T-150) merged into dev.
+### T-197 · summary field: what an entry is about, written for people
+- status: open
+- owner: —
+- priority: P1 · difficulty: 2 · type: feature · area: cli
+- milestone: T-195
+- why: titles and accept lines are written by agents for agents; the page needs one or two plain sentences per entry that a colleague understands
+- depends: T-196
+- accept: `add`, `set`, `add --from`, `apply` and the children of `split` take `--summary` (text, `-` or `@path`) and write `- summary:` after `why` in the field order; it is allowed on tasks, milestones, questions and ideas; `set --unset summary` removes it; `show --json` and `schema` list it; `check` warns, without changing the exit code, about each task or milestone that is not done or dropped and has no summary; `brief` does not print it; a file written by todo 0.8 that has no summary anywhere works unchanged; a test covers each case
+- reqs: R-WRITE-19, TEST-4
+- note (2026-11-21, claude-main): added
 
-### T-148 · Levels 1 to 5: new default difficulties, difficulty required, old values migrated
-- status: done
-- owner: t148-haiku
-- priority: P1 · difficulty: medium · type: feature · area: core
-- milestone: T-147
-- why: a task without a level cannot be given to the right agent, so an unrated task must not exist
-- depends: T-146
-- accept: the default `difficulties` is `1`, `2`, `3`, `4`, `5` and `todo help add` says what each level means without naming a model; `required_fields` defaults to `priority` and `difficulty`, applied to tasks only (milestones, ideas and questions need neither); `add` and `add --from` without a difficulty are refused with `MISSING_FIELD`; the format 2 to 3 migration rewrites `easy` to `2`, `medium` to `3` and `hard` to `4` on entries that are not done or dropped, only when todo.toml sets no `difficulties` of its own, and leaves open tasks without a difficulty for the planner's list; `next` never hands out a task without a difficulty; every refusal leaves the file byte-identical
-- commit: ef67ed1692551538c32f5906f49dc51cba4b771d
-- reqs: R-LEVEL-1, R-MIG-1, R-CFG-2, TEST-4
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t146-opus): T-146 decision (R-CHECK-1, format.md section 18): check does not report a difficulty outside difficulties on done or dropped entries, which keep easy/medium/hard after the migration as a record.
-- note (2026-11-20, t148-haiku): t148-haiku: the format 2 to 3 step changes task lines (the difficulty values), so the old rule that migrations touch only the preamble is gone; R-MIG-1 already says whole lines only, and the bytes outside the changed lines are still checked. R-DISC-1 now lists --difficulty next to --priority, since scan --add goes through add --from and that needs a level; docs/requirements.md is updated in this commit.
-- note (2026-11-20, t148-haiku): t148-haiku: readiness: a task without a level is not ready, so next, list --ready, summary's next-ready list, show --json ready and the done/drop 'now ready' output all leave it out (one rule in is_task_ready, R-READ-3). T-169 records that promote and apply still create tasks without a level.
-- note (2026-11-20, t148-haiku): done — Default difficulties are 1 to 5; required_fields is priority and difficulty for tasks; add and add --from refuse a task without a level (MISSING_FIELD); format 3 with the format 2 to 3 rewrite of easy/medium/hard to 2/3/4 on open entries unless todo.toml sets difficulties; next and list --ready skip unrated tasks; check ignores old names on done or dropped; todo help add and set print the levels; scan --add takes --difficulty. Tests in tests/cmd_levels.rs and tests/doc_migrate.rs; full suite 618 passed; all four clippy runs and fmt pass.
+### T-198 · Page data: states in plain words, counts, dates and the full tree
+- status: open
+- owner: —
+- priority: P1 · difficulty: 3 · type: feature · area: report
+- milestone: T-195
+- why: the page can only keep finished work in its place if the data behind it is one tree with every entry, its state and its dates
+- depends: T-196
+- read: docs/report-mockup.html, src/report/model.rs, tests/fixtures/report_basic.md
+- accept: the report model (src/report/model.rs) holds one tree with every entry of TODO.md, done and dropped ones included, each with one of five states: to do, in progress, waiting, done, cancelled; the overall numbers are "N of M tasks done" where M leaves out cancelled tasks, plus a count per state; each milestone has the same numbers over every task below it, a state (not started, in progress, finished) and, when finished, the date of its done note; a done entry carries the date and text of its last done note as its result, a cancelled one the date and reason of its drop note, a waiting one its latest reason, an in-progress one its owner and the age of the claim; milestones are ordered in progress, then not started, then finished, keeping file order inside each group; tasks without a milestone form the group Other work; finished trees from the archive form the group Earlier work; milestones, questions and ideas are never counted as tasks; unit tests cover each rule with an invented fixture
+- reqs: R-REPORT-1, R-KIND-3, TEST-1
+- note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): Review 2026-11-21: src/report/all.rs uses model::build_page and Page for the --all page; keep what it needs (or give --all its own copy) so report --html --all keeps its v0.8 content and tests.
 
-### T-149 · todo plan: what the planner still has to split, detail or fix
-- status: done
-- owner: t153-haiku
-- priority: P1 · difficulty: medium · type: feature · area: cli
-- milestone: T-147
-- why: todo does not split tasks itself; it shows the planner exactly which ones need its attention
-- depends: T-148, T-153, T-159
-- accept: `todo plan [<milestone>]` lists, in this order: tasks a worker gave back (stuck), each with the problem; tasks above `target_difficulty` (default: the lowest level), hardest first; tasks at the target level that are not ready, each with what is missing; tasks without a difficulty; a last group, counted apart, holds tasks kept above the target on purpose (`final`); done, dropped and claimed entries, milestones, ideas and questions are left out; `summary` shows one line with the three counts within its 40 lines; `plan --json` matches its snapshot; exit 0 when the first four groups are empty, 1 otherwise
-- commit: e30df2449cde01fd4b21727a925fd056ec8b61fc
-- reqs: R-LEVEL-2, R-READ-4
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t146-opus): T-146 decisions (R-LEVEL-2): T-158 asks plan to list unverified done tasks, so plan has a sixth group counted apart (done tasks with verify and no verified), the one exception to 'done entries are left out'; groups 5 and 6 don't change the exit code. Summary line: to split / to detail / without a level, plus kept on purpose; given-back tasks are counted on their own line (R-STUCK-1). Read-only, JSON schema todo.plan.v1.
-- note (2026-11-20, t158-haiku): From T-158: plan must also list done tasks that have a verify line and no verified line (R-VERIFY-2, the counted-apart group 6 of R-LEVEL-2). T-158 built the warnings of check only; plan is not built yet.
-- note (2026-11-20, t150-haiku): From T-150 (t150-haiku): the summary part is done. summary prints the line "kept above the target level on purpose: N" only when N is above 0, and JSON carries kept_on_purpose (left out at 0). A task counts when it has a final, is open or blocked, and its level is above the target (OpsConfig::is_above_target). plan group 5 should use the same rule and leave out claimed, done and dropped tasks. plan itself is not built: its listing, its exit code and the three-count summary line (to split, to detail, without a level) are still open for T-149. The target is OpsConfig::target_difficulty, the first of difficulties, until target_difficulty is read from todo.toml.
-- note (2026-11-20, t153-haiku): Decisions: each task is in the first group it fits (given back, to split, to detail, without a level, kept on purpose, unverified), so the groups do not overlap. Group 6 is left out while verify = false, as check leaves it out. The groups live in ops::plan and summary's planner line reads them, so plan and summary cannot disagree. ops::verify::awaits_verified is the one rule for a done task whose verify has not passed; check and verify --wave use it. Found: a task whose difficulty is set but not configured is in no group, while next hands it out (T-181).
-- note (2026-11-20, t153-haiku): done — todo plan: the six groups of R-LEVEL-2 in order, exit 0 only when the first four are empty, plan --json (todo.plan.v1) with a snapshot. summary's kept-on-purpose line is now the planner's one line with to split, to detail and without a level, and its JSON carries the three counts.
+### T-199 · Needs you: questions, tasks given back and work without activity
+- status: open
+- owner: —
+- priority: P1 · difficulty: 2 · type: feature · area: report
+- milestone: T-195
+- why: the first thing a person asks is whether anything waits for them, and today that is spread over three sections
+- depends: T-198
+- read: docs/report-mockup.html, src/report/model.rs
+- accept: the model has a list Needs you with, in this order: every open question, with the entry it is about and the tasks that wait for it; every task given back with `stuck`, with the problem and the date; every in-progress task whose claim is stale (older than `claim_ttl_hours`), with the owner and the age; the heading shows the count; an empty list reads "Nothing needs you"; each row names the entry by title, not by ID alone; tests cover each kind and the empty case
+- reqs: R-REPORT-4
+- note (2026-11-21, claude-main): added
 
-### T-150 · final: keep a task above level 1 on purpose
-- status: done
-- owner: t150-haiku
-- priority: P2 · difficulty: easy · type: feature · area: cli
-- milestone: T-147
-- why: splitting is the intended way, but the planner may decide as a last resort that a task stays hard; that decision needs a reason and must stop the reminders
-- depends: T-148
-- accept: `set <task> --final <reason>` writes `- final: <reason>` and is refused on a task at the lowest level or without a reason; `set --unset final` removes it; `plan` and `summary` count such tasks apart (see the plan task); `check` reports a `final` on a milestone, idea or question; `show --json` and `schema` list the field
-- commit: 1890a73df8ccedb88f3959a865961469e0e93ced
-- reqs: R-LEVEL-3, TEST-4
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t146-opus): T-146 decision (R-LEVEL-3): --final is refused at or below target_difficulty (default: the lowest level), and set --final on a milestone, question or idea is refused (BAD_VALUE) in addition to check reporting one written by hand.
-- note (2026-11-20, t156-haiku): split (T-156) removes final by its key today: final is an unknown line to the parser, so the generic unset takes it out. When final gets its own field, split must remove it too: add final to FIELDS_OF_A_TASK in src/cli/split.rs, and keep the split test that expects no final line.
-- note (2026-11-20, t150-haiku): done — set --final, --unset final, the refusals (empty reason, milestone, question, idea, target level), check, show --json, schema and the summary count; final is a typed task field; 11 tests in tests/cmd_final.rs; plan's part left as a note on T-149; attempts and verified field gap recorded as T-177
+### T-200 · Last 7 days: what was finished, cancelled and added
+- status: open
+- owner: —
+- priority: P1 · difficulty: 2 · type: feature · area: report
+- milestone: T-195
+- why: a person who looked last week wants to see only what changed since then
+- depends: T-198
+- read: docs/report-mockup.html, src/report/model.rs
+- accept: the model has a list of the events of the last 7 days, newest first, taken from note dates: task done, task cancelled with its reason, milestone finished with its task count, and entries added; several entries added to one milestone on one day are one row ("5 tasks added to Scene loading"); archived entries are included; at most 15 rows are shown and the rest sit behind one closed "earlier this week" part; no event in 7 days reads "Nothing changed in the last 7 days"; tests use a fixed clock
+- reqs: R-REPORT-5
+- note (2026-11-21, claude-main): added
 
-### T-151 · Level-1 tasks carry everything a weak model needs
-- status: done
-- owner: claude-main
-- priority: P1 · type: milestone
-- milestone: T-145
-- goal: A level-1 task names its files, its steps and its check, todo refuses to hand it out until it does, and the worker gets all of it in one work order
-- why: a weak model fails when it has to explore, guess or decide; the task must leave nothing open
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, claude-main): done — Detail fields (T-152), the level-1 ready rule (T-153) and todo brief (T-154) merged into dev.
+### T-201 · description setting: one sentence about the project for the page header
+- status: open
+- owner: —
+- priority: P2 · difficulty: 2 · type: feature · area: config
+- milestone: T-195
+- why: a colleague who opens the page needs to know what the project is before reading its tasks
+- depends: T-196
+- accept: `description = "..."` in todo.toml is shown under the project title on the page; without it the line is left out; line breaks become spaces; the README settings table lists the key; a test covers both cases
+- reqs: R-CFG-2, R-REPORT-1
+- note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): Review 2026-11-21: `report --json` only returns path, bytes and opened (docs/json.md), so the description is not added there; removed from accept.
 
-### T-152 · Detail fields: steps, read and verify
-- status: done
-- owner: t152-haiku
-- priority: P1 · difficulty: hard · type: feature · area: core
-- milestone: T-151
-- why: the steps, the files to look at and the check command are the detail a weak model needs, and they do not fit the existing one-line fields
-- depends: T-146
-- accept: `add`, `set`, `add --from` and `apply` take `--steps` (text, `-` or `@path`; one step per input line, written as numbered indented lines under `- steps:`), `--read` (paths the worker should look at but not change) and `--verify` (one command line); `set --steps` replaces the whole list and `--unset steps` removes it with its lines; the parser reads the indented lines as the value of `steps` and still keeps every other indented line as text; LF, CRLF and byte-order-mark fixtures round-trip byte-identical; the merge driver treats the list as part of the task block; `show --json` returns `steps` as a list; `schema` lists the three fields; the field order in docs/format.md section 10 is followed
-- commit: 810fe9af96c51cfc9d40d21f225df0c82a5e0939
-- reqs: R-DETAIL-1, R-EDIT-1, R-EDIT-7, TEST-2, TEST-3, TEST-4
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t159-haiku): from T-159 (t159-haiku): todo stuck writes attempts through the generic unknown-field path, so it lands after the last known field, not before verified and commit as docs/format.md section 10 says; attempts is not in CANONICAL_FIELD_ORDER (src/doc/parser.rs). When adding steps, read, verify, final, attempts and verified to that order, check that a stuck on a task with a verify line puts attempts in place.
-- note (2026-11-20, t152-haiku): Decisions: a steps part on the priority line is read as one step (check warns) and is moved below - steps: when steps are set or removed; format.md section 8 says so. --field steps=, add --from and apply fields take the list too (raw text, one step per line); set --steps with empty text removes the field. CANONICAL_FIELD_ORDER follows section 10 in full (final, attempts, verified are ordered but not parsed yet; T-150, T-158 and T-159 add those).
-- note (2026-11-20, t152-haiku): Merge driver: steps are merged as lines of the task block by git merge-file (the textual fallback), not as a field group, so a steps change next to another field's change on the other side conflicts. Reproduced; recorded as a P2 problem.
-- note (2026-11-20, t152-haiku): Command tests compare the text from the ## Now heading on and the fixtures have no format line, so the format 3 migration of T-148 does not change their expectations.
-- note (2026-11-20, t152-haiku): done — steps list, read and verify fields: parsed and written with the edit builder, add/set/add --from/apply take them, show --json and schema list them, set --steps and --unset steps, section 10 order, verifier and merge driver cover them; tests and LF/CRLF/BOM fixtures; a steps part on the priority line is read as a step and moved below - steps: on write
+### T-202 · Page layout: header, overall bar, tree, one line per entry, details on click
+- status: open
+- owner: —
+- priority: P1 · difficulty: 3 · type: feature · area: report
+- milestone: T-195
+- why: this is the page itself; it must look and read like the approved mockup, not like a dump of fields
+- depends: T-198, T-197, T-199, T-200, T-201
+- read: docs/report-mockup.html, src/report/html.rs, src/report/style.css, tests/cmd_report.rs
+- accept: `todo report --html` writes a page with the structure, wording and order of docs/report-mockup.html: header (title, description, date); the overall line with one bar in five parts and the legend; Needs you; Last 7 days; All work as one tree of milestones (title, state, "N of M done", small bar, goal) with nested milestones and tasks; unfinished milestones open, finished ones closed. An entry is one line: state mark, title, date for done and cancelled, small ID. A second line appears only for in progress (owner, since when, "no activity" when stale), waiting (the reason) and cancelled (the reason). A click opens the summary, for a done entry its result, and a closed part Technical details with level, priority, area, files, check and whether it passed, commit, who finished it, dependencies and the notes; an entry without a summary shows its why instead. Below the tree, closed: Ideas, Earlier work, and For the planner, which holds the v0.8 planning state and the per-area counts. The v0.8 sections Done and Dropped and the raw field lists are gone. One column, at most 820 px wide, system font, readable on a narrow window and when printed; all text HTML-escaped (test: a title containing `<script>`); the snapshot test uses a new invented fixture that has every state, a nested milestone, a question, a task given back and a stale claim; `report --html --all` still passes its tests
+- reqs: R-REPORT-1, R-REPORT-3, TEST-1
+- note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): Owner 2026-11-21 (red-green colour blind): a state is never shown by colour alone. Every entry has its own mark shape (done ✓, in progress ●, waiting ◐, to do ○, cancelled ✕), the second line names the state in words, and the legend under the bar pairs each mark with its word and count. All colours come from CSS variables so T-203 can switch the set.
 
-### T-153 · Ready rule: a level-1 task is handed out only when it is complete
-- status: done
-- owner: t153-haiku
-- priority: P1 · difficulty: medium · type: feature · area: core
-- milestone: T-151
-- why: calling a task level 1 is only a claim; the tool can at least check that the detail a weak model needs is there
-- depends: T-152, T-148
-- accept: a task at the lowest level is ready only when it has `why`, `accept`, `steps`, `verify` and `files`; `files` has at most `level1_max_files` entries (default 3) and none is a pattern or a folder; every path in `read` exists; no open question is about it; `next` never hands out a lowest-level task that fails the rule; `check` reports each such task with what is missing, as a warning that does not change the exit code; `show --json` carries `ready` and `missing`; tasks at other levels are not affected
-- commit: b18c77fff732a6fd8e2df1ca9c7bcc12e74e5ea9
-- reqs: R-DETAIL-2, R-READ-3, R-CHECK-1
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t146-opus): T-146 decision (R-DETAIL-2): the ready rule applies to tasks at or below target_difficulty, which defaults to the lowest level, so by default exactly the lowest level as this task says; this keeps plan's group 'at the target level, not ready' meaningful when a project raises the target. claim by ID still works; next and list --ready skip failing tasks.
-- note (2026-11-20, t163-haiku): T-163 added ops::waves::detail_gaps (src/ops/waves.rs): the why, accept, steps, verify and files part of R-DETAIL-2 and the level check, used by todo waves. T-153 should extend that one function with the read paths and open questions and use it for next, check and show, not write a second rule. level1_max_files (default 3) and target_difficulty are still constants there until their config keys are read.
-- note (2026-11-20, t153-haiku): detail_gaps(task, doc, archive, cfg) also checks the read paths (they must exist in the folder of TODO.md; a :<line> suffix is not part of the path) and the open questions about the task; next, list --ready, show --json (ready, missing), check (warnings for unfinished tasks only) and waves all read it. target_difficulty (default: the first of difficulties) and level1_max_files (default 3, at least 1) come from todo.toml; load_next_to sets the folder that read paths are relative to, and a configuration without a file skips the read check. waits_on_task counts a question about a task, so done reports the task newly ready when its last open question is closed. R-DETAIL-2 and R-CHECK-1 now say that check reports unfinished tasks only.
-- note (2026-11-20, t153-haiku): done — Ready rule for tasks at or below the target level: detail_gaps (ops::waves) checks why, accept, steps, verify, files (level1_max_files), read paths and open questions; next, list --ready, show --json (ready, missing), check (warnings) and waves use it. target_difficulty and level1_max_files are read from todo.toml; waits_on_task counts a question about a task for newly ready.
-- note (2026-11-20, t154-haiku): T-154 (t154-haiku): target_difficulty and level1_max_files are read from todo.toml now. Use OpsConfig::is_at_or_below_target(difficulty) for the ready rule, not a rank of 0; cfg.level1_max_files replaces the LEVEL1_MAX_FILES constant, which is gone. detail_gaps keeps its checks; the read paths and open questions and the next/check/show wiring stay with this task, as the T-163 note says.
+### T-203 · View buttons, light or dark mode, and colour-blind colours
+- status: open
+- owner: —
+- priority: P1 · difficulty: 2 · type: feature · area: report
+- milestone: T-195
+- why: the owner wants to narrow the tree to what is left or what was done, and to switch between light and dark, without anything on the page being able to change TODO.md
+- depends: T-202
+- read: docs/report-mockup.html
+- accept: the page has the buttons Everything, Still to do, Done and Cancelled, which hide the entries that do not match and every milestone left without a visible entry, and open the milestones that have one; Expand all and Collapse all; one button that switches between light and dark mode; and one button "Colour-blind colours". There are four colour sets, one for each pair of mode and colour-blind setting, as in docs/report-mockup.html: the normal sets use green, blue, amber, grey and red, tuned separately for the white and the dark background; the colour-blind sets (red-green) use only blue for done, orange for in progress, orange with dark stripes in the bar for waiting, light grey for to do and dark grey (near white on the dark background) for cancelled. In every set each state colour has a contrast of at least 3 to 1 against its background, and a test computes that for all four sets. The mode follows the system setting until the button is used; both choices are remembered in the browser (a failure to store them is ignored). All of it is one small inline script with no network access; without scripts the page shows everything in the system mode with the normal colours and the buttons are hidden; the buttons are left out when printing; nothing on the page writes a file or runs a command; the snapshot covers the markup and a test checks that the script names no address
+- reqs: R-REPORT-6, NFR-4
+- note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): Owner 2026-11-21: the owner is red-green colour blind. A button switches the colour scheme only; light and dark mode each need their own colours that fit a white or a black background, in the normal and in the colour-blind scheme.
 
-### T-154 · todo brief: one work order for the worker
-- status: done
-- owner: t154-haiku
-- priority: P1 · difficulty: medium · type: feature · area: cli
-- milestone: T-151
-- why: a weak model should read one text and start, without running several commands to collect the context
-- depends: T-152, T-158, T-159
-- accept: `todo brief <task>` prints, in this order: the goals of the milestones above the task, top down; the title and the why; the files to read; the files it may change, with the sentence that no other file may be changed; the numbered steps; the verify command; for each finished dependency its done note and commit; the exact commands to finish (commit only the listed files, `todo done <id> --commit HEAD`) and to give up (`todo stuck <id> --note`), with the agent name filled in; `next --claim --brief` and `claim --brief` print the same after claiming; `brief --json` matches its snapshot; it reads only and takes no lock
-- commit: 73d88c98fbd29f1abf38405747bb12df598212fd
-- reqs: R-DETAIL-3, R-MILE-4, R-LOCK-5
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t154-haiku): done — brief: todo brief <task> prints the R-DETAIL-3 work order (goals above, ID/title/why, read, files with no-other-file sentence, steps, verify and when done runs it, done dependencies with note and commit, finish and give-up commands); next --claim --brief, next --brief and claim --brief print it; --json todo.brief.v1; target_difficulty and level1_max_files read from todo.toml (defaults: first level, 3); OpsConfig::is_at_or_below_target replaces the rank-0 checks in the done commit rule and in waves detail_gaps; LEVEL1_MAX_FILES removed; R-DETAIL-3 item 7 limited to done dependencies. 21 new tests; full suite 850 passed, 0 failed; fmt, clippy (all features, none, Linux) clean. next/check/show wiring of detail_gaps and the read/question checks left to T-153.
-
-### T-155 · Splitting a task into smaller tasks
-- status: done
-- owner: claude-main
-- priority: P1 · type: milestone
-- milestone: T-145
-- goal: The planner replaces one hard task with several smaller ones in a single step, and nothing that depended on the old task breaks
-- why: dividing is the planner's main move, so it must be one safe command and not a dozen
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, claude-main): done — todo split (T-156) merged into dev.
-
-### T-156 · todo split: turn a task into a milestone with child tasks
-- status: done
-- owner: t156-haiku
-- priority: P1 · difficulty: medium · type: feature · area: cli
-- milestone: T-155
-- why: splitting by hand takes one command per child plus a change of the parent, and a crash in between leaves half a split
-- depends: T-152, T-148
-- accept: `todo split <task> --from <file|->` takes child tasks as JSON lines in the shape of `add --from`; in one locked write with one snapshot the task becomes `type: milestone` with `goal` taken from `--goal` or else from its `accept`, loses `difficulty`, `files`, `steps`, `verify`, `final` and its claim, and every child is added after it with `milestone` set to it; children may depend on each other with `@ref`; tasks that depended on the split task still do and now wait for the whole milestone; all or nothing: one bad child changes nothing; refused on a done, dropped or milestone entry and on a task claimed by another agent without --force; a note on the parent names the children; `--dry-run` prints the diff
-- commit: c913638e3731dc0b5aabac951da12320fa0b3c4e
-- reqs: R-SPLIT-1, R-WRITE-13, R-MILE-1, TEST-4
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t146-opus): T-146 decision (R-SPLIT-1): split also removes read and attempts; a blocked (given-back) task becomes open so its children can be handed out (a blocked milestone would hold them back, R-MILE-6); a child naming its own milestone is refused (BAD_VALUE); no --goal and no accept refuses with MISSING_FIELD; the parent note is 'split into T-021, T-022, ...'.
-- note (2026-11-20, t156-haiku): done — split adds the children and makes the task a milestone in one locked write: goal from --goal or else accept; drops difficulty, files, read, steps, verify, final, attempts, verified and its claim; a blocked task becomes open; the note reads split into <IDs>. Children reuse add --from parsing and @ref handling (parse_batch_entries, check_batch_titles, resolve_batch_depends, entry_lines). Decided: a child with a section, or a question or idea child, is BAD_VALUE; verified is removed (format.md 16), R-SPLIT-1 now says so. 15 tests in tests/cmd_split.rs; cli_overview snapshot lists split. Found T-178 (set --goal with a separator). final is removed by its key until T-150 adds its field; noted on T-150.
-
-### T-157 · A done that can be trusted
-- status: done
-- owner: claude-main
-- priority: P1 · type: milestone
-- milestone: T-145
-- goal: A task counts as done only after its own check passed and its commit stayed inside its files; a worker that fails gives the task back with the problem
-- why: weak models report success when the work is broken, and with many of them nobody can re-check every task by hand
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, claude-main): done — verify (T-158, T-173), todo stuck (T-159) and the commit-scope check (T-160, T-174, T-175) merged into dev.
-
-### T-158 · Verify command: checked at done, or for the whole wave
-- status: done
-- owner: t158-haiku
-- priority: P1 · difficulty: hard · type: feature · area: core
-- milestone: T-157
-- why: asking the worker whether its test passed relies on the one thing that cannot be trusted
-- depends: T-152
-- accept: a task's `verify` command is run by todo in the folder of TODO.md, outside the write lock, through `verify_shell` (default PowerShell on Windows, `sh` elsewhere), stopped after `verify_timeout_seconds` (default 300). `verify_when` in todo.toml picks the mode. Mode `done` (default): `done` runs the command first; exit 0 marks the task done and writes `- verified: <date>`; anything else refuses with exit 1 and the new code `VERIFY_FAILED`, leaves the task claimed, raises `attempts` by one, saves the full output in the state folder and puts its last line in a note; after `verify_attempts` failures (default 3) the task is given back as `stuck` does. Mode `wave`: `done` does not run the command and the task is done without `verified`; `todo verify --wave` then runs the command of every done task that has `verify` and no `verified`, one after another; a pass writes `verified`; a failure reopens the task and gives it back as `stuck` does, with the last line of the output as the problem; it prints passed, failed and the tasks given back, exit 0 only when all passed, and refuses to start while any task is claimed unless --force. In both modes: `todo verify <task>` runs one command without changing anything; `done --no-verify` needs --force and leaves a note; `verify = false` turns running off; a task without `verify` behaves as today; `check` and `plan` list done tasks that are still unverified; the command's output never breaks `--json`; tests use a command that passes, one that fails and one that outlives a short timeout, in each mode
-- commit: cb9f26fa43fc4a217be0cf7a7fb27a7a485c4c9d
-- reqs: R-VERIFY-1, R-VERIFY-2, R-LOCK-4, R-OUT-3, NFR-5, NFR-6
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-19, claude-main): Owner 2026-11-19: both modes wanted. Wave mode exists because in a compiled project one worker's half-finished edit breaks the build for every other worker's check; there the planner checks all tasks when the wave is finished.
-- note (2026-11-20, t146-opus): T-146 decisions (R-VERIFY-1/2): in a linked worktree the command runs in the matching folder of that worktree, not the main checkout, so it checks the worker's own code; output goes to verify/<ID>.log in the state folder; the give-back after verify_attempts counts 'verify failed' notes since the latest unblocked/reopened/stuck note (attempts stays a lifetime total); a shell that cannot start, or verify=false on 'todo verify', is exit 5 with new code VERIFY_NOT_RUN and writes nothing; verify --wave with claimed tasks refuses with ALREADY_CLAIMED; set refuses verified and attempts (BAD_VALUE); reopen removes verified; default verify_shell is pwsh -NoProfile -NonInteractive -Command, else powershell.exe; each --wave result is its own locked write. Note texts are in format.md section 9.
-- note (2026-11-20, t158-haiku): Decisions (T-158): a timeout's last line is 'timed out after N seconds'; a give-back after verify_attempts still exits 1 with VERIFY_FAILED; --no-verify without --force is USAGE (exit 2); apply's done runs no command (see T-173); check warns about unverified done tasks but not while verify = false; set and --unset refuse attempts and verified; the process-tree problem is T-172. The format 3 fixtures wait for T-148.
-- note (2026-11-20, t158-haiku): done — done runs the verify command first; todo verify runs one check or the wave; verify settings and error codes VERIFY_FAILED and VERIFY_NOT_RUN; check warns about unverified done tasks; merged dev with T-148 as 25af8a7
-
-### T-159 · todo stuck: give a task back to the planner with the problem
-- status: done
-- owner: t159-haiku
-- priority: P1 · difficulty: easy · type: feature · area: cli
-- milestone: T-157
-- why: a weak model that cannot finish must have a clean way out, and the planner must learn what went wrong
-- depends: T-146
-- accept: `todo stuck <task> --note <problem>` sets the task to blocked, removes the owner and the claim, adds the note `stuck — <problem>` and raises `attempts` by one, in one write; the note is required; only the owner may do it, others need --force; the level is not changed; such a task is never handed out by `next` until the planner runs `unblock` or `split` on it; `summary` counts tasks given back; a test covers each case and each refusal
-- commit: ce0f54bc7add4bd9757b8b3af0fc7e458e0bcdfb
-- reqs: R-STUCK-1, R-WRITE-9, TEST-4
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t146-opus): T-146 decision (R-STUCK-1): stuck works only on a claimed task (BAD_TRANSITION otherwise); a missing --note is exit 2 USAGE; a task is 'given back' when blocked and its latest blocked/stuck note is a stuck note, and that stuck note counts as the block reason for check, summary and the report (so check does not flag it).
-- note (2026-11-20, t159-haiku): done — todo stuck <task> --note <problem>: claimed to blocked in one write (owner and claim removed, level kept, note stuck — <problem>, attempts +1); owner or --force only; BAD_TRANSITION unless claimed; summary lists tasks given back; stuck counts as the block reason; 7 integration tests and 4 unit tests added; 610 tests pass
-
-### T-160 · done checks that the commit stayed inside the task's files
-- status: done
-- owner: t160-haiku
-- priority: P1 · difficulty: medium · type: feature · area: core
-- milestone: T-157
-- why: in one shared checkout a worker that edits a file outside its task breaks another worker's task without anyone noticing
-- depends: T-162
-- accept: `done --commit` on a task with `files` compares the files that commit changed (from git, before the lock is taken) with the task's paths and patterns; a file outside them refuses with exit 1 and the new code `OUT_OF_SCOPE`, naming the files; `TODO.md` and the archive file are always allowed; --force overrides with a note; a lowest-level task with `files` cannot be finished without `--commit` while git is available; a task without `files`, or a folder without git, behaves as today; tests use a temporary repository with one commit inside and one outside the scope
-- commit: 79e89eac664f5f86074564a4e9e9c2b9252cc603
-- reqs: R-SCOPE-2, R-WRITE-4, NFR-5
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t146-opus): T-146 decision (R-SCOPE-2): a task at or below the target level with files, finished without --commit while git is available, is refused with exit 1 MISSING_FIELD naming --commit HEAD; renames count both paths, merge commits are compared with their first parent; force note 'forced done outside files: <files>'.
-- note (2026-11-20, t160-haiku): Decisions in the code: the target level is the first of difficulties (R-DETAIL-2) until target_difficulty exists from T-148; --force does not override the MISSING_FIELD rule (R-SCOPE-2 now says so); git is available when it is on PATH and the folder of TODO.md is inside a repository (R-SCOPE-2 now says so); apply does not check the commit's files yet (recorded as T-174).
-- note (2026-11-20, t160-haiku): done — done --commit checks the commit's changed files against files (OUT_OF_SCOPE, --force notes them); a lowest-level task with files needs --commit (MISSING_FIELD); merge compared with first parent; renames count both paths; TODO.md and archive always allowed; 15 CLI tests, 9 path-rule tests, exit-code table case
-- note (2026-11-20, t160-haiku): Order of the checks in done and apply after the merge with dev (verify, T-158/T-173): the commit scope is checked first, then the verify command runs; a commit outside the files, or a missing commit, runs no command. The scope is checked again under the lock (R-SCOPE-2, R-VERIFY-1).
-
-### T-161 · Many workers at once without collisions
-- status: done
-- owner: claude-main
-- priority: P1 · type: milestone
-- milestone: T-145
-- goal: Workers in one checkout never get tasks that touch the same file, and the planner sees how many workers are useful now and which chain of tasks limits the speed
-- why: worktrees per agent cost disk space and a serial merge; file scopes let every agent work in the same folder
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, claude-main): done — File scopes (T-162, T-168, T-170) and todo waves (T-163, T-171) merged into dev.
-
-### T-162 · File scopes: next never hands out tasks that share a file
-- status: done
-- owner: t162-haiku
-- priority: P1 · difficulty: hard · type: feature · area: core
-- milestone: T-161
-- why: two tasks with no dependency between them still collide when both edit the same file
-- depends: T-146
-- accept: `files` is a comma-separated list of paths, folders (ending in `/`) and `*` patterns, relative to the folder of TODO.md, compared with `/` and `\` as the same and ignoring case on Windows; two tasks overlap when a path of one equals, lies under or can match a path of the other; `next` and `next --claim` skip a ready task that overlaps a task claimed by someone else whose claim is not stale; `claim <task>` on such a task is refused with exit 1 and the new code `FILES_BUSY`, naming the task in the way, unless --force; tasks without `files` are handed out as today; 10 parallel `next --claim` on tasks that pairwise share files hand out tasks that never overlap; `list --ready` marks tasks held back for this reason; `show --json` lists the overlapping claimed tasks
-- commit: 2cb42c5dda393ccae5f6642ce578e614a8ee0fa7
-- reqs: R-SCOPE-1, R-READ-3, R-CLAIM-2, TEST-5
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t146-opus): T-146 decisions (R-SCOPE-1, format.md section 19): a task blocked with an owner and a non-stale claim also holds its files (an owner may have uncommitted edits); a trailing :<line> (as scan writes) is ignored; ** matches any number of folders; two patterns overlap unless their fixed parts before the first * differ (errs towards overlap); show --json field name files_busy; claim --force note 'forced claim (files held by <ID>)'.
-- note (2026-11-20, t162-haiku): done — file scopes: files overlap rules (src/ops/scope.rs); next and next --claim skip files another agent holds; claim refused with FILES_BUSY unless --force (note: forced claim); show --json files_busy; list --ready marks held-back tasks; check warns on absolute or outside files entries; tests in tests/ops_scope.rs and tests/cmd_scope.rs, FILES_BUSY row in docs/json.md and the exit-code test
-
-### T-163 · todo waves: how much can run in parallel, and the longest chain
-- status: done
-- owner: t163-haiku
-- priority: P1 · difficulty: medium · type: feature · area: cli
-- milestone: T-161
-- why: the number of waves is the fewest rounds the work needs however many agents are spawned, so it is the number the planner should shrink
-- depends: T-162
-- accept: `todo waves [<milestone>]` groups the unfinished tasks into waves: wave 1 is everything ready now, wave n is what becomes ready when the waves before it are done, using each task's dependencies and those inherited from milestones; inside a wave, tasks that share files are shown as one lane because they must run one after another; it prints the number of waves, the size of each, the largest number of workers useful at once, and the longest dependency chain task by task; tasks waiting on a missing ID or in a cycle are listed apart; `waves --json` matches its snapshot; it reads only
-- commit: 4fb0d313d1afd53f6e2c355f33578e6f92a309d8
-- reqs: R-WAVE-1, R-DEP-1, R-MILE-6
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t146-opus): T-146 decisions (R-WAVE-1): claimed tasks count in wave 1 as running; given-back and other blocked tasks, and tasks below a blocked milestone, are listed apart with the missing-ID and cycle ones; tasks not ready for lack of detail or level are placed by their dependencies and marked; workers useful at once = most lanes in any wave; JSON schema todo.waves.v1.
-- note (2026-11-20, t163-haiku): done — todo waves [<milestone>]: waves, lanes (files overlap), the longest chain, workers at once and the tasks apart with reasons; JSON todo.waves.v1 in docs/json.md. Planner in src/ops/waves.rs (one Kahn pass), overlap_lanes in src/ops/scope.rs. Markers for missing level and detail (why, accept, steps, verify, files) placed by dependencies. Tests: cmd_waves (19 incl. snapshot), ops_scope lanes, docs_json example, overview snapshot updated. Merged dev (T-167, T-168) into the branch; merged tree passes fmt, clippy (all features, none, Linux) and cargo test --all-features (703 passed).
-
-### T-164 · HTML report shows the planning state
-- status: done
-- owner: t164-haiku
-- priority: P2 · difficulty: medium · type: feature · area: report
-- milestone: T-145
-- why: the page is the owner's only view, so it must show how far the planner is and where workers failed
-- depends: T-149, T-163
-- accept: each project page shows: open tasks per level; how many are not ready; tasks given back with the problem and their `attempts`; tasks kept above level 1 with the reason; the number of waves and the size of wave 1; each task shows its level, files and verify command when opened; the all-projects page shows open tasks per level on each card; snapshot tests are updated; still no button, form or command on the page
-- commit: 973f8e90230034d0b4c7034192d28724a8d114e2
-- reqs: R-REPORT-3, R-REPORT-1
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t146-opus): T-146 decision: docs/requirements.md I-13 said R-REPORT-3 stays unused; T-146 and this task both name R-REPORT-3, so the ID is reused for the planning state and I-13 now says so.
-- note (2026-11-20, t164-haiku): done — HTML report: each project page has a Planning section (open tasks per level, not ready for lack of detail with what is missing, given back with problem and attempts, kept above the target level with the final reason, waves and wave 1 size), from ops::plan::build_plan, ops::waves::plan_waves and detail_gaps, built once per page; an opened task shows level, files, verify and verified; each all-projects card shows open tasks per level from the page's count. R-REPORT-3 says open means open, claimed or blocked. Dev merged (T-149). Snapshots of both pages updated; tests/cmd_report_planning.rs (7) and one card test; no form, button or command; all text escaped. Release perf: single page 75 ms, 3.99 MB; all projects 582 ms. Full suite 904 passed, 0 failed; fmt and clippy clean on Windows and Linux.
-
-### T-165 · Performance test for plan, waves and file scopes
-- status: done
-- owner: t163-haiku
-- priority: P1 · difficulty: medium · type: test · area: core
-- milestone: T-145
-- why: with thousands of level-1 tasks, overlap and wave calculations must not make every `next` slow
-- depends: T-149, T-163
-- accept: on the generated 5,000-task milestone-tree file, extended so every task has files and a third of them share one, `next`, `plan`, `waves` and `brief` each take under 100 ms and `next --claim` under 200 ms in a release build; the test runs in CI with the other performance tests
-- commit: 4a82f2a2716fc1286e9ec0a56158a3a6d2d51175
+### T-204 · Performance and size of the new page
+- status: open
+- owner: —
+- priority: P1 · difficulty: 2 · type: test · area: report
+- milestone: T-195
+- why: the new page keeps every finished entry in the tree, so it must be measured again on a large list
+- depends: T-203
+- accept: on the generated 5,000-entry milestone-tree file `report --html` finishes in under 500 ms in a release build and the page stays under 5 MB; the existing report performance test asserts both and runs in CI; the measured numbers are recorded in a note
 - reqs: NFR-3, TEST-9
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-20, t163-haiku): done — tests/perf.rs: a planning file from the T-105 generator extended to level 1 with files, why, steps and verify, a third of the tasks sharing one file; the T-105 tests keep their own file and budgets. New ignored release test: next, plan, waves and brief under 100 ms, next --claim --new under 200 ms; medians of five, release, 5,000 entries, 1.84 MB: next 82 ms, plan 83 ms, waves 92 ms, brief 41 ms, next --claim 146 ms. Causes found and fixed in T-182 (waves lanes) and T-183 (next). Whole perf set passes in release; cargo test --all-features: 896 passed.
+- note (2026-11-21, claude-main): added
 
-### T-166 · v0.8 agent rules by role, documentation and release 0.8.0
-- status: done
-- owner: claude-main
-- priority: P1 · difficulty: 3 · type: docs · area: release
-- milestone: T-145
-- why: the new commands only help when every agent knows which role it has and what to run
-- depends: T-150, T-154, T-156, T-160, T-164, T-165
-- accept: the rules are split by role so that no agent carries rules it does not need. The common rules block (AGENTS.md, TODO.md, the skill) is at most 15 lines and ends with one line per role naming its help text. `todo help worker` is at most 10 lines: take work with `todo next --claim --max-difficulty 1 --brief`, change only the listed files, commit only those files, `todo done <id> --commit HEAD`, `todo stuck <id> --note` when it cannot finish; `todo brief` repeats the last three with the task's ID filled in, so a worker needs no other text. `todo help planner` holds the planner's rules: give every task a level; split with `todo split` until `todo plan` is empty; write files, steps and verify for level-1 tasks; keep a higher level only with `--final`; read `todo waves` and break long chains; in wave mode run `todo verify --wave` when a wave is finished, otherwise the full test suite. A test fails when the common block grows past 15 lines or the worker text past 10. The README explains the roles, the levels, file scopes in one checkout and what the verify command is trusted to do; docs/json.md documents every new JSON shape and the codes `VERIFY_FAILED`, `OUT_OF_SCOPE` and `FILES_BUSY`; CHANGELOG.md has the 0.8.0 entry including the format change and the changed defaults; Cargo.toml is 0.8.0; `todo migrate --yes` was run in this repository and `todo check` is clean
-- commit: e143d635e2656c0b3002f3b77c6c0dfcc45032ee
+### T-205 · Planner rules for summaries, documentation and release 1.0.0
+- status: open
+- owner: —
+- priority: P1 · difficulty: 2 · type: docs · area: release
+- milestone: T-195
+- why: the page is only as readable as the texts the planner writes, and the release makes the new page the one people get
+- depends: T-204,T-206
+- accept: `todo help planner` tells the planner to write a `summary` in plain words for every task and milestone (what it is about, no IDs, no file names, at most two sentences), to write the done note as the result in one sentence, and to give a reason a person understands when dropping or giving back a task; the common rules block stays within 15 lines and the worker text within 10; `todo help report` describes the new page (it still says "no script, no buttons"); the README part for people describes the new page with its sections and buttons; docs/json.md documents the `summary` field in `show --json` and `schema` and drops the R-REPORT-3 remark from the `report --json` part; CHANGELOG.md has the 1.0.0 entry; Cargo.toml is 1.0.0; this repository's own entries have summaries, a new `todo.toml` has a description (and nothing else), and `todo check` is clean; T-206 is answered
 - reqs: R-AGENT-1, REL-2, REL-5
-- by: Reynan Henry Tandoyo
-- note (2026-11-19, claude-main): added
-- note (2026-11-19, claude-main): Rules text for the planner: in wave mode run `todo verify --wave` when every worker of the wave has finished, before starting the next wave.
-- note (2026-11-19, claude-main): Owner 2026-11-19: commands cost no context (nothing is loaded until `todo help <command>` is run), but the rules text does and it grew from 11 to 20 lines by v0.7. Keep the common rules short and move role rules into `todo help worker` and `todo help planner`. Lines moved out of the common block today (milestones, ideas, questions, migrate, update) go to the planner text or stay only where a refusal message already names the command.
-- note (2026-11-20, t146-opus): T-146 decisions (R-AGENT-1): help update, migrate, milestones, ideas and questions move to the planner text; R-OUT-11 now says the planner rules name todo help update; D14 is marked as amended. docs/json.md must also document VERIFY_NOT_RUN (exit 5) besides VERIFY_FAILED, OUT_OF_SCOPE and FILES_BUSY, and the schemas todo.plan.v1, todo.brief.v1, todo.waves.v1.
-- note (2026-11-20, t153-haiku): Local part finished on reynanTandoyo/t153 in 375a7d1 (after dev 9a45595): the common rules are 10 lines (src/agents/rules.md), todo help worker is 8 lines and todo help planner holds the planner rules; tests fail past 15 and 10 lines. README, docs/json.md (help topics, stuck, split, next --brief, done refusals, the report planning state), CHANGELOG 0.8.0 (format 3, the changed defaults, fixes T-167 to T-183, the report planning state and T-184) and Cargo.toml and Cargo.lock at 0.8.0 are done. The AGENTS.md block and the skill were reinstalled with the new binary in the worktree; CLAUDE.md imports AGENTS.md. Left for the coordinator: todo migrate --yes on the shared list (todo 0.8 check reports T-166 difficulty medium and a format 2 file until then), agents install and skill install in C:\Project\todo (its AGENTS.md block is outdated), tag, push, publish and install. T-166 stays claimed.
-- note (2026-11-20, claude-main): Released 2026-11-20: tag v0.8.0 on e143d63, GitHub release published by the Release workflow. Installed on this PC with todo help update (SHA-256 matched, todo --version prints 'todo 0.8.0 (e143d63)'); todo migrate --yes moved TODO.md and TODO-archive.md to format 3; todo check is clean.
-- note (2026-11-20, claude-main): forced done (owner was t153-haiku)
-- note (2026-11-20, claude-main): done — v0.8 agent rules by role, docs and 0.8.0 released and installed.
-
-### T-167 · Merge driver: a steps change next to another field's change conflicts
-- status: done
-- owner: t152-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: steps are merged as lines of the task block by git merge-file, so a change to the last step and a change to the line right after the list, made on different sides, conflict although they touch different fields; reproduced with merge-driver run on a base with steps and an accept line below them. A field-group merge for steps (like single-line fields) would avoid it.
-- commit: 1ec53f93b28660043be2e4df62a9e59be0d51fb9
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t152-haiku): added
-- note (2026-11-20, t152-haiku): done — merge driver: the steps list is one field (its field line and step lines) and is merged three-way like a single-line field; a steps change on one side and another field's change on the other merge cleanly, LF and CRLF; both sides changing the list differently conflicts; tests in tests/cmd_merge_driver.rs
-- note (2026-11-20, claude-main): Coordinator 2026-11-20: accepted that two sides editing different lines of one steps list now conflict (the list is one field; a silent merge could reorder steps).
-
-### T-168 · summary next ready list ignores file scopes
-- status: done
-- owner: t162-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: summary lists the next ready tasks with is_task_ready alone, so a task whose files another agent holds (R-SCOPE-1) appears there although next will not hand it out
-- commit: 2f11e04c1c16e9e47fd3919a2fc4f0bf1b34b08c
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t162-haiku): added
-- note (2026-11-20, t162-haiku): done — summary next ready leaves out tasks whose files another agent holds (R-SCOPE-1, R-READ-5): the same check as ready in show and list, applied after the sort so it stops at five; help text and docs/json.md say so; tests in tests/cmd_scope.rs
-
-### T-169 · promote and apply make tasks without a level, which next never hands out
-- status: done
-- owner: t148-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: add refuses a task without a difficulty since T-148, but promote and apply still create one; it is never handed out until someone runs set --difficulty
-- commit: 66493a07fea7486ec39671c3c1479f817416f1be
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t148-haiku): added
-- note (2026-11-20, t148-haiku): done — promote takes --difficulty and refuses MISSING_FIELD without a level (the idea's own level is kept); apply refuses an add operation without a level when required_fields names difficulty, for the whole batch; tasks that are milestones, questions or ideas need none. Tests in tests/cmd_levels_entries.rs; full suite 706 passed; fmt and clippy (Windows, Linux, with and without all-features) pass.
-
-### T-170 · done reports newly ready tasks that files another agent holds
-- status: done
-- owner: t162-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: newly_ready after done or drop uses is_task_ready alone (pipeline.rs), so a task that becomes dependency-free can be listed although next will not hand it out while an overlapping live claim of another agent holds its files (R-SCOPE-1)
-- commit: 70df2d84bac9173017c3009bcc27254947a7c72a
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t162-haiku): added
-- note (2026-11-20, t162-haiku): done — done and drop: newly_ready (text now-ready lines and JSON) leaves out a task whose files another agent's live claim holds, the same files_busy check as next and summary (R-DEP-4, R-SCOPE-1); docs/json.md says so; tests in tests/cmd_scope.rs
-- note (2026-11-20, t162-haiku): after merging T-148, two file-scope tests failed because their newly ready task had no level; the fixtures now give level 2 and format 3 (commit c1ece85); no rule changed
-
-### T-171 · waves places a task below a done or dropped milestone, which next never hands out
-- status: done
-- owner: t163-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: R-MILE-6 says such a task is not ready, but waves follows only the blocked-milestone rule from the T-146 note; the planner should decide whether waves lists it apart too
-- commit: 4b45b97f97419e900a2325b12788ccfdf457abbd
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t163-haiku): added
-- note (2026-11-20, t163-haiku): done — waves now holds back a task below a done, dropped or blocked milestone, listed apart with its reason, as next does (R-MILE-6). Shared rule: read::milestone_holds_back, used by is_task_ready and waves. R-WAVE-1, json.md and the waves help name all three states. Tests in cmd_waves: held-back reasons, dependents, done-milestone dependency, list --ready agreeing with wave 1 on two fixtures. fmt, clippy (Windows and Linux, with and without --all-features) and cargo test --all-features (705 passed) all pass.
-
-### T-172 · A verify timeout stops only the shell, not the processes it started
-- status: done
-- owner: t158-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: R-VERIFY-1 says the command and the processes it started are stopped after verify_timeout_seconds. todo kills only the shell it started (std Child::kill). A build or test started by that shell keeps running after the timeout. Stopping the whole tree needs a Windows job object or a Unix process group, which needs unsafe code or a crate outside NFR-9; decide which.
-- commit: e02dd3e93770e916af73bd7d82bb2735bcebd5b4
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t158-haiku): added
-- note (2026-11-20, t158-haiku): Options (not implemented; needs an owner decision). Nothing in std stops a process tree: Windows needs a Job Object (KILL_ON_JOB_CLOSE) and Unix needs a process group sent a signal (process_group(0) is std, but kill needs libc). Cargo.lock already has libc 0.2.191 and windows-sys 0.61.2, but only as transitive dependencies. (1) Make libc and windows-sys direct dependencies: no new download, a change to the NFR-9 list, a few unsafe calls in todo. (2) Declare the few kernel32 and libc functions by hand: no dependency change, about 80 lines of unsafe FFI with hand-written signatures. (3) Keep the limit and document it. taskkill and kill as extra commands are excluded by NFR-5 and section 13.
-- note (2026-11-20, t158-haiku): done — a verify timeout stops the whole process tree: a process group killed with killpg on Unix, a Job Object with KILL_ON_JOB_CLOSE on Windows; the tree is also stopped after a normal end; libc and windows-sys are direct dependencies (already in Cargo.lock; NFR-9 updated)
-
-### T-173 · apply done runs no verify command, so the task has no passed check
-- status: done
-- owner: t158-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: apply writes every change under one lock, where no command may run (R-LOCK-4). A task finished with apply's done is done without verified until todo verify --wave checks it, while done itself would run the command. Decide whether apply should refuse done on a task that has a verify line.
-- commit: dfbb44e9964d20193b92b9bd4ac5d72d73aaf1f0
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t158-haiku): added
-- note (2026-11-20, t158-haiku): done — apply done runs the task's verify command before the lock, as done does; a failing or unrunnable check refuses the whole batch and writes nothing; tests in tests/cmd_verify.rs
-
-### T-174 · todo apply does not check a done commit against the task's files
-- status: done
-- owner: t160-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: R-SCOPE-2 is checked by done --commit only. A done operation with a commit inside todo apply is not compared with the task's files, so a worker can change a file outside its task through apply
-- commit: f7ce1a03c341db82f51ad96a5b7a4053c7cb3ed2
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t160-haiku): added
-- note (2026-11-20, t160-haiku): done — apply checks a done commit's files as done does: OUT_OF_SCOPE refuses the batch, --force notes the files, MISSING_FIELD and unknown commits as done; 6 tests, four fail with the check disabled
-
-### T-175 · apply writes a done commit as given: HEAD stays in TODO.md where done writes the hash
-- status: done
-- owner: t160-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: apply does not resolve its commit the way done does, so a done operation writes 'commit: HEAD', which names whatever HEAD is when it is read, not the commit that finished the task
-- commit: 0ed6316b4dd9595c261647809e49d70fff31061f
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t160-haiku): added
-- note (2026-11-20, t160-haiku): done — apply writes a done commit's value as done does: HEAD and names resolved to the short hash through the shared resolver, a full hash kept; three tests, two fail with resolution disabled
-
-### T-177 · attempts and verified are read as unknown fields, not as typed task fields
-- status: done
-- owner: t150-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: format.md section 8 lists attempts and verified as task fields, but the parser keeps them as unknown fields: show --json lists them only under fields and schema does not list them as task fields. final is typed since T-150 and the other two should follow the same rule
-- commit: a0a0f01c6c9eff67b47b896c865b8c7816e18368
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t150-haiku): added
-- note (2026-11-20, t150-haiku): done — attempts and verified are typed task fields: the parser reads them on their own line and on the priority line, show --json and schema list them, writes go through the edit builder as before; 3 tests (parser, show and schema, split removes final)
-
-### T-178 · set --goal with a separator on a combined priority line corrupts the line
-- status: done
-- owner: t156-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: set --goal 'lights · shadows' on a task whose goal sits on its priority line writes the value as it is: the goal reads as 'lights' and check reports 'shadows' as a part that is not key: value. set_part_field does not move such a value to a line of its own, as set_line_field does.
-- commit: da7c236be31d861abfa6733b71232eecb68899ac
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t156-haiku): added
-- note (2026-11-20, t156-haiku): done — set --goal, --type and --area put a value that holds the part separator on its own line instead of the combined priority line (edits.rs); add and ask do the same for a new type or area (NewTask, ask.rs). set --priority with the separator is refused (BAD_VALUE), since the priority is the first part of the line and cannot move. Merged dev 4aef723 into the branch (fast-forward, no conflicts). Six new tests in tests/cmd_combined_line.rs; they fail on the code before this commit and all 21 pass after it; format.md section 8 documents the rule. Recorded a new problem: set --priority accepts a value that is not configured.
-
-### T-179 · set --priority accepts a value that is not a configured priority
-- status: done
-- owner: t156-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: set --priority P9 writes P9 with no check (set does not validate priority against the configured priorities), while add and promote refuse it with BAD_VALUE. Found while working on T-178.
-- commit: b306792639e2f2f527ad873ed70b2ea6c0654d51
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t156-haiku): added
-- note (2026-11-20, t156-haiku): done — set --priority, --field priority and apply's set now check the priority with OpsConfig::canonical_priority, the function add uses (also used by ask, promote and apply's add): a value that is not configured is refused with BAD_VALUE and the same message as add, and nothing is written. A configured priority is written in its configured spelling. The check in T-178 for the separator is replaced by this one. Merged dev e801fab (fast-forward). Five new tests (four in tests/cmd_set.rs, one in tests/cmd_apply.rs); five fail before the change. R-WRITE-8 says so.
-
-### T-180 · README lists only some todo.toml keys: the verify and target keys are missing
-- status: done
-- owner: t153-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: a user reads the README for the settings a project can set, and the list leaves out the verify_* keys
-- commit: 2e1c21e0ac77748e21e32e7fc29910203e4c11fa
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t153-haiku): added
-- note (2026-11-20, t153-haiku): done — README configuration table lists all 24 todo.toml keys the code reads, with defaults matching docs/requirements.md R-CFG-2 (target_difficulty, level1_max_files, verify settings, difficulties, required_fields and the older ones).
-
-### T-181 · plan leaves out a task whose difficulty is set but not configured, and next hands it out
-- status: done
-- owner: t153-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: a level that todo.toml does not configure is in no planner group, and next treats it as ready; check reports it but plan and next should agree
-- commit: 17a637a55d84b3ba978c849c8e1c71c93a7dceae
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t153-haiku): added
-- note (2026-11-20, t153-haiku): done — A difficulty that is set but not configured counts as no level: next, list --ready, show (ready), the claim filter of next, plan (without a level, with the reason), waves and summary read one rule (lacks_level with the config, level_problem for the reason). Tests in tests/cmd_unconfigured_level.rs; two docs fixtures moved to configured levels.
-
-### T-182 · waves takes 118 ms on the 5,000-task milestone tree (budget 100 ms): lane grouping compares every file with every other file under src/
-- status: done
-- owner: t163-haiku
-- priority: P1 · difficulty: medium
-- milestone: T-145
-- why: T-165's planning budget test fails on waves (median of five release runs, 118 ms). overlap_lanes buckets entries by their first path part, and most files start with src, so each entry is compared with all earlier ones in one bucket: quadratic for a wave of about 4,000 tasks. Exact-text lookup for single files fixes it; folders and patterns still compare with everything before them
-- commit: 297767f96a34493436aead92468414a7349d0745
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t163-haiku): added
-- note (2026-11-20, t163-haiku): done — overlap_lanes looks single files up by their text (a map), not by their first path part: a wave of about 4,000 tasks under src/ was quadratic. waves on the 5,000-task planning file: 118 ms before, 84 to 92 ms after, median of five in release (T-165). The lane tests in tests/ops_scope.rs compare with the pairwise rule and pass.
-
-### T-183 · next takes 95 ms on the 5,000-task milestone tree, near its 100 ms budget: select_next_task computes files_busy for every ready task, which scans every task each time
-- status: done
-- owner: t163-haiku
-- priority: P2 · difficulty: easy
-- milestone: T-145
-- why: found while measuring T-165: next evaluates files_busy inside min_by_key, so each ready task (about 4,600 here) scans all tasks. Sorting the ready tasks and checking files only for the first one that holds no files gives the same answer with one scan
-- commit: 0ff614ed1a1b38094c9da86a7d697104b75878e0
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t163-haiku): added
-- note (2026-11-20, t163-haiku): done — select_next_task: ready candidates sorted once (each key computed once, file index breaks ties), then the first one whose files no other agent holds is taken, so files_busy runs until one passes. Two commits: 077e5f7 (checks the files in order) and 0ff614e (keys once). next on the 5,000-task planning file: 95 to 137 ms before, 82 ms after (median of five, release). Next, claim, scope and ready-tree tests pass.
-
-### T-184 · Report pages are large: the facts block of every task adds about 250 bytes, so ten projects of 5,000 entries make a 40 MB all-projects page
-- status: done
-- owner: t154-haiku
-- priority: P2 · difficulty: medium
-- milestone: T-145
-- why: T-164 added the level, files, verify and verified block to every opened task (R-REPORT-3). The single page is 3.99 MB at 5,000 entries (budget 5 MB) and the all-projects page of ten such projects is 40 MB; both are within the time budgets, but a page this size is slow to open and to share. Shorter wording, or the block only for tasks that have a check, would cut it.
-- commit: 82eb839cff913507ea50a59763564d1734f217fc
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, t164-haiku): added
-- note (2026-11-20, t154-haiku): done — Page size: all-projects page of ten 5,000-entry projects 40,079,554 -> 28,432,052 bytes (single page 3,995,518 -> 2,830,937); release report timings 74 ms and 579 ms, budgets 500 ms and 5 s. Each opened task shows Level/Files/Verify (and Verified when there is a check) on one line, none for missing parts; the per-task wrapper, the row breaks, the empty notes block, the task row classes and the priority/area chip titles are gone. Left: the fields lists (required, as written) and the dt/dd markup, about 17% of the page; omitting the optional end tags of dt/dd or dropping duplicate fields would take it further, left to the owner. report_basic.md moved to format 3 (todo migrate on a copy).
-
-### T-185 · next is too slow on the 5,000-task milestone tree in CI: 156 ms Linux, 185 ms Windows, budget 100 ms
-- status: done
-- owner: t185-haiku
-- priority: P1 · difficulty: 3 · type: bug · area: core
-- milestone: T-145
-- why: CI is red on main since 0.8.0: perf_5000_entry_milestone_tree_next_plan_waves_brief_meet_budgets fails on both runners; locally next takes 82 ms, so the slower CI machines show the real headroom is too small
-- commit: 20a50e6f5dae36a3d7ae1279abc4b5253aa95198
-- by: Reynan Henry Tandoyo
-- note (2026-11-20, claude-main): added
-- note (2026-11-21, t185-haiku): done — next judges readiness only in candidate order and stops at the first ready task whose files are free; open questions indexed once per selection (OpenQuestionTargets), detail rule checks read paths last. Output unchanged (byte-identical on 10 commands). Perf test medians, 5,000-entry milestone tree: next 72.2 ms before, 45.3 ms after; plan 77.6 -> 75.3; waves 81.0 -> 84.0; brief 38.9 -> 43.1 (noise); next --claim 129.4 -> 105.6. Checks: fmt, clippy (all features, default, linux), cargo test --all-features all pass, perf tests pass.
-
-### T-186 · plan, waves, next and next --claim need about 2.5x headroom for the CI runners
-- status: done
-- owner: t185-haiku
-- priority: P1 · difficulty: 4 · type: bug · area: core
-- milestone: T-145
-- why: CI on windows-latest measured plan 170 ms, waves 134 ms, next 185 ms and next --claim 196 ms (budgets 100/100/100/200, NFR-3); the runner is about 2.3x slower than the dev PC, so locally they must be under about 40 ms (next --claim under about 85 ms)
-- commit: 8b18774c5733920cc5a12ce6c2c81f272921a41b
-- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
-- note (2026-11-21, t185-haiku): done — plan and waves judge open questions through one index per command (OpenQuestionTargets, detail_gaps_with), and plan_waves groups levels in one pass; next, plan, waves and brief end with LoadedRead::leak_for_exit after output (read-only only). Output byte-identical to the T-185 binary on next, plan, waves, brief, list --ready, show --json, summary and tree, text and JSON. Perf-test medians, T-185 then T-186: next 45.3 -> 35.1 ms, plan 75.3 -> 34.7, waves 84.0 -> 43.1 (target 40, missed), brief 43.1 -> 31.7, next --claim 105.6 -> 95.6 (target 85, missed). The claim parses the file twice and drops two documents; reaching 85 needs the parser or the document model to change. Checks: fmt, clippy (all features, default, linux), cargo test --all-features all pass; perf tests pass on the rerun (first run failed on claim 200.1 ms under other agents' cargo load).
-
-### T-187 · next --claim parses the file twice: 229 ms on windows-latest CI, budget 200 ms
-- status: done
-- owner: claude-main
-- priority: P1 · difficulty: 4 · type: bug · area: core
-- milestone: T-145
-- why: After T-186 every other planning timing has headroom on both CI runners, but next --claim measured 229 ms on one windows-latest run (passed on another), so CI on main is red by chance; it reads and parses the 1.8 MB file twice and drops two documents
-- commit: 620851f785d0e49ddde354600a6c37d55675d4c4
-- by: Reynan Henry Tandoyo
-- note (2026-11-21, claude-main): added
-- note (2026-11-21, t185-haiku): Choice: next --claim already chooses its task under the write lock, from the one document that the write reads there, so no pre-lock parse exists to remove. Its second parse is the R-EDIT-7 check of the edited bytes, which stays. Change (commit 620851f): the claim keeps its two documents (the parsed input and the edited one) until the process exits, via edit_doc_keeping_documents; the file is still written and the lock released as before. In-process claim totals, 11 interleaved claims each: 148 ms before, 113 ms after. Perf-test next --claim medians: 95.6 ms before; 76 to 121 ms after across six runs under desktop load. Target 70 is not reached: the remaining cost is the two parses (about 18 and 15 ms), the snapshot (about 10), the atomic write (about 9) and a fresh-file read penalty (about 25 ms) after each write. Option for the planner: parse task blocks in parallel (needs approval, since it adds threads to the parser). Perf gate: the planning test passed in 2 of 6 runs today; the other runs failed on tree, show, add and waves, which this change does not touch, under desktop load.
-- note (2026-11-21, claude-main): Coordinator 2026-11-21: CI green on dev and main after 0a90ef4; next --claim 135 ms and 117 ms on windows-latest (was 229). The 70 ms local target was not reached, but the CI budget is met with headroom; parallel parsing not pursued.
-- note (2026-11-21, claude-main): forced done (owner was t185-haiku)
-- note (2026-11-21, claude-main): done — next --claim keeps its documents until exit; CI windows-latest 135/117 ms (budget 200).
-
-### T-188 · waves has no headroom on windows-latest CI: 99.3 ms of 100 ms
-- status: done
-- owner: claude-main
-- priority: P2 · difficulty: 4 · type: bug · area: core
-- milestone: T-145
-- why: After T-187 CI is green, but one windows-latest run measured waves at 99.3 ms (the other 52.6 ms), so the perf test can fail by chance; waves takes about 43 ms locally and needs to get under about 30 ms
-- commit: ae3902b26443692d17de15d10013d9f8d5bc7353
-- by: Reynan Henry Tandoyo
-- note (2026-11-21, claude-main): added
-- note (2026-11-21, t188-haiku): Commit ae3902b (branch reynanTandoyo/t188), not marked done: waves 46.6 ms before and 39-40 ms after in the T-165 perf test (medians of 5; HEAD re-run 41.6 and 43.0 ms, same PC). Parsing takes about 19 ms and each planning command pays about 21 ms of load before any planning, so the 30 ms target needs waves' own work under about 3 ms; it is now about 6-8 ms. Left: flat planner arrays, readiness without re-parsing milestone IDs, text rendered from the plan, parsed file scopes reused for the gaps (about 3-4 ms in all). The larger lever is the parser: about 3 Strings per field line and one per line, which needs Task storage to borrow from the document (a redesign).
-- note (2026-11-21, claude-main): Coordinator 2026-11-21: accepted at 39-40 ms locally. CI after 511ba0d is green on both runners, waves at most 71 ms (budget 100). The 30 ms target needs a parser redesign (borrowed lines and fields), left for the owner to decide.
-- note (2026-11-21, claude-main): forced done (owner was t188-haiku)
-- note (2026-11-21, claude-main): done — waves 46.6 to about 40 ms locally; CI waves at most 71 ms.
-
-### T-189 · Release 0.8.1: CI speed fixes
-- status: done
-- owner: claude-main
-- priority: P1 · difficulty: 2 · type: release · area: release
-- why: the speed fixes T-185 to T-188 and the CI dependency list fix are on main but not in a release; the owner asked for 0.8.1 on 2026-11-21
-- commit: 84c225b434d7141306a679b567e2ef309cf83bdd
-- by: Reynan Henry Tandoyo
-- note (2026-11-21, claude-main): added
-- note (2026-11-21, claude-main): done — Released 2026-11-21: tag v0.8.1 on 84c225b, published by the Release workflow; installed on this PC with todo help update (SHA-256 matched, todo 0.8.1 (84c225b)); stamp raised to 0.8.1.
+- note (2026-11-21, claude-main): Review 2026-11-21: depends on the question T-206 so 1.0.0 is not released before the owner has judged the page; this repository has no todo.toml yet.
 
 ## Questions
 
-### T-176 · T-172: a verify timeout should stop the whole process tree. Which option: (1) libc and windows-sys as direct dependencies (already in Cargo.lock, NFR-9 list changes), (2) hand-written FFI with no dependency change, or (3) keep the limit and document it? Details are in the note on T-172.
-- status: done
-- owner: claude-main
+### T-206 · When the new page is built from a real project: can you and your colleague each say within a minute what is done, what was cancelled, what is left and what needs you? Answer after T-203, before the 1.0.0 release (T-205).
+- status: open
+- owner: —
 - type: question
-- about: T-172
-- note (2026-11-20, t158-haiku): added
-- note (2026-11-20, claude-main): answer — Option 1: make libc (Unix) and windows-sys (Windows) direct dependencies, target-specific, with only the features needed; both are already in Cargo.lock. Add them to the NFR-9 list with the reason (stop a verify command's whole process tree on timeout, NFR-5 forbids running kill/taskkill). Keep the unsafe calls few, small and commented.
+- about: T-195
+- note (2026-11-21, claude-main): added
+
+## Ideas
+
+### T-192 · Several categories per entry: let `area` hold more than one value (for example ui and math), with list, next and tree matching any of them
+- status: open
+- owner: —
+- type: idea
+- note (2026-11-21, claude-main): added
+
+### T-193 · Review flag: work finished by a low-level worker is marked for a stronger agent to review before it counts as done
+- status: open
+- owner: —
+- type: idea
+- note (2026-11-21, claude-main): added
+
+### T-194 · Task templates: `todo add --template bug` asks for the fields that kind of task needs
+- status: open
+- owner: —
+- type: idea
+- note (2026-11-21, claude-main): added
+
+### T-207 · All-projects page in the new design: an index with one row per project (name, description, bar, needs you, last activity) that links to each project's own page
+- status: open
+- owner: —
+- type: idea
+- about: T-195
+- note (2026-11-21, claude-main): added
