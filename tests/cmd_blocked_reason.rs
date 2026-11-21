@@ -32,20 +32,25 @@ fn summary_reasons(json: &Value) -> BTreeMap<String, Option<String>> {
         .collect()
 }
 
-/// The reason the report page shows for the blocked task `id`: the first `blocked:` reason after
-/// the task's row.
+/// The reason the report page shows for the blocked task `id`: the words after "Waiting ·" on the
+/// second line of the task's own row (R-REPORT-1, "An entry").
 fn report_reason(html: &str, id: &str) -> String {
+    let needle = format!("<span class=\"id\">{id}</span>");
     let row = html
-        .find(&format!("id=\"e-{id}\""))
+        .find(&needle)
         .unwrap_or_else(|| panic!("{id} has no row in the report"));
     let rest = &html[row..];
-    let marker = "<span class=\"reason\">blocked: ";
-    let start = rest
+    let row_end = rest.find("</li>\n").expect("the row closes");
+    let row_text = &rest[..row_end];
+    let marker = "<b>Waiting</b> \u{00B7} ";
+    let start = row_text
         .find(marker)
-        .unwrap_or_else(|| panic!("{id} shows no blocked reason"))
+        .unwrap_or_else(|| panic!("{id} shows no waiting reason"))
         + marker.len();
-    let end = rest[start..].find("</span>").expect("end of reason span");
-    rest[start..start + end].to_string()
+    let end = row_text[start..]
+        .find("</p>")
+        .expect("end of the second line");
+    row_text[start..start + end].to_string()
 }
 
 #[test]

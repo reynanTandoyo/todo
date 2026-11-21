@@ -1,5 +1,5 @@
-//! CLI integration tests for `todo report --html` (T-092; R-REPORT-1, R-LOCK-5): the page it writes,
-//! where it writes it, what it shows and what it leaves alone. Every fixture is invented.
+//! CLI integration tests for `todo report --html` (T-092, T-214; R-REPORT-1, R-LOCK-5): the page it
+//! writes, where it writes it, what it shows and what it leaves alone. Every fixture is invented.
 
 mod common;
 
@@ -13,12 +13,16 @@ use tempfile::TempDir;
 
 use common::{
     fixture, parse_json, run_todo, setup_fixture_proj, setup_proj, stderr_text, stdout_text,
+    write_toml,
 };
 
 const FIXTURE_MARKER: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->\n";
 
 /// The clock every test runs with, so the page and its claim ages do not depend on the day.
 const NOW: &str = "2026-11-19T10:00:00+01:00";
+
+/// The `description` of the fixture project (`todo.toml`, R-CFG-2).
+const DESCRIPTION: &str = "Plans the lanterns for the club hall from a sky map.";
 
 /// Runs `todo report --html` with `extra` options in the project, with the fixed clock.
 fn report(home: &Path, work: &Path, extra: &[&str]) -> Output {
@@ -37,11 +41,43 @@ fn default_html(work: &Path) -> String {
     fs::read_to_string(default_page(work)).unwrap()
 }
 
-/// The position of the row of `id` in `html`, which must be there once.
-fn row_at(html: &str, id: &str) -> usize {
-    let needle = format!("id=\"e-{id}\"");
-    assert_eq!(html.matches(&needle).count(), 1, "{id} should have one row");
-    html.find(&needle).unwrap()
+/// Writes the invented page fixture `report_page.md` (with its archive and a description) into a
+/// new project, runs the report with the fixed clock, and returns the project folder and the page.
+fn fixture_report(tmp: &TempDir) -> (PathBuf, String) {
+    let (home, work, _todo) = setup_fixture_proj(tmp, "report_page.md");
+    fs::write(
+        work.join("TODO-archive.md"),
+        fixture("report_page_archive.md"),
+    )
+    .unwrap();
+    write_toml(&work, &format!("description = \"{DESCRIPTION}\"\n"));
+    let out = report(&home, &work, &[]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr_text(&out));
+    let html = default_html(&work);
+    (work, html)
+}
+
+/// The part of `html` from the heading `heading` (the text inside `<h2>`) to the next `<h2>`, or to
+/// the end of the page.
+fn section<'a>(html: &'a str, heading: &str) -> &'a str {
+    let start = html
+        .find(&format!("<h2>{heading}"))
+        .unwrap_or_else(|| panic!("no section {heading:?}"));
+    let rest = &html[start..];
+    let end = rest[4..].find("<h2>").map_or(rest.len(), |at| at + 4);
+    &rest[..end]
+}
+
+/// The position of each text in `texts` in `haystack`, in order: each must be there and come after
+/// the one before it.
+fn in_order(haystack: &str, texts: &[&str]) {
+    let mut last = 0;
+    for text in texts {
+        let at = haystack[last..]
+            .find(text)
+            .unwrap_or_else(|| panic!("{text:?} is missing or out of order"));
+        last += at + text.len();
+    }
 }
 
 #[test]
@@ -77,77 +113,254 @@ fn report_writes_the_page_to_the_state_folder_and_leaves_todo_md_alone() {
 #[test]
 fn report_html_matches_snapshot_with_a_fixed_clock() {
     let tmp = TempDir::new().unwrap();
-    let (home, work, _todo) = setup_fixture_proj(&tmp, "report_basic.md");
-    let out = report(&home, &work, &[]);
-    assert_eq!(out.status.code(), Some(0), "{}", stderr_text(&out));
-    insta::assert_snapshot!("report_html", default_html(&work));
+    let (_work, html) = fixture_report(&tmp);
+    insta::assert_snapshot!("report_html", html);
 }
 
 #[test]
-fn page_shows_the_work_the_lists_and_the_facts_the_accept_line_asks_for() {
+fn the_header_shows_the_title_the_description_and_the_time_of_the_status() {
     let tmp = TempDir::new().unwrap();
-    let (home, work, _todo) = setup_fixture_proj(&tmp, "report_basic.md");
-    assert_eq!(report(&home, &work, &[]).status.code(), Some(0));
-    let html = default_html(&work);
+    let (_work, html) = fixture_report(&tmp);
+    assert!(html.starts_with("<!doctype html>"));
+    assert!(html.contains("<title>Lantern tool \u{2014} status</title>"));
+    assert!(html.contains("<h1>Lantern tool</h1>"));
+    assert!(html.contains(&format!("<p class=\"desc\">{DESCRIPTION}</p>")));
+    assert!(html.contains("Status as of 19 Nov 2026, 10:00 \u{00B7} from TODO.md"));
+    // The two colour buttons sit beside the header.
+    assert!(html.contains("<button id=\"theme\" type=\"button\">Dark mode</button>"));
+    assert!(html.contains("<button id=\"cb\" type=\"button\" aria-pressed=\"false\""));
+}
 
-    // The work is a tree: milestones with their tasks indented below, top-level tasks last.
-    let order = [
-        "T-001", "T-002", "T-003", "T-006", "T-004", "T-005", "T-015",
-    ];
-    let positions: Vec<usize> = order.iter().map(|id| row_at(&html, id)).collect();
-    assert!(
-        positions.windows(2).all(|pair| pair[0] < pair[1]),
-        "work rows out of order: {order:?}"
+#[test]
+fn the_overall_line_counts_the_tasks_and_the_legend_names_the_five_states() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    assert!(html.contains("<p class=\"big\">5 of 12 tasks done</p>"));
+    for legend in [
+        "<li><span class=\"mark done\">\u{2713}</span><b>5</b> done</li>",
+        "<li><span class=\"mark prog\">\u{25CF}</span><b>2</b> in progress</li>",
+        "<li><span class=\"mark wait\">\u{25D0}</span><b>3</b> waiting</li>",
+        "<li><span class=\"mark todo\">\u{25CB}</span><b>2</b> to do</li>",
+        "<li><span class=\"mark drop\">\u{2715}</span><b>2</b> cancelled <span class=\"muted\">(not counted in the 12)</span></li>",
+    ] {
+        assert!(html.contains(legend), "{legend}");
+    }
+    assert!(html.contains("aria-label=\"5 done, 2 in progress, 3 waiting, 2 to do, 2 cancelled\""));
+    for class in ["seg-done", "seg-prog", "seg-wait", "seg-todo", "seg-drop"] {
+        assert!(
+            html.contains(&format!("<i class=\"{class}\" style=\"width:")),
+            "{class}"
+        );
+    }
+}
+
+#[test]
+fn needs_you_lists_the_question_the_given_back_task_and_the_stale_claim_in_that_order() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    let needs = section(&html, "Needs you (3)");
+    in_order(
+        needs,
+        &[
+            "<span class=\"tag\">Question</span><span class=\"what\">How many lanterns per room?</span>",
+            "Asked 15 Nov \u{00B7} about \u{201C}Lamp plan\u{201D} \u{00B7} the task \u{201C}Count the lanterns per room\u{201D} waits for this answer",
+            "<span class=\"tag\">Given back</span><span class=\"what\">Place the lanterns on the east wall</span>",
+            "A worker could not finish it (16 Nov): the plan puts one lantern too many on the east wall",
+            "<span class=\"tag\">No activity</span><span class=\"what\">Write the sky map test set</span>",
+            "In progress for ",
+            " days by sam. It may have been abandoned.",
+        ],
+    );
+    assert!(!html.contains("Nothing needs you."));
+}
+
+#[test]
+fn last_7_days_lists_the_events_newest_day_first_with_done_before_added() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    let recent = section(&html, "Last 7 days");
+    in_order(
+        recent,
+        &[
+            "<span class=\"d\">18 Nov</span><span class=\"mark done\">\u{2713}</span><span><b>Club hall</b> finished \u{2014} all 2 tasks done</span>",
+            "<span class=\"d\">18 Nov</span><span class=\"mark done\">\u{2713}</span><span>Mark the ceiling points</span>",
+            "<span class=\"d\">17 Nov</span><span class=\"mark done\">\u{2713}</span><span>Read the star catalogue</span>",
+            "<span class=\"d\">17 Nov</span><span class=\"mark done\">\u{2713}</span><span>Measure the hall</span>",
+            "<span class=\"d\">17 Nov</span><span class=\"mark todo\">\u{FF0B}</span><span>Added: Measure the hall</span>",
+            "<span class=\"d\">16 Nov</span><span class=\"mark done\">\u{2713}</span><span>Pick the font for the plan</span>",
+            "<span class=\"d\">16 Nov</span><span class=\"mark todo\">\u{FF0B}</span><span>2 tasks added to <b>Sky map reader</b></span>",
+            "<span class=\"d\">15 Nov</span><span class=\"mark done\">\u{2713}</span><span>Agree the lamp colour</span>",
+            "<span class=\"d\">15 Nov</span><span class=\"mark todo\">\u{FF0B}</span><span>Added: Count the lanterns per room</span>",
+            "<span class=\"d\">14 Nov</span><span class=\"mark drop\">\u{2715}</span><span>Print a poster <span class=\"muted\">\u{2014} cancelled: the plan on the screen is enough</span></span>",
+            "<span class=\"d\">13 Nov</span><span class=\"mark todo\">\u{FF0B}</span><span>Added: Read the star catalogue</span>",
+        ],
+    );
+    // Eleven rows fit in the first fifteen, so the closed part is not there.
+    assert!(!recent.contains("Earlier this week"));
+}
+
+#[test]
+fn all_work_is_one_tree_and_a_done_entry_stays_in_its_milestone() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    // Each milestone holds its nested milestones, then its tasks, in file order; the top-level
+    // tasks come last, under Other work. A milestone row names its title, a task row its ID.
+    in_order(
+        &html,
+        &[
+            "<span class=\"ms-title\">Sky map reader</span>",
+            "<span class=\"id\">T-003</span>",
+            "<span class=\"id\">T-004</span>",
+            "<span class=\"id\">T-005</span>",
+            "<span class=\"id\">T-006</span>",
+            "<span class=\"id\">T-010</span>",
+            "<span class=\"ms-title\">Lamp plan</span>",
+            "<span class=\"id\">T-012</span>",
+            "<span class=\"id\">T-013</span>",
+            "<span class=\"id\">T-014</span>",
+            "<span class=\"ms-title\">Club hall</span>",
+            "<span class=\"id\">T-021</span>",
+            "<span class=\"id\">T-022</span>",
+            "<span class=\"id\">T-016</span>",
+            "<span class=\"ms-title\">Other work</span>",
+            "<span class=\"id\">T-030</span>",
+            "<span class=\"id\">T-032</span>",
+            "<span class=\"id\">T-033</span>",
+        ],
     );
 
-    // A milestone shows its goal and its progress over the tasks below it (not the dropped one).
-    assert!(html.contains("the test scene renders with lighting at 60 frames per second"));
-    assert!(html.contains("<progress value=\"1\" max=\"4\">1 of 4 done</progress>"));
-
-    // Priority, difficulty and area are shown on each task. The fixture is format 3, so the old
-    // level `hard` is level 4 (the migration of format 2 to 3, R-MIG-1).
-    // The priority and the area read as they are; the level keeps its label, as a bare number needs it.
-    assert!(html.contains("<span class=\"chip\">P1</span>"));
-    assert!(html.contains("<span class=\"chip\" title=\"difficulty\">4</span>"));
-    assert!(!html.contains("title=\"difficulty\">hard</span>"));
-    assert!(html.contains("<span class=\"chip\">gpu</span>"));
-
-    // A claim shows its owner and age; a stale claim is marked.
-    assert!(html.contains("claimed by alice, 2 h"));
-    assert!(html.contains("claimed by carol, 216 h"));
-    assert!(html.contains("<span class=\"chip stale\">stale</span>"));
-
-    // A blocked task shows its latest reason, not an earlier note.
+    // The finished milestone is closed and shows its two done tasks.
     assert!(html.contains(
-        "<span class=\"reason\">blocked: the vendor driver crashes on the test scene</span>"
+        "<details class=\"ms\">\n<summary><span class=\"ms-title\">Club hall</span><span class=\"ms-state st-done\">finished 18 Nov</span><span class=\"ms-count\">2 of 2 done</span>"
     ));
-    assert!(!html.contains("blocked: waiting for the driver update"));
-
-    // Unfinished tasks per area; the done task T-011 is not counted, the dropped T-014 is not either.
-    assert!(html.contains("<li><span>docs</span><span class=\"count\">2</span></li>"));
-    assert!(html.contains("<li><span>gpu</span><span class=\"count\">1</span></li>"));
-    assert!(html.contains("<li><span>ui</span><span class=\"count\">2</span></li>"));
-
-    // Open questions link to the entry they are about; a missing entry is named but not linked.
-    assert!(html.contains("about <a href=\"#e-T-002\">T-002 · Lighting</a>"));
-    assert!(html.contains("about <a href=\"#e-T-001\">T-001 · Develop the renderer</a>"));
-    assert!(html.contains("about T-099</span>"));
-    assert!(!html.contains("href=\"#e-T-099\""));
-
-    // Ideas, done and dropped lists. The done task and the dropped tasks below a milestone are
-    // shown once, in their list; the reason of each drop is shown.
-    assert!(html.contains("Hot-reload shaders while the scene runs"));
+    let club = section_from(&html, "Club hall");
     assert!(
-        html.contains("<span class=\"reason dropped\">dropped: replaced by the C shader</span>")
+        club.contains("<span class=\"t\">Measure the hall</span>"),
+        "{club}"
     );
-    assert!(html.contains("dropped: the scene no longer needs it"));
-    assert!(html.contains("Set up the test scene"));
-    assert!(html.contains("<h2>Done (2)</h2>"));
-    assert!(html.contains("<h2>Dropped (2)</h2>"));
+    assert!(club.contains("Result"), "{club}");
 
-    // Light and dark colours, and a narrow layout, are in the inline style.
-    assert!(html.contains("prefers-color-scheme: dark"));
-    assert!(html.contains("max-width: 600px"));
+    // The milestone with work in progress is open and counts its tasks below at any depth.
+    assert!(html.contains(
+        "<details class=\"ms\" open>\n<summary><span class=\"ms-title\">Sky map reader</span><span class=\"ms-state st-prog\">in progress</span><span class=\"ms-count\">1 of 4 done</span>"
+    ));
+    // A cancelled task stays in its place, with its reason on the second line.
+    assert!(html.contains("<li class=\"item drop\">"));
+    assert!(html.contains("<b>Cancelled</b> \u{00B7} the club has no maps left in that format"));
+}
+
+#[test]
+fn the_second_line_names_each_waiting_and_claimed_state_in_words() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    assert!(html.contains("<b>In progress</b> \u{00B7} ines \u{00B7} since yesterday"));
+    assert!(html.contains("<b>In progress</b> \u{00B7} sam \u{00B7} for "));
+    assert!(html.contains(" \u{00B7} <span class=\"stale\">no activity</span>"));
+    assert!(html.contains("<b>Waiting</b> \u{00B7} waiting for the printer driver"));
+    assert!(html.contains(
+        "<b>Waiting</b> \u{00B7} given back by a worker: the plan puts one lantern too many on the east wall"
+    ));
+    assert!(html.contains("<b>Waiting</b> \u{00B7} for your answer: How many lanterns per room?"));
+}
+
+/// The part of `html` from the row of the milestone titled `title` to the end of the page.
+fn section_from<'a>(html: &'a str, title: &str) -> &'a str {
+    let start = html
+        .find(&format!("<span class=\"ms-title\">{title}</span>"))
+        .unwrap_or_else(|| panic!("no milestone {title:?}"));
+    &html[start..]
+}
+
+#[test]
+fn other_work_holds_the_tasks_below_no_milestone() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    let other = section_from(&html, "Other work");
+    assert!(other.contains("not part of a milestone"));
+    in_order(other, &["T-030", "T-032", "T-033"]);
+}
+
+#[test]
+fn more_holds_the_ideas_the_archive_and_the_planner_all_closed() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    let more = &html[html.find("<h2>More</h2>").unwrap()..];
+    assert!(more.contains(
+        "<details class=\"fold\"><summary>Ideas (1) <span class=\"muted\">\u{2014} not planned yet</span></summary>"
+    ));
+    assert!(more.contains("<li>Show the lamp heat map</li>"));
+    assert!(more.contains(
+        "<details class=\"fold\"><summary>Earlier work (1 finished milestone, 2 tasks) <span class=\"muted\">\u{2014} from the archive</span></summary>"
+    ));
+    // The archive's tree is closed: its milestone and its tasks show, but nothing is open.
+    assert!(more.contains("<span class=\"ms-title\">Lantern tool v0</span>"));
+    assert!(more.contains("<span class=\"id\">T-041</span>"));
+    assert!(more.contains("<span class=\"id\">T-042</span>"));
+    assert!(!more.contains("<details class=\"ms\" open>"));
+    assert!(more.contains(
+        "<details class=\"fold\"><summary>For the planner <span class=\"muted\">\u{2014} levels, parallel waves, tasks that still need detail</span></summary>"
+    ));
+    assert!(!more.contains("<details class=\"fold\" open"));
+    // The planner's part is the v0.8 planning state and the counts per area.
+    assert!(more.contains("<section id=\"planning\">"));
+    assert!(more.contains("Not ready for lack of detail (1)"));
+    assert!(more.contains("Given back to the planner (1)"));
+    assert!(more.contains("<section id=\"areas\">"));
+    assert!(more.contains("<li><span>parser</span><span class=\"count\">2</span></li>"));
+    // The planner's rows name the task and link to nothing: the page writes no entry anchors.
+    assert!(!more.contains("href=\"#"));
+}
+
+#[test]
+fn the_v0_8_sections_and_the_raw_field_lists_are_gone() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    for gone in [
+        "<nav class=\"jump\"",
+        "<h2>Done (",
+        "<h2>Dropped (",
+        "<h2>Open questions (",
+        "<h2>Ideas (",
+        "class=\"facts\"",
+        "<progress",
+        "<ul class=\"counts\"",
+        "class=\"chip stale\"",
+    ] {
+        assert!(!html.contains(gone), "the page still has {gone:?}");
+    }
+}
+
+#[test]
+fn an_archive_is_shown_under_earlier_work_and_one_without_it_is_left_out() {
+    let body = format!(
+        "{FIXTURE_MARKER}<!-- todo-format: 2 -->\n# Archive check\n\n## Now\n\n\
+### T-001 · Open task\n- status: open\n- owner: —\n"
+    );
+    let archive = format!(
+        "{FIXTURE_MARKER}<!-- todo-format: 2 -->\n# Archive check\n\n## Archive\n\n\
+### T-002 · Archived done task\n- status: done\n- owner: —\n- note (2026-11-01, alice): done\n\n\
+### T-003 · Archived dropped task\n- status: dropped\n- owner: —\n\
+- note (2026-11-02, alice): dropped — no longer wanted\n"
+    );
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _todo) = setup_proj(&tmp, &body);
+    fs::write(work.join("TODO-archive.md"), archive).unwrap();
+
+    let out = report(&home, &work, &[]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr_text(&out));
+    let html = default_html(&work);
+    let earlier = &html[html.find("Earlier work (").unwrap()..];
+    assert!(earlier.starts_with(
+        "Earlier work (0 finished milestones, 2 tasks) <span class=\"muted\">\u{2014} from the archive</span>"
+    ));
+    assert!(earlier.contains("Archived done task"));
+    assert!(earlier.contains("<b>Cancelled</b> \u{00B7} no longer wanted"));
+
+    // Without an archive, the closed part is not there.
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _todo) = setup_proj(&tmp, &body);
+    assert_eq!(report(&home, &work, &[]).status.code(), Some(0));
+    assert!(!default_html(&work).contains("Earlier work"));
 }
 
 #[test]
@@ -174,18 +387,18 @@ fn text_from_the_task_list_is_escaped() {
     assert!(html.contains("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;"));
     assert!(html.contains("&lt;img src=x onerror=alert(1)&gt; &amp; more"));
     assert!(html.contains("Harbour &lt;i&gt;lights&lt;/i&gt;"));
+    // The area of the open task is shown in its technical details, escaped.
+    assert!(html.contains("<dt>Area</dt><dd>&lt;b&gt;ui&lt;/b&gt;</dd>"));
     assert!(!html.contains("<script"));
     assert!(!html.contains("<img"));
     assert!(!html.contains("<i>"));
-    assert!(!html.contains("<b>"));
+    assert!(!html.contains("<b>ui</b>"));
 }
 
 #[test]
-fn page_has_no_script_no_network_load_and_no_controls() {
+fn page_has_no_script_no_network_load_and_its_buttons_are_hidden_without_js() {
     let tmp = TempDir::new().unwrap();
-    let (home, work, _todo) = setup_fixture_proj(&tmp, "report_basic.md");
-    assert_eq!(report(&home, &work, &[]).status.code(), Some(0));
-    let html = default_html(&work);
+    let (_work, html) = fixture_report(&tmp);
 
     for banned in [
         "<script",
@@ -195,7 +408,6 @@ fn page_has_no_script_no_network_load_and_no_controls() {
         "<object",
         "<embed",
         "<form",
-        "<button",
         "<input",
         "<select",
         "<textarea",
@@ -209,6 +421,39 @@ fn page_has_no_script_no_network_load_and_no_controls() {
     }
     assert!(html.starts_with("<!doctype html>"));
     assert!(html.contains("<style>"));
+    // The buttons are there, and the stylesheet hides them until the page has the class `js`.
+    assert!(html.contains("<div class=\"controls\">"));
+    assert!(html.contains(".page:not(.js) .controls{display:none}"));
+}
+
+#[test]
+fn the_colours_the_layout_and_the_print_rules_are_in_the_stylesheet() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    // Light values of R-REPORT-6, the dark set for the system setting and for the chosen mode.
+    assert!(html.contains("--c-wait:#b07800"));
+    assert!(html.contains("--c-todo:#80868e"));
+    assert!(html.contains("@media (prefers-color-scheme: dark)"));
+    assert!(html.contains(".page:not([data-theme]){"));
+    assert!(html.contains(".page[data-theme=\"dark\"]{"));
+    assert!(html.contains(".page[data-cb=\"on\"]{"));
+    // One column of at most 820 px, narrow windows and print.
+    assert!(html.contains("max-width:820px"));
+    assert!(html.contains("@media (max-width:560px)"));
+    assert!(html.contains("@media print"));
+    // The state classes of the milestone rows and of a stale claim.
+    for class in [
+        ".st-prog{",
+        ".st-none{",
+        ".st-done{",
+        ".st-drop{",
+        ".stale{",
+    ] {
+        assert!(html.contains(class), "{class}");
+    }
+    // The mockup's host fallbacks and its banner are not in the page.
+    assert!(!html.contains("var(--background"));
+    assert!(!html.contains("mockflag"));
 }
 
 #[test]
@@ -311,36 +556,6 @@ fn report_takes_no_lock_even_while_the_write_lock_is_held() {
 }
 
 #[test]
-fn archived_done_and_dropped_entries_are_listed_and_marked_archived() {
-    let body = format!(
-        "{FIXTURE_MARKER}<!-- todo-format: 2 -->\n# Archive check\n\n## Now\n\n\
-### T-001 · Open task\n- status: open\n- owner: —\n"
-    );
-    let archive = format!(
-        "{FIXTURE_MARKER}<!-- todo-format: 2 -->\n# Archive check\n\n## Archive\n\n\
-### T-002 · Archived done task\n- status: done\n- owner: —\n- note (2026-11-01, alice): done\n\n\
-### T-003 · Archived dropped task\n- status: dropped\n- owner: —\n\
-- note (2026-11-02, alice): dropped — no longer wanted\n"
-    );
-    let tmp = TempDir::new().unwrap();
-    let (home, work, _todo) = setup_proj(&tmp, &body);
-    fs::write(work.join("TODO-archive.md"), archive).unwrap();
-
-    let out = report(&home, &work, &[]);
-    assert_eq!(out.status.code(), Some(0), "{}", stderr_text(&out));
-    let html = default_html(&work);
-    assert!(html.contains("TODO.md and TODO-archive.md"));
-    assert!(html.contains("Archived done task"));
-    assert!(html.contains("dropped: no longer wanted"));
-    assert_eq!(
-        html.matches("<span class=\"chip\">archived</span>").count(),
-        2
-    );
-    assert!(html.contains("<h2>Done (1)</h2>"));
-    assert!(html.contains("<h2>Dropped (1)</h2>"));
-}
-
-#[test]
 fn an_empty_list_says_what_is_missing_in_words() {
     let body = format!("{FIXTURE_MARKER}<!-- todo-format: 2 -->\n# Empty list\n");
     let tmp = TempDir::new().unwrap();
@@ -349,10 +564,12 @@ fn an_empty_list_says_what_is_missing_in_words() {
     assert_eq!(out.status.code(), Some(0), "{}", stderr_text(&out));
     let html = default_html(&work);
     assert!(html.contains("<h1>Empty list</h1>"));
-    assert!(html.contains("Nothing unfinished."));
-    assert!(html.contains("No unfinished tasks."));
-    assert!(html.contains("No open questions."));
-    assert!(html.contains("No ideas waiting."));
-    assert!(html.contains("Nothing done yet."));
-    assert!(html.contains("Nothing dropped."));
+    assert!(html.contains("<p class=\"big\">0 of 0 tasks done</p>"));
+    assert!(html.contains("Nothing needs you."));
+    assert!(html.contains("Nothing changed in the last 7 days."));
+    assert!(html.contains("No tasks or milestones in TODO.md yet."));
+    assert!(!html.contains("Ideas ("));
+    assert!(!html.contains("Earlier work"));
+    assert!(html.contains("Every task at or below the target level has its detail."));
+    assert!(html.contains("Nothing given back."));
 }

@@ -120,11 +120,13 @@ fn planning_section(html: &str) -> &str {
     &html[start..start + end]
 }
 
-/// The opened body of the entry `id`, from its row to the end of its row.
+/// The row of the entry `id` in All work, from its ID to the end of its row. A row closes with
+/// `</li>` and a line break; the notes of an opened row close with `</li>` before `</ul>`.
 fn row_of<'a>(html: &'a str, id: &str) -> &'a str {
-    let needle = format!("id=\"e-{id}\"");
+    let needle = format!("<span class=\"id\">{id}</span>");
+    assert_eq!(html.matches(&needle).count(), 1, "{id} has one row");
     let start = html.find(&needle).expect("the entry has a row");
-    let end = html[start..].find("</li>").expect("the row closes");
+    let end = html[start..].find("</li>\n").expect("the row closes");
     &html[start..start + end]
 }
 
@@ -246,31 +248,35 @@ fn an_opened_task_shows_its_level_files_check_and_whether_it_was_verified() {
     let tmp = TempDir::new().expect("tempdir");
     let (_home, _work, html) = built(&tmp);
 
-    // The facts come first, on one line: level, files, check, and whether the check passed.
+    // The technical details of an opened task give its level, its files and its check (R-REPORT-3).
     let t002 = row_of(&html, "T-002");
+    assert!(t002.contains("<dt>Level</dt><dd>1</dd>"), "{t002}");
     assert!(
-        t002.contains(
-            "<p class=\"facts\">Level: 1 \u{00B7} Files: src/config.rs \u{00B7} Verify: <code>cargo test config</code> \u{00B7} Verified: not yet</p>"
-        ),
+        t002.contains("<dt>Files</dt><dd>src/config.rs</dd>"),
         "{t002}"
     );
+    // A check that has not passed yet is shown without a date.
+    assert!(
+        t002.contains("<dt>Check</dt><dd>cargo test config</dd>"),
+        "{t002}"
+    );
+    assert!(!t002.contains("passed"), "{t002}");
 
-    // A done task that passed its check shows the date.
+    // A done task that passed its check shows the date it passed.
     let t007 = row_of(&html, "T-007");
     assert!(
-        t007.contains("Verify: <code>cargo test config</code> \u{00B7} Verified: 2026-11-20</p>"),
+        t007.contains("<dt>Check</dt><dd>cargo test config \u{2014} passed 20 Nov</dd>"),
         "{t007}"
     );
 
-    // A task with no level, files or check says `none`, and has no `Verified` part.
+    // A task with no level, files or check shows none of those rows.
     let t006 = row_of(&html, "T-006");
-    assert!(
-        t006.contains(
-            "<p class=\"facts\">Level: none \u{00B7} Files: none \u{00B7} Verify: none</p>"
-        ),
-        "{t006}"
-    );
-    assert!(!t006.contains("Verified:"), "{t006}");
+    for label in ["Level", "Files", "Check"] {
+        assert!(
+            !t006.contains(&format!("<dt>{label}</dt>")),
+            "{label} in {t006}"
+        );
+    }
 }
 
 #[test]
@@ -304,32 +310,58 @@ fn text_from_the_planning_state_is_escaped_and_the_section_has_no_control() {
 }
 
 #[test]
-fn a_task_given_back_links_to_its_row_and_a_task_not_ready_too() {
+fn a_task_given_back_or_not_ready_is_named_in_the_planner_and_has_its_row_in_all_work() {
     let tmp = TempDir::new().expect("tempdir");
     let (_home, _work, html) = built(&tmp);
     let planning = planning_section(&html);
-    assert!(planning.contains("href=\"#e-T-004\""), "{planning}");
-    assert!(planning.contains("href=\"#e-T-003\""), "{planning}");
-    assert!(planning.contains("href=\"#e-T-005\""), "{planning}");
-    // Each link points at a row the page shows.
-    assert_eq!(html.matches("id=\"e-T-004\"").count(), 1);
-    assert_eq!(html.matches("id=\"e-T-003\"").count(), 1);
-    assert_eq!(html.matches("id=\"e-T-005\"").count(), 1);
+    // The planner names each task by its ID and title. The page writes no anchor for a row, so the
+    // name is not a link.
+    assert!(
+        planning.contains("<span>T-003 \u{00B7} Load the config</span>"),
+        "{planning}"
+    );
+    assert!(
+        planning.contains("<span>T-004 \u{00B7} Write the schema</span>"),
+        "{planning}"
+    );
+    assert!(
+        planning.contains("<span>T-005 \u{00B7} Render the report</span>"),
+        "{planning}"
+    );
+    assert!(!planning.contains("href="), "{planning}");
+    // Each of them has exactly one row in All work.
+    for id in ["T-003", "T-004", "T-005"] {
+        assert_eq!(
+            html.matches(&format!("<span class=\"id\">{id}</span>"))
+                .count(),
+            1,
+            "{id} should have one row"
+        );
+    }
 }
 
 #[test]
-fn the_navigation_names_the_planning_section_first() {
+fn the_planner_part_is_the_last_closed_part_of_more() {
     let tmp = TempDir::new().expect("tempdir");
     let (_home, _work, html) = built(&tmp);
-    let nav = html
-        .find("<nav class=\"jump\"")
-        .expect("the page has a nav");
-    let planning = html.find("href=\"#planning\"").expect("a link to planning");
-    let work = html.find("href=\"#work\"").expect("a link to work");
+    let at = |text: &str| {
+        html.find(text)
+            .unwrap_or_else(|| panic!("{text} is missing"))
+    };
+    let order = [
+        at("<h2>Needs you ("),
+        at("<h2>Last 7 days</h2>"),
+        at("<h2>All work</h2>"),
+        at("<h2>More</h2>"),
+        at("<summary>For the planner"),
+        at("<section id=\"planning\">"),
+    ];
     assert!(
-        nav < planning && planning < work,
-        "planning is the first link"
+        order.windows(2).all(|pair| pair[0] < pair[1]),
+        "the sections are out of order: {order:?}"
     );
+    // The part is closed by default.
+    assert!(!html.contains("<details class=\"fold\" open"));
 }
 
 #[test]

@@ -17,7 +17,7 @@ use crate::find::fs_path;
 use crate::lock::current_time;
 use crate::output::Output;
 use crate::register::{read_register, register_path};
-use crate::report::{build_all_page, build_page, render_all_page, render_page};
+use crate::report::{build_all_page, render_all_page};
 use crate::state::StateDir;
 
 /// The file the page is written to by default, in the state folder (`docs/requirements.md` §7).
@@ -31,7 +31,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "report",
     summary: "Write one HTML page for people: the work, questions, ideas, done and dropped",
     kind: CommandKind::Read,
-    details: "Writes one self-contained HTML page for people; `--html` is required, as the page is the only report so far. The page shows the work as a tree of milestones, each with its goal and progress, and the tasks indented below it, with top-level tasks last; the unfinished tasks per area; open questions, each linked to the milestone or task it is about; ideas; and the done and dropped entries, the dropped ones with the reason. Each task opens to show its fields and notes. The page has inline CSS and no script, loads nothing from the network, and has no buttons or forms. It takes no lock, never changes TODO.md, and is written only when asked. Done and dropped entries in TODO-archive.md are listed too, marked archived. The default file is report.html in the state folder, so git never sees it; `--out <path>` writes elsewhere. `--all` writes one page for every project in the project register instead of the current one: a card per project (tasks per status, top-level milestones with progress, blocked tasks, open questions), then each project's lists. It reads the register and each registered TODO.md and archive, never searches folders, works from any folder and writes nothing in the projects; a project that is gone, cannot be parsed or needs a newer todo shows its problem instead of its lists. Its default file is report-all.html next to the register. `--open` opens the page with the system's default program for HTML files. Text output is the path; `--json` returns the path, the size in bytes and whether the page was opened.",
+    details: "Writes one self-contained HTML page for people; `--html` is required, as the page is the only report so far. The page for one project shows the header with its title and description, the overall line with a bar by state, Needs you (open questions, tasks given back and work without activity), Last 7 days, All work as one tree of milestones and tasks, and More: the ideas, the earlier work in TODO-archive.md, and the planning state for the planner. Each entry opens to show its summary or why, its result and its technical details. The page has inline CSS and no script, loads nothing from the network, and its view buttons are hidden. It takes no lock, never changes TODO.md, and is written only when asked. The default file is report.html in the state folder, so git never sees it; `--out <path>` writes elsewhere. `--all` writes one page for every project in the project register instead of the current one: a card per project (tasks per status, top-level milestones with progress, blocked tasks, open questions), then each project's lists. It reads the register and each registered TODO.md and archive, never searches folders, works from any folder and writes nothing in the projects; a project that is gone, cannot be parsed or needs a newer todo shows its problem instead of its lists. Its default file is report-all.html next to the register. `--open` opens the page with the system's default program for HTML files. Text output is the path; `--json` returns the path, the size in bytes and whether the page was opened.",
     examples: &[
         "todo report --html",
         "todo report --html --open",
@@ -95,14 +95,14 @@ fn run_with_opener(
     }
 
     let (cfg, loaded) = load_read(ctx, out, false, true)?;
-    let page = build_page(
+    let data = crate::report::page::build(
         &loaded.doc,
         loaded.archive.as_ref(),
         &cfg,
         current_time(),
         &loaded.file_label,
     );
-    let html = render_page(&page);
+    let html = crate::report::page::html::render(&data);
 
     let path = match args.out {
         Some(path) => path,
