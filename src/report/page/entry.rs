@@ -269,19 +269,25 @@ fn block_reason(task: &Task) -> String {
     task.blocked_reason().unwrap_or(NO_REASON).to_string()
 }
 
+/// The calendar days from the local date of the claim of `task` to the date of the clock, both in the
+/// clock's offset. The entry's second line and Needs you both count with it, so they agree. `None`
+/// when the claim has no valid time (R-CLAIM-4).
+#[must_use]
+pub(crate) fn claim_days(task: &Task, ctx: &Ctx<'_>) -> Option<i64> {
+    let claimed = task.parse_claimed_at()?;
+    let claimed_day = claimed.with_timezone(ctx.now.offset()).date_naive();
+    Some(
+        ctx.now
+            .date_naive()
+            .signed_duration_since(claimed_day)
+            .num_days(),
+    )
+}
+
 /// How long the claim of `task` has been held, counted in calendar days of the clock's offset.
 /// `None` when the claim has no valid time (R-CLAIM-4).
 fn since(task: &Task, ctx: &Ctx<'_>) -> Option<Since> {
-    // The age needs a valid claim time; the days are then counted on the calendar.
-    ctx.cfg.claim_age(task, ctx.now)?;
-    let claimed = task.parse_claimed_at()?;
-    let claimed_day = claimed.with_timezone(ctx.now.offset()).date_naive();
-    let days = ctx
-        .now
-        .date_naive()
-        .signed_duration_since(claimed_day)
-        .num_days();
-    Some(match days {
+    Some(match claim_days(task, ctx)? {
         ..=0 => Since::Today,
         1 => Since::Yesterday,
         n => Since::Days(n),
