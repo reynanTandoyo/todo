@@ -718,7 +718,7 @@ or with `--json` the task as it is after the change.
     (lists the commits);
   - `DONE_WITHOUT_COMMIT`: a `done` task has no `commit` field and no linked commit;
   - `COMMIT_MISSING`: a `done` task's `commit` field names a commit that doesn't exist.
-  `dropped` tasks and questions are ignored. Exit `0` when there are no findings, `1` when there
+  `dropped` tasks, questions and milestones are ignored. Exit `0` when there are no findings, `1` when there
   are (like `check`), and `5` with error code `NO_GIT_HISTORY` when git isn't on `PATH`, the folder
   isn't in a git repository, or the repository is shallow or has no commits. Output is one line
   per finding, `TODO.md:<line>: T-012 <KIND> (<commits>)`; with `--json`, `data.findings` is a list of
