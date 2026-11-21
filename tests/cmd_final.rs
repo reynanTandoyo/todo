@@ -339,7 +339,7 @@ fn check_reports_a_final_on_an_entry_that_cannot_carry_one_and_on_a_task_at_the_
         assert!(text.contains(expected), "missing {expected:?} in:\n{text}");
     }
     assert!(
-        !text.contains("T-005:"),
+        !text.contains("T-005: final"),
         "a task above the target may keep its final: {text}"
     );
 }

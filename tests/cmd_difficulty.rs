@@ -728,7 +728,7 @@ fn check_warns_about_a_difficulty_that_is_not_configured_as_it_does_for_type_and
         "{text}"
     );
     assert!(
-        !text.contains("T-003:"),
+        !text.contains("T-003: difficulty"),
         "a configured difficulty in another case is not reported: {text}"
     );
 }

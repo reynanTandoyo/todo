@@ -45,6 +45,7 @@ Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock
 
 - `type` is the `type` field as written; `section` is the `##` section the entry is under, or `null`.
 - `archived` is `true` for an entry read from `TODO-archive.md`.
+- `why` is what the entry is for (`R-WRITE-17`); `summary` is what it is about, in one or two plain sentences written for people (`R-WRITE-19`). Both are the text as written, `null` when absent. `brief` prints `why` but not `summary`.
 - `stale` is `true` when the claim is past its timeout (`R-CLAIM-4`); `ready` is `true` when `next` could hand the entry out now, files and detail included.
 - `missing` lists what the detail rule lacks (`R-DETAIL-2`) for a task at or below the target level, in a fixed order: `why`, `accept`, `steps`, `verify`, `files`, `files: more than <n>`, `files: folder or pattern`, `read: <path> does not exist`, then `open question <ID>` for each open question about it. It is `[]` when complete, and always for a task above the target level, a milestone, a question or an idea. `ready` is `false` while it lists anything.
 - `files_busy` lists the tasks of other agents that hold a file this entry names (`R-SCOPE-1`), in file order, each with `id`, `title`, `status` (`claimed` or `blocked`) and `owner`. It is `[]` when none holds one, and `ready` is `false` while it lists a task. A task owned by the same agent is not listed.

@@ -36,7 +36,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "check",
     summary: "Check TODO.md for format, dependency, claim, and state problems",
     kind: CommandKind::Read,
-    details: "Reports problems as `file:line: message` and exits 1 if any are found, or 0 when clean. Pass `--fix` (with `--agent`) to make mechanical repairs only: canonical IDs and separators, missing `status: open`, leftover temporary files, and outdated rules blocks. A warning that does not change the exit code: each unfinished task at or below the target level whose detail is incomplete, with what it lacks (R-DETAIL-2).",
+    details: "Reports problems as `file:line: message` and exits 1 if any are found, or 0 when clean. Pass `--fix` (with `--agent`) to make mechanical repairs only: canonical IDs and separators, missing `status: open`, leftover temporary files, and outdated rules blocks. A warning that does not change the exit code: each unfinished task at or below the target level whose detail is incomplete, with what it lacks (R-DETAIL-2). Also a warning that does not change the exit code: each task or milestone that is not done or dropped and has no `summary` (R-WRITE-19).",
     examples: &[
         "todo check",
         "todo check --fix --agent agent-1",
@@ -192,6 +192,9 @@ pub(crate) fn collect_problems(
             // 3e. Unfinished tasks at or below the target level whose detail is incomplete (warnings
             //     only; R-DETAIL-2).
             warn_detail_gaps(&doc, archive.as_ref(), &cfg, &label, out);
+
+            // 3f. Unfinished tasks and milestones without a summary (warnings only; R-WRITE-19).
+            warn_missing_summaries(&doc, &label, out);
 
             // 4. Dependency checks (missing IDs, dropped dependencies, cycles; R-DEP-3).
             check_dependencies(&doc, archive.as_ref(), &label, &mut problems);
@@ -460,6 +463,24 @@ fn warn_detail_gaps(
             task.heading_line + 1,
             doc.id_config.format_id(task.id),
             missing.join(", ")
+        ));
+    }
+}
+
+/// Warns about each task or milestone that is not done or dropped and has no `summary`
+/// (`R-WRITE-19`). A question and an idea are not warned about. Never changes the exit code.
+fn warn_missing_summaries(doc: &Document, label: &str, out: &mut Output) {
+    for task in &doc.tasks {
+        if task.status.is_finished()
+            || !matches!(task.kind(), EntryKind::Task | EntryKind::Milestone)
+            || task.summary.is_some()
+        {
+            continue;
+        }
+        let id = doc.id_config.format_id(task.id);
+        out.warn(format!(
+            "{label}:{}: {id}: no summary: write one or two plain sentences for people with todo set {id} --summary",
+            task.heading_line + 1
         ));
     }
 }
