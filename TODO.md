@@ -471,6 +471,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - reqs: R-AGENT-1, REL-2, REL-5
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): Review 2026-11-21: depends on the question T-206 so 1.0.0 is not released before the owner has judged the page; this repository has no todo.toml yet.
+- note (2026-11-21, claude-main): Planner: add todo.toml with description only after todo 1.0 is installed here; todo 0.8.1 refuses the unknown key.
 
 ### T-215 · apply refuses a line break in why, goal, read or verify instead of turning it into a space
 - status: done
@@ -518,14 +519,13 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t216-haiku): done — Needs you now counts the days of a claim with the same calendar-day count as the entry's second line (new claim_days in entry.rs, used by since and by needs.rs); a unit test covers a claim 13 days 2 hours old that is 14 calendar days, and the suite passes with 1020 tests.
 
 ### T-217 · Help texts and README describe the new page and how to write for it
-- status: claimed
+- status: done
 - owner: t217-haiku
-- claimed: 2026-11-21T16:42+01:00
-- session: 2bfe83a8-a61d-41a9-8ba7-1c78ddab1fc1
 - priority: P1 · difficulty: 2 · type: docs · area: docs
 - milestone: T-195
 - why: the page is only as readable as the texts the planner writes, and people and agents learn about the page from the README and todo help
 - summary: The help texts and the README explain the new page and how to write texts for it.
+- by: Reynan Henry Tandoyo
 - final: Docs across four files that must say the same thing; Haiku 5.5 at xhigh finishes it from these steps.
 - files: src/agents/planner.md, src/cli/report.rs, README.md, docs/json.md
 - read: docs/requirements.md, docs/report-mockup.html, src/report/page/html.rs
@@ -538,8 +538,12 @@ and what needs them. Problems found while using todo are fixed along the way.
   6. Run cargo test --all-features (help and schema snapshots may need updating with cargo insta; review every changed snapshot) and the four checks of AGENTS.md.
 - accept: todo help planner tells the planner to write a summary for every task and milestone (plain words, at most two sentences, no IDs or file names), the done note as a one-sentence result, and reasons a person understands for drop and stuck; todo help report and its summary describe the new page with its buttons and script, and no longer say the single-project page has no script; the README describes the new page and its buttons for people; docs/json.md places the planning state under For the planner; all tests pass
 - verify: cargo test --all-features
+- verified: 2026-11-21
+- commit: 9c58f0e
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): forced set (owner was t217-haiku)
+- note (2026-11-21, t217-haiku): forced done outside files: tests/snapshots/cli_basic__cli_overview_json.snap
+- note (2026-11-21, t217-haiku): done — Planner help has a Writing for people section, the report help and README describe the one-project page with its buttons, script and no-script fallback, and --all keeps its v0.8 form; cargo test passes with 1036 tests (fmt, clippy and Linux clippy clean). tests/snapshots/cli_basic__cli_overview_json.snap was changed outside files for the new report summary.
 
 ## Questions
 

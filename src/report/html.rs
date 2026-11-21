@@ -1,6 +1,8 @@
-//! Writes the report pages as HTML (T-092, T-094; R-REPORT-1, R-REPORT-2).
+//! Writes the v0.8 report pages as HTML (T-092, T-094; R-REPORT-2). From v1.0 the page for one
+//! project is written by [`crate::report::page`]; this module writes the all-projects page and the
+//! planning part of the new page (For the planner, R-REPORT-3).
 //!
-//! The pages have inline CSS, no script, no form, no button and nothing loaded from the network. Each
+//! These pages have inline CSS, no script, no form, no button and nothing loaded from the network. Each
 //! task opens with `<details>` to show its fields and notes. Every text that comes from a task list
 //! goes through [`escape`], so a title such as `<script>` is shown as text.
 //!
