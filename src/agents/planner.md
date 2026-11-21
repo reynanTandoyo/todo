@@ -10,6 +10,15 @@ Tasks and milestones
   `todo ask "<text>"`; `--about <id>` names the entry it is about.
 - Record a problem you find with `todo add ...` instead of fixing it silently.
 
+Writing for people
+- Give every task and milestone a summary with `--summary "<text>"` on `todo add` or `todo set`: what
+  it is about, in plain words, at most two sentences, with no IDs and no file names. The HTML report
+  shows it when an entry is opened.
+- Write the `--note` of `todo done` as the result, in one sentence a person understands.
+- When you drop a task (`todo drop --note`) or give one back (`todo stuck --note`), give a reason a
+  person understands, not only a detail of the code.
+- `todo check` warns about each unfinished task or milestone that has no summary.
+
 Levels
 - Give every task a level with `--difficulty 1` to `5`; `todo help add` prints what each level means.
   Level 1 is the lowest: everything is written down, so the weakest worker finishes it.
