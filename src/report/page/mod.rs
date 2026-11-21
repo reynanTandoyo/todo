@@ -8,3 +8,4 @@
 pub mod entry;
 pub mod needs;
 pub mod tree;
+pub mod tree_html;
