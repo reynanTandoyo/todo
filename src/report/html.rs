@@ -23,13 +23,13 @@ pub const STYLE: &str = include_str!("style.css");
 /// Where a set of lists sits on a page. `prefix` goes in front of every anchor ID, so that the lists
 /// of several projects on one page do not clash; `level` is the heading level of their sections.
 #[derive(Debug, Clone, Copy)]
-struct Scope<'a> {
+pub(crate) struct Scope<'a> {
     prefix: &'a str,
     level: u8,
 }
 
 /// The scope of the single-project page: no prefix, sections under `h2`.
-const SINGLE: Scope<'static> = Scope {
+pub(crate) const SINGLE: Scope<'static> = Scope {
     prefix: "",
     level: 2,
 };
@@ -192,7 +192,7 @@ fn push_lists(h: &mut String, page: &Page, scope: Scope<'_>) {
 /// The planning state (`R-REPORT-3`): open tasks per level, what is not ready for lack of detail, what
 /// was given back and why, what is kept above the target level, and the waves. Each count is the one
 /// `todo plan` and `todo waves` give.
-fn push_planning(h: &mut String, page: &Page, scope: Scope<'_>) {
+pub(crate) fn push_planning(h: &mut String, page: &Page, scope: Scope<'_>) {
     section_start(h, scope, "planning", "Planning");
     let planning: &Planning = &page.planning;
     let sub = scope.level + 1;
@@ -576,7 +576,7 @@ fn push_body(h: &mut String, entry: &Entry) {
     }
 }
 
-fn push_areas(h: &mut String, page: &Page, scope: Scope<'_>) {
+pub(crate) fn push_areas(h: &mut String, page: &Page, scope: Scope<'_>) {
     section_start(h, scope, "areas", "Unfinished tasks per area");
     h.push_str("<p class=\"hint\">Open, claimed or blocked tasks, counted by their area.</p>\n");
     if page.areas.is_empty() && page.no_area == 0 {
