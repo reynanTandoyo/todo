@@ -423,7 +423,8 @@ or with `--json` the task as it is after the change.
 
 - **R-WRITE-19 COULD** From v1.0 the `summary` field says in one or two plain sentences what an
   entry is about, written for people: no IDs, no file names. The HTML report shows it when an entry
-  is opened (R-REPORT-1); titles, `why` and `accept` stay written for agents.
+  is opened (R-REPORT-1) and names entries by it in Last 7 days (R-REPORT-5); titles, `why` and
+  `accept` stay written for agents.
   - `add --summary T`, `set --summary T`, `"summary"` in `add --from` and `apply`, and the children
     of `split` (R-SPLIT-1) write `- summary: <text>`, which comes after `why` in the field order
     (format.md §10); `-` and `@path` work (R-WRITE-12); line breaks become spaces. It is allowed on

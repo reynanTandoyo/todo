@@ -469,8 +469,10 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t204-haiku): done — The one-page report perf test now runs on the 5,000-entry milestone tree with a summary on every task and a done note on every done task: report --html took 110, 111 and 122 ms (median of five runs per run; limit 500 ms) and the page was 2,897,256 bytes in each run (limit 5 MiB); the four AGENTS.md checks pass and cargo test --all-features passes 1036 tests (the 5 perf tests run with --ignored).
 
 ### T-205 · Planner rules for summaries, documentation and release 1.0.0
-- status: open
-- owner: —
+- status: claimed
+- owner: claude-main
+- claimed: 2026-11-21T20:54+01:00
+- session: f7957659-295e-4e1b-b8f8-96b2d860c5e5
 - priority: P1 · difficulty: 2 · type: docs · area: release
 - milestone: T-195
 - why: the page is only as readable as the texts the planner writes, and the release makes the new page the one people get
@@ -556,12 +558,13 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t217-haiku): done — Planner help has a Writing for people section, the report help and README describe the one-project page with its buttons, script and no-script fallback, and --all keeps its v0.8 form; cargo test passes with 1036 tests (fmt, clippy and Linux clippy clean). tests/snapshots/cli_basic__cli_overview_json.snap was changed outside files for the new report summary.
 
 ### T-218 · Last 7 days shows an entry's summary instead of its title
-- status: open
-- owner: —
+- status: done
+- owner: t218-haiku
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-195
 - why: the owner reviewed the page on this project (T-206): titles are written by agents for agents, so a week's list of them is hard to read for a person
 - summary: The list of what changed this week reads in plain words, using the text written for people where there is one.
+- by: Reynan Henry Tandoyo
 - final: One small change in one module with its requirement and snapshot; Haiku 5.5 at xhigh finishes it from these steps.
 - files: src/report/page/recent.rs, docs/requirements.md, tests/snapshots/cmd_report__report_html.snap, tests/cmd_report.rs
 - read: src/report/page/entry.rs, src/report/page/html.rs
@@ -573,7 +576,10 @@ and what needs them. Problems found while using todo are fixed along the way.
   5. Run the four checks of AGENTS.md.
 - accept: Last 7 days names a task done, a task cancelled and a single added entry by its summary when it has one, else by its title; finished milestones and grouped milestone names keep their titles; R-REPORT-5 says so; unit tests cover each case; all tests pass
 - verify: cargo test --all-features --lib report::page
+- verified: 2026-11-21
+- commit: aed00db
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, t218-haiku): done — Last 7 days names a task done, a task cancelled and a single added entry by its summary when it has one, else by its title; R-REPORT-5 says so; 5 new unit tests and the report snapshot updated; 1041 tests pass across 105 test binaries.
 
 ## Questions
 
