@@ -408,3 +408,59 @@ fn load_next_to_names_the_folder_of_todo_md_for_the_read_paths() {
     let cfg = OpsConfig::load_next_to(&dir.path().join("TODO.md")).unwrap();
     assert_eq!(cfg.todo_folder.as_deref(), Some(dir.path()));
 }
+
+#[test]
+fn description_is_one_line_and_a_blank_or_missing_value_is_none() {
+    // T-201 (R-CFG-2, R-REPORT-1): one sentence about the project, kept on one line.
+    assert_eq!(OpsConfig::default().description, None);
+
+    // Without the key, the description is None.
+    let missing = OpsConfig::from_toml_str("id_prefix = \"T\"\n").unwrap();
+    assert_eq!(missing.description, None);
+
+    // A set value is kept as written, with non-ASCII text, and surrounding spaces are trimmed.
+    let set = OpsConfig::from_toml_str("description = \"  Ein Werkzeug für Aufgabenlisten.  \"\n")
+        .unwrap();
+    assert_eq!(
+        set.description.as_deref(),
+        Some("Ein Werkzeug für Aufgabenlisten.")
+    );
+
+    // The value is also read from todo.toml next to TODO.md.
+    let dir = TempDir::new().unwrap();
+    write_toml(
+        dir.path(),
+        "description = \"Shared by agents and people.\"\n",
+    );
+    let from_file = OpsConfig::load_next_to(&dir.path().join("TODO.md")).unwrap();
+    assert_eq!(
+        from_file.description.as_deref(),
+        Some("Shared by agents and people.")
+    );
+
+    // An empty or blank value is None.
+    for text in ["description = \"\"\n", "description = \"   \"\n"] {
+        let blank = OpsConfig::from_toml_str(text).unwrap();
+        assert_eq!(blank.description, None, "{text:?}");
+    }
+
+    // Each CR or LF becomes a space, whether written as an escape or as a real line break.
+    let escaped = OpsConfig::from_toml_str(r#"description = "first line\nsecond\rthird""#).unwrap();
+    assert_eq!(
+        escaped.description.as_deref(),
+        Some("first line second third")
+    );
+    let multi =
+        OpsConfig::from_toml_str("description = \"\"\"first line\nsecond line\"\"\"\n").unwrap();
+    assert_eq!(multi.description.as_deref(), Some("first line second line"));
+
+    // A value that is not a string is the usual todo.toml error, with its line.
+    let err = OpsConfig::from_toml_str("id_prefix = \"T\"\ndescription = 42\n").unwrap_err();
+    assert_eq!(err.code, todo::error::ErrorCode::BadValue);
+    assert_eq!(err.details.line, Some(2));
+    assert!(
+        err.message.contains("description must be a string"),
+        "got: {}",
+        err.message
+    );
+}

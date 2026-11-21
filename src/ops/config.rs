@@ -86,6 +86,9 @@ pub struct OpsConfig {
     pub snapshots_keep: u64,
     /// How linked git worktrees resolve `TODO.md` (`R-FIND-5`, `R-CFG-2`).
     pub worktree: WorktreeMode,
+    /// One sentence about the project, shown under the title of the HTML report (`R-CFG-2`,
+    /// `R-REPORT-1`). Line breaks are read as spaces; `None` when the setting is absent or blank.
+    pub description: Option<String>,
     /// Whether todo runs `verify` commands at all (`verify`, `R-VERIFY-1`).
     pub verify_enabled: bool,
     /// When the `verify` commands run (`verify_when`, `R-VERIFY-2`).
@@ -132,6 +135,7 @@ impl Default for OpsConfig {
             lock: LockConfig::default(),
             snapshots_keep: DEFAULT_SNAPSHOTS_KEEP,
             worktree: WorktreeMode::Shared,
+            description: None,
             verify_enabled: true,
             verify_when: VerifyWhen::Done,
             verify_timeout_seconds: DEFAULT_VERIFY_TIMEOUT_SECONDS,
@@ -483,6 +487,17 @@ impl OpsConfig {
                                 ),
                             ));
                         }
+                    };
+                }
+                "description" => {
+                    let s = expect_string(&key, val, line)?;
+                    // Each CR or LF becomes a space, so the value stays on one line (R-CFG-2).
+                    let flat = s.replace(['\r', '\n'], " ");
+                    let trimmed = flat.trim();
+                    cfg.description = if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed.to_string())
                     };
                 }
                 "verify" => {
