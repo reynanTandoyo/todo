@@ -50,7 +50,8 @@ rules it doesn't need.
 
 Command output, plain text and JSON alike, is written for agents. The one view meant for people is
 the HTML report (`todo report --html`, R-REPORT-1, R-REPORT-2): a read-only page, built only when
-someone asks for it, that never changes anything. A person who wants a change asks an agent, or edits
+someone asks for it, that never changes anything; its buttons change only what it shows
+(R-REPORT-6). A person who wants a change asks an agent, or edits
 by hand under a lease (R-LOCK-6).
 
 | # | Situation | Requirements |
@@ -83,6 +84,7 @@ by hand under a lease (R-LOCK-6).
 | S26 | A worker cannot finish its task | R-STUCK-1 |
 | S27 | Ten workers in one checkout must never edit the same file | R-SCOPE-1, R-SCOPE-2 |
 | S28 | The planner wants to know how many workers are useful now, and which chain of tasks limits the speed | R-WAVE-1 |
+| S29 | The owner and a colleague want to see within a minute what is done, what was cancelled and why, what is still to do and what needs them | R-REPORT-1, R-REPORT-4, R-REPORT-5, R-WRITE-19 |
 
 ---
 
@@ -148,7 +150,7 @@ The full grammar is in [format.md](format.md). In short:
 ```
 
 (Invented example.) Known fields: `status`, `owner`, `claimed`, `session`, `priority`,
-`difficulty`, `type`, `area`, `milestone`, `about`, `goal`, `why`, `final`, `depends`, `files`,
+`difficulty`, `type`, `area`, `milestone`, `about`, `goal`, `why`, `summary`, `final`, `depends`, `files`,
 `read`, `problem`, `fix`, `steps`, `accept`, `verify`, `attempts`, `verified`, `commit`, `by`, and
 dated `note` lines. Any other `- key: value` line is kept and
 shown in JSON. Everything outside task blocks — the preamble, prose, tables, code — is never changed
@@ -419,6 +421,21 @@ or with `--json` the task as it is after the change.
   todo next --claim --max-difficulty 1 --brief --agent worker-1
   ```
 
+- **R-WRITE-19 COULD** From v1.0 the `summary` field says in one or two plain sentences what an
+  entry is about, written for people: no IDs, no file names. The HTML report shows it when an entry
+  is opened (R-REPORT-1); titles, `why` and `accept` stay written for agents.
+  - `add --summary T`, `set --summary T`, `"summary"` in `add --from` and `apply`, and the children
+    of `split` (R-SPLIT-1) write `- summary: <text>`, which comes after `why` in the field order
+    (format.md §10); `-` and `@path` work (R-WRITE-12); line breaks become spaces. It is allowed on
+    every kind of entry: tasks, milestones, questions and ideas. `set --unset summary` removes it.
+  - `show` and `show --json` show it; `schema` lists it. `brief` (R-DETAIL-3) does not print it:
+    a worker's order needs no text written for people.
+  - `check` warns, without changing its exit code, about each task or milestone that is not done
+    or dropped and has no summary (R-CHECK-1).
+  - It is an ordinary field of format 3: a file without any `summary` line works unchanged, and an
+    older todo keeps the line as an unknown field (format.md §8).
+  - A test covers each case.
+
 ### 5.8 Claims — CLAIM
 
 - **R-CLAIM-1 MUST** `claim <task>` sets `status: claimed`, the owner, and the claim time.
@@ -539,7 +556,9 @@ or with `--json` the task as it is after the change.
   allow, and a `files` or `read` entry that is absolute or leaves the folder of `TODO.md`
   (R-SCOPE-1). These are reported as warnings that don't change the exit code: an unfinished task at
   or below the target level that lacks detail, with what is missing (R-DETAIL-2), and a done task with a
-  `verify` command and no `verified` line (R-VERIFY-2).
+  `verify` command and no `verified` line (R-VERIFY-2). From v1.0 it also warns, without changing
+  the exit code, about a task or milestone that is not done or dropped and has no `summary`
+  (R-WRITE-19).
 - **R-CHECK-2 COULD** `check --fix` makes mechanical repairs only — canonical IDs and separators, a
   missing `status: open`, leftover temporary files, an outdated rules block — and reports the rest.
 
@@ -595,6 +614,7 @@ or with `--json` the task as it is after the change.
   | `lease_max_minutes` | `60` | longest allowed lease |
   | `snapshots_keep` | `200` | snapshots kept |
   | `worktree` | `"shared"` | `"local"` makes each worktree use its own file |
+  | `description` | `""` | one sentence about the project, shown under the title of the HTML report (R-REPORT-1); line breaks become spaces; empty leaves the line out |
 
   An unknown key or a bad value is an error, reported as `todo.toml:<line>: message`.
 - **R-CFG-3 MUST** Settings come from the command line first, then environment variables
@@ -984,57 +1004,189 @@ todo migrate --yes --agent maintainer
 
 ### 5.23 HTML report — REPORT
 
-The report is the one view meant for people (§2). It is an overview only: no buttons, no forms, no
-copy-ready commands; a person who wants a change asks an agent. It is built only when someone asks
-for it, never automatically.
+The report is the one view meant for people (§2). It is an overview only: no forms, no copy-ready
+commands, and nothing on it can change `TODO.md`; a person who wants a change asks an agent. It is
+built only when someone asks for it, never automatically. From v1.0 the page for one project
+(R-REPORT-1) is the page shown in `docs/report-mockup.html`, approved by the owner on 2026-11-21: it
+answers what a reader asks (what is done, what was cancelled and why, what is still to do, what
+needs me) instead of listing what the tool knows. The mockup's invented data and its "Mockup" tag
+are not part of the page; where the mockup and this section differ, this section counts.
+
+Words for people. The page never shows a status keyword; it uses five states:
+
+| Status in `TODO.md` | State on the page | Mark |
+|---|---|---|
+| `open` | to do | ○ |
+| `claimed` | in progress | ● |
+| `blocked` | waiting | ◐ |
+| `done` | done | ✓ |
+| `dropped` | cancelled | ✕ |
+
+One exception: an open task whose `depends` names a question that is not answered (R-DEP-1,
+R-KIND-3) is *waiting* too, for that answer. A state is never shown by colour alone: every entry has
+its mark, a second line names the state in words where there is one, and the legend pairs each mark
+with its word.
 
 - **R-REPORT-1 COULD** `todo report --html [--out <path>] [--open]` writes one self-contained HTML
   file for the project.
-  - CSS is inline; nothing is loaded from the network; no new dependency is needed. The default
-    path is `report.html` in the state folder (§7), so it is never committed. The command prints
-    the path; `--open` then opens the page with the system's default program for HTML files.
+  - CSS and the one small script of R-REPORT-6 are inline; nothing is loaded from the network; no
+    new dependency is needed. The page is complete and readable without the script. The default
+    path is `report.html` in the state folder (§7), so it is never committed. The command prints the
+    path; `--open` then opens the page with the system's default program for HTML files.
   - It is a read command: it takes no lock (R-LOCK-5) and never changes `TODO.md`.
-  - The page keeps the kinds apart in separate lists: (1) work, as a tree of milestones, each with
-    its goal and progress (R-MILE-3), with nested milestones and tasks indented below it (for
-    example "Develop the renderer" with "C shader" and "GPU compiler" below), and top-level tasks
-    last; (2) open questions, each with a link to the milestone or task it is about; (3) ideas;
-    (4) done; (5) dropped, with the reason.
-  - Each task shows its priority, difficulty and area; claimed tasks show owner and age, with stale
-    claims marked; blocked tasks show the reason of their latest `blocked — <reason>` note
-    (`docs/format.md` §9). A task opens to show its fields and notes. The page also gives the number
-    of open tasks per area: every task that is open, claimed or blocked (that is, not done or
-    dropped), counted by its area.
-  - Done and dropped entries in `TODO-archive.md` are listed too, marked as archived. A done or
-    dropped milestone appears in the work tree only while unfinished work sits below it; otherwise
-    it is listed under done or dropped, so each entry appears once.
+  - **Order.** The page shows, top to bottom: the header; the overall line; Needs you (R-REPORT-4);
+    Last 7 days (R-REPORT-5); All work, with the view buttons of R-REPORT-6; and More, with the
+    closed parts Ideas, Earlier work and For the planner.
+  - **Header.** The project's title (the first heading of the preamble, else "Tasks"), the
+    `description` of `todo.toml` (R-CFG-2) on the line below when it is set, and
+    "Status as of <d Mon yyyy>, <hh:mm> · from TODO.md". The two colour buttons of R-REPORT-6 sit
+    beside it.
+  - **Overall line.** "N of M tasks done", counted over the tasks in `TODO.md` (not the archive, not
+    milestones, questions or ideas, R-KIND-3), where M leaves out cancelled tasks. Below it one bar in
+    five parts, in the order done, in progress, waiting, to do, cancelled, each part as wide as its
+    share of all tasks, and a legend that gives each state's mark, count and word; the cancelled
+    count adds "(not counted in the M)". The bar has a text alternative with the same numbers.
+  - **All work** is one tree of the work in `TODO.md`. Every task and milestone appears in its place
+    in the tree whatever its state: done and cancelled entries stay where they are, so finished
+    work is never lost from view.
+    - A milestone is one row: its title, its state, "N of M done" over every task below it at any
+      depth (cancelled tasks left out of both numbers), and a small bar of that share. Opened, it
+      shows "Goal: <goal>", then its nested milestones, then its tasks, each group in file order.
+    - A milestone's state is *finished <date>* when it is done (the date of its latest `done` note),
+      *cancelled <date>* when it is dropped, *in progress* when a task below it is done, in
+      progress or waiting, and *not started* otherwise. Unfinished milestones are open when the
+      page loads; finished and cancelled ones are closed.
+    - Top-level milestones are ordered in progress first, then not started, then finished and
+      cancelled, keeping file order inside each group. Nested milestones keep file order.
+    - Tasks not below any milestone form the last group, *Other work*, shown like a milestone with
+      the state "not part of a milestone" and no goal. It is left out when there are none.
+  - **An entry** (a task) is one line: its mark, its title, the date for done and cancelled entries
+    (the date of the latest `done` or `dropped` note), and its ID in small type. A second line, with
+    the state in words first, appears only for:
+    - in progress: "In progress · <owner> · <since>", where <since> is "since today",
+      "since yesterday" or "for N days" from the claim time, followed by "· no activity" when the
+      claim is stale (`claim_ttl_hours`, R-CLAIM-4);
+    - waiting: "Waiting · <reason>": for a task given back (R-STUCK-1) "given back by a worker:
+      <problem>"; for a task waiting for a question "for your answer: <question>"; otherwise the
+      reason of its latest `blocked — …` note (`docs/format.md` §9);
+    - cancelled: "Cancelled · <reason of its latest drop note>".
+  - **Details.** Clicking an entry opens, below it: "Summary" with its `summary` (R-WRITE-19), or
+    "Why" with its `why` when it has no summary; for a done entry "Result" with the text of its
+    latest `done` note; and a closed part "Technical details" with, where present: level, priority,
+    type, area, files, the check (`verify`) and whether it passed (`verified`), commit, done by
+    (`by`, else the last owner), depends (each with its title), attempts, and the notes. Empty
+    fields are left out. A milestone's details are its goal and summary.
+  - **More.** Three closed parts, each with a count in its heading:
+    - *Ideas (n) — not planned yet*: the open ideas, one title per line (R-KIND-1). Left out when
+      there are none.
+    - *Earlier work (n finished milestones, m tasks) — from the archive*: the same tree as All work,
+      built from `TODO-archive.md`, every milestone closed; archived tasks without a milestone form
+      its own Other work group. Left out when there is no archive.
+    - *For the planner — levels, parallel waves, tasks that still need detail*: the planning state
+      of R-REPORT-3 and the number of unfinished tasks per area (every task that is to do, in
+      progress or waiting, counted by its `area`).
+  - **Layout.** One column at most 820 px wide, system font; the bars and IDs are hidden in a window
+    narrower than 560 px; readable when printed, with the buttons left out. Light and dark mode
+    and the colours follow R-REPORT-6.
+  - Questions are not entries of the tree: open ones appear in Needs you (R-REPORT-4), answered
+    ones in the details of the tasks that name them in `depends`. Ideas appear only under More.
+  - Problems of the files (parse warnings) are printed as warnings with the path of the file; the
+    page is still written.
   - All text from the file is HTML-escaped (tested with a title containing `<script>`).
-  - It is readable in light and dark mode and in a narrow window.
-  - With a fixed clock, the output for a fixture matches its snapshot.
+  - With a fixed clock, the output for an invented fixture that has every state, a nested
+    milestone, a question a task waits for, a task given back and a stale claim matches its
+    snapshot.
 - **R-REPORT-2 COULD** `todo report --html --all [--out <path>] [--open]` puts every registered
   project on one page, built from the project register only (R-PROJ-1); it never searches folders
-  and works from any folder.
+  and works from any folder. Its content stays as in v0.8: the v1.0 design of R-REPORT-1 does not
+  apply to it (a new design for it is the idea T-207).
   - A card per project (tasks per status, top-level milestones with progress, blocked tasks, open
-    questions), followed by each project's lists as in R-REPORT-1. The card counts as `overview`
-    does (R-PROJ-2): tasks per status from `TODO.md` only, and top-level milestones (not nested under
-    a milestone) that are not dropped, with the tasks below them done out of those not dropped.
+    questions), followed by each project's lists in the v0.8 form: (1) work, as a tree of
+    milestones, each with its goal and progress (R-MILE-3), with nested milestones and tasks
+    indented below it and top-level tasks last; (2) open questions, each with a link to the
+    milestone or task it is about; (3) ideas; (4) done; (5) dropped, with the reason. Each task
+    shows its priority, difficulty and area, claimed tasks their owner and age with stale claims
+    marked, blocked tasks the reason of their latest `blocked — <reason>` note, and a task opens to
+    show its fields and notes. Done and dropped entries of `TODO-archive.md` are listed too, marked
+    as archived. The card counts as `overview` does (R-PROJ-2): tasks per status from `TODO.md`
+    only, and top-level milestones (not nested under a milestone) that are not dropped, with the
+    tasks below them done out of those not dropped.
   - The default path is `report-all.html` next to the register.
   - A project that is gone, can't be parsed or needs a newer todo shows its problem instead of its
     lists, decided as `overview` decides it (R-PROJ-2). The other problems of its files are printed
     as warnings with the path of the file, as in R-REPORT-1.
   - An empty register gives a page that says in words how a project is registered (by asking an
     agent to register it), without a copy-ready command.
-  - A snapshot test uses two invented projects.
+  - It has no script and no buttons. A snapshot test uses two invented projects.
 - **R-REPORT-3 COULD** From v0.8 the report shows the planning state (R-LEVEL-2, R-WAVE-1), so the
-  owner sees how far the planner is and where workers failed.
+  owner sees how far the planner is and where workers failed. From v1.0 it sits in the closed part
+  *For the planner* (R-REPORT-1).
   - Each project page shows the open tasks per level (R-LEVEL-1), counted as the areas count open
     work (open, claimed or blocked tasks), with those without a level counted apart; how many tasks
-    are not ready for lack of detail (R-DETAIL-2); the tasks given back (R-STUCK-1), each with its problem and its
-    `attempts`; the tasks kept above the target level, each with the reason of its `final` line
-    (R-LEVEL-3); and the number of waves and the size of wave 1 (R-WAVE-1).
+    are not ready for lack of detail (R-DETAIL-2); the tasks given back (R-STUCK-1), each with its
+    problem and its `attempts`; the tasks kept above the target level, each with the reason of its
+    `final` line (R-LEVEL-3); and the number of waves and the size of wave 1 (R-WAVE-1).
   - A task, when opened, shows its level, its `files` and its `verify` command, and whether it was
-    verified.
+    verified (under Technical details, R-REPORT-1).
   - The all-projects page (R-REPORT-2) shows the open tasks per level on each project's card.
-  - Snapshot tests are updated; the page still has no button, form or command (§13).
+- **R-REPORT-4 COULD** From v1.0 the page has the part *Needs you (n)*, right after the overall
+  line: everything that waits for a person, in this order.
+  - Every open question: the tag "Question", its title, and "Asked <date>" (the date of its
+    `added` note), then "· about “<title>”" when it has an `about` line, then "· the task “<title>”
+    waits for this answer" (or "the tasks “…” and “…” wait for this answer") for the unfinished
+    tasks whose `depends` names it.
+  - Every task given back (R-STUCK-1): the tag "Given back", its title, and "A worker could not
+    finish it (<date>): <problem>", with the date and text of its latest `stuck — …` note.
+  - Every task whose claim is stale (`claim_ttl_hours`): the tag "No activity", its title, and
+    "In progress for N days by <owner>. It may have been abandoned."
+  - Each row names the entry by its title, never by its ID alone. The heading gives the count; an
+    empty part reads "Nothing needs you." The tags are words, so the part does not rely on colour.
+- **R-REPORT-5 COULD** From v1.0 the page has the part *Last 7 days*: what changed in the seven
+  days that end on the day the page is built, newest day first, taken from note dates in
+  `TODO.md` and `TODO-archive.md`.
+  - The events are: a task done (✓ and its title); a task cancelled (✕, its title, and
+    "— cancelled: <reason>"); a milestone finished (✓, its title in bold, "finished", and
+    "— all N tasks done" or "— N of M tasks done"); and entries added, from the `added` notes of
+    tasks and milestones. Entries added on one day below the same milestone are one row,
+    "N tasks added to <milestone>" (top-level ones: "N tasks added to Other work"); a single one
+    reads "Added: <title>".
+  - Within a day the order is milestones finished, tasks done, tasks cancelled, entries added, each
+    in file order (`TODO.md` before the archive). Each row starts with its date ("21 Nov").
+  - At most 15 rows are shown; the rest sit behind one closed part "Earlier this week (n)". With no
+    event the part reads "Nothing changed in the last 7 days."
+  - Tests use a fixed clock.
+- **R-REPORT-6 COULD** From v1.0 the page has view controls. They change only what the page shows;
+  nothing on the page writes a file, runs a command or can change `TODO.md`.
+  - Above All work: the buttons Everything, Still to do, Done and Cancelled. Still to do shows to
+    do, in progress and waiting entries; Done and Cancelled show those states. Entries that don't
+    match are hidden, and so is every milestone left without a visible entry; milestones that have
+    one are opened. The pressed button is marked (`aria-pressed`). Then Expand all and Collapse all.
+  - Beside the header: one button that switches between light and dark mode ("Dark mode" or "Light
+    mode", naming the mode it switches to) and one button "Colour-blind colours" that switches the
+    colour set for red-green colour blindness on and off (`aria-pressed`).
+  - Four colour sets, one for each mode with and without the colour-blind setting. The state
+    colours (marks, state words, milestone states) are:
+
+    | State | Light | Dark | Light, colour-blind | Dark, colour-blind |
+    |---|---|---|---|---|
+    | done | `#2f9e5f` | `#4cc17f` | `#0072b2` | `#56b4e9` |
+    | in progress | `#3b7fe0` | `#6aa5f5` | `#a86400` | `#f0a830` |
+    | waiting | `#b07800` | `#e0a526` | `#a86400` | `#f0a830` |
+    | to do | `#80868e` | `#8b9098` | `#8e949c` | `#7d838c` |
+    | cancelled | `#cf4a4a` | `#ee6b6b` | `#33363b` | `#dcdfe3` |
+
+    The page background is `#ffffff` in light mode and `#17181b` in dark mode. Each state colour has
+    a contrast of at least 3 to 1 against its background (WCAG relative luminance); a test computes
+    that for all four sets. In the colour-blind sets the bar parts differ from the marks: in
+    progress `#e69f00` (dark: `#f0a830`), waiting the same orange with dark stripes, to do
+    `#c9ccd1` (dark: `#4a4e55`); and the state words on the second line of waiting and cancelled
+    entries are underlined, so the five states differ by more than hue.
+  - The mode follows the system setting (`prefers-color-scheme`) until the button is used. Both
+    choices are remembered in the browser (`localStorage`, keys `todo-report-theme` and
+    `todo-report-cb`); a failure to read or store them is ignored.
+  - It is one small inline script that names no address and loads nothing. Without scripts the page
+    shows every entry in the system's mode with the normal colours of that mode, and the buttons
+    are hidden. The buttons are left out when printing.
 
 ```powershell
 todo report --html --open
@@ -1627,6 +1779,12 @@ With `TODO_REGISTER`, the lock and `report-all.html` sit next to the file it nam
   `todo stuck` (R-STUCK-1); file scopes for `next` and `done` (R-SCOPE-1, R-SCOPE-2); `todo waves`
   (R-WAVE-1); the planning state in the HTML report (R-REPORT-3); and the agent rules split into a
   common part, `todo help worker` and `todo help planner` (R-AGENT-1).
+- **v1.0** — decided by the owner on 2026-11-21: a status page made for people, as approved in
+  `docs/report-mockup.html`: the new page for one project with states in plain words and the full
+  tree (R-REPORT-1), Needs you (R-REPORT-4), Last 7 days (R-REPORT-5), view buttons, light or dark
+  mode and colour-blind colours (R-REPORT-6), the planning state moved into For the planner
+  (R-REPORT-3), the `summary` field (R-WRITE-19) and the `description` setting (R-CFG-2). The
+  all-projects page (R-REPORT-2) keeps its v0.8 content. The format stays version 3.
 
 ---
 
@@ -1676,8 +1834,10 @@ Recorded so they aren't lost; each becomes a requirement only by a decision reco
 ## 13. Out of scope
 
 - A terminal UI, desktop app or web server. A generated HTML file, written only on request
-  (R-REPORT-1, R-REPORT-2), is allowed; any control on that page (buttons, forms, scripts that
-  change something, copy-ready commands) stays out, and so does rewriting it automatically.
+  (R-REPORT-1, R-REPORT-2), is allowed. Controls that only change what the page shows (the view
+  buttons, light or dark mode and the colour-blind colours of R-REPORT-6) are allowed; any control
+  that could change something (forms, scripts that write, send or run anything, copy-ready
+  commands) stays out, and so does rewriting the page automatically.
 - Due dates, recurrence and computed priority scores. No score is computed from `difficulty`, and
   todo never sets or changes a level by itself (R-LEVEL-1); the format 2 to 3 migration only
   renames the old values.

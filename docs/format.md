@@ -193,6 +193,7 @@ first line of the file.
 | `about` | on a question or idea: the ID of the milestone or task it is about | about nothing in particular |
 | `goal` | on a milestone: what the piece of work is meant to achieve | none; `check` reports a milestone without a goal |
 | `why` | free text: what the task is for | none |
+| `summary` | free text for people: what the entry is about, in one or two plain sentences, without IDs or file names; allowed on every kind of entry and shown by the HTML report (from todo 1.0) | none; `check` warns about an unfinished task or milestone without one |
 | `final` | on a task above the target level: why it stays at that level on purpose | none |
 | `depends` | task IDs separated by commas; may name a milestone, which counts as finished when it is done or dropped | none |
 | `files` | the paths, folders and patterns the task may change, separated by commas (§19) | none; the task may change any file and holds none |
@@ -272,8 +273,8 @@ is a `stuck — …` note; that note's text is its reason.
 - **Order of fields.** When a field is missing and must be added, it goes after the nearest existing
   field that comes before it in this order, or directly under the heading if there is none:
   `status`, `owner`, `claimed`, `session`, `priority`, `difficulty`, `type`, `area`, `milestone`,
-  `about`, `goal`, `why`, `final`, `depends`, `files`, `read`, `problem`, `fix`, `steps`, `accept`,
-  `verify`, `attempts`, `verified`, `commit`, then other fields. Removing a field removes its line
+  `about`, `goal`, `why`, `summary`, `final`, `depends`, `files`, `read`, `problem`, `fix`, `steps`,
+  `accept`, `verify`, `attempts`, `verified`, `commit`, then other fields. Removing a field removes its line
   only, and for `steps` its step lines too.
 - **New tasks** go at the end of their section: after the section's last non-blank line, with one
   blank line before the heading. Blank lines that followed the section stay after the new task. A
@@ -284,7 +285,7 @@ is a `stuck — …` note; that note's text is its reason.
   - status: open
   - owner: —
   - priority: <priority> · difficulty: <difficulty> · type: <type> · area: <area>    (only the parts given)
-  - milestone: … / - about: … / - goal: … / - why: …    (each only if given)
+  - milestone: … / - about: … / - goal: … / - why: … / - summary: …    (each only if given)
   - depends: … / - files: … / - read: … / - problem: … / - fix: …    (each only if given)
   - steps:    (only if given, followed by its numbered step lines)
   - accept: … / - verify: …    (each only if given)
@@ -412,7 +413,7 @@ version label.
 |---|---|---|
 | 1 | todo 0.1 to 0.5 | the format line is optional |
 | 2 | todo 0.6 and 0.7 | the format line is required; the tool line (§4); the kinds `milestone` and `idea` (§16); the fields `difficulty`, `milestone`, `about`, `goal` and `why` (§8) |
-| 3 | todo 0.8 and later | the levels `1` to `5` as the default `difficulties`; the fields `steps` (a numbered list on indented lines), `read`, `verify`, `final`, `attempts` and `verified` (§8); `files` as the list of paths and patterns a task may change (§19); the notes of `stuck`, `split` and the verify command (§9) |
+| 3 | todo 0.8 and later (todo 1.0 adds the field `summary`, §8, without a new version: an older todo keeps it as an unknown field) | the levels `1` to `5` as the default `difficulties`; the fields `steps` (a numbered list on indented lines), `read`, `verify`, `final`, `attempts` and `verified` (§8); `files` as the list of paths and patterns a task may change (§19); the notes of `stuck`, `split` and the verify command (§9) |
 
 A tool migrates a file in an older format on its first write, and with `todo migrate`, one version
 at a time, under the lock and in one write after a snapshot. Each step changes whole lines only.
