@@ -210,10 +210,8 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t211-haiku): done — Added report::page::entry: entry_view turns a task into an EntryView with its state in words, date, second line and details, unit-tested with 23 tests passing in report::page; fmt and clippy clean on Windows and Linux, full suite 950 passing.
 
 ### T-212 · Page data: the work tree with counts, order, Other work and Earlier work
-- status: claimed
+- status: done
 - owner: t212-haiku
-- claimed: 2026-11-21T15:20+01:00
-- session: d96c59df-0436-40f9-9e4c-a60d3f320cc7
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-198
 - why: the page keeps finished work in its place only if the data is one tree with every entry and the right counts
@@ -232,9 +230,13 @@ and what needs them. Problems found while using todo are fixed along the way.
   8. Run the four checks of AGENTS.md.
 - accept: src/report/page/tree.rs builds one tree with every task and milestone of a document (done and cancelled included), milestone states with dates, N of M per milestone (cancelled left out), overall counts per state over tasks only, the order in progress / not started / finished at the top level, Other work, and Earlier work from the archive; unit tests cover each rule
 - verify: cargo test --all-features --lib report::page
+- verified: 2026-11-21
+- commit: ad42973
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, t212-haiku): forced claim (files held by T-199)
 - note (2026-11-21, claude-main): forced set (owner was t212-haiku)
+- note (2026-11-21, t212-haiku): done — Added report::page::tree: build_tree places every task and milestone with its state, N of M, the overall counts, the top-level order, Other work, and build_earlier for the archive; 9 new unit tests, report::page 32 passing, full suite 959 passing, fmt and clippy clean on Windows and Linux.
 
 ### T-199 · Needs you: questions, tasks given back and work without activity
 - status: done
@@ -264,8 +266,8 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t199-haiku): done — Added report::page::needs: build_needs lists open questions, tasks given back and stale claims in R-REPORT-4 order, with heading, waiting_text and EMPTY; 13 new unit tests, 963 tests passing in the full suite, fmt and clippy clean on Windows and Linux.
 
 ### T-200 · Last 7 days: what was finished, cancelled and added
-- status: open
-- owner: —
+- status: done
+- owner: t200-haiku
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-195
 - why: a person who looked last week wants to see only what changed since then
@@ -284,8 +286,14 @@ and what needs them. Problems found while using todo are fixed along the way.
   8. Run the four checks of AGENTS.md.
 - accept: src/report/page/recent.rs lists the events of the last 7 days from note dates of TODO.md and the archive, newest first: task done, task cancelled with its reason, milestone finished with its task count, entries added grouped per milestone and day; the order within a day is fixed; at most 15 rows, the rest in earlier; the empty text is Nothing changed in the last 7 days.; tests use a fixed clock
 - verify: cargo test --all-features --lib report::page
+- verified: 2026-11-21
+- commit: 3296d64
 - reqs: R-REPORT-5
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, t200-haiku): forced claim (files held by T-213)
+- note (2026-11-21, t200-haiku): done — Added report::page::recent (build_recent, row_text, EMPTY) listing the seven days' done, cancelled, finished milestones and added entries, with 9 new unit tests; report::page 54 passing, full suite 1004 passing, fmt and clippy clean on Windows and Linux.
+- note (2026-11-21, t200-haiku): singular texts (commit b418352)
 
 ### T-201 · description setting: one sentence about the project for the page header
 - status: done
@@ -326,8 +334,8 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, claude-main): split into T-213, T-214
 
 ### T-213 · Page HTML: the All work tree, one line per entry, details on click
-- status: open
-- owner: —
+- status: done
+- owner: t213-haiku
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-202
 - why: the tree is most of the page and must read like the approved mockup, not like a dump of fields
@@ -346,11 +354,17 @@ and what needs them. Problems found while using todo are fixed along the way.
   8. Run the four checks of AGENTS.md.
 - accept: src/report/page/tree_html.rs writes the All work tree in the markup of docs/report-mockup.html: milestones with title, state, N of M done, bar and goal, open unless finished or cancelled; one line per entry with mark, title, date for done and cancelled, and ID; the second line only for in progress, waiting and cancelled, naming the state in words; details with Summary or Why, Result for done, and closed Technical details; Other work last; all text escaped; unit tests cover each rule
 - verify: cargo test --all-features --lib report::page
+- verified: 2026-11-21
+- commit: fa9f98c
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, t213-haiku): done — Added report::page::tree_html: the All work tree as HTML (milestones with state, N of M, bar and goal; one line per entry with mark, title, date and ID; details with Summary or Why, Result, Technical details; second lines; Other work last; all text escaped), with 13 new unit tests; full suite 1008 passing, fmt and clippy clean on Windows and Linux.
 
 ### T-214 · Page HTML: the whole page, wired into report --html, with snapshot
-- status: open
-- owner: —
+- status: claimed
+- owner: t214-haiku
+- claimed: 2026-11-21T15:46+01:00
+- session: d3f0f1ee-f6a7-4492-b27b-8ca6606482b8
 - priority: P1 · difficulty: 3 · type: feature · area: report
 - milestone: T-202
 - why: this puts the parts together into the page people open, replacing the v0.8 page for one project
