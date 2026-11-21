@@ -184,15 +184,15 @@ fn last_7_days_lists_the_events_newest_day_first_with_done_before_added() {
         &[
             "<span class=\"d\">18 Nov</span><span class=\"mark done\">\u{2713}</span><span><b>Club hall</b> finished \u{2014} all 2 tasks done</span>",
             "<span class=\"d\">18 Nov</span><span class=\"mark done\">\u{2713}</span><span>Mark the ceiling points</span>",
-            "<span class=\"d\">17 Nov</span><span class=\"mark done\">\u{2713}</span><span>Read the star catalogue</span>",
-            "<span class=\"d\">17 Nov</span><span class=\"mark done\">\u{2713}</span><span>Measure the hall</span>",
-            "<span class=\"d\">17 Nov</span><span class=\"mark todo\">\u{FF0B}</span><span>Added: Measure the hall</span>",
+            "<span class=\"d\">17 Nov</span><span class=\"mark done\">\u{2713}</span><span>The star catalogue is read from its text file, with the position and brightness of each star.</span>",
+            "<span class=\"d\">17 Nov</span><span class=\"mark done\">\u{2713}</span><span>The hall is measured wall to wall, with the height of the ceiling.</span>",
+            "<span class=\"d\">17 Nov</span><span class=\"mark todo\">\u{FF0B}</span><span>Added: The hall is measured wall to wall, with the height of the ceiling.</span>",
             "<span class=\"d\">16 Nov</span><span class=\"mark done\">\u{2713}</span><span>Pick the font for the plan</span>",
             "<span class=\"d\">16 Nov</span><span class=\"mark todo\">\u{FF0B}</span><span>2 tasks added to <b>Sky map reader</b></span>",
             "<span class=\"d\">15 Nov</span><span class=\"mark done\">\u{2713}</span><span>Agree the lamp colour</span>",
             "<span class=\"d\">15 Nov</span><span class=\"mark todo\">\u{FF0B}</span><span>Added: Count the lanterns per room</span>",
             "<span class=\"d\">14 Nov</span><span class=\"mark drop\">\u{2715}</span><span>Print a poster <span class=\"muted\">\u{2014} cancelled: the plan on the screen is enough</span></span>",
-            "<span class=\"d\">13 Nov</span><span class=\"mark todo\">\u{FF0B}</span><span>Added: Read the star catalogue</span>",
+            "<span class=\"d\">13 Nov</span><span class=\"mark todo\">\u{FF0B}</span><span>Added: The star catalogue is read from its text file, with the position and brightness of each star.</span>",
         ],
     );
     // Eleven rows fit in the first fifteen, so the closed part is not there.

@@ -1149,7 +1149,9 @@ with its word.
     "— all N tasks done" or "— N of M tasks done"); and entries added, from the `added` notes of
     tasks and milestones. Entries added on one day below the same milestone are one row,
     "N tasks added to <milestone>" (top-level ones: "N tasks added to Other work"); a single one
-    reads "Added: <title>".
+    reads "Added: <title>". A task done, a task cancelled and a single entry added are named by
+    their summary (R-WRITE-19) when they have one, else by their title; a milestone finished, and
+    the milestone in N tasks added to <milestone>, are named by their title.
   - Within a day the order is milestones finished, tasks done, tasks cancelled, entries added, each
     in file order (`TODO.md` before the archive). Each row starts with its date ("21 Nov").
   - At most 15 rows are shown; the rest sit behind one closed part "Earlier this week (n)". With no

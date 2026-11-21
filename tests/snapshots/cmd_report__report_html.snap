@@ -202,15 +202,15 @@ details.fold p,details.fold ul{font-size:14px; margin:6px 0 0}
 <ul class="recent">
 <li><span class="d">18 Nov</span><span class="mark done">✓</span><span><b>Club hall</b> finished — all 2 tasks done</span></li>
 <li><span class="d">18 Nov</span><span class="mark done">✓</span><span>Mark the ceiling points</span></li>
-<li><span class="d">17 Nov</span><span class="mark done">✓</span><span>Read the star catalogue</span></li>
-<li><span class="d">17 Nov</span><span class="mark done">✓</span><span>Measure the hall</span></li>
-<li><span class="d">17 Nov</span><span class="mark todo">＋</span><span>Added: Measure the hall</span></li>
+<li><span class="d">17 Nov</span><span class="mark done">✓</span><span>The star catalogue is read from its text file, with the position and brightness of each star.</span></li>
+<li><span class="d">17 Nov</span><span class="mark done">✓</span><span>The hall is measured wall to wall, with the height of the ceiling.</span></li>
+<li><span class="d">17 Nov</span><span class="mark todo">＋</span><span>Added: The hall is measured wall to wall, with the height of the ceiling.</span></li>
 <li><span class="d">16 Nov</span><span class="mark done">✓</span><span>Pick the font for the plan</span></li>
 <li><span class="d">16 Nov</span><span class="mark todo">＋</span><span>2 tasks added to <b>Sky map reader</b></span></li>
 <li><span class="d">15 Nov</span><span class="mark done">✓</span><span>Agree the lamp colour</span></li>
 <li><span class="d">15 Nov</span><span class="mark todo">＋</span><span>Added: Count the lanterns per room</span></li>
 <li><span class="d">14 Nov</span><span class="mark drop">✕</span><span>Print a poster <span class="muted">— cancelled: the plan on the screen is enough</span></span></li>
-<li><span class="d">13 Nov</span><span class="mark todo">＋</span><span>Added: Read the star catalogue</span></li>
+<li><span class="d">13 Nov</span><span class="mark todo">＋</span><span>Added: The star catalogue is read from its text file, with the position and brightness of each star.</span></li>
 </ul>
 <h2>All work</h2>
 <div class="controls">

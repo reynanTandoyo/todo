@@ -30,18 +30,22 @@ const SHOWN: usize = 15;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     /// A milestone finished (its latest `done` note), with the tasks below it that are done of
-    /// those counted (cancelled tasks left out).
+    /// those counted (cancelled tasks left out). `title` is the milestone's title, never its
+    /// summary.
     MilestoneFinished {
         title: String,
         done: usize,
         total: usize,
     },
-    /// A task done (its latest `done` note).
+    /// A task done (its latest `done` note). `title` is the task's summary when it has one, else
+    /// its title.
     Done { title: String },
-    /// A task cancelled (its latest `dropped` note), with its reason.
+    /// A task cancelled (its latest `dropped` note), with its reason. `title` is the task's summary
+    /// when it has one, else its title.
     Cancelled { title: String, reason: String },
     /// Entries added on one day below one milestone, or below none (`milestone` is `None`, Other
-    /// work). `title` is the entry's title when `count` is 1, and empty otherwise.
+    /// work). `title` is the entry's summary when it has one, else its title, when `count` is 1,
+    /// and empty otherwise.
     Added {
         count: usize,
         milestone: Option<String>,
@@ -81,6 +85,7 @@ struct AddedEntry {
     date: NaiveDate,
     /// The milestone above the entry: its ID and title. `None` for Other work.
     parent: Option<(TaskId, String)>,
+    /// The entry's name: its summary when it has one, else its title (see [`name_of`]).
     title: String,
     /// Whether the entry is a task. Tasks of one day below one milestone are one row; milestones
     /// are never grouped, so a row that says "tasks" holds tasks only.
@@ -188,7 +193,7 @@ fn push_task_events(task: &Task, today: NaiveDate, dated: &mut Vec<Dated>) {
             date,
             kind: Kind::Done,
             event: Event::Done {
-                title: task.title.clone(),
+                title: name_of(task),
             },
         });
     }
@@ -197,11 +202,22 @@ fn push_task_events(task: &Task, today: NaiveDate, dated: &mut Vec<Dated>) {
             date,
             kind: Kind::Cancelled,
             event: Event::Cancelled {
-                title: task.title.clone(),
+                title: name_of(task),
                 reason: task.dropped_reason().unwrap_or(NO_REASON).to_string(),
             },
         });
     }
+}
+
+/// The name of a task in the part: its `summary` when it has one, else its title (R-REPORT-5).
+/// A summary that is empty after trimming does not count.
+fn name_of(task: &Task) -> String {
+    task.summary
+        .as_deref()
+        .map(str::trim)
+        .filter(|summary| !summary.is_empty())
+        .unwrap_or(task.title.as_str())
+        .to_string()
 }
 
 /// The finished event of `milestone`, from its latest `done` note, with the counts the tree gives.
@@ -246,7 +262,7 @@ fn push_added(doc: &Document, task: &Task, today: NaiveDate, added: &mut Vec<Add
         added.push(AddedEntry {
             date: note.date,
             parent: parent.clone(),
-            title: task.title.clone(),
+            title: name_of(task),
             is_task,
         });
     }
@@ -735,6 +751,108 @@ mod tests {
                 title: String::new(),
             }),
             "2 tasks added to Other work"
+        );
+    }
+
+    #[test]
+    fn a_done_task_is_named_by_its_summary_and_one_without_a_summary_by_its_title() {
+        let fixture = text(&[
+            "### T-001 · Parse source",
+            "- status: done",
+            "- summary: The parser reads both example files.",
+            "- note (2026-11-20, bob): done",
+            "### T-002 · Cache shaders",
+            "- status: done",
+            "- note (2026-11-20, bob): done",
+        ]);
+        assert_eq!(
+            shown(&recent_of(&fixture, None)),
+            ["The parser reads both example files.", "Cache shaders"]
+        );
+    }
+
+    #[test]
+    fn a_cancelled_task_is_named_by_its_summary_and_keeps_its_reason() {
+        let fixture = text(&[
+            "### T-001 · Cache compiled shaders",
+            "- status: dropped",
+            "- summary: Shaders are compiled at each start.",
+            "- note (2026-11-20, bob): dropped — start-up is already fast enough",
+            "### T-002 · Print a poster",
+            "- status: dropped",
+            "- note (2026-11-20, bob): dropped — not needed",
+        ]);
+        assert_eq!(
+            shown(&recent_of(&fixture, None)),
+            [
+                "Shaders are compiled at each start. — cancelled: start-up is already fast enough",
+                "Print a poster — cancelled: not needed",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_single_added_entry_is_named_by_its_summary() {
+        let fixture = text(&[
+            "### T-001 · Scene loading",
+            "- status: open",
+            "- type: milestone",
+            "### T-002 · Scene A",
+            "- status: open",
+            "- milestone: T-001",
+            "- summary: The first scene is lit.",
+            "- note (2026-11-20, bob): added",
+        ]);
+        assert_eq!(
+            shown(&recent_of(&fixture, None)),
+            ["Added: The first scene is lit."]
+        );
+    }
+
+    #[test]
+    fn grouped_added_rows_keep_the_milestone_title_whatever_the_summaries_say() {
+        let fixture = text(&[
+            "### T-001 · Scene loading",
+            "- status: open",
+            "- type: milestone",
+            "### T-002 · Scene A",
+            "- status: open",
+            "- milestone: T-001",
+            "- summary: The first scene is lit.",
+            "- note (2026-11-20, bob): added",
+            "### T-003 · Scene B",
+            "- status: open",
+            "- milestone: T-001",
+            "- summary: The second scene is lit.",
+            "- note (2026-11-20, bob): added",
+        ]);
+        assert_eq!(
+            shown(&recent_of(&fixture, None)),
+            ["2 tasks added to Scene loading"]
+        );
+    }
+
+    #[test]
+    fn a_finished_milestone_keeps_its_title_even_with_a_summary() {
+        let fixture = text(&[
+            "### T-001 · Shader C",
+            "- status: done",
+            "- type: milestone",
+            "- summary: Every shader is compiled ahead of time.",
+            "- note (2026-11-19, bob): added",
+            "- note (2026-11-20, bob): done — all in",
+            "### T-002 · Parse source",
+            "- status: done",
+            "- milestone: T-001",
+            "- note (2026-11-20, bob): done",
+        ]);
+        assert_eq!(
+            shown(&recent_of(&fixture, None)),
+            [
+                "Shader C finished — its 1 task done",
+                "Parse source",
+                "Added: Every shader is compiled ahead of time.",
+            ]
         );
     }
 }
