@@ -30,6 +30,7 @@ pub const CANONICAL_FIELD_ORDER: &[&str] = &[
     "about",
     "goal",
     "why",
+    "summary",
     "final",
     "depends",
     "files",
@@ -45,7 +46,7 @@ pub const CANONICAL_FIELD_ORDER: &[&str] = &[
 ];
 
 /// Number of known fields tracked for repeated-field detection (`known_field_index`).
-const KNOWN_FIELD_SLOTS: usize = 22;
+const KNOWN_FIELD_SLOTS: usize = 23;
 
 /// Accepted heading separators between `<ID>` and `<title>` (`docs/format.md` §6),
 /// canonical separator first.
@@ -408,6 +409,11 @@ pub struct Task {
     pub why: Option<String>,
     pub why_line: Option<usize>,
 
+    /// `- summary:` value and line index: what the entry is about, written for people
+    /// (`docs/format.md` §8, `R-WRITE-19`).
+    pub summary: Option<String>,
+    pub summary_line: Option<usize>,
+
     /// Parsed dependency references from `- depends:`.
     pub depends: Vec<DependencyRef>,
     /// Raw `- depends:` value, if present.
@@ -580,6 +586,7 @@ impl Task {
             "milestone" => self.milestone.as_deref(),
             "goal" => self.goal.as_deref(),
             "why" => self.why.as_deref(),
+            "summary" => self.summary.as_deref(),
             "depends" => self.depends_raw.as_deref(),
             "files" => self.files.as_deref(),
             "read" => self.read.as_deref(),
@@ -1318,6 +1325,8 @@ fn parse_task_block(
         goal_loc: None,
         why: None,
         why_line: None,
+        summary: None,
+        summary_line: None,
         depends: Vec::new(),
         depends_raw: None,
         depends_line: None,
@@ -1499,6 +1508,10 @@ fn parse_task_block(
                                 task.why = non_empty_string(part_val);
                                 task.why_line = Some(idx);
                             }
+                            "summary" => {
+                                task.summary = non_empty_string(part_val);
+                                task.summary_line = Some(idx);
+                            }
                             "depends" => {
                                 task.depends = parse_depends_list(part_val, id_config);
                                 task.depends_raw = Some(part_val.clone());
@@ -1630,6 +1643,14 @@ fn parse_task_block(
                         Some(owned_val)
                     };
                     task.why_line = Some(idx);
+                }
+                "summary" => {
+                    task.summary = if owned_val.is_empty() {
+                        None
+                    } else {
+                        Some(owned_val)
+                    };
+                    task.summary_line = Some(idx);
                 }
                 "depends" => {
                     task.depends = parse_depends_list(value_str, id_config);
@@ -1766,6 +1787,7 @@ const fn known_field_index(key: &str) -> Option<usize> {
         b"final" => Some(19),
         b"attempts" => Some(20),
         b"verified" => Some(21),
+        b"summary" => Some(22),
         _ => None,
     }
 }

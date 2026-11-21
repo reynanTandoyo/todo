@@ -206,6 +206,7 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
       { "id": "T-012", "title": "C shader", "kind": "task", "status": "open" }
     ],
     "why": null,
+    "summary": null,
     "final": null,
     "depends": ["T-003"],
     "dependencies": [
@@ -321,6 +322,7 @@ the output for a fixture with one open task:
       "milestones": [],
       "children": [],
       "why": "the reader needs it first",
+      "summary": null,
       "final": null,
       "depends": [],
       "dependencies": [],

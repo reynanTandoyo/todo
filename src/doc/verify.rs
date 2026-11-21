@@ -274,6 +274,7 @@ fn tasks_semantically_equal(
         && a.task_type == b.task_type
         && a.area == b.area
         && a.why == b.why
+        && a.summary == b.summary
         && a.files == b.files
         && a.read == b.read
         && a.problem == b.problem
