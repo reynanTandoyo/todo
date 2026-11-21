@@ -60,7 +60,8 @@ pub use pipeline::{
     edit_task_and_write, parse_doc_for_write, require_yes_or_preview,
 };
 pub(crate) use pipeline::{
-    edit_doc_with_found_and_state_and_write, edit_task_with_found_and_write,
+    edit_doc_keeping_documents, edit_doc_with_found_and_state_and_write,
+    edit_task_with_found_and_write,
 };
 pub use query::{
     ListFilter, NextFilter, SelectedNext, StatusFilter, WhereClause, filter_tasks,

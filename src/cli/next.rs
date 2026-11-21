@@ -11,8 +11,8 @@ use crate::lock::current_time;
 use crate::ops::milestone::resolve_milestone;
 use crate::ops::{
     BriefJson, DocWritePlan, NextFilter, TaskJson, WhereClause, build_brief, build_claim_edits,
-    build_task_json, check_task_writable, edit_doc_with_found_and_state_and_write,
-    load_for_read_with_found, plan_claim, select_next_task,
+    build_task_json, check_task_writable, edit_doc_keeping_documents, load_for_read_with_found,
+    plan_claim, select_next_task,
 };
 use crate::output::Output;
 
@@ -107,7 +107,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     let payload = if args.claim {
         let _ = ctx.require_agent()?;
-        let write_res = edit_doc_with_found_and_state_and_write(
+        let write_res = edit_doc_keeping_documents(
             ctx,
             found,
             &cfg,
