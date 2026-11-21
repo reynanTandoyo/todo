@@ -3,6 +3,8 @@
 //! Two files are generated: the flat 5,000-task file (T-065) and a variant of it whose entries
 //! form a milestone tree four levels deep (T-105). The HTML report is timed on the milestone tree
 //! (T-106): one page, and the page for every project of a register that holds ten such projects.
+//! The one page is timed again on the same tree with a summary on every task and a done note on
+//! every done task, so the page carries the text a reader sees (T-204).
 //! All of them run in CI, and not in a normal local `cargo test`. Run them in release mode with:
 //! `cargo test --release --test perf -- --ignored`
 
@@ -83,11 +85,15 @@ fn push_milestone(out: &mut String, id: usize, parent: Option<usize>) {
     let _ = writeln!(out, "- goal: generated goal for milestone {id}");
 }
 
+/// The one-sentence `summary` that every task of the described variant carries (R-WRITE-19).
+const SUMMARY: &str = "A short plain sentence that says what this piece of work is about, so a \
+    reader of the page knows it without opening the file.";
+
 /// The milestone-tree file of T-105: the same 5,000 entries as [`generate_5000_task_file`], but the
 /// first 370 are milestones in three nested levels and the other 4,630 are tasks at depth 4. IDs
 /// follow the file order: top-level milestones, then depth 2, then depth 3, then the tasks.
 fn generate_milestone_tree_file() -> String {
-    generate_milestone_tree(false)
+    generate_milestone_tree(false, false)
 }
 
 /// The planning file of T-165: the milestone tree of [`generate_milestone_tree_file`], extended so
@@ -95,11 +101,18 @@ fn generate_milestone_tree_file() -> String {
 /// file. The detail makes the file about three times larger, so the T-105 budgets keep their own
 /// file.
 fn generate_planned_milestone_tree_file() -> String {
-    generate_milestone_tree(true)
+    generate_milestone_tree(true, false)
 }
 
-/// Builds the milestone tree; `extended` adds the level, the files and the detail of T-165.
-fn generate_milestone_tree(extended: bool) -> String {
+/// The milestone-tree file of T-204: the tree of [`generate_milestone_tree_file`] with a `summary`
+/// on every task and a done note on every done task, as the report of a real project reads them.
+fn generate_described_milestone_tree_file() -> String {
+    generate_milestone_tree(false, true)
+}
+
+/// Builds the milestone tree; `extended` adds the level, the files and the detail of T-165, and
+/// `described` adds the summary and the done note of T-204.
+fn generate_milestone_tree(extended: bool, described: bool) -> String {
     let middle_count = TOP_MILESTONES * MIDDLE_PER_TOP;
     let lower_count = middle_count * LOWER_PER_MIDDLE;
     let milestone_count = TOP_MILESTONES + middle_count + lower_count;
@@ -148,6 +161,9 @@ fn generate_milestone_tree(extended: bool) -> String {
 - priority: {prio} · type: task · area: core\n\
 - milestone: T-{parent:04}"
         );
+        if described {
+            let _ = writeln!(out, "- summary: {SUMMARY}");
+        }
         if extended {
             // A third of the tasks share one file, and every other task names its own (T-165).
             let files = if t % 3 == 0 {
@@ -171,6 +187,9 @@ fn generate_milestone_tree(extended: bool) -> String {
         out.push_str("- accept: completes within NFR-3 budget\n");
         if id % 4 == 0 {
             out.push_str("- note (2026-01-15, alice): initial triage note for benchmark task\n");
+        }
+        if described && status == "done" {
+            out.push_str("- note (2026-02-01, alice): done — checked by the benchmark run\n");
         }
     }
     out
@@ -436,8 +455,8 @@ fn perf_5000_entry_milestone_tree_meets_nfr3_budgets() {
     );
 }
 
-/// The HTML report budgets (T-106; NFR-3): one page of the milestone-tree file in under 500 ms and
-/// under 5 MB.
+/// The HTML report budgets (T-106, T-204; NFR-3): one page of the milestone-tree file, with a
+/// summary on every task and a done note on every done task, in under 500 ms and under 5 MB.
 const REPORT_BUDGET: Duration = Duration::from_millis(500);
 /// The all-projects page of [`REPORT_ALL_PROJECTS`] such projects, in under 5 s.
 const REPORT_ALL_BUDGET: Duration = Duration::from_secs(5);
@@ -448,7 +467,7 @@ const REPORT_ALL_PROJECTS: usize = 10;
 #[test]
 #[ignore = "Performance benchmark (NFR-3, TEST-9, T-106); run with: cargo test --release --test perf -- --ignored"]
 fn perf_5000_entry_milestone_tree_report_html_meets_nfr3_budget() {
-    let body = generate_milestone_tree_file();
+    let body = generate_described_milestone_tree_file();
     let (_tmp, home, work) = project_with(&body);
 
     // Untimed warm-up: the first report also creates the state folder and the first history snapshot.
@@ -463,7 +482,7 @@ fn perf_5000_entry_milestone_tree_report_html_meets_nfr3_budget() {
         .len();
 
     eprintln!(
-        "NFR-3 report timing (5,000 entries, four levels, {} bytes of TODO.md): report --html={:?}, page={} bytes",
+        "NFR-3 report timing (5,000 entries, four levels, summaries and done notes, {} bytes of TODO.md): report --html={:?}, page={} bytes",
         body.len(),
         report_time,
         page_bytes
