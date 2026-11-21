@@ -361,16 +361,14 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t213-haiku): done — Added report::page::tree_html: the All work tree as HTML (milestones with state, N of M, bar and goal; one line per entry with mark, title, date and ID; details with Summary or Why, Result, Technical details; second lines; Other work last; all text escaped), with 13 new unit tests; full suite 1008 passing, fmt and clippy clean on Windows and Linux.
 
 ### T-214 · Page HTML: the whole page, wired into report --html, with snapshot
-- status: claimed
+- status: done
 - owner: t214-haiku
-- claimed: 2026-11-21T15:46+01:00
-- session: d3f0f1ee-f6a7-4492-b27b-8ca6606482b8
 - priority: P1 · difficulty: 3 · type: feature · area: report
 - milestone: T-202
 - why: this puts the parts together into the page people open, replacing the v0.8 page for one project
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
 - depends: T-213, T-199, T-200, T-201, T-210, T-209
-- files: src/report/page/mod.rs, src/report/page/html.rs, src/report/page/style.css, src/report/html.rs, src/cli/report.rs, tests/cmd_report.rs, tests/fixtures/report_page.md, tests/snapshots/cmd_report__report_html.snap
+- files: src/report/page/mod.rs, src/report/page/html.rs, src/report/page/style.css, src/report/html.rs, src/cli/report.rs, tests/cmd_report.rs, tests/fixtures/report_page.md, tests/snapshots/cmd_report__report_html.snap, tests/fixtures/report_page_archive.md, tests/cmd_report_planning.rs, tests/cmd_blocked_reason.rs
 - read: docs/requirements.md, docs/report-mockup.html, src/report/page/entry.rs, src/report/page/tree.rs, src/report/page/needs.rs, src/report/page/recent.rs, src/report/page/tree_html.rs, src/report/model.rs, src/report/all.rs
 - steps:
   1. Read all of section 5.23 of docs/requirements.md and docs/report-mockup.html. Read the files in src/report/page/ and how src/cli/report.rs builds the single-project page today (build_page and render_page).
@@ -383,7 +381,12 @@ and what needs them. Problems found while using todo are fixed along the way.
   8. Run the four checks of AGENTS.md.
 - accept: `todo report --html` writes the page of R-REPORT-1 with the structure, wording and order of docs/report-mockup.html: header with description; overall line, five-part bar and legend; Needs you; Last 7 days; All work as one tree; More with Ideas, Earlier work and For the planner (the v0.8 planning state and per-area counts); the v0.8 sections Done and Dropped and the raw field lists are gone from the single-project page; one column at most 820 px, system font, readable narrow and printed; all text escaped; the snapshot uses the new invented fixture; report --html --all still passes its tests
 - verify: cargo test --all-features --test cmd_report --test cmd_report_all
+- verified: 2026-11-21
+- commit: 05327fd
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): forced set (owner was t214-haiku)
+- note (2026-11-21, t214-haiku): done — report --html writes the whole v1.0 page for one project (header with description, overall bar and legend, Needs you, Last 7 days, All work as one tree, More with Ideas, Earlier work and the planner part) from an invented fixture with its archive, snapshot included; the v0.8 page tests now check the new page with their count and reason assertions kept; 1026 tests passing, fmt and clippy clean on Windows and Linux.
 
 ### T-203 · View buttons, light or dark mode, and colour-blind colours
 - status: open
@@ -462,6 +465,27 @@ and what needs them. Problems found while using todo are fixed along the way.
 - by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, t215-haiku): done — apply add now turns line breaks in title, goal, why, read, verify, files, type, area, problem, fix, accept and extra fields into single spaces, as add does; 4 new tests in tests/cmd_apply_line_breaks.rs and 973 tests pass in the full run.
+
+### T-216 · Needs you and the tree count the days of one claim the same way
+- status: done
+- owner: t216-haiku
+- priority: P1 · difficulty: 1 · type: bug · area: report
+- milestone: T-195
+- why: for the same stale claim Needs you says 13 days and the entry's second line says 14, because one counts elapsed time and the other calendar days; a reader sees two numbers for one fact
+- files: src/report/page/entry.rs, src/report/page/needs.rs
+- read: docs/requirements.md
+- steps:
+  1. In src/report/page/entry.rs, find fn since (it counts calendar days between the claim's local date and the date of ctx.now). Split the day count into a new function `pub(crate) fn claim_days(task: &Task, ctx: &Ctx<'_>) -> Option<i64>` that returns that number (None without a valid claim time), and make since() use it.
+  2. In src/report/page/needs.rs, in fn no_activity_need, replace `ctx.cfg.claim_age(task, ctx.now).map(|age| age.num_days())` with `crate::report::page::entry::claim_days(task, ctx)`.
+  3. Add a unit test in needs.rs: a claim made at 23:00 on one day, with now 13 days and 2 hours later (so 14 calendar days), gives days Some(14) in Needs you, the same as Since::Days(14) from entry_view for the same task.
+  4. Run the four checks of AGENTS.md.
+- accept: Needs you and the entry's second line give the same number of days for one claim, counted in calendar days as entry.rs does; a unit test covers a claim whose elapsed days and calendar days differ
+- verify: cargo test --all-features --lib report::page
+- verified: 2026-11-21
+- commit: 9eadbcc
+- by: Reynan Henry Tandoyo
+- note (2026-11-21, claude-main): added
+- note (2026-11-21, t216-haiku): done — Needs you now counts the days of a claim with the same calendar-day count as the entry's second line (new claim_days in entry.rs, used by since and by needs.rs); a unit test covers a claim 13 days 2 hours old that is 14 calendar days, and the suite passes with 1020 tests.
 
 ## Questions
 
