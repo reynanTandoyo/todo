@@ -118,8 +118,8 @@ fn a_write_never_lowers_a_newer_stamp_and_warns_on_standard_error() {
     let dir = TempDir::new().expect("tempdir");
     copy_fixture(dir.path(), "tool_stamp_newer.md");
 
-    // 0.10.0 is above the running version when compared number by number; compared as text it
-    // would look older, so this also checks the numeric comparison.
+    // 10.0.0 is above the running version when compared number by number (as text, "10.0.0"
+    // and "1.0.0" differ only after the first digit), so the stamp is kept and warned about.
     let out = run_in(
         dir.path(),
         &["note", "T-001", "checked the lanterns", "--agent", "bob"],
@@ -132,7 +132,7 @@ fn a_write_never_lowers_a_newer_stamp_and_warns_on_standard_error() {
     assert!(stderr.contains("TODO.md:3:"), "stderr: {stderr}");
 
     let after = read_todo(dir.path());
-    assert!(after.contains("<!-- todo-tool: 0.10.0 -->"), "{after}");
+    assert!(after.contains("<!-- todo-tool: 10.0.0 -->"), "{after}");
     assert!(!after.contains(&stamp_line(RUNNING)));
 }
 

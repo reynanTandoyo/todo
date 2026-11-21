@@ -69,8 +69,11 @@ fn versions_compare_number_by_number() {
 
     let stamp_0_10 = parse("<!-- todo-format: 1 -->\n<!-- todo-tool: 0.10.0 -->\n");
     assert_eq!(stamp_0_10.tool_stamp_edit(v(0, 9, 0)), None);
+
+    // A stamp above the running version warns; 10.0.0 stays above it for every 1.x to 9.x release.
+    let stamp_10 = parse("<!-- todo-format: 1 -->\n<!-- todo-tool: 10.0.0 -->\n");
     assert!(
-        stamp_0_10
+        stamp_10
             .newer_tool_warning("TODO.md")
             .is_some_and(|w| w.starts_with("TODO.md:2:"))
     );

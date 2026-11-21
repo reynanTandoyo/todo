@@ -1,6 +1,6 @@
 <!-- TEST FIXTURE: invented data, not a real task list -->
 <!-- todo-format: 2 -->
-<!-- todo-tool: 0.10.0 -->
+<!-- todo-tool: 10.0.0 -->
 # Lantern Project — tasks
 
 ## Now
