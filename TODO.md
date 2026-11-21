@@ -1,5 +1,5 @@
 <!-- todo-format: 3 -->
-<!-- todo-tool: 0.8.1 -->
+<!-- todo-tool: 1.0.0 -->
 # todo — task list
 
 The work plan for building `todo`. What each task must achieve is in
@@ -57,13 +57,15 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t191-haiku): done — align now skips milestones like questions, and R-GIT-1 says so; cargo test --all-features passes 919 tests (0 failed), including the new done_milestones_are_ignored.
 
 ### T-195 · A status page made for people
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P1 · type: milestone
 - goal: The owner and a colleague open one page and see within a minute what is done, what was cancelled and why, what is still to do, and what needs them
 - why: the v0.7 page shows what the tool knows instead of what a reader asks: too much text, too little context, and a tree that loses finished work
 - summary: One page shows the owner and a colleague, within a minute, what is done, what was cancelled and why, what is still to do, and what needs them.
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): done — Version 1.0.0: one page shows what is done, what was cancelled and why, what is still to do, and what needs you; the owner judged it ok on this project.
 
 ### T-196 · Requirements for the new status page
 - status: done
@@ -469,10 +471,8 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t204-haiku): done — The one-page report perf test now runs on the 5,000-entry milestone tree with a summary on every task and a done note on every done task: report --html took 110, 111 and 122 ms (median of five runs per run; limit 500 ms) and the page was 2,897,256 bytes in each run (limit 5 MiB); the four AGENTS.md checks pass and cargo test --all-features passes 1036 tests (the 5 perf tests run with --ignored).
 
 ### T-205 · Planner rules for summaries, documentation and release 1.0.0
-- status: claimed
+- status: done
 - owner: claude-main
-- claimed: 2026-11-21T20:54+01:00
-- session: f7957659-295e-4e1b-b8f8-96b2d860c5e5
 - priority: P1 · difficulty: 2 · type: docs · area: release
 - milestone: T-195
 - why: the page is only as readable as the texts the planner writes, and the release makes the new page the one people get
@@ -480,10 +480,13 @@ and what needs them. Problems found while using todo are fixed along the way.
 - final: Docs and release work done by the planner and one worker at the end; it depends on the owner's answer to T-206.
 - depends: T-204,T-206
 - accept: CHANGELOG.md has the 1.0.0 entry; Cargo.toml is 1.0.0; this repository's own unfinished and v1.0 entries have summaries; a new todo.toml has a description (and nothing else); todo check is clean; T-206 is answered
+- commit: a8e491e
 - reqs: R-AGENT-1, REL-2, REL-5
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): Review 2026-11-21: depends on the question T-206 so 1.0.0 is not released before the owner has judged the page; this repository has no todo.toml yet.
 - note (2026-11-21, claude-main): Planner: add todo.toml with description only after todo 1.0 is installed here; todo 0.8.1 refuses the unknown key.
+- note (2026-11-21, claude-main): done — 1.0.0 released on dev: version and changelog (b7debb1), newer-stamp tests moved above 1.0 (e62e64e), todo.toml with the description, summaries on the v1.0 entries; todo 1.0.0 installed here.
 
 ### T-215 · apply refuses a line break in why, goal, read or verify instead of turning it into a space
 - status: done
@@ -616,4 +619,10 @@ and what needs them. Problems found while using todo are fixed along the way.
 - owner: —
 - type: idea
 - about: T-195
+- note (2026-11-21, claude-main): added
+
+### T-219 · Flaky test: cmd_verify a_check_that_outlives_verify_timeout_seconds_counts_as_failed hung once under full-suite load on Windows (seen by t218-haiku 2026-11-21) and left todo.exe and pwsh running; passed alone and on rerun
+- status: open
+- owner: —
+- type: idea
 - note (2026-11-21, claude-main): added
