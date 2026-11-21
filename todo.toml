@@ -1,2 +1,0 @@
-# Settings for todo (docs/requirements.md, R-CFG-2). Everything else uses the defaults.
-description = "A command-line tool that lets several agents and people share one TODO.md task list safely, with a status page for people."
