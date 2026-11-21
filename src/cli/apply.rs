@@ -13,7 +13,8 @@ use crate::atomic::read_file_with_snapshot;
 use crate::cli::add::resolve_target_section;
 use crate::cli::{CommandKind, CommandMeta, Context};
 use crate::doc::{
-    Document, EntryKind, LineEdit, TaskChangeIntent, TaskId, verify_task_edits,
+    Document, EntryKind, LineEdit, TaskChangeIntent, TaskId, sanitize_trimmed_value,
+    verify_task_edits,
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, fs_path, synced_folder_warning, verify_folder};
@@ -95,6 +96,7 @@ enum ApplyOp {
         milestone: Option<String>,
         goal: Option<String>,
         why: Option<String>,
+        summary: Option<String>,
         depends: Option<DependsValue>,
         files: Option<String>,
         read: Option<String>,
@@ -145,6 +147,7 @@ enum ApplyOp {
         milestone: Option<String>,
         goal: Option<String>,
         why: Option<String>,
+        summary: Option<String>,
         depends: Option<DependsValue>,
         files: Option<String>,
         read: Option<String>,
@@ -512,6 +515,7 @@ fn apply_one_op(
             milestone,
             goal,
             why,
+            summary,
             depends,
             files,
             read,
@@ -546,6 +550,12 @@ fn apply_one_op(
                 .or_else(|| fields.get("why").map(String::as_str))
                 .map(str::trim)
                 .filter(|w| !w.is_empty());
+            // `summary` may also come from `fields`; line breaks become spaces (R-WRITE-19).
+            let summary_src = summary
+                .as_deref()
+                .or_else(|| fields.get("summary").map(String::as_str))
+                .map(sanitize_trimmed_value)
+                .filter(|s| !s.is_empty());
             let read_src = read
                 .as_deref()
                 .or_else(|| fields.get("read").map(String::as_str))
@@ -637,6 +647,7 @@ fn apply_one_op(
                 milestone: milestone_id.as_deref(),
                 goal: goal_src,
                 why: why_src,
+                summary: summary_src.as_deref(),
                 depends: dep_str.as_deref(),
                 files: trim(files),
                 read: read_src,
@@ -835,6 +846,7 @@ fn apply_task_op(
             milestone,
             goal,
             why,
+            summary,
             depends,
             files,
             read,
@@ -886,6 +898,7 @@ fn apply_task_op(
             }
             let rest = [
                 ("why", why),
+                ("summary", summary),
                 ("files", files),
                 ("read", read),
                 ("problem", problem),

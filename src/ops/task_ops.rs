@@ -702,6 +702,8 @@ pub struct NewTask<'a> {
     pub goal: Option<&'a str>,
     /// `why` value: what the task is for.
     pub why: Option<&'a str>,
+    /// `summary` value: what the entry is about, written for people (R-WRITE-19).
+    pub summary: Option<&'a str>,
     /// `depends` value (comma-separated IDs).
     pub depends: Option<&'a str>,
     /// `files` value.
@@ -758,6 +760,7 @@ impl NewTask<'_> {
             ("milestone", self.milestone),
             ("goal", self.goal),
             ("why", self.why),
+            ("summary", self.summary),
             ("depends", self.depends),
             ("files", self.files),
             ("read", self.read),
@@ -790,6 +793,7 @@ impl NewTask<'_> {
             "milestone",
             "goal",
             "why",
+            "summary",
             "depends",
             "files",
             "read",

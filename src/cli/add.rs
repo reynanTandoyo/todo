@@ -75,6 +75,10 @@ pub struct Args {
     #[arg(long, value_name = "TEXT")]
     pub why: Option<String>,
 
+    /// `summary` field value: what the entry is about, in plain words for people (R-WRITE-19).
+    #[arg(long, value_name = "TEXT")]
+    pub summary: Option<String>,
+
     /// Dependencies (comma-separated task IDs).
     #[arg(long, value_name = "IDS")]
     pub depends: Option<String>,
@@ -169,6 +173,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         goal_val.as_deref(),
     )?;
     let why_arg = resolve_opt_text_arg(args.why.as_deref())?;
+    let summary_arg = resolve_opt_text_arg(args.summary.as_deref())?;
     let files_arg = resolve_opt_text_arg(args.files.as_deref())?;
     let read_arg = resolve_opt_text_arg(args.read.as_deref())?;
     let problem_arg = resolve_opt_text_arg(args.problem.as_deref())?;
@@ -177,6 +182,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     let accept_arg = resolve_opt_text_arg(args.accept.as_deref())?;
     let verify_arg = resolve_opt_text_arg(args.verify.as_deref())?;
     let why_val = resolve_opt(why_arg.as_deref(), &extra_fields, "why");
+    let summary_val = resolve_opt(summary_arg.as_deref(), &extra_fields, "summary");
     let depends_val = resolve_opt(args.depends.as_deref(), &extra_fields, "depends");
     let files_val = resolve_opt(files_arg.as_deref(), &extra_fields, "files");
     let read_val = resolve_opt(read_arg.as_deref(), &extra_fields, "read");
@@ -193,6 +199,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             task_type: type_val.as_deref(),
             area: area_val.as_deref(),
             why: why_val.as_deref(),
+            summary: summary_val.as_deref(),
             depends: depends_val.as_deref(),
             files: files_val.as_deref(),
             read: read_val.as_deref(),
@@ -262,6 +269,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
                 milestone: milestone_id.as_deref(),
                 goal: goal_val.as_deref(),
                 why: why_val.as_deref(),
+                summary: summary_val.as_deref(),
                 depends: depends_val.as_deref(),
                 files: files_val.as_deref(),
                 read: read_val.as_deref(),
@@ -440,6 +448,7 @@ struct RequiredValues<'a> {
     task_type: Option<&'a str>,
     area: Option<&'a str>,
     why: Option<&'a str>,
+    summary: Option<&'a str>,
     depends: Option<&'a str>,
     files: Option<&'a str>,
     read: Option<&'a str>,
@@ -463,6 +472,7 @@ fn check_required_fields(
             "type" => values.task_type.is_some(),
             "area" => values.area.is_some(),
             "why" => values.why.is_some(),
+            "summary" => values.summary.is_some(),
             "depends" => values.depends.is_some(),
             "files" => values.files.is_some(),
             "read" => values.read.is_some(),
@@ -629,6 +639,7 @@ struct BatchAddEntry {
     milestone: Option<String>,
     goal: Option<String>,
     why: Option<String>,
+    summary: Option<String>,
     depends: Option<DependsInput>,
     files: Option<String>,
     read: Option<String>,
@@ -653,6 +664,7 @@ pub(crate) struct ValidatedBatchEntry {
     pub(crate) milestone: Option<String>,
     pub(crate) goal: Option<String>,
     pub(crate) why: Option<String>,
+    pub(crate) summary: Option<String>,
     pub(crate) depends_tokens: Vec<String>,
     pub(crate) files: Option<String>,
     pub(crate) read: Option<String>,
@@ -995,6 +1007,12 @@ pub(crate) fn parse_batch_entries(
             .map(sanitize_trimmed_value)
             .filter(|s| !s.is_empty())
             .or_else(|| resolve_opt(None, &extra, "why"));
+        let summary = parsed
+            .summary
+            .as_deref()
+            .map(sanitize_trimmed_value)
+            .filter(|s| !s.is_empty())
+            .or_else(|| resolve_opt(None, &extra, "summary"));
         let files = parsed
             .files
             .as_deref()
@@ -1070,6 +1088,7 @@ pub(crate) fn parse_batch_entries(
                 task_type: task_type.as_deref(),
                 area: area.as_deref(),
                 why: why.as_deref(),
+                summary: summary.as_deref(),
                 depends: depends_summary.as_deref(),
                 files: files.as_deref(),
                 read: read.as_deref(),
@@ -1101,6 +1120,7 @@ pub(crate) fn parse_batch_entries(
             milestone: parent,
             goal,
             why,
+            summary,
             depends_tokens,
             files,
             read,
@@ -1191,6 +1211,7 @@ pub(crate) fn entry_lines(
         milestone,
         goal: entry.goal.as_deref(),
         why: entry.why.as_deref(),
+        summary: entry.summary.as_deref(),
         depends,
         files: entry.files.as_deref(),
         read: entry.read.as_deref(),
