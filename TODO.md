@@ -27,6 +27,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P2 · type: milestone
 - goal: Every problem found while using todo on real work is recorded here and fixed, and todo's own checks (check, align, plan) stay clean on this repository
 - why: the tool is only trusted when its own reports have no false alarms
+- summary: Bugs we run into while using todo on real work get written down and fixed, so its own checks give no false alarms.
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): Seen by t209-haiku 2026-11-21: apply only trims why (line breaks are not turned into spaces as format.md section 10 says); check and add a task if confirmed.
 
@@ -36,6 +37,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P2 · difficulty: 1 · type: bug · area: git
 - milestone: T-190
 - why: a milestone is closed, not committed, so align exits 1 on a clean list (six false findings on this repository at v0.8.1)
+- summary: The check that compares tasks with the git history no longer complains about finished milestones, which are closed rather than committed.
 - files: src/cli/align.rs, tests/cmd_align.rs, docs/requirements.md
 - steps:
   1. Open src/cli/align.rs and find the comment `// Questions are answered, not committed (R-GIT-1).` (near line 85). The `if` under it skips a task whose `task_type` equals "question".
@@ -58,6 +60,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P1 · type: milestone
 - goal: The owner and a colleague open one page and see within a minute what is done, what was cancelled and why, what is still to do, and what needs them
 - why: the v0.7 page shows what the tool knows instead of what a reader asks: too much text, too little context, and a tree that loses finished work
+- summary: One page shows the owner and a colleague, within a minute, what is done, what was cancelled and why, what is still to do, and what needs them.
 - note (2026-11-21, claude-main): added
 
 ### T-196 · Requirements for the new status page
@@ -66,6 +69,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P0 · difficulty: 3 · type: docs · area: docs
 - milestone: T-195
 - why: the v0.7 page was specified in words only and came out wrong; this time the approved mockup is the reference and the requirements must describe exactly that page
+- summary: The requirements describe the approved page design exactly, so everyone builds the same page.
 - read: docs/report-mockup.html, docs/requirements.md, docs/format.md
 - accept: docs/requirements.md describes the page shown in docs/report-mockup.html (approved by the owner on 2026-11-21): R-REPORT-1 is rewritten for the new layout (header, overall line and bar, the tree with done and cancelled entries in place, one line per entry, the second line, summary and technical details, Other work, and the closed parts Ideas, Earlier work and For the planner); R-REPORT-4 (Needs you), R-REPORT-5 (Last 7 days) and R-REPORT-6 (view buttons and light or dark mode) are new; R-WRITE-19 defines the `summary` field; the settings table gains `description`; the five words for people are fixed: to do (open), in progress (claimed), waiting (blocked), done, cancelled (dropped); the rule "no control that changes TODO.md" stays and view controls are allowed; a small inline script is allowed and the page must be readable without it; R-REPORT-3 says the planning state moves into For the planner; `report --html --all` keeps its v0.8 content and is out of scope; docs/format.md lists `summary` with its place in the field order and the format stays version 3; section 11 lists v1.0
 - commit: dc6710a
@@ -83,6 +87,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - milestone: T-195
 - goal: Every entry can carry a summary for people, written through todo and checked
 - why: titles and accept lines are written by agents for agents; the page needs one or two plain sentences per entry that a colleague understands
+- summary: Every task and milestone can carry a short text written for people, and todo points out unfinished work that has none.
 - depends: T-196
 - accept: `add`, `set`, `add --from`, `apply` and the children of `split` take `--summary` (text, `-` or `@path`) and write `- summary:` after `why` in the field order; it is allowed on tasks, milestones, questions and ideas; `set --unset summary` removes it; `show --json` and `schema` list it; `check` warns, without changing the exit code, about each task or milestone that is not done or dropped and has no summary; `brief` does not print it; a file written by todo 0.8 that has no summary anywhere works unchanged; a test covers each case
 - reqs: R-WRITE-19, TEST-4
@@ -95,6 +100,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P1 · difficulty: 2 · type: feature · area: core
 - milestone: T-197
 - why: every other part of the summary field needs the parser to know it first
+- summary: todo reads the new short text for people and shows it.
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
 - files: src/doc/parser.rs, src/doc/verify.rs, src/ops/read.rs, src/cli/schema.rs, src/cli/show.rs, tests/field_summary.rs, docs/json.md, tests/doc_parser.rs
 - read: docs/requirements.md, docs/format.md
@@ -120,6 +126,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P1 · difficulty: 2 · type: feature · area: cli
 - milestone: T-197
 - why: planners and agents must be able to write the summary through todo, never by hand
+- summary: The short text for people can be written with every command that creates or changes an entry.
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
 - depends: T-208
 - files: src/cli/add.rs, src/cli/set.rs, src/cli/apply.rs, src/cli/split.rs, src/ops/task_ops.rs, src/ops/edits.rs, tests/field_summary_write.rs
@@ -148,6 +155,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P1 · difficulty: 2 · type: feature · area: cli
 - milestone: T-197
 - why: the page is only readable when every unfinished task and milestone has a summary, so check must point at the ones missing
+- summary: todo warns about unfinished tasks and milestones that have no text for people yet.
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
 - depends: T-208
 - files: src/cli/check.rs, src/ops/brief.rs, docs/json.md, tests/field_summary_check.rs, tests/cmd_final.rs, tests/cmd_difficulty.rs
@@ -175,6 +183,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - milestone: T-195
 - goal: The data behind the new page: every entry with its state, dates and texts, in one tree with counts
 - why: the page can only keep finished work in its place if the data behind it is one tree with every entry, its state and its dates
+- summary: The data behind the new page: every entry with its state in plain words, its dates and texts, in one tree with counts.
 - depends: T-196
 - accept: the report model (src/report/model.rs) holds one tree with every entry of TODO.md, done and dropped ones included, each with one of five states: to do, in progress, waiting, done, cancelled; the overall numbers are "N of M tasks done" where M leaves out cancelled tasks, plus a count per state; each milestone has the same numbers over every task below it, a state (not started, in progress, finished) and, when finished, the date of its done note; a done entry carries the date and text of its last done note as its result, a cancelled one the date and reason of its drop note, a waiting one its latest reason, an in-progress one its owner and the age of the claim; milestones are ordered in progress, then not started, then finished, keeping file order inside each group; tasks without a milestone form the group Other work; finished trees from the archive form the group Earlier work; milestones, questions and ideas are never counted as tasks; unit tests cover each rule with an invented fixture
 - reqs: R-REPORT-1, R-KIND-3, TEST-1
@@ -188,6 +197,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-198
 - why: every part of the new page shows entries the same way, so one function must decide an entry's state and texts
+- summary: Decides how one entry reads on the page: to do, in progress, waiting, done or cancelled, with its date and reason.
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
 - depends: T-208
 - files: src/report/mod.rs, src/report/page/mod.rs, src/report/page/entry.rs
@@ -215,6 +225,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-198
 - why: the page keeps finished work in its place only if the data is one tree with every entry and the right counts
+- summary: Builds the tree of all work, finished parts included, with how much of each part is done.
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
 - depends: T-211
 - files: src/report/page/mod.rs, src/report/page/tree.rs
@@ -244,6 +255,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-195
 - why: the first thing a person asks is whether anything waits for them, and today that is spread over three sections
+- summary: The page lists everything that waits for a person: open questions, tasks a worker gave back, and work nobody has touched for too long.
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
 - depends: T-211
 - files: src/report/page/mod.rs, src/report/page/needs.rs
@@ -271,6 +283,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-195
 - why: a person who looked last week wants to see only what changed since then
+- summary: The page lists what changed in the last week: what was finished, cancelled or added.
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
 - depends: T-212
 - files: src/report/page/mod.rs, src/report/page/recent.rs
@@ -301,6 +314,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P2 · difficulty: 1 · type: feature · area: config
 - milestone: T-195
 - why: a colleague who opens the page needs to know what the project is before reading its tasks
+- summary: A project can have a one-sentence description that the page shows under its title.
 - depends: T-196
 - files: src/ops/config.rs, README.md, tests/config_toml.rs
 - steps:
@@ -327,6 +341,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - milestone: T-195
 - goal: The new page itself: it looks and reads like the approved mockup
 - why: this is the page itself; it must look and read like the approved mockup, not like a dump of fields
+- summary: The page itself, built to look and read like the approved design.
 - accept: `todo report --html` writes a page with the structure, wording and order of docs/report-mockup.html: header (title, description, date); the overall line with one bar in five parts and the legend; Needs you; Last 7 days; All work as one tree of milestones (title, state, "N of M done", small bar, goal) with nested milestones and tasks; unfinished milestones open, finished ones closed. An entry is one line: state mark, title, date for done and cancelled, small ID. A second line appears only for in progress (owner, since when, "no activity" when stale), waiting (the reason) and cancelled (the reason). A click opens the summary, for a done entry its result, and a closed part Technical details with level, priority, area, files, check and whether it passed, commit, who finished it, dependencies and the notes; an entry without a summary shows its why instead. Below the tree, closed: Ideas, Earlier work, and For the planner, which holds the v0.8 planning state and the per-area counts. The v0.8 sections Done and Dropped and the raw field lists are gone. One column, at most 820 px wide, system font, readable on a narrow window and when printed; all text HTML-escaped (test: a title containing `<script>`); the snapshot test uses a new invented fixture that has every state, a nested milestone, a question, a task given back and a stale claim; `report --html --all` still passes its tests
 - reqs: R-REPORT-1, R-REPORT-3, TEST-1
 - note (2026-11-21, claude-main): added
@@ -339,6 +354,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-202
 - why: the tree is most of the page and must read like the approved mockup, not like a dump of fields
+- summary: Draws the tree of all work: one line per entry, with details when you click it.
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
 - depends: T-212
 - files: src/report/page/mod.rs, src/report/page/tree_html.rs
@@ -366,6 +382,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P1 · difficulty: 3 · type: feature · area: report
 - milestone: T-202
 - why: this puts the parts together into the page people open, replacing the v0.8 page for one project
+- summary: Puts all parts together into the page that todo writes for one project.
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
 - depends: T-213, T-199, T-200, T-201, T-210, T-209
 - files: src/report/page/mod.rs, src/report/page/html.rs, src/report/page/style.css, src/report/html.rs, src/cli/report.rs, tests/cmd_report.rs, tests/fixtures/report_page.md, tests/snapshots/cmd_report__report_html.snap, tests/fixtures/report_page_archive.md, tests/cmd_report_planning.rs, tests/cmd_blocked_reason.rs
@@ -389,11 +406,12 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t214-haiku): done — report --html writes the whole v1.0 page for one project (header with description, overall bar and legend, Needs you, Last 7 days, All work as one tree, More with Ideas, Earlier work and the planner part) from an invented fixture with its archive, snapshot included; the v0.8 page tests now check the new page with their count and reason assertions kept; 1026 tests passing, fmt and clippy clean on Windows and Linux.
 
 ### T-203 · View buttons, light or dark mode, and colour-blind colours
-- status: open
-- owner: —
+- status: done
+- owner: t203-haiku
 - priority: P1 · difficulty: 2 · type: feature · area: report
 - milestone: T-195
 - why: the owner wants to narrow the tree to what is left or what was done, and to switch between light and dark, without anything on the page being able to change TODO.md
+- summary: Buttons narrow the page to what is left, done or cancelled, and switch between light and dark and to colours for red-green colour blindness.
 - final: The owner's workers are Haiku 5.5 at xhigh effort, which finished level-3 tasks in v0.8 (T-148, T-149); this is one coherent change with full detail, and smaller pieces would not compile on their own.
 - depends: T-202
 - files: src/report/page/html.rs, src/report/page/style.css, src/report/page/script.js, tests/cmd_report.rs, tests/report_colours.rs, tests/snapshots/cmd_report__report_html.snap
@@ -407,16 +425,24 @@ and what needs them. Problems found while using todo are fixed along the way.
   6. Run the four checks of AGENTS.md.
 - accept: the page has the buttons of R-REPORT-6 (Everything, Still to do, Done, Cancelled, Expand all, Collapse all, light or dark mode, Colour-blind colours) driven by one small inline script with no network access; four colour sets with exactly the colours of the R-REPORT-6 table, each state colour at least 3 to 1 against its background, computed by a test; the mode follows the system until the button is used and both choices are remembered (failures ignored); without scripts every entry shows in the system mode with the normal colours and the buttons are hidden; the buttons are left out when printing; nothing on the page writes a file or runs a command; the snapshot covers the markup and a test checks that the script names no address
 - verify: cargo test --all-features --test cmd_report --test report_colours
+- verified: 2026-11-21
+- commit: 7b3dcee
 - reqs: R-REPORT-6, NFR-4
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): Owner 2026-11-21: the owner is red-green colour blind. A button switches the colour scheme only; light and dark mode each need their own colours that fit a white or a black background, in the normal and in the colour-blind scheme.
+- note (2026-11-21, claude-main): Planner 2026-11-21: T-214 is merged and looks like the mockup in a browser. While you are in style.css: the date of done and cancelled entries (span.when) looked blue in dark mode in one browser; make sure it uses the muted text colour in all four sets.
+- note (2026-11-21, t203-haiku): done — Added the view buttons, light or dark mode and colour-blind colours to the page, driven by one inline script that makes no network call; the four colour sets match the R-REPORT-6 table with 3 to 1 contrast (tests/report_colours.rs); cargo test --all-features passes 1036 tests.
 
 ### T-204 · Performance and size of the new page
-- status: open
-- owner: —
+- status: claimed
+- owner: t204-haiku
+- claimed: 2026-11-21T16:41+01:00
+- session: 1e043d24-60a1-4169-a02d-3b55b3957038
 - priority: P1 · difficulty: 1 · type: test · area: report
 - milestone: T-195
 - why: the new page keeps every finished entry in the tree, so it must be measured again on a large list
+- summary: The new page is measured on a very large task list to make sure it stays fast and small.
 - depends: T-203
 - files: tests/perf.rs
 - read: docs/requirements.md
@@ -430,6 +456,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - verify: cargo test --release --all-features --test perf
 - reqs: NFR-3, TEST-9
 - note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): forced set (owner was t204-haiku)
 
 ### T-205 · Planner rules for summaries, documentation and release 1.0.0
 - status: open
@@ -437,9 +464,10 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P1 · difficulty: 2 · type: docs · area: release
 - milestone: T-195
 - why: the page is only as readable as the texts the planner writes, and the release makes the new page the one people get
+- summary: Version 1.0.0 is released with the new page as the page people get.
 - final: Docs and release work done by the planner and one worker at the end; it depends on the owner's answer to T-206.
 - depends: T-204,T-206
-- accept: `todo help planner` tells the planner to write a `summary` in plain words for every task and milestone (what it is about, no IDs, no file names, at most two sentences), to write the done note as the result in one sentence, and to give a reason a person understands when dropping or giving back a task; the common rules block stays within 15 lines and the worker text within 10; `todo help report` describes the new page (it still says "no script, no buttons"); the README part for people describes the new page with its sections and buttons; docs/json.md documents the `summary` field in `show --json` and `schema` and drops the R-REPORT-3 remark from the `report --json` part; CHANGELOG.md has the 1.0.0 entry; Cargo.toml is 1.0.0; this repository's own entries have summaries, a new `todo.toml` has a description (and nothing else), and `todo check` is clean; T-206 is answered
+- accept: CHANGELOG.md has the 1.0.0 entry; Cargo.toml is 1.0.0; this repository's own unfinished and v1.0 entries have summaries; a new todo.toml has a description (and nothing else); todo check is clean; T-206 is answered
 - reqs: R-AGENT-1, REL-2, REL-5
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): Review 2026-11-21: depends on the question T-206 so 1.0.0 is not released before the owner has judged the page; this repository has no todo.toml yet.
@@ -450,6 +478,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P2 · difficulty: 2 · type: bug · area: cli
 - milestone: T-190
 - why: add and set turn line breaks in a value into single spaces (format.md section 10), but apply only trims these values and then refuses the write, so the same input works with add and fails with apply
+- summary: Adding tasks in a batch now accepts text with line breaks, as adding them one by one already did.
 - final: One small fix in one file plus its test; Haiku 5.5 at xhigh finishes it from these steps.
 - files: src/cli/apply.rs, tests/cmd_apply_line_breaks.rs
 - read: docs/format.md, src/cli/add.rs
@@ -472,6 +501,7 @@ and what needs them. Problems found while using todo are fixed along the way.
 - priority: P1 · difficulty: 1 · type: bug · area: report
 - milestone: T-195
 - why: for the same stale claim Needs you says 13 days and the entry's second line says 14, because one counts elapsed time and the other calendar days; a reader sees two numbers for one fact
+- summary: The page shows the same number of days for a claim everywhere.
 - files: src/report/page/entry.rs, src/report/page/needs.rs
 - read: docs/requirements.md
 - steps:
@@ -486,6 +516,30 @@ and what needs them. Problems found while using todo are fixed along the way.
 - by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, t216-haiku): done — Needs you now counts the days of a claim with the same calendar-day count as the entry's second line (new claim_days in entry.rs, used by since and by needs.rs); a unit test covers a claim 13 days 2 hours old that is 14 calendar days, and the suite passes with 1020 tests.
+
+### T-217 · Help texts and README describe the new page and how to write for it
+- status: claimed
+- owner: t217-haiku
+- claimed: 2026-11-21T16:42+01:00
+- session: 2bfe83a8-a61d-41a9-8ba7-1c78ddab1fc1
+- priority: P1 · difficulty: 2 · type: docs · area: docs
+- milestone: T-195
+- why: the page is only as readable as the texts the planner writes, and people and agents learn about the page from the README and todo help
+- summary: The help texts and the README explain the new page and how to write texts for it.
+- final: Docs across four files that must say the same thing; Haiku 5.5 at xhigh finishes it from these steps.
+- files: src/agents/planner.md, src/cli/report.rs, README.md, docs/json.md
+- read: docs/requirements.md, docs/report-mockup.html, src/report/page/html.rs
+- steps:
+  1. Read section 5.23 and R-WRITE-19 in docs/requirements.md.
+  2. src/agents/planner.md (printed by todo help planner): add a section 'Writing for people' after 'Tasks and milestones' with these rules, each one line or two: write a summary for every task and milestone with --summary (what it is about, in plain words, at most two sentences, no IDs and no file names; the HTML report shows it); write the done note as the result in one sentence a person understands; when dropping a task or giving it back, give a reason a person understands; todo check warns about unfinished work without a summary. Keep the existing text.
+  3. src/cli/report.rs: the META summary becomes 'Write one HTML page for people: what is done, cancelled, still to do, and what needs you'. In details, describe the page of R-REPORT-1 and R-REPORT-4 to R-REPORT-6 as the code now writes it, including the view buttons, light or dark mode and the colour-blind colours driven by one small inline script with no network access, that nothing on the page changes TODO.md, and that --all keeps the v0.8 page with no script; remove every sentence that says the page has no script or no buttons for the single-project page.
+  4. README.md: in the part for people near the top (around the numbered steps that mention report --html --all) and in the section 'HTML report for people', describe the new page for one project: the overall line and bar, Needs you, Last 7 days, All work with done and cancelled entries in place, a click opens the summary and Technical details, More with Ideas, Earlier work and For the planner, the buttons Everything / Still to do / Done / Cancelled, Expand and Collapse all, light or dark mode and Colour-blind colours; that the page works without scripts; and that --all keeps its earlier form. Keep the PowerShell examples.
+  5. docs/json.md: in the section on todo report --html --json, the paragraph that starts 'The page shows the planning state' now says it sits in the closed part For the planner.
+  6. Run cargo test --all-features (help and schema snapshots may need updating with cargo insta; review every changed snapshot) and the four checks of AGENTS.md.
+- accept: todo help planner tells the planner to write a summary for every task and milestone (plain words, at most two sentences, no IDs or file names), the done note as a one-sentence result, and reasons a person understands for drop and stuck; todo help report and its summary describe the new page with its buttons and script, and no longer say the single-project page has no script; the README describes the new page and its buttons for people; docs/json.md places the planning state under For the planner; all tests pass
+- verify: cargo test --all-features
+- note (2026-11-21, claude-main): added
+- note (2026-11-21, claude-main): forced set (owner was t217-haiku)
 
 ## Questions
 
