@@ -4,6 +4,49 @@ All notable changes to `todo` are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-21
+
+A status page made for people. `todo report --html` writes a new page for one project, built as the
+mockup the owner approved (`docs/report-mockup.html`): within a minute a person sees what is done,
+what was cancelled and why, what is still to do, and what needs them. The file format stays
+version 3: the new `summary` field is an ordinary field, and todo 0.8 keeps it as an unknown field.
+
+### Added
+
+- The new page for one project (`R-REPORT-1`): five states in plain words (to do, in progress,
+  waiting, done, cancelled), each with its own mark, so no state depends on colour; an overall line
+  with a five-part bar and legend; one tree of all work in which done and cancelled entries keep
+  their place; one line per entry, a second line only for work in progress, waiting or cancelled,
+  and the summary, result and technical details on click; Other work; and the closed parts Ideas,
+  Earlier work (the archive) and For the planner (the planning state of v0.8, `R-REPORT-3`)
+  (T-211 to T-214).
+- Needs you (`R-REPORT-4`): open questions with the tasks that wait for them, tasks given back by a
+  worker, and claims without activity (T-199, T-216).
+- Last 7 days (`R-REPORT-5`): what was finished, cancelled and added, named by the entries' summaries
+  (T-200, T-218).
+- View buttons, light or dark mode and colours for red-green colour blindness (`R-REPORT-6`): one
+  small inline script with no network access; the page is complete without it, and every state
+  colour has a contrast of at least 3 to 1 in all four colour sets (T-203).
+- The `summary` field (`R-WRITE-19`): one or two plain sentences for people, written with `add`,
+  `add --from`, `apply`, `set` and the children of `split`; `show` and `schema` list it; `check`
+  warns about unfinished work without one; `brief` leaves it out (T-208 to T-210).
+- The `description` setting in `todo.toml`: one sentence shown under the page title (T-201).
+  todo 0.8 refuses a `todo.toml` that sets it, so update todo everywhere before you add it.
+- `todo help planner` has a part on writing for people (T-217).
+
+### Changed
+
+- `report --html --all` keeps its v0.8 page, now described in its own words (`R-REPORT-2`).
+- The report performance test runs on the milestone tree with a summary on every task: about
+  110 ms and 2.9 MB for 5,000 entries (limits 500 ms and 5 MB, `NFR-3`, T-204).
+
+### Fixed
+
+- `align` no longer reports done milestones as `DONE_WITHOUT_COMMIT`, or milestones named by commits
+  as `COMMITTED_NOT_DONE`: milestones are closed, not committed (`R-GIT-1`, T-191).
+- `apply` turns line breaks in text values into single spaces, as `add` and `set` do, instead of
+  refusing the write (T-215).
+
 ## [0.8.1] - 2026-11-21
 
 Faster planning commands on large task lists. No change to the file format (still version 3), to
