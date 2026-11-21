@@ -531,6 +531,8 @@ pub struct TaskJson {
     pub children: Vec<ChildJson>,
     /// `- why:` value, if present: what the task is for (R-WRITE-17).
     pub why: Option<String>,
+    /// `- summary:` value, if present: what the entry is about, written for people (R-WRITE-19).
+    pub summary: Option<String>,
     /// `- final:` value, if present: why the task stays above the target level (R-LEVEL-3).
     #[serde(rename = "final")]
     pub final_reason: Option<String>,
@@ -820,6 +822,7 @@ pub fn build_task_json(
         milestones,
         children,
         why: task.why.clone(),
+        summary: task.summary.clone(),
         final_reason: task.final_reason.clone(),
         depends: task.depends.iter().map(|d| d.raw.clone()).collect(),
         dependencies,
