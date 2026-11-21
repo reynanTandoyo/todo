@@ -241,6 +241,7 @@ where
         cfg,
         command,
         out,
+        false,
         |doc, archive, state, label, agent, now| {
             Ok(op(doc, archive, state, label, agent, now)?.into())
         },
@@ -274,10 +275,77 @@ where
         cfg,
         command,
         out,
+        false,
         |doc, archive, state, label, agent, now| {
             Ok(op(doc, archive, state, label, agent, now)?.into())
         },
     )
+}
+
+/// [`edit_doc_with_found_and_state_and_write`] for the write that ends `next --claim`, where the
+/// documents the write parsed are kept until the process exits instead of being freed (T-187).
+///
+/// The file is written and closed as before, and the command prints nothing from the documents
+/// after the write. Freeing a parsed file costs about 10 ms of small deallocations, which the
+/// process exit gives back anyway, so a claim keeps them (see [`Held`]). Other writes drop them.
+pub(crate) fn edit_doc_keeping_documents<T, F>(
+    ctx: &Context,
+    found: FoundTodo,
+    cfg: &OpsConfig,
+    command: &str,
+    out: &mut Output,
+    mut op: F,
+) -> Result<WriteDocResult<T>>
+where
+    F: FnMut(
+        &Document,
+        Option<&Document>,
+        &StateDir,
+        &str,
+        &str,
+        DateTime<FixedOffset>,
+    ) -> Result<DocWritePlan<T>>,
+{
+    crate::cli::emit_find_notices(&found, out);
+    edit_doc_core(
+        ctx,
+        found,
+        cfg,
+        command,
+        out,
+        true,
+        |doc, archive, state, label, agent, now| {
+            Ok(op(doc, archive, state, label, agent, now)?.into())
+        },
+    )
+}
+
+/// A document that a write holds while it computes its change (T-187). Dropped, it frees its
+/// memory; kept, it lives until the process exits, and dropping it does nothing.
+enum Held {
+    Owned(Box<Document>),
+    Kept(&'static Document),
+}
+
+impl Held {
+    fn new(doc: Document, keep: bool) -> Self {
+        if keep {
+            Self::Kept(Box::leak(Box::new(doc)))
+        } else {
+            Self::Owned(Box::new(doc))
+        }
+    }
+}
+
+impl std::ops::Deref for Held {
+    type Target = Document;
+
+    fn deref(&self) -> &Document {
+        match self {
+            Self::Owned(doc) => doc,
+            Self::Kept(doc) => doc,
+        }
+    }
 }
 
 fn edit_doc_core<T, F>(
@@ -286,6 +354,7 @@ fn edit_doc_core<T, F>(
     cfg: &OpsConfig,
     command: &str,
     out: &mut Output,
+    keep_documents: bool,
     mut op: F,
 ) -> Result<WriteDocResult<T>>
 where
@@ -322,7 +391,7 @@ where
         &mut lock_warnings,
         |bytes, _snap| {
             let parse_timer = crate::timing::PhaseTimer::start("write.parse_doc");
-            let parsed = parse_doc_for_write(bytes, &label, cfg)?;
+            let parsed = Held::new(parse_doc_for_write(bytes, &label, cfg)?, keep_documents);
             parse_timer.finish();
             stamp_warning = parsed.newer_tool_warning(&label);
             let arch_timer = crate::timing::PhaseTimer::start("write.read_archive");
@@ -332,7 +401,7 @@ where
             let (migrated_todo, migration) =
                 PendingMigration::plan(&parsed, &label, archive.as_ref(), &archive_path, cfg)?
                     .split();
-            let doc = migrated_todo.as_ref().map_or(&parsed, |m| &m.doc);
+            let doc = migrated_todo.as_ref().map_or(&*parsed, |m| &m.doc);
             let working: Cow<[u8]> = match &migrated_todo {
                 Some(m) => Cow::Owned(m.doc.to_bytes()),
                 None => Cow::Borrowed(bytes),
@@ -390,6 +459,8 @@ where
                         return Ok(WriteOutcomeFull::Unchanged((false, val)));
                     }
                     let touched_tasks = crate::history::diff_doc_task_ids(doc, &applied.doc);
+                    // The edited document is written as bytes from here on, and nothing reads it again.
+                    let _edited = Held::new(applied.doc, keep_documents);
                     migrated_notice = migration.as_ref().map(|m| m.summary.clone());
                     Ok(WriteOutcomeFull::Changed {
                         new_bytes: applied.bytes,
@@ -528,6 +599,7 @@ where
         cfg,
         command,
         out,
+        false,
         |doc, archive, _state, label, agent, now| {
             let task = resolve_task_in_doc(doc, task_input)?;
             let task_id = task.id;
