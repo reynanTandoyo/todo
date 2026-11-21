@@ -121,6 +121,22 @@ fn answered_questions_are_ignored() {
 }
 
 #[test]
+fn done_milestones_are_ignored() {
+    let dir = TempDir::new().expect("tempdir");
+    init_repo(dir.path());
+    commit(dir.path(), "unrelated change");
+    let mut body = HEAD.to_string();
+    body.push_str(&task(
+        "T-001",
+        "done",
+        "- type: milestone\n- goal: Example goal\n",
+    ));
+    fs::write(dir.path().join("TODO.md"), body).expect("write");
+    let out = run_in(dir.path(), &["align"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stdout_text(&out));
+}
+
+#[test]
 fn done_task_matched_by_subject_only_is_fine() {
     let dir = TempDir::new().expect("tempdir");
     init_repo(dir.path());

@@ -82,11 +82,11 @@ pub fn run(_args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     let mut findings: Vec<Finding> = Vec::new();
     for task in &loaded.doc.tasks {
-        // Questions are answered, not committed (R-GIT-1).
+        // Questions are answered and milestones are closed, not committed (R-GIT-1).
         if task
             .task_type
             .as_deref()
-            .is_some_and(|ty| ty.eq_ignore_ascii_case("question"))
+            .is_some_and(|ty| ty.eq_ignore_ascii_case("question") || ty.eq_ignore_ascii_case("milestone"))
         {
             continue;
         }
