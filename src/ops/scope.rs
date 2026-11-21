@@ -52,21 +52,30 @@ pub fn parse_files(value: &str) -> Vec<ScopeEntry> {
 /// A path as `files` compares it: `/` separators, no `.` or empty parts, lower case on Windows. A
 /// trailing `/` (a folder) is kept. `None` when no part is left.
 fn normalise(text: &str) -> Option<String> {
-    let slashed = text.replace('\\', "/");
-    let folder = slashed.ends_with('/');
-    let parts: Vec<&str> = slashed
-        .split('/')
+    // One buffer, filled in one pass (`files` is parsed for every task of a wave, T-188).
+    let folder = text.ends_with(['/', '\\']);
+    let mut out = String::with_capacity(text.len() + 1);
+    for part in text
+        .split(['/', '\\'])
         .filter(|part| !part.is_empty() && *part != ".")
-        .collect();
-    if parts.is_empty() {
+    {
+        if !out.is_empty() {
+            out.push('/');
+        }
+        out.push_str(part);
+    }
+    if out.is_empty() {
         return None;
     }
-    let mut out = parts.join("/");
     if folder {
         out.push('/');
     }
     if cfg!(windows) {
-        out = out.to_lowercase();
+        if out.is_ascii() {
+            out.make_ascii_lowercase();
+        } else {
+            out = out.to_lowercase();
+        }
     }
     Some(out)
 }
@@ -218,12 +227,17 @@ pub fn overlap_lanes(scopes: &[Vec<ScopeEntry>]) -> Vec<usize> {
             seen.push((item, entry));
         }
     }
-    let mut lane_of_root: HashMap<usize, usize> = HashMap::new();
+    // The lane number of each root, given when the root is first met (`usize::MAX` until then).
+    let mut lane_of_root: Vec<usize> = vec![usize::MAX; scopes.len()];
+    let mut lanes = 0usize;
     (0..scopes.len())
         .map(|item| {
             let root = find_root(&mut parent, item);
-            let next = lane_of_root.len();
-            *lane_of_root.entry(root).or_insert(next)
+            if lane_of_root[root] == usize::MAX {
+                lane_of_root[root] = lanes;
+                lanes += 1;
+            }
+            lane_of_root[root]
         })
         .collect()
 }

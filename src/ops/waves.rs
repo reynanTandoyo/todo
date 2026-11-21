@@ -10,8 +10,9 @@
 //! tasks never recurses deeply. Whatever cannot be ordered, because it waits on a blocked entry, a
 //! missing ID or a cycle, is listed apart with the reason.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
+use crate::doc::id::FastU64Map;
 use crate::doc::{DependencyRef, Document, EntryKind, Status, Task, TaskId};
 use crate::find::fs_path;
 use crate::ops::config::OpsConfig;
@@ -92,9 +93,18 @@ pub fn plan_waves<'a>(
             matches!(t.kind(), EntryKind::Task | EntryKind::Milestone) && is_unfinished(t.status)
         })
         .collect();
-    let node_of: HashMap<TaskId, usize> =
+    let node_of: FastU64Map<TaskId, usize> =
         nodes.iter().enumerate().map(|(i, t)| (t.id, i)).collect();
-    let index = doc.milestone_index();
+    // The nodes whose `milestone` field names each ID, in file order. Only nodes are needed here, so
+    // this is built instead of `doc.milestone_index()`, which also counts progress (T-188).
+    let mut children: FastU64Map<TaskId, Vec<usize>> = FastU64Map::default();
+    for (i, node) in nodes.iter().enumerate() {
+        if let Some(parent) = doc.milestone_parent_id(node)
+            && parent != node.id
+        {
+            children.entry(parent).or_default().push(i);
+        }
+    }
 
     // `preds[i]` are the nodes that node `i` waits for; `reason[i]` says why node `i` is not placed.
     let mut preds: Vec<Vec<usize>> = vec![Vec::new(); nodes.len()];
@@ -107,12 +117,9 @@ pub fn plan_waves<'a>(
                 own = Some("blocked milestone".to_string());
             }
             // A milestone is finished when the entries directly below it are.
-            preds[i].extend(
-                index
-                    .children_of(node.id)
-                    .iter()
-                    .filter_map(|child| node_of.get(&child.id).copied()),
-            );
+            if let Some(below) = children.get(&node.id) {
+                preds[i].extend_from_slice(below);
+            }
         } else {
             if node.status == Status::Blocked {
                 own = Some(blocked_reason(node));
@@ -358,7 +365,7 @@ enum Resolved {
 fn resolve(
     doc: &Document,
     archive: Option<&Document>,
-    node_of: &HashMap<TaskId, usize>,
+    node_of: &FastU64Map<TaskId, usize>,
     dep: &DependencyRef,
 ) -> Resolved {
     let Some(id) = dep.id else {
@@ -518,14 +525,14 @@ fn read_gaps(task: &Task, cfg: &OpsConfig) -> Vec<String> {
 /// entry for each task (T-185, T-186).
 pub struct OpenQuestionTargets {
     /// The open questions about each entry, in file order: the document first, then the archive.
-    about: HashMap<TaskId, Vec<TaskId>>,
+    about: FastU64Map<TaskId, Vec<TaskId>>,
 }
 
 impl OpenQuestionTargets {
     /// Indexes the open questions of `doc` and `archive` in one pass over both.
     #[must_use]
     pub fn new(doc: &Document, archive: Option<&Document>, cfg: &OpsConfig) -> Self {
-        let mut about: HashMap<TaskId, Vec<TaskId>> = HashMap::new();
+        let mut about: FastU64Map<TaskId, Vec<TaskId>> = FastU64Map::default();
         for question in [Some(doc), archive]
             .into_iter()
             .flatten()
