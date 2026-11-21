@@ -22,14 +22,16 @@ The owner and a colleague see on one page what is done, what was cancelled, what
 and what needs them. Problems found while using todo are fixed along the way.
 
 ### T-190 · Problems found while using todo are fixed
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · type: milestone
 - goal: Every problem found while using todo on real work is recorded here and fixed, and todo's own checks (check, align, plan) stay clean on this repository
 - why: the tool is only trusted when its own reports have no false alarms
 - summary: Bugs we run into while using todo on real work get written down and fixed, so its own checks give no false alarms.
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): Seen by t209-haiku 2026-11-21: apply only trims why (line breaks are not turned into spaces as format.md section 10 says); check and add a task if confirmed.
+- note (2026-11-21, claude-main): done — The false align findings on milestones (T-191) and the line breaks refused by apply (T-215) are fixed.
 
 ### T-191 · align reports every done milestone as DONE_WITHOUT_COMMIT
 - status: done
@@ -81,8 +83,8 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, claude-main): done — R-REPORT-1 rewritten for the mockup; R-REPORT-4/5/6, R-WRITE-19, description setting, v1.0 added; R-REPORT-2 keeps v0.8 content in its own words; an open task that depends on an unanswered question shows as waiting; light-mode waiting and to-do colours darkened to reach 3:1.
 
 ### T-197 · summary field: what an entry is about, written for people
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P1 · type: milestone · area: cli
 - milestone: T-195
 - goal: Every entry can carry a summary for people, written through todo and checked
@@ -91,8 +93,10 @@ and what needs them. Problems found while using todo are fixed along the way.
 - depends: T-196
 - accept: `add`, `set`, `add --from`, `apply` and the children of `split` take `--summary` (text, `-` or `@path`) and write `- summary:` after `why` in the field order; it is allowed on tasks, milestones, questions and ideas; `set --unset summary` removes it; `show --json` and `schema` list it; `check` warns, without changing the exit code, about each task or milestone that is not done or dropped and has no summary; `brief` does not print it; a file written by todo 0.8 that has no summary anywhere works unchanged; a test covers each case
 - reqs: R-WRITE-19, TEST-4
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): split into T-208, T-209, T-210
+- note (2026-11-21, claude-main): done — The summary field is read, written by every command and checked (T-208 to T-210).
 
 ### T-208 · summary field: read it, show it and list it in schema
 - status: done
@@ -177,8 +181,8 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t210-haiku): done — check warns, without changing its exit code, about each open, claimed or blocked task or milestone without a summary; brief leaves the summary out and docs/json.md lists it next to why; cargo test --all-features passes 931 tests with 0 failed, and fmt and clippy are clean for Windows and Linux.
 
 ### T-198 · Page data: states in plain words, counts, dates and the full tree
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P1 · type: milestone · area: report
 - milestone: T-195
 - goal: The data behind the new page: every entry with its state, dates and texts, in one tree with counts
@@ -187,9 +191,11 @@ and what needs them. Problems found while using todo are fixed along the way.
 - depends: T-196
 - accept: the report model (src/report/model.rs) holds one tree with every entry of TODO.md, done and dropped ones included, each with one of five states: to do, in progress, waiting, done, cancelled; the overall numbers are "N of M tasks done" where M leaves out cancelled tasks, plus a count per state; each milestone has the same numbers over every task below it, a state (not started, in progress, finished) and, when finished, the date of its done note; a done entry carries the date and text of its last done note as its result, a cancelled one the date and reason of its drop note, a waiting one its latest reason, an in-progress one its owner and the age of the claim; milestones are ordered in progress, then not started, then finished, keeping file order inside each group; tasks without a milestone form the group Other work; finished trees from the archive form the group Earlier work; milestones, questions and ideas are never counted as tasks; unit tests cover each rule with an invented fixture
 - reqs: R-REPORT-1, R-KIND-3, TEST-1
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): Review 2026-11-21: src/report/all.rs uses model::build_page and Page for the --all page; keep what it needs (or give --all its own copy) so report --html --all keeps its v0.8 content and tests.
 - note (2026-11-21, claude-main): split into T-211, T-212
+- note (2026-11-21, claude-main): done — The page data: every entry with its state, dates and texts, in one tree with counts (T-211, T-212).
 
 ### T-211 · Page data: one entry with its state, date, second line and details
 - status: done
@@ -335,8 +341,8 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t201-haiku): CRLF in description gives one space (commit 1eabde8)
 
 ### T-202 · Page layout: header, overall bar, tree, one line per entry, details on click
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P1 · type: milestone · area: report
 - milestone: T-195
 - goal: The new page itself: it looks and reads like the approved mockup
@@ -344,9 +350,11 @@ and what needs them. Problems found while using todo are fixed along the way.
 - summary: The page itself, built to look and read like the approved design.
 - accept: `todo report --html` writes a page with the structure, wording and order of docs/report-mockup.html: header (title, description, date); the overall line with one bar in five parts and the legend; Needs you; Last 7 days; All work as one tree of milestones (title, state, "N of M done", small bar, goal) with nested milestones and tasks; unfinished milestones open, finished ones closed. An entry is one line: state mark, title, date for done and cancelled, small ID. A second line appears only for in progress (owner, since when, "no activity" when stale), waiting (the reason) and cancelled (the reason). A click opens the summary, for a done entry its result, and a closed part Technical details with level, priority, area, files, check and whether it passed, commit, who finished it, dependencies and the notes; an entry without a summary shows its why instead. Below the tree, closed: Ideas, Earlier work, and For the planner, which holds the v0.8 planning state and the per-area counts. The v0.8 sections Done and Dropped and the raw field lists are gone. One column, at most 820 px wide, system font, readable on a narrow window and when printed; all text HTML-escaped (test: a title containing `<script>`); the snapshot test uses a new invented fixture that has every state, a nested milestone, a question, a task given back and a stale claim; `report --html --all` still passes its tests
 - reqs: R-REPORT-1, R-REPORT-3, TEST-1
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): Owner 2026-11-21 (red-green colour blind): a state is never shown by colour alone. Every entry has its own mark shape (done ✓, in progress ●, waiting ◐, to do ○, cancelled ✕), the second line names the state in words, and the legend under the bar pairs each mark with its word and count. All colours come from CSS variables so T-203 can switch the set.
 - note (2026-11-21, claude-main): split into T-213, T-214
+- note (2026-11-21, claude-main): done — The new page is written by report --html and reads like the approved mockup (T-213, T-214).
 
 ### T-213 · Page HTML: the All work tree, one line per entry, details on click
 - status: done
@@ -435,10 +443,8 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, t203-haiku): done — Added the view buttons, light or dark mode and colour-blind colours to the page, driven by one inline script that makes no network call; the four colour sets match the R-REPORT-6 table with 3 to 1 contrast (tests/report_colours.rs); cargo test --all-features passes 1036 tests.
 
 ### T-204 · Performance and size of the new page
-- status: claimed
+- status: done
 - owner: t204-haiku
-- claimed: 2026-11-21T16:41+01:00
-- session: 1e043d24-60a1-4169-a02d-3b55b3957038
 - priority: P1 · difficulty: 1 · type: test · area: report
 - milestone: T-195
 - why: the new page keeps every finished entry in the tree, so it must be measured again on a large list
@@ -454,9 +460,13 @@ and what needs them. Problems found while using todo are fixed along the way.
   5. Run the four checks of AGENTS.md, and put the numbers in the done note.
 - accept: on the generated 5,000-entry milestone-tree file `report --html` finishes in under 500 ms in a release build and the page stays under 5 MB; the existing report performance test asserts both and runs in CI; the measured numbers are recorded in the done note
 - verify: cargo test --release --all-features --test perf
+- verified: 2026-11-21
+- commit: b4c08c4
 - reqs: NFR-3, TEST-9
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, claude-main): forced set (owner was t204-haiku)
+- note (2026-11-21, t204-haiku): done — The one-page report perf test now runs on the 5,000-entry milestone tree with a summary on every task and a done note on every done task: report --html took 110, 111 and 122 ms (median of five runs per run; limit 500 ms) and the page was 2,897,256 bytes in each run (limit 5 MiB); the four AGENTS.md checks pass and cargo test --all-features passes 1036 tests (the 5 perf tests run with --ignored).
 
 ### T-205 · Planner rules for summaries, documentation and release 1.0.0
 - status: open
