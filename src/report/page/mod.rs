@@ -7,3 +7,4 @@
 
 pub mod entry;
 pub mod needs;
+pub mod tree;
