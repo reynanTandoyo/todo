@@ -527,6 +527,7 @@ requirements in [`docs/requirements.md`](docs/requirements.md) §5.14 (R-CFG-2) 
 | `lease_max_minutes` | `60` | longest allowed lease |
 | `snapshots_keep` | `200` | snapshots kept |
 | `worktree` | `"shared"` | `"local"`: each worktree uses its own `TODO.md` |
+| `description` | `""` | one sentence about the project, shown under the title of the HTML report |
 
 ## Adding it to a project
 
