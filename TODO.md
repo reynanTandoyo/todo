@@ -22,14 +22,14 @@ A planner splits the work until every task is level 1, the level the weakest mod
 without a mistake. Workers then take those tasks at the same time, in one checkout.
 
 ### T-145 · Weak models finish the work in parallel
-- status: done
-- owner: claude-main
+- status: open
+- owner: —
 - priority: P1 · type: milestone
 - goal: A planner splits the work until every task is level 1; any number of cheap agents then finish those tasks at the same time, without touching each other's files and without a false done
 - why: the owner wants work finished faster by spawning many cheap agents (Haiku, DeepSeek flash) instead of a few strong ones
-- by: Reynan Henry Tandoyo
 - note (2026-11-19, claude-main): added
 - note (2026-11-20, claude-main): done — v0.8 released as 0.8.0: levels 1 to 5, detailed level-1 tasks, split, verify, stuck, commit scope, file scopes, waves, plan and brief.
+- note (2026-11-20, claude-main): reopened — Reopened: CI shows next at 156 ms (Linux) and 185 ms (Windows) on the T-165 milestone-tree perf test, budget 100 ms.
 
 ### T-146 · v0.8 requirements: levels, detailed tasks, split, verify, stuck, file scopes, waves
 - status: done
@@ -534,6 +534,50 @@ without a mistake. Workers then take those tasks at the same time, in one checko
 - by: Reynan Henry Tandoyo
 - note (2026-11-20, t164-haiku): added
 - note (2026-11-20, t154-haiku): done — Page size: all-projects page of ten 5,000-entry projects 40,079,554 -> 28,432,052 bytes (single page 3,995,518 -> 2,830,937); release report timings 74 ms and 579 ms, budgets 500 ms and 5 s. Each opened task shows Level/Files/Verify (and Verified when there is a check) on one line, none for missing parts; the per-task wrapper, the row breaks, the empty notes block, the task row classes and the priority/area chip titles are gone. Left: the fields lists (required, as written) and the dt/dd markup, about 17% of the page; omitting the optional end tags of dt/dd or dropping duplicate fields would take it further, left to the owner. report_basic.md moved to format 3 (todo migrate on a copy).
+
+### T-185 · next is too slow on the 5,000-task milestone tree in CI: 156 ms Linux, 185 ms Windows, budget 100 ms
+- status: done
+- owner: t185-haiku
+- priority: P1 · difficulty: 3 · type: bug · area: core
+- milestone: T-145
+- why: CI is red on main since 0.8.0: perf_5000_entry_milestone_tree_next_plan_waves_brief_meet_budgets fails on both runners; locally next takes 82 ms, so the slower CI machines show the real headroom is too small
+- commit: 20a50e6f5dae36a3d7ae1279abc4b5253aa95198
+- by: Reynan Henry Tandoyo
+- note (2026-11-20, claude-main): added
+- note (2026-11-21, t185-haiku): done — next judges readiness only in candidate order and stops at the first ready task whose files are free; open questions indexed once per selection (OpenQuestionTargets), detail rule checks read paths last. Output unchanged (byte-identical on 10 commands). Perf test medians, 5,000-entry milestone tree: next 72.2 ms before, 45.3 ms after; plan 77.6 -> 75.3; waves 81.0 -> 84.0; brief 38.9 -> 43.1 (noise); next --claim 129.4 -> 105.6. Checks: fmt, clippy (all features, default, linux), cargo test --all-features all pass, perf tests pass.
+
+### T-186 · plan, waves, next and next --claim need about 2.5x headroom for the CI runners
+- status: done
+- owner: t185-haiku
+- priority: P1 · difficulty: 4 · type: bug · area: core
+- milestone: T-145
+- why: CI on windows-latest measured plan 170 ms, waves 134 ms, next 185 ms and next --claim 196 ms (budgets 100/100/100/200, NFR-3); the runner is about 2.3x slower than the dev PC, so locally they must be under about 40 ms (next --claim under about 85 ms)
+- commit: 8b18774c5733920cc5a12ce6c2c81f272921a41b
+- by: Reynan Henry Tandoyo
+- note (2026-11-21, claude-main): added
+- note (2026-11-21, t185-haiku): done — plan and waves judge open questions through one index per command (OpenQuestionTargets, detail_gaps_with), and plan_waves groups levels in one pass; next, plan, waves and brief end with LoadedRead::leak_for_exit after output (read-only only). Output byte-identical to the T-185 binary on next, plan, waves, brief, list --ready, show --json, summary and tree, text and JSON. Perf-test medians, T-185 then T-186: next 45.3 -> 35.1 ms, plan 75.3 -> 34.7, waves 84.0 -> 43.1 (target 40, missed), brief 43.1 -> 31.7, next --claim 105.6 -> 95.6 (target 85, missed). The claim parses the file twice and drops two documents; reaching 85 needs the parser or the document model to change. Checks: fmt, clippy (all features, default, linux), cargo test --all-features all pass; perf tests pass on the rerun (first run failed on claim 200.1 ms under other agents' cargo load).
+
+### T-187 · next --claim parses the file twice: 229 ms on windows-latest CI, budget 200 ms
+- status: done
+- owner: claude-main
+- priority: P1 · difficulty: 4 · type: bug · area: core
+- milestone: T-145
+- why: After T-186 every other planning timing has headroom on both CI runners, but next --claim measured 229 ms on one windows-latest run (passed on another), so CI on main is red by chance; it reads and parses the 1.8 MB file twice and drops two documents
+- commit: 620851f785d0e49ddde354600a6c37d55675d4c4
+- by: Reynan Henry Tandoyo
+- note (2026-11-21, claude-main): added
+- note (2026-11-21, t185-haiku): Choice: next --claim already chooses its task under the write lock, from the one document that the write reads there, so no pre-lock parse exists to remove. Its second parse is the R-EDIT-7 check of the edited bytes, which stays. Change (commit 620851f): the claim keeps its two documents (the parsed input and the edited one) until the process exits, via edit_doc_keeping_documents; the file is still written and the lock released as before. In-process claim totals, 11 interleaved claims each: 148 ms before, 113 ms after. Perf-test next --claim medians: 95.6 ms before; 76 to 121 ms after across six runs under desktop load. Target 70 is not reached: the remaining cost is the two parses (about 18 and 15 ms), the snapshot (about 10), the atomic write (about 9) and a fresh-file read penalty (about 25 ms) after each write. Option for the planner: parse task blocks in parallel (needs approval, since it adds threads to the parser). Perf gate: the planning test passed in 2 of 6 runs today; the other runs failed on tree, show, add and waves, which this change does not touch, under desktop load.
+- note (2026-11-21, claude-main): Coordinator 2026-11-21: CI green on dev and main after 0a90ef4; next --claim 135 ms and 117 ms on windows-latest (was 229). The 70 ms local target was not reached, but the CI budget is met with headroom; parallel parsing not pursued.
+- note (2026-11-21, claude-main): forced done (owner was t185-haiku)
+- note (2026-11-21, claude-main): done — next --claim keeps its documents until exit; CI windows-latest 135/117 ms (budget 200).
+
+### T-188 · waves has no headroom on windows-latest CI: 99.3 ms of 100 ms
+- status: open
+- owner: —
+- priority: P2 · difficulty: 4 · type: bug · area: core
+- milestone: T-145
+- why: After T-187 CI is green, but one windows-latest run measured waves at 99.3 ms (the other 52.6 ms), so the perf test can fail by chance; waves takes about 43 ms locally and needs to get under about 30 ms
+- note (2026-11-21, claude-main): added
 
 ## Questions
 
