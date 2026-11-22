@@ -129,6 +129,13 @@ details.fold p,details.fold ul{font-size:14px; margin:6px 0 0}
 .page[data-cb="on"] .seg{height:12px}
 .page[data-cb="on"] li.wait .line2 b, .page[data-cb="on"] li.drop .line2 b{text-decoration:underline}
 .head .controls{flex-direction:column; align-items:stretch}
+.ms-mark{display:inline-block; flex:none; min-width:1.5em; padding:0 4px; border:1.5px solid var(--p-fg); border-radius:4px; font-size:11px; font-weight:700; line-height:1.5; text-align:center}
+.ms-id{flex:none; font-size:12px; color:var(--p-mfg); font-family:var(--font-mono,ui-monospace,Consolas,monospace)}
+details.chain{margin-top:6px}
+details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
+.chain-line{margin:2px 0 6px; font-size:13px; line-height:1.6}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+@media (max-width:560px){ .ms-id{display:none} }
 </style>
 </head>
 <body style="margin:0">
@@ -185,6 +192,7 @@ details.fold p,details.fold ul{font-size:14px; margin:6px 0 0}
   <button data-f="left" aria-pressed="false">Still to do</button>
   <button data-f="done" aria-pressed="false">Done</button>
   <button data-f="drop" aria-pressed="false">Cancelled</button>
+  <button id="arch" aria-pressed="false">Include archive</button>
   <span class="sp"></span>
   <button id="exp">Expand all</button>
   <button id="col">Collapse all</button>
@@ -193,12 +201,12 @@ details.fold p,details.fold ul{font-size:14px; margin:6px 0 0}
 <div id="tree">
 
 <details class="ms" open>
-  <summary><span class="ms-title">Develop the renderer</span><span class="ms-state" style="color:var(--c-prog)">in progress</span><span class="ms-count">8 of 13 done</span><span class="bar"><i style="width:62%"></i></span></summary>
+  <summary><span class="ms-mark" role="img" aria-label="Milestone">M</span><span class="ms-id">T-150</span><span class="ms-title">Develop the renderer</span><span class="ms-state" style="color:var(--c-prog)">in progress</span><span class="ms-count">8 of 13 done</span><span class="bar"><i style="width:62%"></i></span></summary>
   <div class="ms-body">
     <p class="goal">Goal: one frame of a lit, textured scene is drawn on the GPU.</p>
 
     <details class="ms">
-      <summary><span class="ms-title">C shader</span><span class="ms-state" style="color:var(--c-done)">finished 19 Nov</span><span class="ms-count">5 of 5 done</span><span class="bar"><i style="width:100%"></i></span></summary>
+      <summary><span class="ms-mark" role="img" aria-label="Milestone">M</span><span class="ms-id">T-151</span><span class="ms-title">C shader</span><span class="ms-state" style="color:var(--c-done)">finished 19 Nov</span><span class="ms-count">5 of 5 done</span><span class="bar"><i style="width:100%"></i></span></summary>
       <div class="ms-body">
         <p class="goal">Goal: shaders can be written in a small C-like language.</p>
         <ul class="items">
@@ -214,14 +222,14 @@ details.fold p,details.fold ul{font-size:14px; margin:6px 0 0}
     </details>
 
     <details class="ms" open>
-      <summary><span class="ms-title">GPU compiler</span><span class="ms-state" style="color:var(--c-prog)">in progress</span><span class="ms-count">2 of 5 done</span><span class="bar"><i style="width:40%"></i></span></summary>
+      <summary><span class="ms-mark" role="img" aria-label="Milestone">M</span><span class="ms-id">T-152</span><span class="ms-title">GPU compiler</span><span class="ms-state" style="color:var(--c-prog)">in progress</span><span class="ms-count">2 of 5 done</span><span class="bar"><i style="width:40%"></i></span></summary>
       <div class="ms-body">
         <p class="goal">Goal: a C shader is turned into a program the graphics card can run.</p>
         <ul class="items">
           <li class="item done"><details><summary><span class="mark">✓</span><span class="t">Report shader errors with line numbers</span><span class="when">20 Nov</span><span class="id">T-210</span></summary><div class="more"><p><span class="lbl">Summary</span><br>An error now reads “lighting.shader, line 14: unknown name ‘ligth’” instead of “compile failed”.</p></div></details></li>
           <li class="item done"><details><summary><span class="mark">✓</span><span class="t">Parse shader source into a syntax tree</span><span class="when">21 Nov</span><span class="id">T-211</span></summary>
             <div class="more"><p><span class="lbl">Summary</span><br>The compiler now understands the structure of a shader, which every later stage builds on. Both example shaders parse.</p>
-            <details class="tech"><summary>Technical details</summary><dl><dt>Done by</dt><dd>Mara Lindqvist</dd><dt>Files</dt><dd>src/compiler/parser.c, tests/parser_test.c</dd><dt>Check</dt><dd>make test-parser — passed 21 Nov</dd><dt>Commit</dt><dd>9f03b7d</dd><dt>Level</dt><dd>1</dd><dt>Notes</dt><dd>3 notes</dd></dl></details></div></details></li>
+            <details class="tech"><summary>Technical details</summary><dl><dt>Done by</dt><dd>Mara Lindqvist</dd><dt>Files</dt><dd>src/compiler/parser.c, tests/parser_test.c</dd><dt>Check</dt><dd>make test-parser — passed 21 Nov</dd><dt>Commit</dt><dd>9f03b7d</dd><dt>Level</dt><dd>1</dd><dt>Notes</dt><dd>3 notes</dd></dl></details><details class="chain"><summary>Show chain</summary><p class="lbl">Before this task</p><p class="chain-line"><span class="mark done">✓</span> T-201 Define the shader language grammar <span class="sr">(done)</span> → <span class="mark done">✓</span> T-202 Split shader text into tokens <span class="sr">(done)</span> → <b>this task</b></p><p class="lbl">After this task</p><p class="chain-line"><b>this task</b> → <span class="mark prog">●</span> T-212 Emit the vertex stage <span class="sr">(in progress)</span> → <span class="mark wait">◐</span> T-213 Link the stages into one program <span class="sr">(waiting)</span></p></details></div></details></li>
           <li class="item prog"><details><summary><span class="mark">●</span><span class="t">Emit the vertex stage</span><span class="id">T-212</span></summary><div class="more"><p><span class="lbl">Summary</span><br>Produce the part of the GPU program that places each corner of a triangle on screen.</p></div></details>
             <p class="line2"><b>In progress</b> · worker-3 · since yesterday</p></li>
           <li class="item wait"><details><summary><span class="mark">◐</span><span class="t">Link the stages into one program</span><span class="id">T-213</span></summary><div class="more"><p><span class="lbl">Summary</span><br>Join the vertex and fragment stages into the single program the graphics card loads.</p></div></details>
@@ -243,7 +251,7 @@ details.fold p,details.fold ul{font-size:14px; margin:6px 0 0}
 </details>
 
 <details class="ms" open>
-  <summary><span class="ms-title">Scene loading</span><span class="ms-state muted">not started</span><span class="ms-count">0 of 5 done</span><span class="bar"><i style="width:0%"></i></span></summary>
+  <summary><span class="ms-mark" role="img" aria-label="Milestone">M</span><span class="ms-id">T-153</span><span class="ms-title">Scene loading</span><span class="ms-state muted">not started</span><span class="ms-count">0 of 5 done</span><span class="bar"><i style="width:0%"></i></span></summary>
   <div class="ms-body">
     <p class="goal">Goal: a scene file with models, textures and a camera is loaded and shown.</p>
     <ul class="items">
@@ -257,7 +265,7 @@ details.fold p,details.fold ul{font-size:14px; margin:6px 0 0}
 </details>
 
 <details class="ms">
-  <summary><span class="ms-title">Windowing and input</span><span class="ms-state" style="color:var(--c-done)">finished 10 Nov</span><span class="ms-count">8 of 8 done</span><span class="bar"><i style="width:100%"></i></span></summary>
+  <summary><span class="ms-mark" role="img" aria-label="Milestone">M</span><span class="ms-id">T-154</span><span class="ms-title">Windowing and input</span><span class="ms-state" style="color:var(--c-done)">finished 10 Nov</span><span class="ms-count">8 of 8 done</span><span class="bar"><i style="width:100%"></i></span></summary>
   <div class="ms-body">
     <p class="goal">Goal: the program opens a window on Windows and Linux and reacts to keyboard and mouse.</p>
     <ul class="items">

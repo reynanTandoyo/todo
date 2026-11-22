@@ -1053,6 +1053,11 @@ with its word.
     - A milestone is one row: its title, its state, "N of M done" over every task below it at any
       depth (cancelled tasks left out of both numbers), and a small bar of that share. Opened, it
       shows "Goal: <goal>", then its nested milestones, then its tasks, each group in file order.
+    - From v1.1 every milestone row, nested ones included, starts with the milestone marker: a small
+      outlined badge with the letter "M" (text alternative "Milestone"), then the milestone's ID in
+      small type ("M T-195 A status page made for people"), so milestones stand out from tasks
+      without relying on colour. Other work has neither marker nor ID. In a window narrower than
+      560 px the ID is hidden, as for tasks; the marker stays.
     - A milestone's state is *finished <date>* when it is done (the date of its latest `done` note),
       *cancelled <date>* when it is dropped, *in progress* when a task below it is done, in
       progress or waiting, and *not started* otherwise. Unfinished milestones are open when the
@@ -1076,7 +1081,8 @@ with its word.
     latest `done` note; and a closed part "Technical details" with, where present: level, priority,
     type, area, files, the check (`verify`) and whether it passed (`verified`), commit, done by
     (`by`, else the last owner), depends (each with its title), attempts, and the notes. Empty
-    fields are left out. A milestone's details are its goal and summary.
+    fields are left out. A milestone's details are its goal and summary. From v1.1 a task's
+    details end with the closed part "Show chain" of R-REPORT-7, when it has a chain.
   - **More.** Three closed parts, each with a count in its heading:
     - *Ideas (n) — not planned yet*: the open ideas, one title per line (R-KIND-1). Left out when
       there are none.
@@ -1085,7 +1091,9 @@ with its word.
       its own Other work group. Left out when there is no archive.
     - *For the planner — levels, parallel waves, tasks that still need detail*: the planning state
       of R-REPORT-3 and the number of unfinished tasks per area (every task that is to do, in
-      progress or waiting, counted by its `area`).
+      progress or waiting, counted by its `area`). From v1.1 its headings are subheadings of this
+      part (`h3`, and `h4` below them), smaller than the page's section headings, so they do not
+      look like new sections of the page.
   - **Layout.** One column at most 820 px wide, system font; the bars and IDs are hidden in a window
     narrower than 560 px; readable when printed, with the buttons left out. Light and dark mode
     and the colours follow R-REPORT-6.
@@ -1094,6 +1102,11 @@ with its word.
   - Problems of the files (parse warnings) are printed as warnings with the path of the file; the
     page is still written.
   - All text from the file is HTML-escaped (tested with a title containing `<script>`).
+  - From v1.1 text between a pair of backticks in a title, goal, summary, why, result, reason,
+    note, idea, the description or a row of Needs you or Last 7 days is shown as code (a `code`
+    element, still HTML-escaped): `` `todo add` `` reads as `todo add` in a code font. A backtick
+    without a partner on the same text is shown as typed. IDs, files and the check command are
+    not changed.
   - With a fixed clock, the output for an invented fixture that has every state, a nested
     milestone, a question a task waits for, a task given back and a stale claim matches its
     snapshot.
@@ -1164,6 +1177,20 @@ with its word.
     do, in progress and waiting entries; Done and Cancelled show those states. Entries that don't
     match are hidden, and so is every milestone left without a visible entry; milestones that have
     one are opened. The pressed button is marked (`aria-pressed`). Then Expand all and Collapse all.
+  - From v1.1, when a view button leaves no visible entry, All work shows one line in words
+    instead of a blank space: "Nothing still to do." (Still to do), "Nothing done yet." (Done) or
+    "Nothing cancelled." (Cancelled). The line is in the page from the start, hidden, and the
+    script sets its text and shows or hides it.
+  - From v1.1, when the project has an archive, the controls of All work also have the toggle
+    button "Include archive" (`aria-pressed`). Pressed, it adds the archive's tree (the tree of
+    Earlier work) to All work, below the tree of `TODO.md`, under the line "From the archive";
+    every archived milestone stays closed until opened. The overall line then counts the tasks of
+    both files ("N of M tasks done, archive included", with the bar and legend of those numbers),
+    and the closed part Earlier work under More is hidden, since its tree now shows in All work.
+    The view buttons, Expand all and Collapse all work on the archived entries too. Pressed again,
+    everything is as before. The choice is remembered in the browser like the others (key
+    `todo-report-archive`). The page writes both overall lines, the second one hidden, so the
+    script only switches between them. Without an archive there is no such button.
   - Beside the header: one button that switches between light and dark mode ("Dark mode" or "Light
     mode", naming the mode it switches to) and one button "Colour-blind colours" that switches the
     colour set for red-green colour blindness on and off (`aria-pressed`).
@@ -1189,7 +1216,32 @@ with its word.
     `todo-report-cb`); a failure to read or store them is ignored.
   - It is one small inline script that names no address and loads nothing. Without scripts the page
     shows every entry in the system's mode with the normal colours of that mode, and the buttons
-    are hidden. The buttons are left out when printing.
+    are hidden. The buttons are left out when printing. Without scripts the archive stays under
+    Earlier work, as in v1.0.
+- **R-REPORT-7 COULD** From v1.1 a task's details show its chain on request: the tasks it waits for
+  and the tasks that wait for it, through `depends`, so a person sees why a task is where it is.
+  The main view does not change.
+  - It is a closed part "Show chain" at the end of an opened task's details (R-REPORT-1), after
+    Technical details. It needs no script. A task that has no `depends` and that no entry's
+    `depends` names has no such part. Milestones have none.
+  - Opened, it shows two groups. *Before this task*: one line per path through `depends` from a
+    task that waits for nothing (or whose dependencies are not found) to this task. *After this
+    task*: one line per path from this task through the entries whose `depends` name it, to an
+    entry that nothing waits for. A group with no path is left out.
+  - A line is a row of steps joined by "→", read from first to last:
+    "✓ T-001 Agree the lamp colour → ● T-005 Parse the map header → this task". Each step has its
+    state mark, its ID, its title and, as text for screen readers and print, its state in words;
+    a step from the archive adds "(archived)". The task itself is written as "this task". A
+    `depends` entry that names a milestone is a step with the milestone's state (finished,
+    cancelled, in progress or not started); the dependencies of the milestones above a task
+    (R-MILE-6) are not steps. An ID that names no entry is a step "T-999 (not found)", which ends
+    the path. A path that comes back to a step already on it ends with "… back to T-005".
+  - Each group shows at most 10 lines, and a path at most 12 steps (the steps nearest the task are
+    kept; a longer path starts with "…"). More lines are counted: "and 3 more paths".
+  - Both files are searched: `TODO.md` and `TODO-archive.md`. The work done for one task is
+    bounded by these limits, so the page stays within NFR-3 on the 5,000-entry file.
+  - Unit tests cover a straight chain, a branch, a step in the archive, a milestone step, an ID
+    that is not found, a loop, the limits, and a task without a chain.
 
 ```powershell
 todo report --html --open
@@ -1788,6 +1840,11 @@ With `TODO_REGISTER`, the lock and `report-all.html` sit next to the file it nam
   mode and colour-blind colours (R-REPORT-6), the planning state moved into For the planner
   (R-REPORT-3), the `summary` field (R-WRITE-19) and the `description` setting (R-CFG-2). The
   all-projects page (R-REPORT-2) keeps its v0.8 content. The format stays version 3.
+- **v1.1** — decided by the owner on 2026-11-22 after looking at this project's own page: a line in
+  words when a view button matches nothing, subheadings in For the planner (R-REPORT-1,
+  R-REPORT-6); text between backticks shown as code; the milestone marker with the milestone's ID
+  (R-REPORT-1); the toggle that adds the archive to All work (R-REPORT-6); and the chain of a task
+  on request (R-REPORT-7). The format stays version 3.
 
 ---
 
