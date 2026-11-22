@@ -4,7 +4,7 @@ All notable changes to `todo` are documented in this file.
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-11-21
+## [1.0.0] - 2026-11-22
 
 A status page made for people. `todo report --html` writes a new page for one project, built as the
 mockup the owner approved (`docs/report-mockup.html`): within a minute a person sees what is done,
