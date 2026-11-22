@@ -626,3 +626,4 @@ and what needs them. Problems found while using todo are fixed along the way.
 - owner: —
 - type: idea
 - note (2026-11-21, claude-main): added
+- note (2026-11-22, claude-main): Also seen in CI on main 2026-11-21 (run 44908893803, windows-latest): cmd_verify a_check_that_ends_normally_leaves_no_child_process_running failed at tests/cmd_verify.rs:1341; the same commit passed on dev. Both flakes are process timing in cmd_verify on Windows.
