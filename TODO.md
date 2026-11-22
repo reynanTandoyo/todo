@@ -584,6 +584,98 @@ and what needs them. Problems found while using todo are fixed along the way.
 - note (2026-11-21, claude-main): added
 - note (2026-11-21, t218-haiku): done — Last 7 days names a task done, a task cancelled and a single added entry by its summary when it has one, else by its title; R-REPORT-5 says so; 5 new unit tests and the report snapshot updated; 1041 tests pass across 105 test binaries.
 
+## v1.1: the status page, polished
+
+Small fixes the owner found on this project's own page, the archive shown in the same tree, and
+milestones that stand out from tasks.
+
+### T-220 · The status page, polished
+- status: open
+- owner: —
+- priority: P2 · type: milestone
+- goal: The page reads clearly on a finished project too: no blank views, one heading style, milestones that stand out, and the archive shown in the same tree on request
+- why: the owner looked at this project's own page after the 1.0.0 release (2026-11-22) and found these points
+- summary: Small improvements to the status page that the owner found on this project's own page after the 1.0 release.
+- note (2026-11-22, claude-main): added
+
+### T-221 · Requirements for the v1.1 page changes
+- status: open
+- owner: —
+- priority: P1 · difficulty: 3 · type: docs · area: docs
+- milestone: T-220
+- why: the five changes touch R-REPORT-1 and R-REPORT-6; the requirements must say exactly what to build before workers start
+- summary: Writes down exactly how the five page changes should look and behave before anyone builds them.
+- accept: docs/requirements.md describes: the text a filter shows when nothing matches; the planner part's inner headings as subheadings of For the planner; text between backticks in titles, summaries and ideas shown as code (still escaped); the milestone marker and ID on every milestone row; and the archive toggle (button, what it shows, the overall line with the archive, the page without scripts); section 11 lists v1.1; docs/report-mockup.html shows the milestone marker and the toggle
+- note (2026-11-22, claude-main): added
+
+### T-222 · A filter that matches nothing says so instead of leaving the tree blank
+- status: open
+- owner: —
+- priority: P2 · difficulty: 2 · type: bug · area: report
+- milestone: T-220
+- why: on a finished project Still to do and Cancelled leave All work completely empty, which looks broken
+- summary: When a view button matches nothing, the page says so instead of showing an empty space.
+- depends: T-221
+- accept: when Still to do, Done or Cancelled leaves no visible entry, All work shows one line in words (Nothing still to do. / Nothing done yet. / Nothing cancelled.) and hides it again for a filter that matches; a test covers the markup and the script names the texts
+- note (2026-11-22, claude-main): added
+
+### T-223 · For the planner uses subheadings, not main section headings
+- status: open
+- owner: —
+- priority: P2 · difficulty: 2 · type: bug · area: report
+- milestone: T-220
+- why: inside the closed part For the planner the old v0.8 code writes Planning and Unfinished tasks per area as main headings, which look like new sections of the page
+- summary: The headings inside the planner part look like part of it, not like new sections of the page.
+- depends: T-221
+- accept: the planning part and the per-area counts inside For the planner use h3 headings styled smaller than the page's section headings; the all-projects page (report --html --all) is unchanged; the snapshot is updated
+- note (2026-11-22, claude-main): added
+
+### T-224 · Text between backticks shows as code on the page
+- status: open
+- owner: —
+- priority: P2 · difficulty: 2 · type: bug · area: report
+- milestone: T-220
+- why: titles, summaries and ideas often name commands or fields in backticks, and the page shows the backticks as typed
+- summary: Commands and field names written between backticks look like code on the page instead of showing the backticks.
+- depends: T-221
+- accept: in titles, summaries, results, reasons and ideas on the one-project page, a pair of backticks around text becomes a code element with the text inside it, still HTML-escaped; an unpaired backtick stays as typed; tests cover a pair, two pairs, an unpaired backtick and a <script> inside backticks
+- note (2026-11-22, claude-main): added
+
+### T-225 · Milestones stand out: a marker and their ID on every milestone row
+- status: open
+- owner: —
+- priority: P2 · difficulty: 2 · type: feature · area: report
+- milestone: T-220
+- why: in the tree a milestone and a task differ only by a small triangle and bold text, so the structure is hard to see
+- summary: Milestones get a clear marker and their number, so the parts of the work are easy to tell from single tasks.
+- depends: T-221
+- accept: every milestone row in All work and Earlier work starts with a marker that says it is a milestone (as R-REPORT-1 describes it) and shows its ID in small type like tasks do; nested milestones are as clear as top-level ones; it works in all four colour sets and without colour; the snapshot is updated
+- note (2026-11-22, claude-main): added
+- note (2026-11-22, claude-main): Owner 2026-11-22: make the milestone (the tree's knot) more visible, for example with 'M - <ID>' in front of the title.
+
+### T-226 · A button shows the archived work in the All work tree
+- status: open
+- owner: —
+- priority: P2 · difficulty: 3 · type: feature · area: report
+- milestone: T-220
+- why: the owner wants to see the whole history in one tree, not only the work still in TODO.md
+- summary: One button adds everything that was finished earlier to the tree, so the whole history of the project can be seen in one place.
+- depends: T-221
+- accept: All work has a toggle button (Include archive, aria-pressed) that adds the archived milestones and tasks to the tree in the usual order (finished, closed) and makes the overall line count them too; the filters work on the archived entries as well; the choice is remembered like the colour choices; without scripts the page is as in v1.0 (the archive under Earlier work); tests cover the markup and the script
+- note (2026-11-22, claude-main): added
+- note (2026-11-22, claude-main): Owner 2026-11-22: a toggle button that also builds and shows the tree for the archived items.
+
+### T-227 · Release 1.1.0
+- status: open
+- owner: —
+- priority: P2 · difficulty: 2 · type: docs · area: release
+- milestone: T-220
+- why: the owner gets the polished page through a release
+- summary: Version 1.1.0 is released with the polished page.
+- depends: T-222, T-223, T-224, T-225, T-226
+- accept: README and todo help report describe the archive toggle and the milestone marker; CHANGELOG.md has the 1.1.0 entry; Cargo.toml is 1.1.0; all checks pass on Windows and Linux; the owner has looked at this project's page
+- note (2026-11-22, claude-main): added
+
 ## Questions
 
 ### T-206 · When the new page is built from a real project: can you and your colleague each say within a minute what is done, what was cancelled, what is left and what needs you? Answer after T-203, before the 1.0.0 release (T-205).
