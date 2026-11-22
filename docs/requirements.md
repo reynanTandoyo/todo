@@ -1232,12 +1232,15 @@ with its word.
     "✓ T-001 Agree the lamp colour → ● T-005 Parse the map header → this task". Each step has its
     state mark, its ID, its title and, as text for screen readers and print, its state in words;
     a step from the archive adds "(archived)". The task itself is written as "this task". A
-    `depends` entry that names a milestone is a step with the milestone's state (finished,
-    cancelled, in progress or not started); the dependencies of the milestones above a task
+    `depends` entry that names a milestone is a step with the milestone marker and the
+    milestone's state as the tree shows it (finished, cancelled, in progress or not started); a
+    question or an idea named in `depends` is a step with its status in the five words; the
+    dependencies of the milestones above a task
     (R-MILE-6) are not steps. An ID that names no entry is a step "T-999 (not found)", which ends
     the path. A path that comes back to a step already on it ends with "… back to T-005".
   - Each group shows at most 10 lines, and a path at most 12 steps (the steps nearest the task are
-    kept; a longer path starts with "…"). More lines are counted: "and 3 more paths".
+    kept; a longer path starts with "…"). More lines are counted, up to 100: "and 3 more paths",
+    or "and more than 100 more paths".
   - Both files are searched: `TODO.md` and `TODO-archive.md`. The work done for one task is
     bounded by these limits, so the page stays within NFR-3 on the 5,000-entry file.
   - Unit tests cover a straight chain, a branch, a step in the archive, a milestone step, an ID

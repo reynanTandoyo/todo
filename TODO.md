@@ -599,14 +599,17 @@ milestones that stand out from tasks.
 - note (2026-11-22, claude-main): added
 
 ### T-221 · Requirements for the v1.1 page changes
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P1 · difficulty: 3 · type: docs · area: docs
 - milestone: T-220
 - why: the five changes touch R-REPORT-1 and R-REPORT-6; the requirements must say exactly what to build before workers start
 - summary: Writes down exactly how the five page changes should look and behave before anyone builds them.
 - accept: docs/requirements.md describes: the text a filter shows when nothing matches; the planner part's inner headings as subheadings of For the planner; text between backticks in titles, summaries and ideas shown as code (still escaped); the milestone marker and ID on every milestone row; and the archive toggle (button, what it shows, the overall line with the archive, the page without scripts); section 11 lists v1.1; docs/report-mockup.html shows the milestone marker and the toggle
+- commit: 3b2c166
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-22, claude-main): done — Requirements and mockup for v1.1: milestone marker, planner subheadings, backticks as code, empty-filter line, Include archive toggle, and R-REPORT-7 Show chain.
 
 ### T-222 · A filter that matches nothing says so instead of leaving the tree blank
 - status: open
