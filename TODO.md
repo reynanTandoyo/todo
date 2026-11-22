@@ -614,82 +614,477 @@ milestones that stand out from tasks.
 ### T-222 · A filter that matches nothing says so instead of leaving the tree blank
 - status: open
 - owner: —
-- priority: P2 · difficulty: 2 · type: bug · area: report
+- priority: P2 · type: milestone · area: report
 - milestone: T-220
+- goal: A view button that matches nothing says so in words
 - why: on a finished project Still to do and Cancelled leave All work completely empty, which looks broken
 - summary: When a view button matches nothing, the page says so instead of showing an empty space.
 - depends: T-221
 - accept: when Still to do, Done or Cancelled leaves no visible entry, All work shows one line in words (Nothing still to do. / Nothing done yet. / Nothing cancelled.) and hides it again for a filter that matches; a test covers the markup and the script names the texts
 - note (2026-11-22, claude-main): added
+- note (2026-11-22, claude-main): split into T-230, T-231
+
+### T-230 · All work holds a hidden line for a view that matches nothing
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-222
+- why: the script needs a place in the page to write "Nothing still to do." and the like
+- summary: Prepares the line that tells the reader when a view button finds nothing.
+- files: src/report/page/html.rs, tests/cmd_report.rs, tests/snapshots/cmd_report__report_html.snap
+- read: docs/requirements.md
+- steps:
+  1. Read the bullet of R-REPORT-6 in docs/requirements.md that starts `From v1.1, when a view button leaves no visible entry`.
+  2. In src/report/page/html.rs, in fn push_all_work, directly after the call `push_tree(h, &page.tree, page.today);`, add `h.push_str("<p id=\"empty-view\" class=\"muted\" hidden></p>\n");`.
+  3. In tests/cmd_report.rs add a test `all_work_has_a_hidden_line_for_an_empty_view`: let tmp = TempDir::new().unwrap(); let (_work, html) = fixture_report(&tmp); assert that section(&html, "All work") contains `<p id="empty-view" class="muted" hidden></p>`.
+  4. Update the page snapshot: in PowerShell run `$env:INSTA_UPDATE='always'; cargo test --all-features --test cmd_report; Remove-Item Env:INSTA_UPDATE`, then read `git diff tests/snapshots/cmd_report__report_html.snap` and check that only lines this task means to change are different.
+  5. Run the four checks of AGENTS.md.
+- accept: All work ends with `<p id="empty-view" class="muted" hidden></p>` after the tree; the new test passes; the snapshot is updated
+- verify: cargo test --all-features --test cmd_report
+- note (2026-11-22, claude-main): added
+
+### T-231 · The script writes the line for a view that matches nothing
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-222
+- why: on a finished project Still to do and Cancelled leave All work blank, which looks broken
+- summary: When a view button finds nothing, the page now says so in words instead of showing an empty space.
+- depends: T-230
+- files: src/report/page/script.js, tests/cmd_report.rs
+- read: docs/requirements.md
+- steps:
+  1. Read the same bullet of R-REPORT-6 in docs/requirements.md, and fn applyFilter in src/report/page/script.js.
+  2. In src/report/page/script.js, after the line that defines `filterButtons`, add `var emptyView = document.getElementById('empty-view');` and `var EMPTY_TEXT = { left: 'Nothing still to do.', done: 'Nothing done yet.', drop: 'Nothing cancelled.' };`.
+  3. At the end of function applyFilter (after the loop that sets aria-pressed), add: `if (emptyView) { var none = filter !== 'all' && !tree.querySelector('li.item:not(.hide)'); emptyView.textContent = none ? EMPTY_TEXT[filter] : ''; emptyView.hidden = !none; }`.
+  4. In tests/cmd_report.rs add a test `the_script_names_the_texts_of_an_empty_view`: build the page with fixture_report, take the text between the last `<script>` and `</script>`, and assert it contains `empty-view`, `Nothing still to do.`, `Nothing done yet.` and `Nothing cancelled.`.
+  5. Run the four checks of AGENTS.md.
+- accept: the script shows Nothing still to do. / Nothing done yet. / Nothing cancelled. in the empty-view line when the pressed filter leaves no visible entry, and hides the line otherwise; the new test passes
+- verify: cargo test --all-features --test cmd_report
+- note (2026-11-22, claude-main): added
 
 ### T-223 · For the planner uses subheadings, not main section headings
 - status: open
 - owner: —
-- priority: P2 · difficulty: 2 · type: bug · area: report
+- priority: P2 · difficulty: 1 · type: bug · area: report
 - milestone: T-220
 - why: inside the closed part For the planner the old v0.8 code writes Planning and Unfinished tasks per area as main headings, which look like new sections of the page
 - summary: The headings inside the planner part look like part of it, not like new sections of the page.
-- depends: T-221
-- accept: the planning part and the per-area counts inside For the planner use h3 headings styled smaller than the page's section headings; the all-projects page (report --html --all) is unchanged; the snapshot is updated
+- depends: T-221,T-229
+- files: src/report/page/html.rs, tests/cmd_report_planning.rs, tests/snapshots/cmd_report__report_html.snap
+- read: docs/requirements.md
+- steps:
+  1. Read the sentence of R-REPORT-1 in docs/requirements.md that starts `From v1.1 its headings are subheadings of this part`.
+  2. In src/report/page/html.rs, fn push_planner: instead of writing push_planning and push_areas straight into h, write them into a new String `part`, then lower its headings by one level before adding it to h: replace `<h3>` with `<h4>` and `</h3>` with `</h4>` first, then `<h2>` with `<h3>` and `</h2>` with `</h3>`. Add a comment that escaped text never holds these tags, as fn push_earlier says. Do not change src/report/html.rs, so the all-projects page keeps its headings.
+  3. In tests/cmd_report_planning.rs, change the assertions that look for the planner's headings: `<h3>Open tasks per level</h3>` becomes `<h4>Open tasks per level</h4>`, and any `<h2>Planning` or `<h3>` heading of the planner part one level lower in the same way. Add one assertion that the planner part holds `<h3>Planning</h3>` and no `<h2>`.
+  4. Update the page snapshot: in PowerShell run `$env:INSTA_UPDATE='always'; cargo test --all-features --test cmd_report; Remove-Item Env:INSTA_UPDATE`, then read `git diff tests/snapshots/cmd_report__report_html.snap` and check that only lines this task means to change are different.
+  5. Run the four checks of AGENTS.md.
+- accept: inside For the planner the headings are h3 (Planning, Unfinished tasks per area) and h4 below them; the page's own section headings stay h2; src/report/html.rs and the all-projects page are unchanged; the planning tests check the new levels; the snapshot is updated
+- verify: cargo test --all-features --test cmd_report --test cmd_report_planning
 - note (2026-11-22, claude-main): added
 
 ### T-224 · Text between backticks shows as code on the page
 - status: open
 - owner: —
-- priority: P2 · difficulty: 2 · type: bug · area: report
+- priority: P2 · type: milestone · area: report
 - milestone: T-220
+- goal: Text between backticks shows as code everywhere on the page
 - why: titles, summaries and ideas often name commands or fields in backticks, and the page shows the backticks as typed
 - summary: Commands and field names written between backticks look like code on the page instead of showing the backticks.
 - depends: T-221
 - accept: in titles, summaries, results, reasons and ideas on the one-project page, a pair of backticks around text becomes a code element with the text inside it, still HTML-escaped; an unpaired backtick stays as typed; tests cover a pair, two pairs, an unpaired backtick and a <script> inside backticks
 - note (2026-11-22, claude-main): added
+- note (2026-11-22, claude-main): split into T-232, T-233, T-234
+
+### T-232 · A text helper that shows text between backticks as code
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-224
+- why: titles, summaries and ideas often name commands in backticks; the page needs one function that escapes text and turns those pairs into code
+- summary: Adds the small function that turns text written between backticks into code on the page.
+- files: src/report/page/text.rs, src/report/page/mod.rs
+- read: docs/requirements.md
+- steps:
+  1. Read the bullet of R-REPORT-1 in docs/requirements.md that starts `From v1.1 text between a pair of backticks`.
+  2. Create src/report/page/text.rs with a module doc comment (`//! Text from the task list as HTML (T-224; R-REPORT-1).`) and `pub fn inline_code(text: &str) -> String`. Use crate::report::html::escape for every piece of text. Walk the text: find a backtick; find the next backtick after it; if both exist and the text between them is not empty, write escape(text before), then `<code>`, escape(text between), `</code>`, and continue after the second backtick; otherwise write the rest escaped as it is (an unpaired or empty pair of backticks stays as typed, escaped).
+  3. Add `pub mod text;` to src/report/page/mod.rs next to the other `pub mod` lines.
+  4. In text.rs add #[cfg(test)] mod tests with: plain text is only escaped; `a `b` c` gives `a <code>b</code> c`; two pairs give two code elements; an unpaired backtick stays; two backticks with nothing between stay as typed; `<script>` between backticks is escaped inside the code element.
+  5. Run the four checks of AGENTS.md.
+- accept: src/report/page/text.rs has inline_code, which escapes text and turns each pair of backticks around non-empty text into a code element; an unpaired or empty pair stays as typed; unit tests cover each case
+- verify: cargo test --all-features --lib report::page
+- note (2026-11-22, claude-main): added
+
+### T-233 · The tree shows text between backticks as code
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-224
+- why: the tree is where most text from the task list appears
+- summary: Titles, goals, summaries, results, reasons and notes in the tree show commands as code.
+- depends: T-232
+- files: src/report/page/tree_html.rs, tests/snapshots/cmd_report__report_html.snap
+- read: docs/requirements.md
+- steps:
+  1. Read src/report/page/text.rs (fn inline_code) and src/report/page/tree_html.rs.
+  2. In src/report/page/tree_html.rs import `super::text::inline_code`. Replace `escape(...)` by `inline_code(...)` where these texts are written: the entry title in push_entry, the milestone title in push_summary (not the words Other work, which never hold backticks, but it does no harm), the goal, the text in push_labelled (summary, why, result), the reasons in second_line_html and waiting_html, and the note text in notes_html. Keep `escape` for IDs, owners, files, the check command, commit and every attribute value.
+  3. Add a unit test in tree_html.rs that builds an entry from invented text whose title is `Add the `--summary` option` and checks that the HTML holds `<code>--summary</code>`.
+  4. Update the page snapshot: in PowerShell run `$env:INSTA_UPDATE='always'; cargo test --all-features --test cmd_report; Remove-Item Env:INSTA_UPDATE`, then read `git diff tests/snapshots/cmd_report__report_html.snap` and check that only lines this task means to change are different.
+  5. Run the four checks of AGENTS.md.
+- accept: every title, goal, summary, why, result, reason and note in the tree goes through inline_code; IDs, files and the check stay escaped only; a unit test covers a title with backticks
+- verify: cargo test --all-features --lib report::page
+- note (2026-11-22, claude-main): added
+
+### T-234 · Needs you, Last 7 days, ideas and the description show text between backticks as code
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-224
+- why: the same text appears in Needs you, Last 7 days and Ideas
+- summary: The other parts of the page show commands written between backticks as code too.
+- depends: T-232
+- files: src/report/page/html.rs, tests/cmd_report.rs, tests/snapshots/cmd_report__report_html.snap
+- read: docs/requirements.md
+- steps:
+  1. Read src/report/page/text.rs (fn inline_code) and src/report/page/html.rs.
+  2. In src/report/page/html.rs import `super::text::inline_code`. Replace `escape(...)` by `inline_code(...)` for: the description in push_header, the titles and texts of the rows in push_need, the row texts in push_recent_rows and event_html, and each idea in push_more. Keep `escape` for the page title in <title>, attribute values and IDs.
+  3. In tests/cmd_report.rs add a test `ideas_show_text_between_backticks_as_code`: write a small invented TODO.md (start it with the line `<!-- TEST FIXTURE: invented data, not a real task list -->`, then `<!-- todo-format: 3 -->`, a `# Title`, a `## Ideas` section and one idea `### T-001 · Try `todo add --template bug`` with `- status: open`, `- owner: —`, `- type: idea`), run the report with the helper `report`, and assert the page holds `<code>todo add --template bug</code>`. Look at the existing tests for how they set up a project (setup helpers in tests/common).
+  4. Update the page snapshot: in PowerShell run `$env:INSTA_UPDATE='always'; cargo test --all-features --test cmd_report; Remove-Item Env:INSTA_UPDATE`, then read `git diff tests/snapshots/cmd_report__report_html.snap` and check that only lines this task means to change are different.
+  5. Run the four checks of AGENTS.md.
+- accept: the description, Needs you rows, Last 7 days rows and ideas go through inline_code; the new test passes; the snapshot is updated
+- verify: cargo test --all-features --test cmd_report
+- note (2026-11-22, claude-main): added
 
 ### T-225 · Milestones stand out: a marker and their ID on every milestone row
 - status: open
 - owner: —
-- priority: P2 · difficulty: 2 · type: feature · area: report
+- priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-220
 - why: in the tree a milestone and a task differ only by a small triangle and bold text, so the structure is hard to see
 - summary: Milestones get a clear marker and their number, so the parts of the work are easy to tell from single tasks.
-- depends: T-221
-- accept: every milestone row in All work and Earlier work starts with a marker that says it is a milestone (as R-REPORT-1 describes it) and shows its ID in small type like tasks do; nested milestones are as clear as top-level ones; it works in all four colour sets and without colour; the snapshot is updated
+- depends: T-221,T-229
+- files: src/report/page/tree_html.rs, tests/cmd_report.rs, tests/snapshots/cmd_report__report_html.snap
+- read: docs/requirements.md, docs/report-mockup.html
+- steps:
+  1. Read the bullet of R-REPORT-1 in docs/requirements.md that starts `From v1.1 every milestone row`, and a milestone row of docs/report-mockup.html (span.ms-mark and span.ms-id before span.ms-title).
+  2. In src/report/page/tree_html.rs, give fn push_summary one more parameter `id: Option<&str>` after `h`. When it is Some(id), write `<span class=\"ms-mark\" role=\"img\" aria-label=\"Milestone\">M</span><span class=\"ms-id\">{escaped id}</span>` directly after `<summary>` and before the ms-title span. push_milestone passes `Some(&milestone.id)`; push_other_work passes None.
+  3. Add unit tests in the tests module of tree_html.rs: a milestone row holds the marker and its ID before its title; a nested milestone has them too; the Other work row has neither.
+  4. In tests/cmd_report.rs, run the tests and fix any assertion that expects `<summary><span class=\"ms-title\">` directly for a milestone, so it allows the marker and ID in front; do not weaken other checks.
+  5. Update the page snapshot: in PowerShell run `$env:INSTA_UPDATE='always'; cargo test --all-features --test cmd_report; Remove-Item Env:INSTA_UPDATE`, then read `git diff tests/snapshots/cmd_report__report_html.snap` and check that only lines this task means to change are different.
+  6. Run the four checks of AGENTS.md.
+- accept: every milestone row in All work and Earlier work, nested ones too, starts with the marker M (aria-label Milestone) and the milestone's ID before its title; Other work has neither; unit tests cover it; the snapshot is updated
+- verify: cargo test --all-features --test cmd_report --lib report::page
 - note (2026-11-22, claude-main): added
 - note (2026-11-22, claude-main): Owner 2026-11-22: make the milestone (the tree's knot) more visible, for example with 'M - <ID>' in front of the title.
 
 ### T-226 · A button shows the archived work in the All work tree
 - status: open
 - owner: —
-- priority: P2 · difficulty: 3 · type: feature · area: report
+- priority: P2 · type: milestone · area: report
 - milestone: T-220
+- goal: One button adds the archive to All work and to the overall line
 - why: the owner wants to see the whole history in one tree, not only the work still in TODO.md
 - summary: One button adds everything that was finished earlier to the tree, so the whole history of the project can be seen in one place.
 - depends: T-221
 - accept: All work has a toggle button (Include archive, aria-pressed) that adds the archived milestones and tasks to the tree in the usual order (finished, closed) and makes the overall line count them too; the filters work on the archived entries as well; the choice is remembered like the colour choices; without scripts the page is as in v1.0 (the archive under Earlier work); tests cover the markup and the script
 - note (2026-11-22, claude-main): added
 - note (2026-11-22, claude-main): Owner 2026-11-22: a toggle button that also builds and shows the tree for the archived items.
+- note (2026-11-22, claude-main): split into T-235, T-236, T-237, T-238
+
+### T-235 · Page data counts the tasks of TODO.md and the archive together
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-226
+- why: the overall line with the archive included needs counts over both files
+- summary: Prepares the numbers the overall line shows when the archive is included.
+- files: src/report/page/tree.rs, src/report/page/mod.rs
+- read: docs/requirements.md
+- steps:
+  1. Read the bullet of R-REPORT-6 in docs/requirements.md that starts `From v1.1, when the project has an archive`.
+  2. In src/report/page/tree.rs, in `impl Counts`, add `#[must_use] pub const fn plus(self, other: Self) -> Self` that adds each of the five fields. Add a unit test for it in the tests module of tree.rs.
+  3. In src/report/page/mod.rs add to PageData the field `pub counts_with_archive: Option<tree::Counts>` with the doc comment `The overall counts over TODO.md and the archive together (R-REPORT-6, Include archive); None without an archive.` In fn build, set it to `earlier.as_ref().map(|e| tree.counts.plus(e.tree.counts))`: build `earlier` into a local variable before the PageData literal so both fields can use it.
+  4. Run the four checks of AGENTS.md.
+- accept: Counts has plus; PageData has counts_with_archive, the sum of the counts of TODO.md and the archive, None without an archive; a unit test covers plus
+- verify: cargo test --all-features --lib report::page
+- note (2026-11-22, claude-main): added
+
+### T-236 · The page writes a second, hidden overall line with the archive included
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-226
+- why: the script only switches between two overall lines; the page must already hold both
+- summary: Adds the overall numbers for the whole history, shown when the archive is included.
+- depends: T-235
+- files: src/report/page/html.rs, tests/cmd_report.rs, tests/snapshots/cmd_report__report_html.snap
+- read: docs/requirements.md
+- steps:
+  1. Read the same bullet of R-REPORT-6 and fn push_overall in src/report/page/html.rs.
+  2. Give push_overall two more parameters: `id: &str` and `with_archive: bool`. It opens the block with `<div class="overall" id="{id}"` followed by ` hidden` when with_archive is true, then `>`. The first line reads `{done} of {total} tasks done` as now, and with with_archive true `{done} of {total} tasks done, archive included`.
+  3. In fn render, call `push_overall(h, &page.counts, "overall-now", false)`, and directly after it, when `page.counts_with_archive` is Some(counts), `push_overall(h, &counts, "overall-all", true)`.
+  4. In tests/cmd_report.rs add a test `the_overall_line_with_the_archive_is_in_the_page_and_hidden`: with fixture_report (which has an archive) assert the page holds `id="overall-now"` and `<div class="overall" id="overall-all" hidden>` and `tasks done, archive included`; and with a project without an archive (see the existing test that leaves the archive out) assert it holds no `overall-all`.
+  5. Update the page snapshot: in PowerShell run `$env:INSTA_UPDATE='always'; cargo test --all-features --test cmd_report; Remove-Item Env:INSTA_UPDATE`, then read `git diff tests/snapshots/cmd_report__report_html.snap` and check that only lines this task means to change are different.
+  6. Run the four checks of AGENTS.md.
+- accept: the page has the overall line with id overall-now and, with an archive, a hidden second one with id overall-all that counts both files and says archive included; tests cover both cases
+- verify: cargo test --all-features --test cmd_report
+- note (2026-11-22, claude-main): added
+
+### T-237 · The Include archive button and a movable archive tree
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-226
+- why: the script moves the archive's tree into All work; the markup must give it IDs and a label
+- summary: Adds the button and gives the archived tree what it needs to move into All work.
+- depends: T-236
+- files: src/report/page/html.rs, tests/cmd_report.rs, tests/snapshots/cmd_report__report_html.snap
+- read: docs/requirements.md
+- steps:
+  1. Read the same bullet of R-REPORT-6, fn push_all_work and fn push_earlier in src/report/page/html.rs.
+  2. In push_all_work, when `page.earlier.is_some()`, write `<button id="arch" type="button" aria-pressed="false">Include archive</button>\n` directly after the Cancelled button (before `<span class="sp"></span>`). Split the one string literal into two pushes to do that.
+  3. In push_earlier: open the fold as `<details class="fold" id="earlier">` instead of `<details class="fold">`; change the replacement of `<div id="tree">` so it becomes `<div class="tree" id="arch-tree">\n<p class="arch-label">From the archive</p>`.
+  4. In tests/cmd_report.rs add a test `the_archive_has_a_toggle_and_a_movable_tree`: with fixture_report assert the controls hold `<button id="arch"` and the text `Include archive`, the page holds `id="earlier"`, `id="arch-tree"` and `From the archive`; with a project without an archive assert there is no `id="arch"`.
+  5. Update the page snapshot: in PowerShell run `$env:INSTA_UPDATE='always'; cargo test --all-features --test cmd_report; Remove-Item Env:INSTA_UPDATE`, then read `git diff tests/snapshots/cmd_report__report_html.snap` and check that only lines this task means to change are different.
+  6. Run the four checks of AGENTS.md.
+- accept: with an archive All work has the button Include archive (id arch, aria-pressed false), Earlier work has id earlier and its tree id arch-tree with the label From the archive; without an archive there is no button; tests cover both
+- verify: cargo test --all-features --test cmd_report
+- note (2026-11-22, claude-main): added
+
+### T-238 · The script adds the archive to All work when Include archive is pressed
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-226
+- why: the owner wants to see the whole history in one tree
+- summary: One button now shows everything finished earlier in the same tree, with the overall numbers for the whole history.
+- depends: T-237
+- files: src/report/page/script.js, tests/cmd_report.rs
+- read: docs/requirements.md
+- steps:
+  1. Read the same bullet of R-REPORT-6 and the whole of src/report/page/script.js.
+  2. After the line that defines `tree`, add: `var archButton = document.getElementById('arch'); var archTree = document.getElementById('arch-tree'); var earlierFold = document.getElementById('earlier'); var overallNow = document.getElementById('overall-now'); var overallAll = document.getElementById('overall-all'); var ARCH_KEY = 'todo-report-archive'; var archiveIncluded = false; var currentFilter = 'all';`.
+  3. Add `function workItems(selector)`: it returns an array of the elements matching selector inside `tree`, followed by those inside `archTree` when `archiveIncluded` is true (use Array.prototype.slice.call on each querySelectorAll result and concat).
+  4. In applyFilter, set `currentFilter = filter;` first; replace `tree.querySelectorAll('li.item')` and `tree.querySelectorAll('details.ms')` by `workItems('li.item')` and `workItems('details.ms')`; in the empty-view check use `!workItems('li.item:not(.hide)').length` instead of `!tree.querySelector('li.item:not(.hide)')`. In the Expand all and Collapse all handlers use `workItems('details.ms')` and `workItems('details')` instead of the tree queries.
+  5. Add `function setArchive(on)`: if `!archButton || !archTree` return; archiveIncluded = on; when on, insert archTree directly after tree (`tree.parentNode.insertBefore(archTree, tree.nextSibling)`), else append it back to earlierFold (`earlierFold.appendChild(archTree)`); `earlierFold.hidden = on`; when both overall lines exist, `overallNow.hidden = on` and `overallAll.hidden = !on`; set aria-pressed on archButton; then `applyFilter(currentFilter)`.
+  6. After the filter buttons get their click handlers, add: `if (archButton) { setArchive(load(ARCH_KEY) === 'on'); archButton.addEventListener('click', function () { var on = !archiveIncluded; setArchive(on); save(ARCH_KEY, on ? 'on' : 'off'); }); }`.
+  7. In tests/cmd_report.rs add a test `the_script_moves_the_archive_into_all_work`: the script text holds `todo-report-archive`, `arch-tree`, `overall-all` and `function setArchive`.
+  8. Run the four checks of AGENTS.md.
+- accept: pressing Include archive moves the archive's tree into All work below the tree of TODO.md, hides Earlier work, switches the overall line to the one with the archive, applies the current filter to both trees and remembers the choice under todo-report-archive; pressing it again puts everything back; Expand all, Collapse all and the empty-view line cover the archive too; the test passes
+- verify: cargo test --all-features --test cmd_report
+- note (2026-11-22, claude-main): added
 
 ### T-227 · Release 1.1.0
 - status: open
 - owner: —
-- priority: P2 · difficulty: 2 · type: docs · area: release
+- priority: P2 · type: milestone · area: release
 - milestone: T-220
+- goal: Version 1.1.0 is released with the polished page
 - why: the owner gets the polished page through a release
 - summary: Version 1.1.0 is released with the polished page.
 - depends: T-222, T-223, T-224, T-225, T-226, T-228
 - accept: README and todo help report describe the archive toggle and the milestone marker; CHANGELOG.md has the 1.1.0 entry; Cargo.toml is 1.1.0; all checks pass on Windows and Linux; the owner has looked at this project's page
 - note (2026-11-22, claude-main): added
+- note (2026-11-22, claude-main): split into T-245, T-246
+
+### T-245 · Help text and README describe the v1.1 page
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: docs · area: docs
+- milestone: T-227
+- why: people and agents learn about the page from the README and todo help report
+- summary: The help and the README explain the milestone marker, the archive button and the chain.
+- files: README.md, src/cli/report.rs, tests/snapshots/cli_basic__cli_overview_json.snap
+- read: docs/requirements.md
+- steps:
+  1. Read the v1.1 bullets of R-REPORT-1, R-REPORT-6 and R-REPORT-7 in docs/requirements.md.
+  2. In src/cli/report.rs, in the `details` text of META, add one sentence each for: the milestone marker M with the ID; Include archive, which adds the archive's tree to All work and counts it in the overall line; Show chain in a task's details; the line shown when a view button matches nothing. Keep the summary line unless a test requires otherwise.
+  3. In README.md, in the section 'HTML report for people' (and in the part for people near the top if it lists the buttons), add the same four points in plain words.
+  4. Run cargo test --all-features; if a help snapshot changes, update it the same way (INSTA_UPDATE=always for that test) and read the diff.
+  5. Run the four checks of AGENTS.md.
+- accept: todo help report and the README describe the milestone marker, Include archive, Show chain and the empty-view line; all tests pass
+- verify: cargo test --all-features
+- note (2026-11-22, claude-main): added
+
+### T-246 · Version 1.1.0 and changelog
+- status: open
+- owner: —
+- priority: P2 · difficulty: 2 · type: docs · area: release
+- milestone: T-227
+- why: the owner gets the polished page through a release
+- summary: Version 1.1.0 is released with the polished page.
+- final: The release is done by the planner: version, changelog, checks on both systems and the owner's look before tagging.
+- depends: T-245
+- files: Cargo.toml, CHANGELOG.md, docs/json.md
+- read: docs/requirements.md
+- steps:
+  1. The planner does this task: version 1.1.0 in Cargo.toml, Cargo.lock and the examples of docs/json.md, the changelog entry, the overview snapshot, all checks on Windows and Linux, and the owner's look at this project's page before tagging.
+- accept: Cargo.toml is 1.1.0; CHANGELOG.md has the 1.1.0 entry; all checks pass on Windows and Linux; the owner has looked at this project's page
+- verify: cargo test --all-features
+- note (2026-11-22, claude-main): added
 
 ### T-228 · Show chain: each task can show the chain of tasks it waits for and that wait for it
 - status: open
 - owner: —
-- priority: P2 · difficulty: 3 · type: feature · area: report
+- priority: P2 · type: milestone · area: report
 - milestone: T-220
+- goal: Each task shows, on request, the chain of tasks before and after it
 - why: the owner wants to see why a task is where it is: which tasks must finish before it and which wait for it, without cluttering the main view
 - summary: Each task can show, on request, the chain of tasks that come before it and after it, with the state of each one.
 - depends: T-221
 - accept: inside an opened entry (next to Technical details, closed by default, so the main view does not change) a part Show chain lists the tasks it waits for, through every level of depends, and the tasks that wait for it, as chains in order such as T-001 ✓ → T-005 ● → this task → T-112 ○, each step with its mark, ID, title and state in words; milestones in the way count as R-MILE-6 says; dependencies on archived entries show their state and are marked archived; a task without dependencies in either direction shows no Show chain part; branches (a task that waits for two) are shown as separate lines, at most 10 lines, with the rest counted; works without scripts; unit tests cover a straight chain, a branch, an archived step, a missing ID and a cycle
 - note (2026-11-22, claude-main): added
 - note (2026-11-22, claude-main): Owner 2026-11-22: emphasise the chain of a todo item without cluttering the main view; a 'show chain' button per task showing e.g. T001 -> T005 -> T112 with the status of each item. T-221 decides the exact form and draws it in the mockup.
+- note (2026-11-22, claude-main): split into T-239, T-240, T-241, T-242, T-243, T-244
+
+### T-239 · Chain data: the steps and an index of every entry
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-228
+- why: the chain of each task is found through depends in both files; one index built once keeps the page fast
+- summary: Prepares what the page needs to know about every entry to draw the chain of a task.
+- files: src/report/page/chain.rs, src/report/page/mod.rs
+- read: docs/requirements.md, src/report/page/entry.rs, src/report/page/tree.rs
+- steps:
+  1. Read R-REPORT-7 in docs/requirements.md, and in src/report/page/entry.rs fn entry_view, fn dependencies and the Ctx struct (to see how depends are read and IDs are written).
+  2. Create src/report/page/chain.rs with the module doc comment `//! The chain of a task (T-228; R-REPORT-7): the tasks it waits for and the tasks that wait for it.` and add `pub mod chain;` to src/report/page/mod.rs.
+  3. Define in src/report/page/chain.rs, each with `#[derive(Debug, Clone, PartialEq, Eq)]` and a doc comment: `pub enum StepState { Task(State), Milestone(MilestoneState), NotFound }`; `pub struct Step { pub id: String, pub title: String, pub state: StepState, pub archived: bool }` (title is empty when not found); `pub enum PathEnd { Open, Loop(String) }` (Loop names the ID the path came back to); `pub struct Path { pub steps: Vec<Step>, pub cut: bool, pub end: PathEnd }` (cut is true when steps far from the task were left out); `pub struct Chain { pub before: Vec<Path>, pub more_before: usize, pub after: Vec<Path>, pub more_after: usize }`. State is super::entry::State and MilestoneState is super::tree::MilestoneState.
+  4. Add `pub struct ChainIndex` (derive Debug, Default) with private fields: `nodes: HashMap<String, Node>` and `dependents: HashMap<String, Vec<String>>`, where `struct Node { title: String, archived: bool, milestone: bool, state: State, milestone_state: Option<MilestoneState>, depends: Vec<String> }` (derive Debug, Clone).
+  5. Add `pub fn new(doc: &Document, archive: Option<&Document>, ctx: &Ctx<'_>) -> Self`: for every task of doc (archived false) and then of the archive (archived true), the key is the canonical ID (ctx.cfg.id_config.format_id), the state is `entry_view(task, ctx).state`, milestone is `task.kind() == EntryKind::Milestone`, and depends are the canonical IDs of its depends, read the same way fn dependencies in entry.rs reads them. An ID already in the map is not replaced (TODO.md wins). For every depends ID d of an entry e, push e's ID to `dependents[d]` in file order.
+  6. Add `pub fn set_milestone_states(&mut self, tree: &Tree)`: walk tree.milestones and their nested milestones recursively and set `milestone_state = Some(view.state)` on the node with the same ID.
+  7. Add `pub fn step(&self, id: &str) -> Step`: a known node gives its title, archived flag and StepState::Milestone(state) when it is a milestone with a milestone_state, else StepState::Task(state); an unknown ID gives an empty title and StepState::NotFound.
+  8. Add unit tests (invented text parsed into a Document, as the other tests of this module folder do): the index finds a task of TODO.md and one of the archive (archived true); dependents lists the entries that name an ID; step of an unknown ID is NotFound; a milestone step after set_milestone_states carries the milestone state.
+  9. Run the four checks of AGENTS.md.
+- accept: src/report/page/chain.rs has StepState, Step, PathEnd, Path, Chain and ChainIndex with new, set_milestone_states and step; the index covers both files, TODO.md first; unit tests cover each point
+- verify: cargo test --all-features --lib report::page
+- note (2026-11-22, claude-main): added
+
+### T-240 · Chain data: the paths before and after a task, with their limits
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-228
+- why: the page shows at most 10 paths of at most 12 steps each way, and counts the rest
+- summary: Works out, for one task, every path of tasks that leads to it and away from it, within fixed limits.
+- depends: T-239
+- files: src/report/page/chain.rs
+- read: docs/requirements.md
+- steps:
+  1. Read R-REPORT-7 in docs/requirements.md (the bullets about the two groups, a line, and the limits) and src/report/page/chain.rs.
+  2. Add constants `MAX_LINES: usize = 10`, `MAX_STEPS: usize = 12`, `MAX_COUNTED: usize = 101` with doc comments naming R-REPORT-7.
+  3. Add `pub fn chain_of(&self, id: &str) -> Option<Chain>`: return None when the node has no depends and no dependents. Otherwise fill `before` and `after` as below.
+  4. Before: a depth-first walk from the task over depends. Keep the current path as a Vec<String> of IDs, starting empty. For the node at the end of the path (the task itself at the start), look at its depends: when it has none, or the ID is unknown (not found), the path is complete. For each dependency d in order: if d is the task itself or already in the path, record the path plus d with PathEnd::Loop(d); else push d and continue from it. When the path reaches MAX_STEPS IDs, record it with cut = true instead of going deeper. A recorded path's steps are the IDs reversed (the start first, the direct dependency last), each turned into a Step with self.step. A not-found ID is a step of its own and ends its path.
+  5. After: the same walk over `dependents` instead of depends, from the task outwards; the steps are not reversed (the direct dependent first).
+  6. Counting: keep the first MAX_LINES recorded paths in the Vec; count every recorded path; stop the walk as soon as the count reaches MAX_LINES + MAX_COUNTED. more_before (and more_after) is the count minus the kept lines, so a value of MAX_COUNTED or more means more than 100.
+  7. Unit tests: a straight chain A <- B <- C gives for C one before path [A, B] and for A one after path [B, C]; a branch (C depends on A and B) gives two before paths; a step in the archive is archived; a milestone in depends is a milestone step; an unknown ID gives a NotFound step that ends its path; A depends on B and B on A gives a Loop end; 15 tasks that all wait for one task give 10 after paths and more_after 5; a 20-long chain gives a cut path of 12 steps holding the 12 nearest IDs; a task without depends and dependents gives None.
+  8. Run the four checks of AGENTS.md.
+- accept: chain_of returns None for a task with no depends and no dependents, and otherwise the before paths (start first) and after paths (nearest first), each at most 12 steps (cut keeps the nearest), loops ended with Loop, unknown IDs as NotFound steps, at most 10 paths per group with the rest counted up to 101; unit tests cover each rule
+- verify: cargo test --all-features --lib report::page
+- note (2026-11-22, claude-main): added
+
+### T-241 · Every task on the page carries its chain
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-228
+- why: the HTML of an entry is written from its EntryView, so the chain must be part of it
+- summary: Connects the chain to every task in the tree and in the archive.
+- depends: T-240
+- files: src/report/page/entry.rs, src/report/page/mod.rs, src/report/page/chain.rs
+- read: docs/requirements.md
+- steps:
+  1. Read src/report/page/chain.rs, the struct EntryView in src/report/page/entry.rs and fn build in src/report/page/mod.rs.
+  2. In entry.rs add to EntryView the field `pub chain: Option<super::chain::Chain>` with the doc comment `The chain of R-REPORT-7, filled in by chain::fill_chains; None in entry_view.`, and set `chain: None` in the EntryView literal of fn entry_view.
+  3. In chain.rs add `pub fn fill_chains(tree: &mut Tree, index: &ChainIndex)`: for every EntryView in tree.other and in the tasks of every milestone at any depth, set `entry.chain = index.chain_of(&entry.id)`.
+  4. In mod.rs fn build: build tree and earlier into local variables first (earlier may already be one); then `let mut index = chain::ChainIndex::new(doc, archive, &ctx); index.set_milestone_states(&tree);` and the same for the earlier tree when there is one; then `chain::fill_chains(&mut tree, &index)` and the same for `&mut earlier.tree`; then build the PageData literal with them. The overall counts are read before or after; they do not change.
+  5. Add a unit test in chain.rs: after fill_chains on a tree of invented text, a task that depends on another has Some chain and a task without depends or dependents has None.
+  6. Run the four checks of AGENTS.md.
+- accept: EntryView has chain; fill_chains sets it for every task of the tree and of the archive's tree; build fills both with one index; a unit test covers it
+- verify: cargo test --all-features --lib report::page
+- note (2026-11-22, claude-main): added
+
+### T-242 · Chain HTML: the closed part Show chain
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-228
+- why: the chain must not clutter the main view, so it is a closed part inside a task's details
+- summary: Draws the chain of a task as short lines of marked steps, hidden until the reader opens it.
+- depends: T-240
+- files: src/report/page/chain_html.rs, src/report/page/mod.rs
+- read: docs/requirements.md, docs/report-mockup.html
+- steps:
+  1. Read R-REPORT-7 in docs/requirements.md and the opened chain at the end of the T-211 entry in docs/report-mockup.html (details.chain, p.lbl, p.chain-line, span.sr), and src/report/page/chain.rs.
+  2. Create src/report/page/chain_html.rs with a module doc comment naming T-228 and R-REPORT-7, and add `pub mod chain_html;` to src/report/page/mod.rs. Escape every text with crate::report::html::escape.
+  3. Write `pub fn push_chain(h: &mut String, chain: &Chain)`: `<details class="chain"><summary>Show chain</summary>`; when before is not empty, `<p class="lbl">Before this task</p>` and one `<p class="chain-line">` per path, its steps joined by ` → `, then ` → <b>this task</b>`; when after is not empty, `<p class="lbl">After this task</p>` and per path `<b>this task</b> → ` then the steps joined by ` → `; after each group with more paths, `<p class="muted">and N more paths</p>` (N = more), or `and more than 100 more paths` when more is 101 or more, or `and 1 more path` for one; then `</details>`.
+  4. A step is: for a task `<span class="mark {class}">{mark}</span> <span class="cid">{id}</span> {title} <span class="sr">({word})</span>` with State::class, mark and word; for a milestone `<span class="ms-mark" role="img" aria-label="Milestone">M</span> <span class="cid">{id}</span> {title} <span class="muted">({state words})</span>` with not started / in progress / finished / cancelled; for NotFound `<span class="cid">{id}</span> <span class="muted">(not found)</span>`. An archived step adds ` <span class="muted">(archived)</span>`. A cut path starts with `… → `. A path with PathEnd::Loop(id) ends with ` → … back to <span class="cid">{id}</span>` (after the steps, before `→ <b>this task</b>` in a before line; at the end of an after line).
+  5. Unit tests with hand-built Chain values: one before and one after line in order; a milestone step; a not-found step; an archived step; a cut path; a loop; the more texts for 1, 5 and 101; a title with <script> is escaped. Never use the class `id` for an ID in a chain (other tests count `class="id"` per entry).
+  6. Run the four checks of AGENTS.md.
+- accept: src/report/page/chain_html.rs writes the closed part Show chain with the groups Before this task and After this task, each line of marked steps joined by arrows with this task in bold, milestone, archived, not-found, cut and loop steps as R-REPORT-7 says, and the more texts; unit tests cover each case
+- verify: cargo test --all-features --lib report::page
+- note (2026-11-22, claude-main): added
+
+### T-243 · Opened tasks show their chain
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-228
+- why: this puts the chain on the page
+- summary: Each task's details end with Show chain when the task has one.
+- depends: T-241, T-242
+- files: src/report/page/tree_html.rs, tests/cmd_report.rs, tests/snapshots/cmd_report__report_html.snap
+- read: docs/requirements.md
+- steps:
+  1. Read fn push_details in src/report/page/tree_html.rs and fn push_chain in src/report/page/chain_html.rs.
+  2. In push_details, after the technical details are added to the details body, add: when `entry.chain` is Some(chain), call `super::chain_html::push_chain(&mut body, chain)` (use the same String the technical details go into, so the chain is the last part of the opened details). If push_details writes nothing when body is empty, keep that rule.
+  3. In tests/cmd_report.rs add a test `a_task_with_dependencies_shows_its_chain`: build the page with fixture_report; assert it holds `<details class="chain"><summary>Show chain</summary>` at least once and that a task of the fixture that has `depends` (look in tests/fixtures/report_page.md) shows `this task` in its row.
+  4. Update the page snapshot: in PowerShell run `$env:INSTA_UPDATE='always'; cargo test --all-features --test cmd_report; Remove-Item Env:INSTA_UPDATE`, then read `git diff tests/snapshots/cmd_report__report_html.snap` and check that only lines this task means to change are different.
+  5. Run the four checks of AGENTS.md.
+- accept: a task with a chain has the closed part Show chain at the end of its details; a task without one has none; the test passes and the snapshot is updated
+- verify: cargo test --all-features --test cmd_report
+- note (2026-11-22, claude-main): added
+
+### T-244 · The page with chains stays within the speed and size limits
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: test · area: report
+- milestone: T-228
+- why: chains add work and HTML for every task; NFR-3 still holds
+- summary: Checks that adding chains keeps the page fast and small on a very large task list.
+- depends: T-243
+- files: tests/perf.rs
+- read: docs/requirements.md
+- steps:
+  1. Read NFR-3 in docs/requirements.md and the report test in tests/perf.rs.
+  2. Run `cargo test --release --all-features --test perf -- --ignored --nocapture` three times and write down the time and the size of report --html.
+  3. If the page is under 500 ms and under 5 MB, change nothing in tests/perf.rs and put the numbers in the done note. If it is over a limit, do not raise the limit: run `todo stuck` with the numbers.
+  4. Run the four checks of AGENTS.md.
+- accept: report --html on the 5,000-entry milestone tree is still under 500 ms and 5 MB with chains, measured three times in a release build; the numbers are in the done note
+- verify: cargo test --release --all-features --test perf -- --ignored
+- note (2026-11-22, claude-main): added
+
+### T-229 · Stylesheet rules for the v1.1 page
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: feature · area: report
+- milestone: T-220
+- why: every v1.1 page part needs its CSS; writing it in one place first keeps the other tasks to their markup
+- summary: Adds the look of the new page parts: the milestone badge, code text, the chain and the archive line.
+- depends: T-221
+- files: src/report/page/style.css, tests/snapshots/cmd_report__report_html.snap
+- read: docs/requirements.md, docs/report-mockup.html
+- steps:
+  1. Read the v1.1 bullets of R-REPORT-1, R-REPORT-6 and R-REPORT-7 in docs/requirements.md, and the rules at the end of the style block of docs/report-mockup.html (.ms-mark, .ms-id, details.chain, .chain-line, .sr).
+  2. Open src/report/page/style.css. Directly before the line that starts with `@media (max-width:560px)`, add these rules, each on its own line: `.page h4{font-size:13px; margin:12px 0 4px}` ; `.page code{font-family:ui-monospace,Consolas,monospace; font-size:.92em; background:var(--p-mut); padding:0 3px; border-radius:3px}` ; `.ms-mark{display:inline-block; flex:none; min-width:1.5em; padding:0 4px; border:1.5px solid var(--p-fg); border-radius:4px; font-size:11px; font-weight:700; line-height:1.5; text-align:center}` ; `.ms-id{flex:none; font-size:12px; color:var(--p-mfg); font-family:ui-monospace,Consolas,monospace}` ; `details.chain{margin-top:6px}` ; `details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}` ; `.chain-line{margin:2px 0 6px; font-size:13px; line-height:1.6}` ; `.chain-line .cid{font-family:ui-monospace,Consolas,monospace; font-size:12px}` ; `.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}` ; `.arch-label{margin:14px 0 8px; font-size:13px; font-weight:600; color:var(--p-mfg)}`.
+  3. Change the line `@media (max-width:560px){ .bar{display:none} .id{display:none} }` to `@media (max-width:560px){ .bar{display:none} .id{display:none} .ms-id{display:none} }`.
+  4. Change the print rule `@media print{ .controls{display:none} details.ms{break-inside:avoid} }` so it also contains `.sr{position:static; width:auto; height:auto; clip:auto}` inside the braces.
+  5. Check that `--p-mut`, `--p-fg` and `--p-mfg` are defined in the file (search for `--p-mut:`); if a name differs, use the name the file defines for the muted background, the text colour and the muted text colour.
+  6. Update the page snapshot: in PowerShell run `$env:INSTA_UPDATE='always'; cargo test --all-features --test cmd_report; Remove-Item Env:INSTA_UPDATE`, then read `git diff tests/snapshots/cmd_report__report_html.snap` and check that only lines this task means to change are different.
+  7. Run the four checks of AGENTS.md.
+- accept: src/report/page/style.css has the rules for h4, code, .ms-mark, .ms-id, details.chain, .chain-line, .sr and .arch-label, the narrow-window rule hides .ms-id, the print rule shows .sr; the colour test and all report tests pass; the snapshot is updated
+- verify: cargo test --all-features --test cmd_report --test report_colours
+- note (2026-11-22, claude-main): added
 
 ## Questions
 
