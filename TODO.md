@@ -672,9 +672,21 @@ milestones that stand out from tasks.
 - milestone: T-220
 - why: the owner gets the polished page through a release
 - summary: Version 1.1.0 is released with the polished page.
-- depends: T-222, T-223, T-224, T-225, T-226
+- depends: T-222, T-223, T-224, T-225, T-226, T-228
 - accept: README and todo help report describe the archive toggle and the milestone marker; CHANGELOG.md has the 1.1.0 entry; Cargo.toml is 1.1.0; all checks pass on Windows and Linux; the owner has looked at this project's page
 - note (2026-11-22, claude-main): added
+
+### T-228 · Show chain: each task can show the chain of tasks it waits for and that wait for it
+- status: open
+- owner: —
+- priority: P2 · difficulty: 3 · type: feature · area: report
+- milestone: T-220
+- why: the owner wants to see why a task is where it is: which tasks must finish before it and which wait for it, without cluttering the main view
+- summary: Each task can show, on request, the chain of tasks that come before it and after it, with the state of each one.
+- depends: T-221
+- accept: inside an opened entry (next to Technical details, closed by default, so the main view does not change) a part Show chain lists the tasks it waits for, through every level of depends, and the tasks that wait for it, as chains in order such as T-001 ✓ → T-005 ● → this task → T-112 ○, each step with its mark, ID, title and state in words; milestones in the way count as R-MILE-6 says; dependencies on archived entries show their state and are marked archived; a task without dependencies in either direction shows no Show chain part; branches (a task that waits for two) are shown as separate lines, at most 10 lines, with the rest counted; works without scripts; unit tests cover a straight chain, a branch, an archived step, a missing ID and a cycle
+- note (2026-11-22, claude-main): added
+- note (2026-11-22, claude-main): Owner 2026-11-22: emphasise the chain of a todo item without cluttering the main view; a 'show chain' button per task showing e.g. T001 -> T005 -> T112 with the status of each item. T-221 decides the exact form and draws it in the mockup.
 
 ## Questions
 
