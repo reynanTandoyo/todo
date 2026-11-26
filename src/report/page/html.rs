@@ -317,6 +317,7 @@ fn push_all_work(h: &mut String, page: &PageData) {
         h.push_str("<p class=\"muted\">No tasks or milestones in TODO.md yet.</p>\n");
     }
     push_tree(h, &page.tree, page.today);
+    h.push_str("<p id=\"empty-view\" class=\"muted\" hidden></p>\n");
 }
 
 /// More (R-REPORT-1): the closed parts Ideas, Earlier work and For the planner.

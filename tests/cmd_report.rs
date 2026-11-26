@@ -250,6 +250,19 @@ fn all_work_is_one_tree_and_a_done_entry_stays_in_its_milestone() {
 }
 
 #[test]
+fn all_work_has_a_hidden_line_for_an_empty_view() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    // The line sits after the tree, hidden, so the script can show it when a view matches nothing.
+    let all = section(&html, "All work");
+    assert!(
+        all.trim_end()
+            .ends_with("<p id=\"empty-view\" class=\"muted\" hidden></p>"),
+        "{all}"
+    );
+}
+
+#[test]
 fn the_second_line_names_each_waiting_and_claimed_state_in_words() {
     let tmp = TempDir::new().unwrap();
     let (_work, html) = fixture_report(&tmp);
