@@ -188,7 +188,7 @@ details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
 <button id="cb" type="button" aria-pressed="false" title="Colours that stay apart with red-green colour blindness">Colour-blind colours</button>
 </div>
 </header>
-<div class="overall">
+<div class="overall" id="overall-now">
 <p class="big">5 of 12 tasks done</p>
 <div class="seg" role="img" aria-label="5 done, 2 in progress, 3 waiting, 2 to do, 2 cancelled">
 <i class="seg-done" style="width:35.7%"></i><i class="seg-prog" style="width:14.3%"></i><i class="seg-wait" style="width:21.4%"></i><i class="seg-todo" style="width:14.3%"></i><i class="seg-drop" style="width:14.3%"></i></div>
@@ -198,6 +198,18 @@ details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
 <li><span class="mark wait">◐</span><b>3</b> waiting</li>
 <li><span class="mark todo">○</span><b>2</b> to do</li>
 <li><span class="mark drop">✕</span><b>2</b> cancelled <span class="muted">(not counted in the 12)</span></li>
+</ul>
+</div>
+<div class="overall" id="overall-all" hidden>
+<p class="big">6 of 13 tasks done, archive included</p>
+<div class="seg" role="img" aria-label="6 done, 2 in progress, 3 waiting, 2 to do, 3 cancelled">
+<i class="seg-done" style="width:37.5%"></i><i class="seg-prog" style="width:12.5%"></i><i class="seg-wait" style="width:18.8%"></i><i class="seg-todo" style="width:12.5%"></i><i class="seg-drop" style="width:18.8%"></i></div>
+<ul class="legend">
+<li><span class="mark done">✓</span><b>6</b> done</li>
+<li><span class="mark prog">●</span><b>2</b> in progress</li>
+<li><span class="mark wait">◐</span><b>3</b> waiting</li>
+<li><span class="mark todo">○</span><b>2</b> to do</li>
+<li><span class="mark drop">✕</span><b>3</b> cancelled <span class="muted">(not counted in the 13)</span></li>
 </ul>
 </div>
 <h2>Needs you (3)</h2>
