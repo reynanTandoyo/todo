@@ -286,6 +286,7 @@ details.fold p,details.fold ul{font-size:14px; margin:6px 0 0}
 </div>
 </details>
 </div>
+<p id="empty-view" class="muted" hidden></p>
 <h2>More</h2>
 <details class="fold"><summary>Ideas (1) <span class="muted">— not planned yet</span></summary>
 <ul>
