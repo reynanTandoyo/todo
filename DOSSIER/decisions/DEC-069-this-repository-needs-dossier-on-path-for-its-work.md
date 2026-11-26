@@ -2,7 +2,7 @@
 # DEC-069 · This repository needs dossier on PATH for its work; todo itself does not depend on it
 
 - kind: decision
-- status: approved
+- status: superseded
 - created: 2026-11-26T20:00:13+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
@@ -10,8 +10,11 @@
 - valid-from: 2026-11-26T20:00:13+01:00
 - standing: yes
 - topic: process
+- valid-until: 2026-11-26T23:17:07+01:00
+- superseded-by: DEC-070
 - history: 2026-11-26T20:00:13+01:00 reyna via reyna - claude fable 5.2: created
 - history: 2026-11-26T20:00:13+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T23:17:07+01:00 reyna via reyna - claude fable 5.2: superseded — by DEC-070
 
 ## Decision
 
