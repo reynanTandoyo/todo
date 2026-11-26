@@ -68,7 +68,7 @@ Returned by `show`, `add`, `claim`, `release`, `done`, `drop`, `block`, `unblock
   "ok": true,
   "data": {
     "name": "todo",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "about": "Concurrency-safe editor for TODO.md task lists",
     "commands": [
       { "kind": "read", "name": "list", "summary": "List and filter tasks" }
@@ -87,7 +87,7 @@ below), not this command.
 {
   "schema": "todo.version.v1",
   "ok": true,
-  "data": { "version": "1.0.0", "commit": "abc1234" },
+  "data": { "version": "1.1.0", "commit": "abc1234" },
   "warnings": []
 }
 ```
@@ -121,7 +121,7 @@ For `todo help update --json`, `data` has `topic` (always `update`), `version`, 
   "ok": true,
   "data": {
     "topic": "update",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "executable": "C:\\Users\\alice\\AppData\\Local\\Programs\\todo\\todo.exe",
     "repository": "https://github.com/reynanTandoyo/todo",
     "latest_release": "https://github.com/reynanTandoyo/todo/releases/latest",
@@ -572,7 +572,7 @@ first group it fits, so no task is in two groups. The example holds one task in 
     "write_lock": { "held": false },
     "format_version": 2,
     "tool_stamp": "0.6.0",
-    "running_version": "1.0.0",
+    "running_version": "1.1.0",
     "counts": { "open": 10, "claimed": 4, "blocked": 0, "done": 27, "dropped": 3, "total": 44, "milestones": 2, "questions": 1, "ideas": 3 }
   },
   "warnings": []

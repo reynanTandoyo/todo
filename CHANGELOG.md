@@ -4,6 +4,37 @@ All notable changes to `todo` are documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-27
+
+The status page, polished: what the owner found on this project's own page after the 1.0.0
+release. The file format stays version 3; nothing changes for agents.
+
+### Added
+
+- Show chain (`R-REPORT-7`): an opened task's details end with a closed part that lists, as lines
+  of marked steps, the tasks it waits for (Before this task) and the tasks that wait for it (After
+  this task), through every level of `depends` in `TODO.md` and the archive. Missing IDs and loops
+  are named; each group shows at most 10 lines of at most 12 steps and counts the rest. It needs no
+  script (T-228, T-239 to T-244, T-247).
+- Include archive (`R-REPORT-6`): when the project has an archive, a toggle button adds the archive's
+  tree to All work under "From the archive" and counts its tasks in the overall line ("N of M tasks
+  done, archive included"); the view buttons, Expand all and Collapse all cover it, and the choice
+  is remembered. Without scripts the archive stays under Earlier work (T-226, T-235 to T-238).
+- The milestone marker (`R-REPORT-1`): every milestone row, nested and archived ones included,
+  starts with a badge "M" and the milestone's ID (T-225).
+
+### Changed
+
+- A view button that matches nothing says so in one line ("Nothing still to do.", "Nothing done
+  yet.", "Nothing cancelled.") instead of leaving All work blank (T-222, T-230, T-231).
+- The headings inside For the planner are subheadings of that part, no longer main section
+  headings; the all-projects page is unchanged (T-223).
+- Text between backticks in titles, goals, summaries, results, reasons, notes, ideas, the
+  description, Needs you and Last 7 days shows as code, still HTML-escaped (T-224, T-232 to T-234).
+- `todo help report` and the README describe the new parts (T-245).
+- On the 5,000-entry test file the page takes about 140 ms and 3.4 MB (1.0.0: about 110 ms and
+  2.9 MB), within NFR-3 (T-244).
+
 ## [1.0.0] - 2026-11-22
 
 A status page made for people. `todo report --html` writes a new page for one project, built as the
