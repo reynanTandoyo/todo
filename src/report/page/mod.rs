@@ -7,6 +7,7 @@
 //! [`super::html`] writes. Read-only: nothing here changes a document.
 
 pub mod chain;
+pub mod chain_html;
 pub mod entry;
 pub mod html;
 pub mod needs;
