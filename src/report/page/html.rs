@@ -365,13 +365,23 @@ fn push_earlier(h: &mut String, earlier: &Earlier, today: NaiveDate) {
 }
 
 /// For the planner (R-REPORT-3, More): the planning state and the unfinished tasks per area, from the
-/// v0.8 page's parts. Closed by default.
+/// v0.8 page's parts. Closed by default. Its headings are subheadings of the part (R-REPORT-1): `h3`,
+/// and `h4` below them.
 fn push_planner(h: &mut String, page: &PageData) {
+    let mut part = String::new();
+    push_planning(&mut part, &page.planner, SINGLE);
+    push_areas(&mut part, &page.planner, SINGLE);
+    // Escaped text never holds these tags, so the replacements touch the markup only. The `h3` tags
+    // go first, so that the headings lowered from `h2` are not lowered again.
+    let part = part
+        .replace("<h3>", "<h4>")
+        .replace("</h3>", "</h4>")
+        .replace("<h2>", "<h3>")
+        .replace("</h2>", "</h3>");
     h.push_str(
         "<details class=\"fold\"><summary>For the planner <span class=\"muted\">\u{2014} levels, parallel waves, tasks that still need detail</span></summary>\n",
     );
-    push_planning(h, &page.planner, SINGLE);
-    push_areas(h, &page.planner, SINGLE);
+    h.push_str(&part);
     h.push_str("</details>\n");
 }
 

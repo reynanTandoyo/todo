@@ -120,6 +120,17 @@ fn planning_section(html: &str) -> &str {
     &html[start..start + end]
 }
 
+/// The planner part of the page (For the planner): from its summary to its closing tag.
+fn planner_part(html: &str) -> &str {
+    let start = html
+        .find("<summary>For the planner")
+        .expect("the page has the planner part");
+    let end = html[start..]
+        .find("</details>")
+        .expect("the planner part closes");
+    &html[start..start + end]
+}
+
 /// The row of the entry `id` in All work, from its ID to the end of its row. A row closes with
 /// `</li>` and a line break; the notes of an opened row close with `</li>` before `</ul>`.
 fn row_of<'a>(html: &'a str, id: &str) -> &'a str {
@@ -138,7 +149,7 @@ fn the_planning_section_counts_what_the_planner_counts() {
 
     // Open, claimed or blocked tasks by level: two at level 1, one at 2, one at 3, one without a level.
     assert!(
-        planning.contains("<h3>Open tasks per level</h3>"),
+        planning.contains("<h4>Open tasks per level</h4>"),
         "{planning}"
     );
     assert!(
@@ -362,6 +373,13 @@ fn the_planner_part_is_the_last_closed_part_of_more() {
     );
     // The part is closed by default.
     assert!(!html.contains("<details class=\"fold\" open"));
+
+    // Its headings are subheadings of the part: `h3` for Planning, and no `h2` (R-REPORT-1).
+    let part = planner_part(&html);
+    assert!(
+        part.contains("<h3>Planning</h3>") && !part.contains("<h2>"),
+        "{part}"
+    );
 }
 
 #[test]
