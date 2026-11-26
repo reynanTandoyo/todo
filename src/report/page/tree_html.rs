@@ -5,7 +5,9 @@
 //! a milestone is a `details.ms` row with its title, its state, "N of M done" and a bar; an entry is
 //! one `li.item` with its mark, title and ID, whose details open on click. The stylesheet (T-214)
 //! gives the colours and the layout, so the markup carries classes and bar widths only. Every text
-//! from the file is escaped with [`escape`].
+//! from the file is escaped with [`escape`]; the texts a person reads as prose (titles, goals,
+//! summaries, reasons and notes) go through [`inline_code`], which also shows text between backticks
+//! as code (T-233).
 
 use std::fmt::Write as _;
 
@@ -14,6 +16,7 @@ use chrono::{Datelike, NaiveDate};
 use super::entry::{
     Dependency, Details, EntryView, NoteLine, SecondLine, Since, State, WaitReason,
 };
+use super::text::inline_code;
 use super::tree::{MilestoneState, MilestoneView, Tree};
 use crate::report::html::escape;
 
@@ -38,7 +41,7 @@ pub fn push_entry(h: &mut String, entry: &EntryView, today: NaiveDate) {
         "<li class=\"item {}\"><details><summary><span class=\"mark\">{}</span><span class=\"t\">{}</span>",
         entry.state.class(),
         entry.state.mark(),
-        escape(&entry.title),
+        inline_code(&entry.title),
     );
     if let Some(date) = entry.date {
         let _ = write!(h, "<span class=\"when\">{}</span>", date_short(date, today));
@@ -80,7 +83,7 @@ pub fn push_milestone(h: &mut String, milestone: &MilestoneView, today: NaiveDat
     );
     h.push_str("<div class=\"ms-body\">\n");
     if let Some(goal) = &milestone.goal {
-        let _ = writeln!(h, "<p class=\"goal\">Goal: {}</p>", escape(goal));
+        let _ = writeln!(h, "<p class=\"goal\">Goal: {}</p>", inline_code(goal));
     }
     if let Some(summary) = &milestone.summary {
         h.push_str("<div class=\"more\">");
@@ -144,7 +147,7 @@ fn push_summary(
     let _ = writeln!(
         h,
         "<summary><span class=\"ms-title\">{}</span><span class=\"ms-state {state_class}\">{}</span><span class=\"ms-count\">{done} of {total} done</span><span class=\"bar\"><i style=\"width:{}%\"></i></span></summary>",
-        escape(title),
+        inline_code(title),
         escape(state_text),
         percent(done, total),
     );
@@ -215,7 +218,7 @@ fn push_labelled(out: &mut String, label: &str, text: &str) {
     let _ = write!(
         out,
         "<p><span class=\"lbl\">{label}</span><br>{}</p>",
-        escape(text)
+        inline_code(text)
     );
 }
 
@@ -275,7 +278,7 @@ fn check_html(verify: &str, verified: Option<&str>, today: NaiveDate) -> String 
 /// A dependency as "T-002 Shipped part", or its ID alone when no task list holds it.
 fn dependency_html(dependency: &Dependency) -> String {
     match &dependency.title {
-        Some(title) => format!("{} {}", escape(&dependency.id), escape(title)),
+        Some(title) => format!("{} {}", escape(&dependency.id), inline_code(title)),
         None => escape(&dependency.id),
     }
 }
@@ -294,7 +297,7 @@ fn notes_html(notes: &[NoteLine], today: NaiveDate) -> String {
         }
         let text = note.text.trim();
         if !text.is_empty() {
-            parts.push(escape(text));
+            parts.push(inline_code(text));
         }
         let _ = write!(html, "<li>{}</li>", parts.join(" · "));
     }
@@ -320,7 +323,7 @@ fn second_line_html(second: &SecondLine) -> String {
             parts.join(" · ")
         }
         SecondLine::Waiting(reason) => format!("<b>Waiting</b> · {}", waiting_html(reason)),
-        SecondLine::Cancelled(reason) => format!("<b>Cancelled</b> · {}", escape(reason)),
+        SecondLine::Cancelled(reason) => format!("<b>Cancelled</b> · {}", inline_code(reason)),
     }
 }
 
@@ -337,9 +340,11 @@ fn since_text(since: Option<Since>) -> Option<String> {
 /// block reason.
 fn waiting_html(reason: &WaitReason) -> String {
     match reason {
-        WaitReason::GivenBack(problem) => format!("given back by a worker: {}", escape(problem)),
-        WaitReason::Question(title) => format!("for your answer: {}", escape(title)),
-        WaitReason::Blocked(reason) => escape(reason),
+        WaitReason::GivenBack(problem) => {
+            format!("given back by a worker: {}", inline_code(problem))
+        }
+        WaitReason::Question(title) => format!("for your answer: {}", inline_code(title)),
+        WaitReason::Blocked(reason) => inline_code(reason),
     }
 }
 
@@ -756,5 +761,16 @@ mod tests {
         assert!(!tree.contains("<i>goal"));
         assert!(tree.contains("Milestone &lt;script&gt;"));
         assert!(tree.contains("Goal: &lt;i&gt;goal&lt;/i&gt;"));
+    }
+
+    #[test]
+    fn text_between_backticks_in_a_title_is_shown_as_code() {
+        let html = entries_html(&text(&[
+            "### T-001 · Add the `--summary` option",
+            "- status: open",
+        ]));
+        let item = item_of(&html, "T-001");
+        assert!(item.contains("<span class=\"t\">Add the <code>--summary</code> option</span>"));
+        assert!(item.contains("<span class=\"id\">T-001</span>"));
     }
 }
