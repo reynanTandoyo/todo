@@ -425,6 +425,25 @@ fn text_from_the_task_list_is_escaped() {
 }
 
 #[test]
+fn ideas_show_text_between_backticks_as_code() {
+    let body = format!(
+        "{FIXTURE_MARKER}<!-- todo-format: 3 -->\n# Title\n\n## Ideas\n\n\
+### T-001 · Try `todo add --template bug`\n\
+- status: open\n\
+- owner: —\n\
+- type: idea\n"
+    );
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _todo) = setup_proj(&tmp, &body);
+    let out = report(&home, &work, &[]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr_text(&out));
+    let html = default_html(&work);
+
+    assert!(html.contains("<code>todo add --template bug</code>"));
+    assert!(!html.contains("`todo add --template bug`"));
+}
+
+#[test]
 fn page_loads_nothing_from_the_network_and_its_buttons_are_hidden_without_js() {
     let tmp = TempDir::new().unwrap();
     let (_work, html) = fixture_report(&tmp);
