@@ -347,7 +347,7 @@ fn more_holds_the_ideas_the_archive_and_the_planner_all_closed() {
     ));
     assert!(more.contains("<li>Show the lamp heat map</li>"));
     assert!(more.contains(
-        "<details class=\"fold\"><summary>Earlier work (1 finished milestone, 2 tasks) <span class=\"muted\">\u{2014} from the archive</span></summary>"
+        "<details class=\"fold\" id=\"earlier\"><summary>Earlier work (1 finished milestone, 2 tasks) <span class=\"muted\">\u{2014} from the archive</span></summary>"
     ));
     // The archive's tree is closed: its milestone and its tasks show, but nothing is open.
     assert!(more.contains("<span class=\"ms-title\">Lantern tool v0</span>"));
@@ -418,6 +418,46 @@ fn an_archive_is_shown_under_earlier_work_and_one_without_it_is_left_out() {
     let (home, work, _todo) = setup_proj(&tmp, &body);
     assert_eq!(report(&home, &work, &[]).status.code(), Some(0));
     assert!(!default_html(&work).contains("Earlier work"));
+}
+
+#[test]
+fn the_archive_has_a_toggle_and_a_movable_tree() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    let html = lf(&html);
+    // With an archive, All work holds the toggle of R-REPORT-6, not pressed, after Cancelled and
+    // before the expand and collapse buttons.
+    let all = section(&html, "All work");
+    in_order(
+        all,
+        &[
+            "<button data-f=\"drop\" aria-pressed=\"false\">Cancelled</button>",
+            "<button id=\"arch\" type=\"button\" aria-pressed=\"false\">Include archive</button>",
+            "<span class=\"sp\"></span>",
+        ],
+    );
+    // Earlier work is the closed fold under More, and its tree carries the id and the label that the
+    // script moves into All work.
+    let more = &html[html.find("<h2>More</h2>").unwrap()..];
+    assert!(more.contains("<details class=\"fold\" id=\"earlier\"><summary>Earlier work ("));
+    assert!(more.contains(
+        "<div class=\"tree\" id=\"arch-tree\">\n<p class=\"arch-label\">From the archive</p>\n"
+    ));
+    assert!(html.contains("Include archive"));
+
+    // Without an archive there is neither the toggle nor the closed part to move.
+    let tmp = TempDir::new().unwrap();
+    let body = format!(
+        "{FIXTURE_MARKER}<!-- todo-format: 2 -->\n# Plain check\n\n## Now\n\n\
+### T-001 · Open task\n- status: open\n- owner: —\n"
+    );
+    let (home, work, _todo) = setup_proj(&tmp, &body);
+    assert_eq!(report(&home, &work, &[]).status.code(), Some(0));
+    let html = default_html(&work);
+    assert!(!html.contains("id=\"arch\""));
+    assert!(!html.contains("Include archive"));
+    assert!(!html.contains("id=\"earlier\""));
+    assert!(!html.contains("arch-tree"));
 }
 
 #[test]
