@@ -205,8 +205,9 @@ fn percent(done: usize, total: usize) -> usize {
 }
 
 /// The part of an entry that opens on click (R-REPORT-1, "Details"): "Summary", or "Why" when there
-/// is no summary; "Result" for a done entry; and the closed "Technical details". Nothing is written
-/// when none of them is present.
+/// is no summary; "Result" for a done entry; the closed "Technical details"; and, last, the closed
+/// "Show chain" of R-REPORT-7 when the task has a chain. Nothing is written when none of them is
+/// present.
 fn push_details(h: &mut String, entry: &EntryView, today: NaiveDate) {
     let mut body = String::new();
     if let Some(summary) = &entry.summary {
@@ -219,6 +220,9 @@ fn push_details(h: &mut String, entry: &EntryView, today: NaiveDate) {
     }
     if let Some(technical) = technical_details(&entry.details, today) {
         body.push_str(&technical);
+    }
+    if let Some(chain) = &entry.chain {
+        super::chain_html::push_chain(&mut body, chain);
     }
     if !body.is_empty() {
         let _ = write!(h, "<div class=\"more\">{body}</div>");
