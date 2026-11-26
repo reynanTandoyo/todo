@@ -159,11 +159,18 @@ todo report --html --all
 - Needs you: open questions, tasks a worker gave back, and tasks in progress without activity;
 - Last 7 days: the tasks done or cancelled, the milestones finished and the tasks added in the last
   seven days;
-- All work: the milestones and tasks as one tree, with done and cancelled entries in place. A click
-  opens an entry's summary (or why), its result and its technical details: level, files, check and
-  whether the check passed. Above the tree, the buttons Everything, Still to do (to do, in progress
-  and waiting), Done and Cancelled choose what is shown, and Expand all and Collapse all open or close
-  the whole tree;
+- All work: the milestones and tasks as one tree, with done and cancelled entries in place. Every
+  milestone row starts with a badge M and the milestone's ID, so milestones stand out from tasks. A
+  click opens an entry's summary (or why), its result and its technical details: level, files, check
+  and whether the check passed. A task that waits for others, or that others wait for, also has a
+  closed part, Show chain, with the tasks it waits for and the tasks that wait for it. Above the tree,
+  the buttons Everything, Still to do (to do, in progress and waiting), Done and Cancelled choose what
+  is shown, and Expand all and Collapse all open or close the whole tree. When a button matches no
+  entry, All work says so in one line: `Nothing still to do.`, `Nothing done yet.` or
+  `Nothing cancelled.`. When the project has an archive, the button Include archive adds the archive's
+  tree below the tree of TODO.md, under "From the archive", and counts its tasks in the overall line;
+  while it is pressed, the closed part Earlier work is hidden, since its tree is shown in All work;
+  pressed again, everything is as before;
 - More, in closed parts: Ideas, Earlier work from `TODO-archive.md`, and For the planner (levels,
   parallel waves and tasks that still need detail).
 
