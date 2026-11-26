@@ -155,6 +155,36 @@ fn the_overall_line_counts_the_tasks_and_the_legend_names_the_five_states() {
 }
 
 #[test]
+fn the_overall_line_with_the_archive_is_in_the_page_and_hidden() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    // The line of TODO.md is shown. The line that counts the archive too is in the page, hidden
+    // until the button of R-REPORT-6 shows it. The archive holds one done and one cancelled task
+    // (its milestone is not counted).
+    assert!(html.contains(
+        "<div class=\"overall\" id=\"overall-now\">\n<p class=\"big\">5 of 12 tasks done</p>"
+    ));
+    assert!(html.contains(
+        "<div class=\"overall\" id=\"overall-all\" hidden>\n<p class=\"big\">6 of 13 tasks done, archive included</p>"
+    ));
+    assert!(html.contains("aria-label=\"6 done, 2 in progress, 3 waiting, 2 to do, 3 cancelled\""));
+    in_order(&html, &["id=\"overall-now\"", "id=\"overall-all\" hidden>"]);
+
+    // Without an archive there is no second line.
+    let tmp = TempDir::new().unwrap();
+    let body = format!(
+        "{FIXTURE_MARKER}<!-- todo-format: 2 -->\n# Plain check\n\n## Now\n\n\
+### T-001 · Open task\n- status: open\n- owner: —\n"
+    );
+    let (home, work, _todo) = setup_proj(&tmp, &body);
+    assert_eq!(report(&home, &work, &[]).status.code(), Some(0));
+    let html = default_html(&work);
+    assert!(html.contains("<div class=\"overall\" id=\"overall-now\">"));
+    assert!(!html.contains("overall-all"));
+    assert!(!html.contains("archive included"));
+}
+
+#[test]
 fn needs_you_lists_the_question_the_given_back_task_and_the_stale_claim_in_that_order() {
     let tmp = TempDir::new().unwrap();
     let (_work, html) = fixture_report(&tmp);

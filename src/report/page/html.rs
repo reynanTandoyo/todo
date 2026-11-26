@@ -52,7 +52,10 @@ pub fn render(page: &PageData) -> String {
         escape(&page.title)
     );
     push_header(&mut h, page);
-    push_overall(&mut h, &page.counts);
+    push_overall(&mut h, &page.counts, "overall-now", false);
+    if let Some(counts) = &page.counts_with_archive {
+        push_overall(&mut h, counts, "overall-all", true);
+    }
     push_needs(&mut h, page);
     push_recent(&mut h, page);
     push_all_work(&mut h, page);
@@ -84,8 +87,10 @@ fn push_header(h: &mut String, page: &PageData) {
     );
 }
 
-/// The overall line (R-REPORT-1): "N of M tasks done", one bar in five parts, and the legend.
-fn push_overall(h: &mut String, counts: &Counts) {
+/// The overall line (R-REPORT-1): "N of M tasks done", one bar in five parts, and the legend. `id`
+/// names the block. With `with_archive` (R-REPORT-6, Include archive) the block is the second one:
+/// it is hidden until the button shows it, and its first line says "archive included".
+fn push_overall(h: &mut String, counts: &Counts, id: &str, with_archive: bool) {
     let total = counts.total_counted();
     let parts = [
         (State::Done, counts.done),
@@ -96,10 +101,19 @@ fn push_overall(h: &mut String, counts: &Counts) {
     ];
     let all: usize = parts.iter().map(|(_, count)| count).sum();
 
-    h.push_str("<div class=\"overall\">\n");
+    let _ = write!(h, "<div class=\"overall\" id=\"{id}\"");
+    if with_archive {
+        h.push_str(" hidden");
+    }
+    h.push_str(">\n");
+    let archive = if with_archive {
+        ", archive included"
+    } else {
+        ""
+    };
     let _ = writeln!(
         h,
-        "<p class=\"big\">{} of {total} tasks done</p>",
+        "<p class=\"big\">{} of {total} tasks done{archive}</p>",
         counts.done
     );
 
