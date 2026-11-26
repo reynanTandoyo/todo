@@ -612,8 +612,8 @@ milestones that stand out from tasks.
 - note (2026-11-22, claude-main): done — Requirements and mockup for v1.1: milestone marker, planner subheadings, backticks as code, empty-filter line, Include archive toggle, and R-REPORT-7 Show chain.
 
 ### T-222 · A filter that matches nothing says so instead of leaving the tree blank
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · type: milestone · area: report
 - milestone: T-220
 - goal: A view button that matches nothing says so in words
@@ -621,8 +621,10 @@ milestones that stand out from tasks.
 - summary: When a view button matches nothing, the page says so instead of showing an empty space.
 - depends: T-221
 - accept: when Still to do, Done or Cancelled leaves no visible entry, All work shows one line in words (Nothing still to do. / Nothing done yet. / Nothing cancelled.) and hides it again for a filter that matches; a test covers the markup and the script names the texts
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
 - note (2026-11-22, claude-main): split into T-230, T-231
+- note (2026-11-26, claude-main): done — T-230 and T-231 done: an empty view says so in words
 
 ### T-230 · All work holds a hidden line for a view that matches nothing
 - status: done
@@ -649,14 +651,14 @@ milestones that stand out from tasks.
 - note (2026-11-26, t230-haiku): done — Added the hidden empty-view line after the All work tree in src/report/page/html.rs with a test and updated snapshot; full suite passes 1042 tests (1041 before plus the new one), fmt and both clippy targets clean.
 
 ### T-231 · The script writes the line for a view that matches nothing
-- status: open
-- owner: —
+- status: done
+- owner: t231-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-222
 - why: on a finished project Still to do and Cancelled leave All work blank, which looks broken
 - summary: When a view button finds nothing, the page now says so in words instead of showing an empty space.
 - depends: T-230
-- files: src/report/page/script.js, tests/cmd_report.rs
+- files: src/report/page/script.js, tests/cmd_report.rs, tests/snapshots/cmd_report__report_html.snap
 - read: docs/requirements.md
 - steps:
   1. Read the same bullet of R-REPORT-6 in docs/requirements.md, and fn applyFilter in src/report/page/script.js.
@@ -666,11 +668,17 @@ milestones that stand out from tasks.
   5. Run the four checks of AGENTS.md.
 - accept: the script shows Nothing still to do. / Nothing done yet. / Nothing cancelled. in the empty-view line when the pressed filter leaves no visible entry, and hides the line otherwise; the new test passes
 - verify: cargo test --all-features --test cmd_report
+- verified: 2026-11-26
+- commit: e337572
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-26, t231-haiku): Committed as e337572 on t231 (not pushed). todo done was refused by the files guard: tests/snapshots/cmd_report__report_html.snap changed but is not in the files line. The snapshot must change because the page embeds the script; it was updated by the insta candidate, minus its assertion_line metadata line, and CRLF kept; the diff is only the 8 script lines. Checks: fmt ok; clippy Windows and Linux ok; cargo test --all-features 1060 passed, 0 failed (cmd_report 25 of 25). Not forced. Needs a decision: add the snapshot to files, or finish with --force.
+- note (2026-11-26, claude-main): forced set (owner was t231-haiku)
+- note (2026-11-26, t231-haiku): done — The script names the empty view in words (Nothing still to do. / Nothing done yet. / Nothing cancelled.) and hides the line otherwise; the HTML snapshot changed with the script and is now listed in files; full suite passes 1060 tests, 0 failed, with fmt and both clippy targets clean.
 
 ### T-223 · For the planner uses subheadings, not main section headings
-- status: open
-- owner: —
+- status: done
+- owner: t223-haiku
 - priority: P2 · difficulty: 1 · type: bug · area: report
 - milestone: T-220
 - why: inside the closed part For the planner the old v0.8 code writes Planning and Unfinished tasks per area as main headings, which look like new sections of the page
@@ -686,11 +694,16 @@ milestones that stand out from tasks.
   5. Run the four checks of AGENTS.md.
 - accept: inside For the planner the headings are h3 (Planning, Unfinished tasks per area) and h4 below them; the page's own section headings stay h2; src/report/html.rs and the all-projects page are unchanged; the planning tests check the new levels; the snapshot is updated
 - verify: cargo test --all-features --test cmd_report --test cmd_report_planning
+- verified: 2026-11-26
+- commit: d1ce065
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-26, t223-haiku): forced claim (files held by T-233)
+- note (2026-11-26, t223-haiku): done — The planner part of the page now uses h3 for Planning and Unfinished tasks per area and h4 below them, with the all-projects page unchanged; all 1059 tests pass, and fmt and both clippy checks pass.
 
 ### T-224 · Text between backticks shows as code on the page
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · type: milestone · area: report
 - milestone: T-220
 - goal: Text between backticks shows as code everywhere on the page
@@ -698,8 +711,10 @@ milestones that stand out from tasks.
 - summary: Commands and field names written between backticks look like code on the page instead of showing the backticks.
 - depends: T-221
 - accept: in titles, summaries, results, reasons and ideas on the one-project page, a pair of backticks around text becomes a code element with the text inside it, still HTML-escaped; an unpaired backtick stays as typed; tests cover a pair, two pairs, an unpaired backtick and a <script> inside backticks
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
 - note (2026-11-22, claude-main): split into T-232, T-233, T-234
+- note (2026-11-27, claude-main): done — T-232, T-233, T-234 done: text between backticks shows as code
 
 ### T-232 · A text helper that shows text between backticks as code
 - status: done
@@ -727,8 +742,8 @@ milestones that stand out from tasks.
 - note (2026-11-26, t232-haiku): done — Added inline_code in src/report/page/text.rs, which escapes text and turns pairs of backticks around non-empty text into code; 10 new tests, 1051 tests passing in cargo test --all-features.
 
 ### T-233 · The tree shows text between backticks as code
-- status: open
-- owner: —
+- status: done
+- owner: t233-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-224
 - why: the tree is where most text from the task list appears
@@ -744,11 +759,15 @@ milestones that stand out from tasks.
   5. Run the four checks of AGENTS.md.
 - accept: every title, goal, summary, why, result, reason and note in the tree goes through inline_code; IDs, files and the check stay escaped only; a unit test covers a title with backticks
 - verify: cargo test --all-features --lib report::page
+- verified: 2026-11-27
+- commit: c4ad609
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-27, t233-haiku): done — Titles, goals, summaries, why, results, reasons, notes and dependency titles in the tree now go through inline_code, so text between backticks shows as code; the page snapshot is unchanged, and cargo test --all-features passes 1060 tests (106 binaries, 5 ignored).
 
 ### T-234 · Needs you, Last 7 days, ideas and the description show text between backticks as code
-- status: open
-- owner: —
+- status: done
+- owner: t234-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-224
 - why: the same text appears in Needs you, Last 7 days and Ideas
@@ -764,11 +783,16 @@ milestones that stand out from tasks.
   5. Run the four checks of AGENTS.md.
 - accept: the description, Needs you rows, Last 7 days rows and ideas go through inline_code; the new test passes; the snapshot is updated
 - verify: cargo test --all-features --test cmd_report
+- verified: 2026-11-27
+- commit: bf73f93
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-26, t234-haiku): forced claim (files held by T-233)
+- note (2026-11-27, t234-haiku): done — Needs you rows, Last 7 days rows, the description and ideas now go through inline_code, and a new test ideas_show_text_between_backticks_as_code passes; cargo test --all-features passes 1060 tests with 0 failed, fmt and both clippy targets pass, and the page snapshot is unchanged because its fixtures hold no backticks.
 
 ### T-225 · Milestones stand out: a marker and their ID on every milestone row
-- status: open
-- owner: —
+- status: done
+- owner: t225-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-220
 - why: in the tree a milestone and a task differ only by a small triangle and bold text, so the structure is hard to see
@@ -785,8 +809,16 @@ milestones that stand out from tasks.
   6. Run the four checks of AGENTS.md.
 - accept: every milestone row in All work and Earlier work, nested ones too, starts with the marker M (aria-label Milestone) and the milestone's ID before its title; Other work has neither; unit tests cover it; the snapshot is updated
 - verify: cargo test --all-features --test cmd_report --lib report::page
+- verified: 2026-11-27
+- commit: 3205ba9
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
 - note (2026-11-22, claude-main): Owner 2026-11-22: make the milestone (the tree's knot) more visible, for example with 'M - <ID>' in front of the title.
+- note (2026-11-27, t225-haiku): forced claim (files held by T-234)
+- note (2026-11-27, t225-haiku): done — Milestone rows now start with the M marker and their ID before the title, with three new unit tests, the two cmd_report assertions and the report snapshot updated; cargo test --all-features passes 1075 tests (5 ignored), and fmt and both clippy checks pass.
+- note (2026-11-27, t225-haiku): Claim needed --force: T-234 (t234-haiku) also lists src/report/page/tree_html.rs, so both tasks edit that file and the merge of T-234 will need care. Snapshot update wrote LF line endings; git warns that LF will become CRLF on the next touch, which was already the case for this file and was not changed. Dossier entries for tree_html.rs, tests/cmd_report.rs were refused twice on first edit (re-made unchanged); none of them conflicted with the change.
+- note (2026-11-27, t225-haiku): Correction to the note above: the committed snapshot is LF before and after this commit (git ls-files --eol shows i/lf). The CRLF warning only appears because insta wrote LF into the snapshot in a working copy whose other files are CRLF; nothing in the commit changed line endings.
+- note (2026-11-27, t225-haiku): Correction: the file overlap with T-234 was tests/cmd_report.rs and tests/snapshots/cmd_report__report_html.snap, not tree_html.rs; T-234 (bf73f93) is already on dev. A trial merge of this branch with dev (git merge-tree) is clean, but the merged result has not been tested.
 
 ### T-226 · A button shows the archived work in the All work tree
 - status: open
@@ -826,8 +858,8 @@ milestones that stand out from tasks.
 - note (2026-11-26, t235-haiku): done — Added Counts::plus and PageData.counts_with_archive (TODO.md plus archive counts, None without an archive) with a unit test for plus; 1042 tests pass, 76 in report::page; the claim needed --force because T-239 lists the same files.
 
 ### T-236 · The page writes a second, hidden overall line with the archive included
-- status: open
-- owner: —
+- status: done
+- owner: t236-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-226
 - why: the script only switches between two overall lines; the page must already hold both
@@ -844,7 +876,13 @@ milestones that stand out from tasks.
   6. Run the four checks of AGENTS.md.
 - accept: the page has the overall line with id overall-now and, with an archive, a hidden second one with id overall-all that counts both files and says archive included; tests cover both cases
 - verify: cargo test --all-features --test cmd_report
+- verified: 2026-11-27
+- commit: be9fc26
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-27, t236-haiku): forced claim (files held by T-225)
+- note (2026-11-27, t236-haiku): Claimed with --force: the claim was refused only because claimed T-225 (t225-haiku) lists the same files, so T-225 may touch src/report/page/html.rs too and conflict on merge. The dossier guard refused my first edit of html.rs and tests/cmd_report.rs; I read the entries listed (none conflicts with this change) and made the same edits again. The new test's expected numbers (6 of 13, 3 cancelled) were counted by hand from the fixtures and match the regenerated snapshot.
+- note (2026-11-27, t236-haiku): done — push_overall takes an id and a with-archive flag, so the page writes the hidden overall-all line (6 of 13 tasks done, archive included) beside overall-now when the project has an archive, with a test for both cases; cargo test passes 1074 tests with 0 failures.
 
 ### T-237 · The Include archive button and a movable archive tree
 - status: open
@@ -875,7 +913,7 @@ milestones that stand out from tasks.
 - why: the owner wants to see the whole history in one tree
 - summary: One button now shows everything finished earlier in the same tree, with the overall numbers for the whole history.
 - depends: T-237
-- files: src/report/page/script.js, tests/cmd_report.rs
+- files: src/report/page/script.js, tests/cmd_report.rs, tests/snapshots/cmd_report__report_html.snap
 - read: docs/requirements.md
 - steps:
   1. Read the same bullet of R-REPORT-6 and the whole of src/report/page/script.js.
@@ -889,6 +927,7 @@ milestones that stand out from tasks.
 - accept: pressing Include archive moves the archive's tree into All work below the tree of TODO.md, hides Earlier work, switches the overall line to the one with the archive, applies the current filter to both trees and remembers the choice under todo-report-archive; pressing it again puts everything back; Expand all, Collapse all and the empty-view line cover the archive too; the test passes
 - verify: cargo test --all-features --test cmd_report
 - note (2026-11-22, claude-main): added
+- note (2026-11-26, claude-main): files widened: the page embeds script.js, so the report snapshot changes too (as on T-231)
 
 ### T-227 · Release 1.1.0
 - status: open
@@ -981,8 +1020,8 @@ milestones that stand out from tasks.
 - note (2026-11-26, t239-haiku): done — Added src/report/page/chain.rs (StepState, Step, PathEnd, Path, Chain, ChainIndex with new, set_milestone_states and step) and registered it in page/mod.rs; cargo test --all-features passes 1047 tests (6 new chain tests), fmt and clippy pass for Windows and Linux. Read as: the index is in memory per page build, which D15 allows, and holds every entry of both files; dependents list each ID once; an archived milestone shows its tree state only when the archive tree is also passed to set_milestone_states.
 
 ### T-240 · Chain data: the paths before and after a task, with their limits
-- status: open
-- owner: —
+- status: done
+- owner: t240-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-228
 - why: the page shows at most 10 paths of at most 12 steps each way, and counts the rest
@@ -1001,11 +1040,15 @@ milestones that stand out from tasks.
   8. Run the four checks of AGENTS.md.
 - accept: chain_of returns None for a task with no depends and no dependents, and otherwise the before paths (start first) and after paths (nearest first), each at most 12 steps (cut keeps the nearest), loops ended with Loop, unknown IDs as NotFound steps, at most 10 paths per group with the rest counted up to 101; unit tests cover each rule
 - verify: cargo test --all-features --lib report::page
+- verified: 2026-11-26
+- commit: 6927441
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-26, t240-haiku): done — Added chain_of with the walk, limits and counting in src/report/page/chain.rs plus 11 unit tests (17 in the chain module, 1070 passing in cargo test); read as: a path that reaches 12 steps is cut only when something lies beyond it, a loop step includes the repeated ID, an unknown task gives None, and milestones are not excluded here so the page must skip them.
 
 ### T-241 · Every task on the page carries its chain
-- status: open
-- owner: —
+- status: done
+- owner: t241-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-228
 - why: the HTML of an entry is written from its EntryView, so the chain must be part of it
@@ -1022,11 +1065,17 @@ milestones that stand out from tasks.
   6. Run the four checks of AGENTS.md.
 - accept: EntryView has chain; fill_chains sets it for every task of the tree and of the archive's tree; build fills both with one index; a unit test covers it
 - verify: cargo test --all-features --lib report::page
+- verified: 2026-11-27
+- commit: ed26074
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-27, t241-haiku): done — EntryView has a chain field that build fills for every task of the tree and the archive's tree from one ChainIndex, milestones keep none, and a unit test covers both trees; cargo test passes 1072 tests, fmt and clippy pass on Windows and Linux; the dossier guard refused my first edit of entry.rs with a list of entries that did not conflict, and the same edit went through on retry.
 
 ### T-242 · Chain HTML: the closed part Show chain
-- status: open
-- owner: —
+- status: claimed
+- owner: t242-haiku
+- claimed: 2026-11-27T00:10+01:00
+- session: d8acd188-8117-44e0-b198-60d1e5b9560f
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-228
 - why: the chain must not clutter the main view, so it is a closed part inside a task's details
@@ -1153,3 +1202,4 @@ milestones that stand out from tasks.
 - type: idea
 - note (2026-11-21, claude-main): added
 - note (2026-11-22, claude-main): Also seen in CI on main 2026-11-21 (run 44908893803, windows-latest): cmd_verify a_check_that_ends_normally_leaves_no_child_process_running failed at tests/cmd_verify.rs:1341; the same commit passed on dev. Both flakes are process timing in cmd_verify on Windows.
+- note (2026-11-27, claude-main): 2026-11-26: t233 worker saw two more cmd_verify timing failures in full runs under parallel load; both passed on rerun
