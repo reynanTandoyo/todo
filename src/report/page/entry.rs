@@ -151,6 +151,8 @@ pub struct EntryView {
     pub result: Option<String>,
     /// The closed part "Technical details" (R-REPORT-1).
     pub details: Details,
+    /// The chain of R-REPORT-7, filled in by chain::fill_chains; None in entry_view.
+    pub chain: Option<super::chain::Chain>,
 }
 
 /// The technical details of an entry. Empty fields are `None` or empty, and the page leaves them out.
@@ -240,6 +242,7 @@ pub fn entry_view(task: &Task, ctx: &Ctx<'_>) -> EntryView {
             State::ToDo | State::InProgress | State::Waiting | State::Cancelled => None,
         },
         details: details(task, ctx),
+        chain: None,
     }
 }
 
