@@ -12,6 +12,8 @@
   var themeButton = document.getElementById('theme');
   var cbButton = document.getElementById('cb');
   var filterButtons = document.querySelectorAll('.controls button[data-f]');
+  var emptyView = document.getElementById('empty-view');
+  var EMPTY_TEXT = { left: 'Nothing still to do.', done: 'Nothing done yet.', drop: 'Nothing cancelled.' };
   var systemDark = null;
   try {
     systemDark = window.matchMedia('(prefers-color-scheme: dark)');
@@ -125,6 +127,12 @@
         button.getAttribute('data-f') === filter ? 'true' : 'false'
       );
     });
+    /* A view that leaves no visible entry names it in words; otherwise the line stays hidden. */
+    if (emptyView) {
+      var none = filter !== 'all' && !tree.querySelector('li.item:not(.hide)');
+      emptyView.textContent = none ? EMPTY_TEXT[filter] : '';
+      emptyView.hidden = !none;
+    }
   }
 
   filterButtons.forEach(function (button) {
