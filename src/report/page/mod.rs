@@ -10,6 +10,7 @@ pub mod entry;
 pub mod html;
 pub mod needs;
 pub mod recent;
+pub mod text;
 pub mod tree;
 pub mod tree_html;
 
