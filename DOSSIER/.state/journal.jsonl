@@ -508,3 +508,5 @@
 {"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-056","event":"changed","detail":"related LES-002"}
 {"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-002","event":"changed","detail":"related DEC-056"}
 {"time":"2026-11-26T19:55:56+01:00","name":"reyna - claude fable 5.2","person":"reyna - claude fable 5.2","llm":false,"command":"hooks","id":"HOOKS","event":"changed","detail":"hooks installed; DOSSIER_AGENT set"}
+{"time":"2026-11-26T20:00:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"tool","id":"TOOL-008","event":"created","detail":"draft"}
+{"time":"2026-11-26T20:00:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-069","event":"created","detail":"approved"}

@@ -62,6 +62,28 @@ CI also runs clippy for Linux. To check that locally:
 `cargo build --release` produces `target\release\todo.exe`. The C runtime is linked in
 (`.cargo/config.toml`), so the program runs on a PC without Visual C++ installed.
 
+## Tools this repository needs
+
+Working here needs two programs on `PATH`. The `todo` program itself needs neither to run; these
+are for the work on this repository.
+
+- `todo` 1.0 or newer, the released one: it manages `TODO.md`. `todo help update` prints how to
+  install it.
+- `dossier` 1.2 or newer: it manages the `DOSSIER` folder, and the Claude Code hooks in
+  `.claude/settings.json` call it (`dossier brief`, `dossier guard`, `dossier after`). Releases:
+  <https://github.com/reynanTandoyo/dossier/releases>; copy `dossier.exe` into a folder on `PATH`.
+  Check with `dossier --version`.
+
+## Working with the dossier
+
+- What was decided, assumed, found and learned is in the `DOSSIER` folder. Never edit files there
+  directly.
+- Workers: if your first edit of a file is refused with a list of entries, read them and make the
+  same edit again. That is not an error.
+- Workers: you write nothing to the dossier. If you learn something, say it in your `todo done` or
+  `todo stuck` note.
+- Planner: run `dossier help agents` and follow it.
+
 <!-- todo:begin -->
 # Working with TODO.md
 
