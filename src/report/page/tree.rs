@@ -38,6 +38,18 @@ impl Counts {
         self.done + self.in_progress + self.waiting + self.to_do
     }
 
+    /// The counts of two sets of tasks added up, state by state (the overall line with the archive).
+    #[must_use]
+    pub const fn plus(self, other: Self) -> Self {
+        Self {
+            done: self.done + other.done,
+            in_progress: self.in_progress + other.in_progress,
+            waiting: self.waiting + other.waiting,
+            to_do: self.to_do + other.to_do,
+            cancelled: self.cancelled + other.cancelled,
+        }
+    }
+
     fn record(&mut self, state: State) {
         match state {
             State::Done => self.done += 1,
@@ -703,6 +715,35 @@ mod tests {
                 ..Counts::default()
             }
         );
+    }
+
+    #[test]
+    fn plus_adds_each_state_of_two_counts() {
+        let first = Counts {
+            done: 1,
+            in_progress: 2,
+            waiting: 3,
+            to_do: 4,
+            cancelled: 5,
+        };
+        let second = Counts {
+            done: 10,
+            in_progress: 20,
+            waiting: 30,
+            to_do: 40,
+            cancelled: 50,
+        };
+        assert_eq!(
+            first.plus(second),
+            Counts {
+                done: 11,
+                in_progress: 22,
+                waiting: 33,
+                to_do: 44,
+                cancelled: 55,
+            }
+        );
+        assert_eq!(first.plus(Counts::default()), first);
     }
 
     #[test]
