@@ -124,7 +124,7 @@ li.drop .t{color:var(--p-mfg); text-decoration:line-through}
 .line2 b{font-weight:600; color:var(--p-fg)}
 .more{margin:4px 0 8px 1.75em; padding:8px 12px; border-left:2px solid var(--p-bd); background:var(--p-mut); border-radius:0 6px 6px 0; font-size:14px}
 .more p{margin:0 0 6px}
-.more .lbl{font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--p-mfg)}
+.more .lbl, details.chain .lbl{font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--p-mfg)}
 details.tech>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
 details.tech dl{display:grid; grid-template-columns:max-content 1fr; gap:2px 12px; margin:6px 0 0; font-size:13px}
 details.tech dt{color:var(--p-mfg)} details.tech dd{margin:0; overflow-wrap:anywhere}
