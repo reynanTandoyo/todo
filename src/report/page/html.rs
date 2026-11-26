@@ -313,8 +313,9 @@ fn rest_of<'a>(words: &'a str, title: &str) -> &'a str {
     words.strip_prefix(title).unwrap_or_default().trim_start()
 }
 
-/// All work (R-REPORT-1, R-REPORT-6): the view buttons and the expand and collapse buttons, then the
-/// tree. The buttons are hidden until the page has the class `js`.
+/// All work (R-REPORT-1, R-REPORT-6): the view buttons, the Include archive toggle when the project
+/// has an archive, and the expand and collapse buttons, then the tree. The buttons are hidden until
+/// the page has the class `js`.
 fn push_all_work(h: &mut String, page: &PageData) {
     h.push_str(
         "<h2>All work</h2>\n<div class=\"controls\">\n\
@@ -322,8 +323,15 @@ fn push_all_work(h: &mut String, page: &PageData) {
 <button data-f=\"all\" aria-pressed=\"true\">Everything</button>\n\
 <button data-f=\"left\" aria-pressed=\"false\">Still to do</button>\n\
 <button data-f=\"done\" aria-pressed=\"false\">Done</button>\n\
-<button data-f=\"drop\" aria-pressed=\"false\">Cancelled</button>\n\
-<span class=\"sp\"></span>\n\
+<button data-f=\"drop\" aria-pressed=\"false\">Cancelled</button>\n",
+    );
+    if page.earlier.is_some() {
+        h.push_str(
+            "<button id=\"arch\" type=\"button\" aria-pressed=\"false\">Include archive</button>\n",
+        );
+    }
+    h.push_str(
+        "<span class=\"sp\"></span>\n\
 <button id=\"exp\" type=\"button\">Expand all</button>\n\
 <button id=\"col\" type=\"button\">Collapse all</button>\n\
 </div>\n",
@@ -356,18 +364,22 @@ fn push_more(h: &mut String, page: &PageData) {
     push_planner(h, page);
 }
 
-/// Earlier work (R-REPORT-1, More): the archive's tree, with every milestone closed. The archive's
-/// tree has the same markup as All work, so its `id` is dropped to keep the page's IDs unique.
+/// Earlier work (R-REPORT-1, More): the archive's tree, with every milestone closed. The tree gets
+/// the id `arch-tree` and a label, so that the script can move it into All work (R-REPORT-6).
 fn push_earlier(h: &mut String, earlier: &Earlier, today: NaiveDate) {
     let mut tree = String::new();
     push_tree(&mut tree, &earlier.tree, today);
     // Escaped text never holds these tags, so the replacements touch the markup only.
     let tree = tree
         .replace("<details class=\"ms\" open>", "<details class=\"ms\">")
-        .replacen("<div id=\"tree\">", "<div class=\"tree\">", 1);
+        .replacen(
+            "<div id=\"tree\">",
+            "<div class=\"tree\" id=\"arch-tree\">\n<p class=\"arch-label\">From the archive</p>",
+            1,
+        );
     let _ = writeln!(
         h,
-        "<details class=\"fold\"><summary>Earlier work ({}, {}) <span class=\"muted\">\u{2014} from the archive</span></summary>",
+        "<details class=\"fold\" id=\"earlier\"><summary>Earlier work ({}, {}) <span class=\"muted\">\u{2014} from the archive</span></summary>",
         counted(
             earlier.finished_milestones,
             "finished milestone",

@@ -242,6 +242,7 @@ details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
 <button data-f="left" aria-pressed="false">Still to do</button>
 <button data-f="done" aria-pressed="false">Done</button>
 <button data-f="drop" aria-pressed="false">Cancelled</button>
+<button id="arch" type="button" aria-pressed="false">Include archive</button>
 <span class="sp"></span>
 <button id="exp" type="button">Expand all</button>
 <button id="col" type="button">Collapse all</button>
@@ -316,8 +317,9 @@ details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
 <li>Show the lamp heat map</li>
 </ul>
 </details>
-<details class="fold"><summary>Earlier work (1 finished milestone, 2 tasks) <span class="muted">— from the archive</span></summary>
-<div class="tree">
+<details class="fold" id="earlier"><summary>Earlier work (1 finished milestone, 2 tasks) <span class="muted">— from the archive</span></summary>
+<div class="tree" id="arch-tree">
+<p class="arch-label">From the archive</p>
 <details class="ms">
 <summary><span class="ms-mark" role="img" aria-label="Milestone">M</span><span class="ms-id">T-040</span><span class="ms-title">Lantern tool v0</span><span class="ms-state st-done">finished 2 Oct</span><span class="ms-count">1 of 1 done</span><span class="bar"><i style="width:100%"></i></span></summary>
 <div class="ms-body">
