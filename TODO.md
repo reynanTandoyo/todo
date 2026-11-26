@@ -821,8 +821,8 @@ milestones that stand out from tasks.
 - note (2026-11-27, t225-haiku): Correction: the file overlap with T-234 was tests/cmd_report.rs and tests/snapshots/cmd_report__report_html.snap, not tree_html.rs; T-234 (bf73f93) is already on dev. A trial merge of this branch with dev (git merge-tree) is clean, but the merged result has not been tested.
 
 ### T-226 · A button shows the archived work in the All work tree
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · type: milestone · area: report
 - milestone: T-220
 - goal: One button adds the archive to All work and to the overall line
@@ -830,9 +830,11 @@ milestones that stand out from tasks.
 - summary: One button adds everything that was finished earlier to the tree, so the whole history of the project can be seen in one place.
 - depends: T-221
 - accept: All work has a toggle button (Include archive, aria-pressed) that adds the archived milestones and tasks to the tree in the usual order (finished, closed) and makes the overall line count them too; the filters work on the archived entries as well; the choice is remembered like the colour choices; without scripts the page is as in v1.0 (the archive under Earlier work); tests cover the markup and the script
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
 - note (2026-11-22, claude-main): Owner 2026-11-22: a toggle button that also builds and shows the tree for the archived items.
 - note (2026-11-22, claude-main): split into T-235, T-236, T-237, T-238
+- note (2026-11-27, claude-main): done — T-235 to T-238 done: Include archive adds the archive's tree to All work
 
 ### T-235 · Page data counts the tasks of TODO.md and the archive together
 - status: done
@@ -885,8 +887,8 @@ milestones that stand out from tasks.
 - note (2026-11-27, t236-haiku): done — push_overall takes an id and a with-archive flag, so the page writes the hidden overall-all line (6 of 13 tasks done, archive included) beside overall-now when the project has an archive, with a test for both cases; cargo test passes 1074 tests with 0 failures.
 
 ### T-237 · The Include archive button and a movable archive tree
-- status: open
-- owner: —
+- status: done
+- owner: t237-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-226
 - why: the script moves the archive's tree into All work; the markup must give it IDs and a label
@@ -903,11 +905,16 @@ milestones that stand out from tasks.
   6. Run the four checks of AGENTS.md.
 - accept: with an archive All work has the button Include archive (id arch, aria-pressed false), Earlier work has id earlier and its tree id arch-tree with the label From the archive; without an archive there is no button; tests cover both
 - verify: cargo test --all-features --test cmd_report
+- verified: 2026-11-27
+- commit: 2d1b77f
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-27, t237-haiku): Worker notes: the dossier guard refused the first edit of src/report/page/html.rs and tests/cmd_report.rs with entries in force (LES-002, FND-034, DEC-038, DEC-055, DEC-059 and timing/version lessons); none conflicts with this task, so the same edits were made again. The script that moves arch-tree into All work and hides the earlier fold is not in files (script.js is not listed), so it is left for the task that owns the script; the markup carries the ids it needs. Each push is a separate literal: the button is pushed only when page.earlier is Some. git warns that LF will become CRLF for tests/snapshots/cmd_report__report_html.snap; the diff shows only the intended five lines.
+- note (2026-11-27, t237-haiku): done — The page adds the Include archive button to All work when the project has an archive, gives Earlier work the id earlier and its tree the id arch-tree with the label From the archive, with a test for both cases; cargo test passes 1079 tests with 0 failures.
 
 ### T-238 · The script adds the archive to All work when Include archive is pressed
-- status: open
-- owner: —
+- status: done
+- owner: t238-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-226
 - why: the owner wants to see the whole history in one tree
@@ -926,8 +933,13 @@ milestones that stand out from tasks.
   8. Run the four checks of AGENTS.md.
 - accept: pressing Include archive moves the archive's tree into All work below the tree of TODO.md, hides Earlier work, switches the overall line to the one with the archive, applies the current filter to both trees and remembers the choice under todo-report-archive; pressing it again puts everything back; Expand all, Collapse all and the empty-view line cover the archive too; the test passes
 - verify: cargo test --all-features --test cmd_report
+- verified: 2026-11-27
+- commit: dda6e73
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
 - note (2026-11-26, claude-main): files widened: the page embeds script.js, so the report snapshot changes too (as on T-231)
+- note (2026-11-27, t238-haiku): done — The script moves the archive tree into All work when Include archive is pressed, and the view filters, Expand all, Collapse all, the empty-view line, the overall line and the stored choice cover it; four absence assertions in cmd_report.rs were narrowed because the script now names those ids, and the snapshot changed only in the script. cargo test --all-features passes 1095 tests with 0 failures (5 ignored), fmt and both clippy targets are clean, and a jsdom run of the page's script passed 33 checks outside the repository.
+- note (2026-11-27, t238-haiku): Assumed: when the archive leaves All work its entries lose the view filter's hide, so Earlier work shows them all as before the button; milestones the filter opened stay open. Not run in a real browser: the behaviour was checked with jsdom on the snapshot page only.
 
 ### T-227 · Release 1.1.0
 - status: open
@@ -943,8 +955,8 @@ milestones that stand out from tasks.
 - note (2026-11-22, claude-main): split into T-245, T-246
 
 ### T-245 · Help text and README describe the v1.1 page
-- status: open
-- owner: —
+- status: done
+- owner: t245-haiku
 - priority: P2 · difficulty: 1 · type: docs · area: docs
 - milestone: T-227
 - why: people and agents learn about the page from the README and todo help report
@@ -959,11 +971,17 @@ milestones that stand out from tasks.
   5. Run the four checks of AGENTS.md.
 - accept: todo help report and the README describe the milestone marker, Include archive, Show chain and the empty-view line; all tests pass
 - verify: cargo test --all-features
+- verified: 2026-11-27
+- commit: 326af71
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-27, t245-haiku): done — Help text (report META details) and README HTML report section now describe the milestone marker, Include archive, Show chain and the empty-view line; fmt, clippy (Windows and Linux) and cargo test pass: 1096 tests passed, 0 failed, 5 ignored.
 
 ### T-246 · Version 1.1.0 and changelog
-- status: open
-- owner: —
+- status: claimed
+- owner: claude-main
+- claimed: 2026-11-27T00:50+01:00
+- session: f7957659-295e-4e1b-b8f8-96b2d860c5e5
 - priority: P2 · difficulty: 2 · type: docs · area: release
 - milestone: T-227
 - why: the owner gets the polished page through a release
@@ -979,8 +997,8 @@ milestones that stand out from tasks.
 - note (2026-11-22, claude-main): added
 
 ### T-228 · Show chain: each task can show the chain of tasks it waits for and that wait for it
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · type: milestone · area: report
 - milestone: T-220
 - goal: Each task shows, on request, the chain of tasks before and after it
@@ -988,9 +1006,12 @@ milestones that stand out from tasks.
 - summary: Each task can show, on request, the chain of tasks that come before it and after it, with the state of each one.
 - depends: T-221
 - accept: inside an opened entry (next to Technical details, closed by default, so the main view does not change) a part Show chain lists the tasks it waits for, through every level of depends, and the tasks that wait for it, as chains in order such as T-001 ✓ → T-005 ● → this task → T-112 ○, each step with its mark, ID, title and state in words; milestones in the way count as R-MILE-6 says; dependencies on archived entries show their state and are marked archived; a task without dependencies in either direction shows no Show chain part; branches (a task that waits for two) are shown as separate lines, at most 10 lines, with the rest counted; works without scripts; unit tests cover a straight chain, a branch, an archived step, a missing ID and a cycle
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
 - note (2026-11-22, claude-main): Owner 2026-11-22: emphasise the chain of a todo item without cluttering the main view; a 'show chain' button per task showing e.g. T001 -> T005 -> T112 with the status of each item. T-221 decides the exact form and draws it in the mockup.
 - note (2026-11-22, claude-main): split into T-239, T-240, T-241, T-242, T-243, T-244
+- note (2026-11-27, claude-main): T-242 readings accepted: a loop's repeated step is named only by the back-to text; a cut after-line ends with the ellipsis (requirements updated)
+- note (2026-11-27, claude-main): done — T-239 to T-244 and T-247 done: a task's details show its chain; page 137-147 ms and 3.4 MB on the 5,000-entry file
 
 ### T-239 · Chain data: the steps and an index of every entry
 - status: done
@@ -1072,10 +1093,8 @@ milestones that stand out from tasks.
 - note (2026-11-27, t241-haiku): done — EntryView has a chain field that build fills for every task of the tree and the archive's tree from one ChainIndex, milestones keep none, and a unit test covers both trees; cargo test passes 1072 tests, fmt and clippy pass on Windows and Linux; the dossier guard refused my first edit of entry.rs with a list of entries that did not conflict, and the same edit went through on retry.
 
 ### T-242 · Chain HTML: the closed part Show chain
-- status: claimed
+- status: done
 - owner: t242-haiku
-- claimed: 2026-11-27T00:10+01:00
-- session: d8acd188-8117-44e0-b198-60d1e5b9560f
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-228
 - why: the chain must not clutter the main view, so it is a closed part inside a task's details
@@ -1092,11 +1111,17 @@ milestones that stand out from tasks.
   6. Run the four checks of AGENTS.md.
 - accept: src/report/page/chain_html.rs writes the closed part Show chain with the groups Before this task and After this task, each line of marked steps joined by arrows with this task in bold, milestone, archived, not-found, cut and loop steps as R-REPORT-7 says, and the more texts; unit tests cover each case
 - verify: cargo test --all-features --lib report::page
+- verified: 2026-11-27
+- commit: 99bb210
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-27, t242-haiku): Readings of R-REPORT-7 that the spec left open, decided in chain_html.rs: (1) a loop path repeats the ID it comes back to as its walk-end step; that step is not written as a step, the line ends with '… back to <id>' (before lines: after the steps, before this task; after lines: at the end). (2) A cut path puts its '…' at the far end: first on a before line as the spec says, but last on an after line, since the spec's 'starts with' would put it before this task. (3) Step titles go through inline_code (backticks as code, as tree titles do), so the escape guarantee holds. R-REPORT-7 and step 4 should say which end the cut marker sits at; the owner should confirm (2). The .lbl and .cid rules for the chain are not in src/report/page/style.css (T-214 / a later task); I did not touch that file.
+- note (2026-11-27, t242-haiku): Correction to the previous note: style.css has .chain-line .cid, and .chain-line and details.chain rules, so only the group labels are unstyled: the rule .more .lbl is the only one for p.lbl, so 'Before this task' and 'After this task' show as plain text. A rule such as details.chain .lbl belongs in src/report/page/style.css, which this task's files do not list; I did not change it.
+- note (2026-11-27, t242-haiku): done — Added src/report/page/chain_html.rs with push_chain for the closed part Show chain (both groups, marked steps, cut, loop, archived and not-found steps, and the more counts), registered in page/mod.rs; 15 new tests, and cargo test passes 1089 tests (223 in the library).
 
 ### T-243 · Opened tasks show their chain
-- status: open
-- owner: —
+- status: done
+- owner: t243-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-228
 - why: this puts the chain on the page
@@ -1112,11 +1137,18 @@ milestones that stand out from tasks.
   5. Run the four checks of AGENTS.md.
 - accept: a task with a chain has the closed part Show chain at the end of its details; a task without one has none; the test passes and the snapshot is updated
 - verify: cargo test --all-features --test cmd_report
+- verified: 2026-11-27
+- commit: 982daab
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-27, claude-main): added after T-242: in src/report/page/style.css change the selector '.more .lbl{' to '.more .lbl, details.chain .lbl{' so the Before this task / After this task labels are styled; the snapshot then changes too
+- note (2026-11-27, claude-main): the label style moved to its own task T-247; ignore the earlier note about style.css
+- note (2026-11-27, t243-haiku): forced claim (files held by T-237)
+- note (2026-11-27, t243-haiku): done — Added the closed Show chain part to push_details after Technical details, with test a_task_with_dependencies_shows_its_chain and the updated snapshot (three chains: T-004, T-005, T-014); cargo test passes 1094 tests with 0 failed, and fmt and clippy pass on Windows and Linux; I claimed with --force because T-237 (t237-haiku) lists the same tests/cmd_report.rs and snapshot, and the dossier guard refused my first edits of tree_html.rs and cmd_report.rs with entries that did not conflict, so I retried each edit as the task says; questions such as T-015 are not opened entries, so they show no chain.
 
 ### T-244 · The page with chains stays within the speed and size limits
-- status: open
-- owner: —
+- status: done
+- owner: t244-haiku
 - priority: P2 · difficulty: 1 · type: test · area: report
 - milestone: T-228
 - why: chains add work and HTML for every task; NFR-3 still holds
@@ -1131,7 +1163,12 @@ milestones that stand out from tasks.
   4. Run the four checks of AGENTS.md.
 - accept: report --html on the 5,000-entry milestone tree is still under 500 ms and 5 MB with chains, measured three times in a release build; the numbers are in the done note
 - verify: cargo test --release --all-features --test perf -- --ignored
+- verified: 2026-11-27
+- commit: d36f0ac
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-27, t244-haiku): done — No file changed: report --html on the 5,000-entry milestone tree with chains took 147.0, 136.0 and 142.7 ms over three release runs (budget 500 ms) and wrote a 3,443,562-byte page (budget 5 MB), and cargo test passes 1095 tests with 0 failed, with fmt and clippy passing on Windows and Linux.
+- note (2026-11-27, t244-haiku): Worker note: the brief's Finish step (git add tests/perf.rs, then git commit) cannot commit here because the budgets held and the file stayed unchanged; the task commit is an empty commit (d36f0ac) instead. The chain part of the page is in the timed file: push_details writes Show chain for every entry that has a chain, and every fifth task has a depends line. Also: cargo test counted 1095 passed and 5 ignored, where the T-243 note counted 1094.
 
 ### T-229 · Stylesheet rules for the v1.1 page
 - status: done
@@ -1158,6 +1195,30 @@ milestones that stand out from tasks.
 - by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
 - note (2026-11-26, t229-haiku): done — Added the v1.1 page rules to style.css (milestone marker and ID, code, h4 subheadings, chain part, archive label, screen-reader class), hid the milestone ID under 560 px, showed the screen-reader class in print and updated the report snapshot; all 1041 tests pass, and fmt and both clippy checks pass.
+
+### T-247 · The labels inside Show chain use the small label style
+- status: done
+- owner: t247-haiku
+- priority: P2 · difficulty: 1 · type: bug · area: report
+- milestone: T-228
+- why: the Before this task and After this task labels of Show chain show as plain text, because the label rule in style.css only covers .more
+- summary: The two group names inside Show chain look like the other small labels on the page.
+- depends: T-243
+- files: src/report/page/style.css, tests/snapshots/cmd_report__report_html.snap
+- read: src/report/page/chain_html.rs
+- steps:
+  1. Read fn push_chain in src/report/page/chain_html.rs: the labels are <p class="lbl">.
+  2. In src/report/page/style.css change the selector `.more .lbl{` to `.more .lbl, details.chain .lbl{` and change nothing else.
+  3. Run cargo test --all-features --test cmd_report; the snapshot test shows the one changed CSS line; accept it (PowerShell: $env:INSTA_UPDATE='always'; cargo test --all-features --test cmd_report) and check that git diff of the snapshot shows only that line.
+  4. Run the four checks of AGENTS.md.
+- accept: style.css styles p.lbl inside details.chain like the labels under More; the snapshot differs only in that CSS line
+- verify: cargo test --all-features --test cmd_report
+- verified: 2026-11-27
+- commit: 55ba68d
+- by: Reynan Henry Tandoyo
+- note (2026-11-27, claude-main): added
+- note (2026-11-27, t247-haiku): forced claim (files held by T-238)
+- note (2026-11-27, t247-haiku): done — Extended the .more .lbl rule to details.chain .lbl so the Show chain labels use the small label style, and the snapshot differs only in that CSS line; cargo test --all-features passes 1095 tests with 0 failed, and fmt and clippy pass on Windows and Linux; I claimed with --force because T-238 (t238-haiku) lists the same snapshot file, and the dossier guard refused my first style.css edit with entries that did not conflict, so I made the same edit again as the task says.
 
 ## Questions
 
