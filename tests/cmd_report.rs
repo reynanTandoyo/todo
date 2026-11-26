@@ -263,6 +263,20 @@ fn all_work_has_a_hidden_line_for_an_empty_view() {
 }
 
 #[test]
+fn the_script_names_the_texts_of_an_empty_view() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    // The page's own script is the last script element, and the texts of the empty view live there.
+    let start = html.rfind("<script>").unwrap() + "<script>".len();
+    let end = html.rfind("</script>").unwrap();
+    let script = &html[start..end];
+    assert!(script.contains("empty-view"), "{script}");
+    assert!(script.contains("Nothing still to do."), "{script}");
+    assert!(script.contains("Nothing done yet."), "{script}");
+    assert!(script.contains("Nothing cancelled."), "{script}");
+}
+
+#[test]
 fn the_second_line_names_each_waiting_and_claimed_state_in_words() {
     let tmp = TempDir::new().unwrap();
     let (_work, html) = fixture_report(&tmp);
