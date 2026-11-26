@@ -6,6 +6,7 @@
 //! planner's part (R-REPORT-3) is the planning state that [`super::model`] decides and
 //! [`super::html`] writes. Read-only: nothing here changes a document.
 
+pub mod chain;
 pub mod entry;
 pub mod html;
 pub mod needs;
