@@ -1239,7 +1239,8 @@ with its word.
     (R-MILE-6) are not steps. An ID that names no entry is a step "T-999 (not found)", which ends
     the path. A path that comes back to a step already on it ends with "… back to T-005".
   - Each group shows at most 10 lines, and a path at most 12 steps (the steps nearest the task are
-    kept; a longer path starts with "…"). More lines are counted, up to 100: "and 3 more paths",
+    kept; the cut end shows "…": a longer line before the task starts with "…", a longer line
+    after it ends with "…"). More lines are counted, up to 100: "and 3 more paths",
     or "and more than 100 more paths".
   - Both files are searched: `TODO.md` and `TODO-archive.md`. The work done for one task is
     bounded by these limits, so the page stays within NFR-3 on the 5,000-entry file.
