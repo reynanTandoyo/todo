@@ -15,6 +15,7 @@ use super::PageData;
 use super::entry::State;
 use super::needs::{self, Need};
 use super::recent::{self, Event};
+use super::text::inline_code;
 use super::tree::{Counts, Earlier};
 use super::tree_html::{date_short, push_tree};
 use crate::report::html::{SINGLE, escape, push_areas, push_planning};
@@ -68,7 +69,7 @@ fn push_header(h: &mut String, page: &PageData) {
     h.push_str("<header class=\"head\"><div class=\"grow\">\n");
     let _ = writeln!(h, "<h1>{}</h1>", escape(&page.title));
     if let Some(description) = &page.description {
-        let _ = writeln!(h, "<p class=\"desc\">{}</p>", escape(description));
+        let _ = writeln!(h, "<p class=\"desc\">{}</p>", inline_code(description));
     }
     let _ = writeln!(
         h,
@@ -211,10 +212,10 @@ fn push_need(h: &mut String, need: &Need, today: NaiveDate) {
     let _ = write!(
         h,
         "<div class=\"need\"><span class=\"tag\">{tag}</span><span class=\"what\">{}</span>",
-        escape(title)
+        inline_code(title)
     );
     if !text.is_empty() {
-        let _ = write!(h, "\n<p class=\"muted\">{}</p>", escape(&text));
+        let _ = write!(h, "\n<p class=\"muted\">{}</p>", inline_code(&text));
     }
     h.push_str("</div>\n");
 }
@@ -265,21 +266,21 @@ fn event_html(event: &Event) -> (&'static str, char, String) {
             MARK_DONE,
             format!(
                 "<b>{}</b> {}",
-                escape(title),
-                escape(rest_of(&words, title))
+                inline_code(title),
+                inline_code(rest_of(&words, title))
             ),
         ),
-        Event::Done { title } => ("done", MARK_DONE, escape(title)),
+        Event::Done { title } => ("done", MARK_DONE, inline_code(title)),
         Event::Cancelled { title, .. } => (
             "drop",
             MARK_CANCELLED,
             format!(
                 "{} <span class=\"muted\">{}</span>",
-                escape(title),
-                escape(rest_of(&words, title))
+                inline_code(title),
+                inline_code(rest_of(&words, title))
             ),
         ),
-        Event::Added { count: 1, .. } => ("todo", MARK_ADDED, escape(&words)),
+        Event::Added { count: 1, .. } => ("todo", MARK_ADDED, inline_code(&words)),
         Event::Added {
             count, milestone, ..
         } => (
@@ -287,7 +288,7 @@ fn event_html(event: &Event) -> (&'static str, char, String) {
             MARK_ADDED,
             format!(
                 "{count} tasks added to <b>{}</b>",
-                escape(milestone.as_deref().unwrap_or("Other work"))
+                inline_code(milestone.as_deref().unwrap_or("Other work"))
             ),
         ),
     }
@@ -331,7 +332,7 @@ fn push_more(h: &mut String, page: &PageData) {
         );
         h.push_str("<ul>\n");
         for idea in &page.ideas {
-            let _ = writeln!(h, "<li>{}</li>", escape(idea));
+            let _ = writeln!(h, "<li>{}</li>", inline_code(idea));
         }
         h.push_str("</ul>\n</details>\n");
     }
