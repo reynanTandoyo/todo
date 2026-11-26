@@ -328,9 +328,9 @@ details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
 </details>
 <details class="fold"><summary>For the planner <span class="muted">— levels, parallel waves, tasks that still need detail</span></summary>
 <section id="planning">
-<h2>Planning</h2>
+<h3>Planning</h3>
 <p class="hint">What the planner still has to do. The target level is 1: a task at or below it needs complete detail before a worker is handed it.</p>
-<h3>Open tasks per level</h3>
+<h4>Open tasks per level</h4>
 <p class="hint">Open, claimed or blocked tasks, counted by their level.</p>
 <ul class="areas levels">
 <li><span>1</span><span class="count">1</span></li>
@@ -339,21 +339,21 @@ details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
 <li><span>4</span><span class="count">1</span></li>
 <li><span>5</span><span class="count">0</span></li>
 </ul>
-<h3>Not ready for lack of detail (1)</h3>
+<h4>Not ready for lack of detail (1)</h4>
 <ul class="card-list">
 <li><span>T-030 · Add a licence file</span> <span class="chip" title="level">1</span> <span class="reason">missing: why, accept, steps, verify, files</span></li>
 </ul>
-<h3>Given back to the planner (1)</h3>
+<h4>Given back to the planner (1)</h4>
 <ul class="card-list">
 <li><span>T-013 · Place the lanterns on the east wall</span> <span class="chip" title="level">4</span> <span class="reason">the plan puts one lantern too many on the east wall</span> <span class="chip">attempts 0</span></li>
 </ul>
-<h3>Kept above the target level on purpose (0)</h3>
+<h4>Kept above the target level on purpose (0)</h4>
 <p class="empty">Nothing kept above the target level.</p>
-<h3>Waves</h3>
+<h4>Waves</h4>
 <p>2 waves in all. Wave 1 holds 3 tasks in 3 lanes.</p>
 </section>
 <section id="areas">
-<h2>Unfinished tasks per area</h2>
+<h3>Unfinished tasks per area</h3>
 <p class="hint">Open, claimed or blocked tasks, counted by their area.</p>
 <ul class="areas">
 <li><span>docs</span><span class="count">1</span></li>
