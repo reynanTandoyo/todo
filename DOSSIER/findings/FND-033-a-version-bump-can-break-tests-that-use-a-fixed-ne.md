@@ -1,0 +1,25 @@
+<!-- dossier-format: 1 -->
+# FND-033 · A version bump can break tests that use a fixed newer version as data
+
+- kind: finding
+- status: approved
+- created: 2026-11-26T19:49:25+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:49:25+01:00 by reyna
+- valid-from: 2026-11-26T19:49:25+01:00
+- topic: testing
+- code: tests
+- related: DEC-062, LES-008
+- history: 2026-11-26T19:49:25+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:49:25+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:43+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-062
+- history: 2026-11-26T19:51:44+01:00 reyna via reyna - claude fable 5.2: changed — related LES-008
+
+## Observation
+
+Tests of the tool stamp used 0.9.0 and 0.10.0 as versions newer than the running one; with the bump to 1.0.0 they were older and the tests failed. They now use 10.0.0.
+
+## Evidence
+
+v1.0 release run, 2026-11-22

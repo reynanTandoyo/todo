@@ -1,0 +1,32 @@
+<!-- dossier-format: 1 -->
+# DEC-052 · libc and windows-sys are direct dependencies, to stop every process a verify command starts
+
+- kind: decision
+- status: approved
+- created: 2026-11-26T19:47:13+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:47:13+01:00 by reyna
+- valid-from: 2026-11-26T19:47:13+01:00
+- task: T-172
+- standing: yes
+- topic: verify
+- code: src/process_tree.rs
+- related: DEC-018, DEC-048, FND-030
+- history: 2026-11-26T19:47:13+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:47:13+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:40+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-018
+- history: 2026-11-26T19:51:42+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-048
+- history: 2026-11-26T19:51:42+01:00 reyna via reyna - claude fable 5.2: changed — related FND-030
+
+## Decision
+
+libc (Unix only) and windows-sys (Windows only) are direct, target-specific dependencies with only the features needed. They stop the whole process tree of a verify command on a timeout: a process group on Unix, a Job Object on Windows. The unsafe calls are few, small, commented and live only in src/process_tree.rs. (Owner, 2026-11-20, answer to question T-176)
+
+## Reason
+
+Nothing in the standard library stops a process tree, and NFR-5 forbids running kill or taskkill. Both crates were already in Cargo.lock as transitive dependencies, so nothing new is downloaded.
+
+## Rejected
+
+Hand-written FFI without a dependency change; keeping the limit and only documenting it.

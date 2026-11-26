@@ -1,0 +1,26 @@
+<!-- dossier-format: 1 -->
+# FND-042 · Refactoring to remove duplication was not worth continuing
+
+- kind: finding
+- status: approved
+- created: 2026-11-26T19:49:26+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:49:26+01:00 by reyna
+- valid-from: 2026-11-26T19:49:26+01:00
+- outcome: dead end
+- task: T-083
+- topic: process
+- related: DEC-025, LES-001
+- history: 2026-11-26T19:49:26+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:49:26+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:40+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-025
+- history: 2026-11-26T19:51:40+01:00 reyna via reyna - claude fable 5.2: changed — related LES-001
+
+## Observation
+
+Tried: a refactoring in chunks to remove duplicated code, started from an audit that estimated about 4,100 duplicated lines. Three chunks removed about 520 lines with identical behaviour. Then jscpd measured only 2.3 percent duplication, and the work was stopped.
+
+## Evidence
+
+docs/refactoring.md; task T-083 dropped 2026-11-15

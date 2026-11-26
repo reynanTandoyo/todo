@@ -1,11 +1,32 @@
 {
   "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "dossier after",
+            "timeout": 30,
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      }
+    ],
     "PreToolUse": [
       {
         "_managed_by": "todo",
         "hooks": [
           {
             "command": "todo guard",
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write|MultiEdit"
+      },
+      {
+        "hooks": [
+          {
+            "command": "dossier guard",
             "type": "command"
           }
         ],
@@ -29,6 +50,14 @@
         "hooks": [
           {
             "command": "todo summary",
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "dossier brief",
             "type": "command"
           }
         ]

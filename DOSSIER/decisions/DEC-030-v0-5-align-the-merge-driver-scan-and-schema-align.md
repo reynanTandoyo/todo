@@ -1,0 +1,29 @@
+<!-- dossier-format: 1 -->
+# DEC-030 · v0.5: align, the merge driver, scan and schema; align only reports
+
+- kind: decision
+- status: approved
+- created: 2026-11-26T19:47:12+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:47:12+01:00 by reyna
+- valid-from: 2026-11-26T19:47:12+01:00
+- standing: yes
+- topic: git
+- code: src/cli/align.rs, src/cli/merge_driver.rs
+- related: FND-037
+- history: 2026-11-26T19:47:12+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:47:12+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:44+01:00 reyna via reyna - claude fable 5.2: changed — related FND-037
+
+## Decision
+
+Four ideas became requirements: align compares tasks with the git history (R-GIT-1), a git merge driver merges TODO.md task by task (R-GIT-2, R-GIT-3), scan finds TODO: and FIXME: comments (R-DISC-1) and schema describes the tool as JSON (R-SCHEMA-1). align only reports and never changes TODO.md; a task's status is never changed automatically. (Owner, 2026-11-17)
+
+## Reason
+
+The link between tasks and commits should be checkable, and TODO.md should merge cleanly between branches and machines. Changing a status from git evidence would let a wrong commit message close a task.
+
+## Rejected
+
+Marking tasks done automatically from the git history.

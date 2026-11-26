@@ -1,0 +1,25 @@
+<!-- dossier-format: 1 -->
+# FND-034 · The owner judged the v0.7 status page horrible
+
+- kind: finding
+- status: approved
+- created: 2026-11-26T19:49:25+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:49:25+01:00 by reyna
+- valid-from: 2026-11-26T19:49:25+01:00
+- task: T-195
+- topic: report
+- code: src/report
+- related: DEC-055
+- history: 2026-11-26T19:49:25+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:49:25+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:42+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-055
+
+## Observation
+
+The page of v0.7 had too much text, too little context and a confusing tree. Read as a person: it opened with planner internals; finished work was pulled out of the tree into flat lists; every task dumped its raw fields; the words were the tool's (claimed, blocked, wave); and titles written by agents for agents ran to 150 characters.
+
+## Evidence
+
+Owner, session of 2026-11-21, after trying the page built from this project

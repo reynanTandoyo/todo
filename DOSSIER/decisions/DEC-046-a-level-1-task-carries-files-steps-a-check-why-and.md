@@ -1,0 +1,31 @@
+<!-- dossier-format: 1 -->
+# DEC-046 · A level-1 task carries files, steps, a check, why and accept, and is handed out only when complete
+
+- kind: decision
+- status: approved
+- created: 2026-11-26T19:47:13+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:47:13+01:00 by reyna
+- valid-from: 2026-11-26T19:47:13+01:00
+- standing: yes
+- topic: planning
+- code: src/ops/brief.rs
+- related: DEC-044, ASM-001, HOW-003
+- history: 2026-11-26T19:47:13+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:47:13+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:41+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-044
+- history: 2026-11-26T19:51:41+01:00 reyna via reyna - claude fable 5.2: changed — related ASM-001
+- history: 2026-11-26T19:51:41+01:00 reyna via reyna - claude fable 5.2: changed — related HOW-003
+
+## Decision
+
+A task at the target level needs why, accept, files (what it may change, at most 3), steps (a numbered list) and verify (one command line); read names what the worker should look at. next hands out such a task only when all of it is there. todo brief prints one work order with everything a worker needs: the goals above the task, the why, the files, the steps, the check, the results of finished dependencies and the exact commands to finish or give up. (Owner, 2026-11-19)
+
+## Reason
+
+A weak model fails when it has to explore, guess or decide. Calling a task level 1 is only a claim; the tool can at least check that the detail is there. A long file list is a sign the task is not level 1 yet.
+
+## Rejected
+
+Many more detail fields (not, example): steps can hold them.

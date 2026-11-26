@@ -1,0 +1,25 @@
+<!-- dossier-format: 1 -->
+# FND-018 · Lane grouping in waves was quadratic for many tasks under one folder
+
+- kind: finding
+- status: approved
+- created: 2026-11-26T19:49:25+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:49:25+01:00 by reyna
+- valid-from: 2026-11-26T19:49:25+01:00
+- task: T-182
+- topic: testing
+- code: src/ops/waves.rs
+- related: DEC-050
+- history: 2026-11-26T19:49:25+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:49:25+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:42+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-050
+
+## Observation
+
+waves took 118 ms on the 5,000-task planning file (limit 100 ms) because lane grouping compared every file with every other file under src/. Looking single files up in a map brought it to 84 to 92 ms; later work brought it to about 40 ms.
+
+## Evidence
+
+Tasks T-182 and T-188, median of five release runs

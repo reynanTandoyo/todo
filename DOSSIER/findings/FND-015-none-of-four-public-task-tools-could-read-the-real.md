@@ -1,0 +1,24 @@
+<!-- dossier-format: 1 -->
+# FND-015 · None of four public task tools could read the real task lists
+
+- kind: finding
+- status: approved
+- created: 2026-11-26T19:49:25+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:49:25+01:00 by reyna
+- valid-from: 2026-11-26T19:49:25+01:00
+- topic: process
+- related: DEC-003, DEC-020
+- history: 2026-11-26T19:49:25+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:49:25+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:39+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-003
+- history: 2026-11-26T19:51:40+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-020
+
+## Observation
+
+Four public Rust projects were read at source level (arkan/td, aegea-dev/primum, 9aia/myco, lens077/ToDo). None can read either real TODO.md; td, run on copies, listed 0 tasks for both and refused every write. What was taken from each as an idea, and what was avoided, is listed per project in docs/research.md section 2; lens077/ToDo has no licence, so only ideas were used and no code.
+
+## Evidence
+
+docs/research.md section 2, study of 2026-11-15

@@ -1,0 +1,26 @@
+<!-- dossier-format: 1 -->
+# DEC-059 · v1.1: polish of the status page after reading this project's own page
+
+- kind: decision
+- status: approved
+- created: 2026-11-26T19:47:14+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:47:14+01:00 by reyna
+- valid-from: 2026-11-26T19:47:14+01:00
+- task: T-220
+- standing: yes
+- topic: report
+- code: src/report
+- related: DEC-055
+- history: 2026-11-26T19:47:14+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:47:14+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:42+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-055
+
+## Decision
+
+Five changes: a line in words when a view button matches nothing; subheadings in For the planner; text between backticks shown as code; every milestone row carries a marker and its ID; a button adds the archive to All work; and each task shows, on request, the chain of tasks it waits for and that wait for it. The format stays version 3. (Owner, 2026-11-22)
+
+## Reason
+
+Found by looking at the page built from this finished project: a filter left the tree blank, milestones did not stand out, and the archived work could not be seen in the same tree.

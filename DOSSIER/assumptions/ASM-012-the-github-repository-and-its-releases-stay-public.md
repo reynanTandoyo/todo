@@ -1,0 +1,28 @@
+<!-- dossier-format: 1 -->
+# ASM-012 · The GitHub repository and its releases stay public and reachable
+
+- kind: assumption
+- status: approved
+- created: 2026-11-26T19:49:26+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:49:26+01:00 by reyna
+- valid-from: 2026-11-26T19:49:26+01:00
+- state: open
+- topic: release
+- related: DEC-042
+- history: 2026-11-26T19:49:26+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:49:26+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:41+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-042
+
+## Assumption
+
+github.com/reynanTandoyo/todo stays public, and each release keeps todo.exe, todo-linux-x86_64 and their SHA-256 files under the same names.
+
+## Reason
+
+todo help update prints these addresses and names; a test checks them only against the release workflow, not against GitHub.
+
+## Affects
+
+todo help update, the release workflow

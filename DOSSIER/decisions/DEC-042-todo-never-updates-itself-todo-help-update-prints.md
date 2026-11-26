@@ -1,0 +1,30 @@
+<!-- dossier-format: 1 -->
+# DEC-042 · todo never updates itself; todo help update prints the steps for an agent
+
+- kind: decision
+- status: approved
+- created: 2026-11-26T19:47:13+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:47:13+01:00 by reyna
+- valid-from: 2026-11-26T19:47:13+01:00
+- standing: yes
+- topic: versions
+- code: src/cli/help.rs
+- related: DEC-017, ASM-012
+- history: 2026-11-26T19:47:13+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:47:13+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:40+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-017
+- history: 2026-11-26T19:51:41+01:00 reyna via reyna - claude fable 5.2: changed — related ASM-012
+
+## Decision
+
+todo help update prints the running version, the path of the running executable, the repository (github.com/reynanTandoyo/todo) and the steps to download the latest release, compare its SHA-256, replace the executable and run todo migrate --yes in each project. todo itself never connects to the network; the agent runs the commands. (Owner, 2026-11-18)
+
+## Reason
+
+When a file needs a newer todo, the agent should be able to update the executable from the official repository instead of guessing, and the rule of no network access stays.
+
+## Rejected
+
+Self-update by the program.

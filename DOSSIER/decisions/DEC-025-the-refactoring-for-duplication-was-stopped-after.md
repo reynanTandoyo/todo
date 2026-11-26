@@ -1,0 +1,30 @@
+<!-- dossier-format: 1 -->
+# DEC-025 · The refactoring for duplication was stopped after three chunks
+
+- kind: decision
+- status: approved
+- created: 2026-11-26T19:47:12+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:47:12+01:00 by reyna
+- valid-from: 2026-11-26T19:47:12+01:00
+- task: T-083
+- standing: yes
+- topic: process
+- related: FND-021, FND-042
+- history: 2026-11-26T19:47:12+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:47:12+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:40+01:00 reyna via reyna - claude fable 5.2: changed — related FND-021
+- history: 2026-11-26T19:51:40+01:00 reyna via reyna - claude fable 5.2: changed — related FND-042
+
+## Decision
+
+Task T-083 (remove duplication without changing behaviour) was dropped after chunk 3. Kept: shared task operations for the status commands and apply, shared test helpers, shared section lookup. (Owner, 2026-11-15)
+
+## Reason
+
+jscpd measured only 2.3 percent duplicated code (575 lines). The size comes from the feature set, the safety machinery and the tests, not from copy and paste; the remaining items were not worth their cost.
+
+## Rejected
+
+Continuing with the remaining chunks (pipeline variants, lock and history, parser, test leftovers).

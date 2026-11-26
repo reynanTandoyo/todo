@@ -1,0 +1,29 @@
+<!-- dossier-format: 1 -->
+# DEC-049 · A worker that cannot finish gives the task back to the planner with the problem
+
+- kind: decision
+- status: approved
+- created: 2026-11-26T19:47:13+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:47:13+01:00 by reyna
+- valid-from: 2026-11-26T19:47:13+01:00
+- standing: yes
+- topic: verify
+- code: src/cli/stuck.rs
+- related: DEC-048
+- history: 2026-11-26T19:47:13+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:47:13+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:42+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-048
+
+## Decision
+
+todo stuck <task> --note <problem> blocks the task, removes the owner and the claim, and records the problem; the planner sees it first in todo plan and releases it with unblock or split. The level is not changed automatically. It reuses the blocked status, so no sixth status was needed. (Owner, 2026-11-19)
+
+## Reason
+
+A weak model that cannot finish must have a clean way out, and the planner must learn what went wrong. Whether the task was too hard or only badly described is the planner's judgement.
+
+## Rejected
+
+Raising the level automatically after a failure.

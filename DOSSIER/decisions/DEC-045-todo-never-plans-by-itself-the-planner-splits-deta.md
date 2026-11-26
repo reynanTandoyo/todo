@@ -1,0 +1,29 @@
+<!-- dossier-format: 1 -->
+# DEC-045 · todo never plans by itself: the planner splits, details and rates, and todo shows what is left
+
+- kind: decision
+- status: approved
+- created: 2026-11-26T19:47:13+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:47:13+01:00 by reyna
+- valid-from: 2026-11-26T19:47:13+01:00
+- standing: yes
+- topic: planning
+- code: src/ops/plan.rs, src/cli/split.rs
+- related: DEC-044
+- history: 2026-11-26T19:47:13+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:47:13+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:41+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-044
+
+## Decision
+
+todo does not divide, detail or rate tasks. todo plan lists what the planner still has to do: tasks given back, tasks above the target level, tasks at the target level without complete detail, and tasks without a level. todo split is only a helper: it turns one task into a milestone and adds the child tasks in one locked step. todo never starts, chooses or stops agents. (Owner, 2026-11-19)
+
+## Reason
+
+Dividing work needs judgement that belongs to a strong model, not to the tool; the tool's part is to make sure nothing is forgotten and that a split cannot be left half done.
+
+## Rejected
+
+A tool that decomposes tasks by itself.

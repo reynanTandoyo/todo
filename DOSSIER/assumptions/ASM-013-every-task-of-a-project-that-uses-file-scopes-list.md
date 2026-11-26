@@ -1,0 +1,28 @@
+<!-- dossier-format: 1 -->
+# ASM-013 · Every task of a project that uses file scopes lists all the files it changes
+
+- kind: assumption
+- status: approved
+- created: 2026-11-26T19:49:26+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:49:26+01:00 by reyna
+- valid-from: 2026-11-26T19:49:26+01:00
+- state: open
+- topic: verify
+- related: DEC-047
+- history: 2026-11-26T19:49:26+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:49:26+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:41+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-047
+
+## Assumption
+
+A level-1 task changes only the files it names, and a planner knows those files before the work starts.
+
+## Reason
+
+next can keep workers apart only for files that are named. A file the planner forgot is caught at done, after the work.
+
+## Affects
+
+file scopes, OUT_OF_SCOPE, waves and lanes

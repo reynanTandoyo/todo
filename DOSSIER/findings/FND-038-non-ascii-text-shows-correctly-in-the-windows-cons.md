@@ -1,0 +1,25 @@
+<!-- dossier-format: 1 -->
+# FND-038 · Non-ASCII text shows correctly in the Windows consoles
+
+- kind: finding
+- status: approved
+- created: 2026-11-26T19:49:25+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:49:25+01:00 by reyna
+- valid-from: 2026-11-26T19:49:25+01:00
+- task: T-006
+- topic: cli
+- code: src/output.rs, scripts/console-check.ps1
+- related: DEC-014
+- history: 2026-11-26T19:49:25+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:49:25+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:39+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-014
+
+## Observation
+
+The middle dot, the em dash and Japanese text render correctly in todo list and todo show; the owner ran scripts/console-check.ps1 in PowerShell. Other shells were not repeated, because direct console output goes through the Windows console API whatever the shell. Piped output is UTF-8 (automated test).
+
+## Evidence
+
+Task T-006, owner's manual check of 2026-11-15

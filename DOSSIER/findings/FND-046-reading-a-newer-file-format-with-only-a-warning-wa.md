@@ -1,0 +1,26 @@
+<!-- dossier-format: 1 -->
+# FND-046 · Reading a newer file format with only a warning was not safe
+
+- kind: finding
+- status: approved
+- created: 2026-11-26T19:49:26+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:49:26+01:00 by reyna
+- valid-from: 2026-11-26T19:49:26+01:00
+- outcome: dead end
+- task: T-104
+- topic: versions
+- code: src/doc/parser.rs
+- related: DEC-041
+- history: 2026-11-26T19:49:26+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:49:26+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:41+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-041
+
+## Observation
+
+Up to todo 0.5 a file with a higher format version could be read, with a warning, but not written. With milestones and ideas in the file, such a tool would list and hand out entries it does not understand. From v0.6 an unknown format is refused for every task command.
+
+## Evidence
+
+docs/format.md section 4; task T-104, 2026-11-18

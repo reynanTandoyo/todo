@@ -1,0 +1,28 @@
+<!-- dossier-format: 1 -->
+# ASM-007 · A verify command is as trustworthy as the TODO.md it comes from
+
+- kind: assumption
+- status: approved
+- created: 2026-11-26T19:49:26+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:49:26+01:00 by reyna
+- valid-from: 2026-11-26T19:49:26+01:00
+- state: open
+- topic: verify
+- related: DEC-048
+- history: 2026-11-26T19:49:26+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:49:26+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:42+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-048
+
+## Assumption
+
+Whoever can change TODO.md is allowed to make todo run a command on this PC, with the rights of the agent that runs todo.
+
+## Reason
+
+todo runs the verify line as written; it cannot tell a harmful command from a test. Agents can already run any command, so this was accepted.
+
+## Affects
+
+verify.timeout, todo done, todo verify --wave

@@ -1,0 +1,30 @@
+<!-- dossier-format: 1 -->
+# DEC-053 · Old difficulty words migrate to levels 2, 3 and 4; finished entries keep them as a record
+
+- kind: decision
+- status: approved
+- created: 2026-11-26T19:47:13+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:47:13+01:00 by reyna
+- valid-from: 2026-11-26T19:47:13+01:00
+- task: T-148
+- standing: yes
+- topic: versions
+- code: src/doc/migrate.rs
+- related: DEC-044
+- history: 2026-11-26T19:47:13+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:47:13+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:41+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-044
+
+## Decision
+
+The format 2 to 3 migration rewrites easy to 2, medium to 3 and hard to 4 on entries that are not done or dropped, when todo.toml sets no difficulties of its own. Done and dropped entries keep the old words, and check does not report them.
+
+## Reason
+
+None of the old words meant level 1 in the strict sense of v0.8, so no old task may become level 1 by migration.
+
+## Rejected
+
+Mapping easy to level 1.

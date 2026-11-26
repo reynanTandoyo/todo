@@ -1,0 +1,24 @@
+<!-- dossier-format: 1 -->
+# FND-041 · In PowerShell, text with backticks, quotes or a dollar sign is changed inside double quotes
+
+- kind: finding
+- status: approved
+- created: 2026-11-26T19:49:26+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:49:26+01:00 by reyna
+- valid-from: 2026-11-26T19:49:26+01:00
+- topic: cli
+- code: src/cli/mod.rs
+- related: LES-016
+- history: 2026-11-26T19:49:26+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:49:26+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:44+01:00 reyna via reyna - claude fable 5.2: changed — related LES-016
+
+## Observation
+
+Backticks are escape characters and a dollar sign starts a variable inside PowerShell double quotes, so task text passed that way arrives changed. Single quotes, or the - and @path forms that every todo text option accepts, pass it intact.
+
+## Evidence
+
+Requirement R-WRITE-12, situation S13; sessions of 2026-11-18

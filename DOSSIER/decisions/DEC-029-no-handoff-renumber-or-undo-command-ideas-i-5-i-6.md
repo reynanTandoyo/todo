@@ -1,0 +1,24 @@
+<!-- dossier-format: 1 -->
+# DEC-029 · No handoff, renumber or undo command (ideas I-5, I-6, I-9 dropped)
+
+- kind: decision
+- status: approved
+- created: 2026-11-26T19:47:12+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- approved: 2026-11-26T19:47:12+01:00 by reyna
+- valid-from: 2026-11-26T19:47:12+01:00
+- standing: yes
+- topic: cli
+- related: DEC-005
+- history: 2026-11-26T19:47:12+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:47:12+01:00 reyna via reyna - claude fable 5.2: approved
+- history: 2026-11-26T19:51:39+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-005
+
+## Decision
+
+Three ideas are dropped: todo handoff (a summary note of an agent's open claims), todo renumber (change a task's ID and every reference) and todo undo (revert an agent's last change). (Owner, 2026-11-17)
+
+## Reason
+
+todo note already does the handoff. Commit messages keep the old ID, so renumbering breaks the link to the history. reopen, release, set and restore already reverse any change.

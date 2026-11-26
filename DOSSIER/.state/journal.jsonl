@@ -1,0 +1,510 @@
+{"time":"2026-11-26T19:42:51+01:00","name":"reyna - claude fable 5.2","person":"reyna - claude fable 5.2","llm":false,"command":"init","id":"DOSSIER","event":"created","detail":"code TODO"}
+{"time":"2026-11-26T19:42:51+01:00","name":"reyna - claude fable 5.2","person":"reyna - claude fable 5.2","llm":false,"command":"people","id":"SETTINGS","event":"changed","detail":"person reyna"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: format (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: locking (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: claims (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: cli (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: agents (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: milestones (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: planning (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: verify (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: report (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: projects (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: git (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: versions (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: release (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: testing (said by reyna)"}
+{"time":"2026-11-26T19:42:57+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"topics","id":"SETTINGS","event":"changed","detail":"topic added: process (said by reyna)"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"map","id":"MAP","event":"set","detail":"docs"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"map","id":"MAP","event":"set","detail":"src"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"map","id":"MAP","event":"set","detail":"src/doc"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"map","id":"MAP","event":"set","detail":"src/ops"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"map","id":"MAP","event":"set","detail":"src/cli"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"map","id":"MAP","event":"set","detail":"src/report"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"map","id":"MAP","event":"set","detail":"src/register"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"map","id":"MAP","event":"set","detail":"src/agents"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"map","id":"MAP","event":"set","detail":"tests"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"map","id":"MAP","event":"set","detail":"tests/fixtures"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"map","id":"MAP","event":"set","detail":".github/workflows"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"map","id":"MAP","event":"set","detail":"scripts"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"release.version: 1.0.0"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"format.version: 3"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"build.rust-minimum: 1.89"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"speed.read: 100 ms"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"speed.write: 200 ms"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"speed.report: 500 ms"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"speed.report-all: 5 s"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"speed.test-file: 5000 tasks"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"size.report-page: 5 MB"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"size.exe: 5 MB"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"limits.claim-ttl: 24 h"}
+{"time":"2026-11-26T19:44:45+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"limits.lock-wait: 30 s"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"limits.lease: 10 min"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"limits.lease-max: 60 min"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"limits.snapshots-kept: 200"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"limits.summary-lines: 40 lines"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"limits.rename-retry: 2 s"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"planning.levels: 1 to 5"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"planning.level1-max-files: 3 files"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"verify.timeout: 300 s"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"verify.attempts: 3"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"rules.common-lines: 15 lines"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"rules.worker-lines: 10 lines"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"report.width: 820 px"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"report.recent-days: 7 days"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"report.recent-rows: 15 rows"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"value","id":"VALUES","event":"set","detail":"report.contrast-minimum: 3 to 1"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"entry"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"task"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"milestone"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"question"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"idea"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"status"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"claim"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"stale claim"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"write lock"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"lease"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"state folder"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"snapshot"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"journal"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"archive"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"managed block"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"combined priority line"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"tool stamp"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"format version"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"migration"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"level"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"target level"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"planner"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"worker"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"work order"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"ready"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"verify command"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"given back"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"file scope"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"wave"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"lane"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"final"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"summary"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"status page"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"needs you"}
+{"time":"2026-11-26T19:44:46+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"project register"}
+{"time":"2026-11-26T19:44:47+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"owner"}
+{"time":"2026-11-26T19:47:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-001","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-002","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-003","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-004","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-005","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-006","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-007","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-008","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-009","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-010","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-011","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-012","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-013","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-014","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-015","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-016","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-017","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-018","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-019","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-020","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-021","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-022","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-023","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-024","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-025","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-026","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-027","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-028","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-029","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-030","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-031","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-032","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-033","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-034","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-035","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-036","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-028","event":"superseded","detail":"by DEC-036"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-037","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-013","event":"superseded","detail":"by DEC-037"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-038","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-039","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-040","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-041","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-042","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-043","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-044","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-045","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-046","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-047","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-048","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-049","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-050","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-051","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-016","event":"superseded","detail":"by DEC-051"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-052","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-053","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:13+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-054","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:14+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-055","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:14+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-056","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:14+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-057","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:14+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-058","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:14+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-059","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:14+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-060","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:14+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-061","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:14+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-062","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:14+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-063","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:47:14+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-064","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:24+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-001","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:24+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-002","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:24+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-003","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:24+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-004","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:24+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-005","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:24+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-006","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-007","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-008","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-009","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-010","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-011","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-012","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-013","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-014","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-015","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-016","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-017","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-018","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-019","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-020","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-021","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-022","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-023","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-024","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-025","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-026","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-027","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-028","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-029","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-030","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-031","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-032","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-033","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-034","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-035","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-036","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-037","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-038","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:25+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-039","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-040","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-041","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-042","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-043","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-044","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-045","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-046","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-001","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-002","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-003","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-004","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-005","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-006","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-007","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-008","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-009","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-010","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-011","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-012","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:49:26+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"assume","id":"ASM-013","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:51:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-001","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-002","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-003","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-004","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-005","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-006","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-007","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-008","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-009","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-010","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:11+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-011","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-012","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-013","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-014","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-015","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"learn","id":"LES-016","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"tool","id":"TOOL-001","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"tool","id":"TOOL-002","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"tool","id":"TOOL-003","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"tool","id":"TOOL-004","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"tool","id":"TOOL-005","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"tool","id":"TOOL-006","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"tool","id":"TOOL-007","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"howto","id":"HOW-001","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"howto","id":"HOW-002","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"howto","id":"HOW-003","event":"created","detail":"draft"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"ID"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"JSON"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"HTML"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"CI"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"PC"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"MCP"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"AGENTS.md"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"NFR"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"WSL"}
+{"time":"2026-11-26T19:51:12+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"requirement ID"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-003","event":"changed","detail":"related FND-005"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-005","event":"changed","detail":"related DEC-003"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-003","event":"changed","detail":"related FND-015"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-015","event":"changed","detail":"related DEC-003"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-004","event":"changed","detail":"related FND-013"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-013","event":"changed","detail":"related DEC-004"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-005","event":"changed","detail":"related FND-005"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-005","event":"changed","detail":"related DEC-005"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-005","event":"changed","detail":"related DEC-029"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-029","event":"changed","detail":"related DEC-005"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-006","event":"changed","detail":"related ASM-006"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-006","event":"changed","detail":"related DEC-006"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-007","event":"changed","detail":"related FND-002"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-002","event":"changed","detail":"related DEC-007"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-007","event":"changed","detail":"related FND-023"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-023","event":"changed","detail":"related DEC-007"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-008","event":"changed","detail":"related FND-009"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-009","event":"changed","detail":"related DEC-008"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-008","event":"changed","detail":"related FND-008"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-008","event":"changed","detail":"related DEC-008"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-008","event":"changed","detail":"related ASM-003"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-003","event":"changed","detail":"related DEC-008"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-009","event":"changed","detail":"related FND-002"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-002","event":"changed","detail":"related DEC-009"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-010","event":"changed","detail":"related FND-001"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-001","event":"changed","detail":"related DEC-010"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-012","event":"changed","detail":"related FND-011"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-011","event":"changed","detail":"related DEC-012"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-012","event":"changed","detail":"related DEC-054"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-054","event":"changed","detail":"related DEC-012"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-014","event":"changed","detail":"related FND-022"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-022","event":"changed","detail":"related DEC-014"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-014","event":"changed","detail":"related FND-023"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-023","event":"changed","detail":"related DEC-014"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-014","event":"changed","detail":"related DEC-061"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-061","event":"changed","detail":"related DEC-014"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-014","event":"changed","detail":"related FND-038"}
+{"time":"2026-11-26T19:51:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-038","event":"changed","detail":"related DEC-014"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-017","event":"changed","detail":"related DEC-042"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-042","event":"changed","detail":"related DEC-017"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-017","event":"changed","detail":"related DEC-038"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-038","event":"changed","detail":"related DEC-017"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-018","event":"changed","detail":"related FND-026"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-026","event":"changed","detail":"related DEC-018"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-018","event":"changed","detail":"related DEC-052"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-052","event":"changed","detail":"related DEC-018"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-018","event":"changed","detail":"related LES-009"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-009","event":"changed","detail":"related DEC-018"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-020","event":"changed","detail":"related FND-007"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-007","event":"changed","detail":"related DEC-020"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-020","event":"changed","detail":"related FND-015"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-015","event":"changed","detail":"related DEC-020"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-037","event":"changed","detail":"related DEC-036"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-036","event":"changed","detail":"related DEC-037"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-051","event":"changed","detail":"related FND-036"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-036","event":"changed","detail":"related DEC-051"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-051","event":"changed","detail":"related LES-012"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-012","event":"changed","detail":"related DEC-051"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-051","event":"changed","detail":"related DEC-027"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-027","event":"changed","detail":"related DEC-051"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-051","event":"changed","detail":"related FND-012"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-012","event":"changed","detail":"related DEC-051"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-001","event":"changed","detail":"related DEC-002"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-002","event":"changed","detail":"related DEC-001"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-001","event":"changed","detail":"related DEC-044"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-044","event":"changed","detail":"related DEC-001"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-025","event":"changed","detail":"related FND-021"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-021","event":"changed","detail":"related DEC-025"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-025","event":"changed","detail":"related FND-042"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-042","event":"changed","detail":"related DEC-025"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-021","event":"changed","detail":"related LES-001"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-001","event":"changed","detail":"related FND-021"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-042","event":"changed","detail":"related LES-001"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-001","event":"changed","detail":"related FND-042"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-027","event":"changed","detail":"related FND-036"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-036","event":"changed","detail":"related DEC-027"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-036","event":"changed","detail":"related DEC-058"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-058","event":"changed","detail":"related DEC-036"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-032","event":"changed","detail":"related DEC-033"}
+{"time":"2026-11-26T19:51:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-033","event":"changed","detail":"related DEC-032"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-032","event":"changed","detail":"related FND-044"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-044","event":"changed","detail":"related DEC-032"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-032","event":"changed","detail":"related DEC-034"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-034","event":"changed","detail":"related DEC-032"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-032","event":"changed","detail":"related LES-015"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-015","event":"changed","detail":"related DEC-032"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-034","event":"changed","detail":"related FND-004"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-004","event":"changed","detail":"related DEC-034"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-039","event":"changed","detail":"related DEC-040"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-040","event":"changed","detail":"related DEC-039"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-039","event":"changed","detail":"related ASM-004"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-004","event":"changed","detail":"related DEC-039"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-040","event":"changed","detail":"related DEC-041"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-041","event":"changed","detail":"related DEC-040"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-041","event":"changed","detail":"related FND-046"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-046","event":"changed","detail":"related DEC-041"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-041","event":"changed","detail":"related FND-032"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-032","event":"changed","detail":"related DEC-041"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-042","event":"changed","detail":"related ASM-012"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-012","event":"changed","detail":"related DEC-042"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-044","event":"changed","detail":"related ASM-001"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-001","event":"changed","detail":"related DEC-044"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-044","event":"changed","detail":"related ASM-002"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-002","event":"changed","detail":"related DEC-044"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-044","event":"changed","detail":"related DEC-045"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-045","event":"changed","detail":"related DEC-044"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-044","event":"changed","detail":"related DEC-046"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-046","event":"changed","detail":"related DEC-044"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-044","event":"changed","detail":"related DEC-053"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-053","event":"changed","detail":"related DEC-044"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-044","event":"changed","detail":"related DEC-060"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-060","event":"changed","detail":"related DEC-044"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-044","event":"changed","detail":"related FND-003"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-003","event":"changed","detail":"related DEC-044"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-046","event":"changed","detail":"related ASM-001"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-001","event":"changed","detail":"related DEC-046"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-046","event":"changed","detail":"related HOW-003"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"HOW-003","event":"changed","detail":"related DEC-046"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-047","event":"changed","detail":"related ASM-013"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-013","event":"changed","detail":"related DEC-047"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-047","event":"changed","detail":"related FND-040"}
+{"time":"2026-11-26T19:51:41+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-040","event":"changed","detail":"related DEC-047"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-047","event":"changed","detail":"related LES-013"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-013","event":"changed","detail":"related DEC-047"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-047","event":"changed","detail":"related DEC-050"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-050","event":"changed","detail":"related DEC-047"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-048","event":"changed","detail":"related ASM-007"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-007","event":"changed","detail":"related DEC-048"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-048","event":"changed","detail":"related DEC-052"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-052","event":"changed","detail":"related DEC-048"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-048","event":"changed","detail":"related FND-030"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-030","event":"changed","detail":"related DEC-048"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-048","event":"changed","detail":"related FND-031"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-031","event":"changed","detail":"related DEC-048"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-048","event":"changed","detail":"related DEC-049"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-049","event":"changed","detail":"related DEC-048"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-052","event":"changed","detail":"related FND-030"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-030","event":"changed","detail":"related DEC-052"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-050","event":"changed","detail":"related FND-018"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-018","event":"changed","detail":"related DEC-050"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-055","event":"changed","detail":"related FND-043"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-043","event":"changed","detail":"related DEC-055"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-055","event":"changed","detail":"related FND-034"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-034","event":"changed","detail":"related DEC-055"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-055","event":"changed","detail":"related FND-035"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-035","event":"changed","detail":"related DEC-055"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-055","event":"changed","detail":"related LES-002"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-002","event":"changed","detail":"related DEC-055"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-055","event":"changed","detail":"related DEC-038"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-038","event":"changed","detail":"related DEC-055"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-055","event":"changed","detail":"related DEC-056"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-056","event":"changed","detail":"related DEC-055"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-055","event":"changed","detail":"related DEC-057"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-057","event":"changed","detail":"related DEC-055"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-055","event":"changed","detail":"related DEC-059"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-059","event":"changed","detail":"related DEC-055"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-055","event":"changed","detail":"related ASM-010"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-010","event":"changed","detail":"related DEC-055"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-055","event":"changed","detail":"related FND-020"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-020","event":"changed","detail":"related DEC-055"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-057","event":"changed","detail":"related ASM-009"}
+{"time":"2026-11-26T19:51:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-009","event":"changed","detail":"related DEC-057"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-061","event":"changed","detail":"related HOW-001"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"HOW-001","event":"changed","detail":"related DEC-061"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-061","event":"changed","detail":"related FND-045"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-045","event":"changed","detail":"related DEC-061"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-061","event":"changed","detail":"related ASM-011"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-011","event":"changed","detail":"related DEC-061"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-061","event":"changed","detail":"related LES-010"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-010","event":"changed","detail":"related DEC-061"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-062","event":"changed","detail":"related HOW-002"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"HOW-002","event":"changed","detail":"related DEC-062"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-062","event":"changed","detail":"related LES-007"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-007","event":"changed","detail":"related DEC-062"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-062","event":"changed","detail":"related LES-008"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-008","event":"changed","detail":"related DEC-062"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-062","event":"changed","detail":"related FND-033"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-033","event":"changed","detail":"related DEC-062"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-060","event":"changed","detail":"related LES-003"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-003","event":"changed","detail":"related DEC-060"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-060","event":"changed","detail":"related HOW-003"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"HOW-003","event":"changed","detail":"related DEC-060"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-022","event":"changed","detail":"related TOOL-001"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"TOOL-001","event":"changed","detail":"related DEC-022"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-022","event":"changed","detail":"related LES-014"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-014","event":"changed","detail":"related DEC-022"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-023","event":"changed","detail":"related FND-028"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-028","event":"changed","detail":"related DEC-023"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-023","event":"changed","detail":"related LES-006"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-006","event":"changed","detail":"related DEC-023"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-019","event":"changed","detail":"related LES-004"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-004","event":"changed","detail":"related FND-019"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-019","event":"changed","detail":"related TOOL-003"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"TOOL-003","event":"changed","detail":"related FND-019"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-019","event":"changed","detail":"related ASM-008"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-008","event":"changed","detail":"related FND-019"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-016","event":"changed","detail":"related ASM-008"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"ASM-008","event":"changed","detail":"related FND-016"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-029","event":"changed","detail":"related LES-005"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-005","event":"changed","detail":"related FND-029"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-027","event":"changed","detail":"related LES-006"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-006","event":"changed","detail":"related FND-027"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-022","event":"changed","detail":"related LES-011"}
+{"time":"2026-11-26T19:51:43+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-011","event":"changed","detail":"related FND-022"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-025","event":"changed","detail":"related LES-010"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-010","event":"changed","detail":"related FND-025"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-041","event":"changed","detail":"related LES-016"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-016","event":"changed","detail":"related FND-041"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-026","event":"changed","detail":"related LES-009"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-009","event":"changed","detail":"related FND-026"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-032","event":"changed","detail":"related LES-007"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-007","event":"changed","detail":"related FND-032"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-033","event":"changed","detail":"related LES-008"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-008","event":"changed","detail":"related FND-033"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-030","event":"changed","detail":"related FND-037"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-037","event":"changed","detail":"related DEC-030"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-064","event":"changed","detail":"related DEC-063"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-063","event":"changed","detail":"related DEC-064"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"HOW-001","event":"changed","detail":"related TOOL-002"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"TOOL-002","event":"changed","detail":"related HOW-001"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"HOW-002","event":"changed","detail":"related TOOL-006"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"TOOL-006","event":"changed","detail":"related HOW-002"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"HOW-002","event":"changed","detail":"related TOOL-007"}
+{"time":"2026-11-26T19:51:44+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"TOOL-007","event":"changed","detail":"related HOW-002"}
+{"time":"2026-11-26T19:52:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-065","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:52:39+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-066","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-067","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"decide","id":"DEC-068","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-047","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-048","event":"created","detail":"approved"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"PATH"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"CRLF"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"LF"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"SHA-256"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"ASCII"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"MB"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"TODO_AGENT"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"TODO_FILE"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"term","id":"GLOSSARY","event":"added","detail":"R-OUT"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-065","event":"changed","detail":"related DEC-017"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-017","event":"changed","detail":"related DEC-065"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-066","event":"changed","detail":"related DEC-012"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-012","event":"changed","detail":"related DEC-066"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-066","event":"changed","detail":"related DEC-054"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-054","event":"changed","detail":"related DEC-066"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-067","event":"changed","detail":"related DEC-043"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-043","event":"changed","detail":"related DEC-067"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-068","event":"changed","detail":"related DEC-022"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-022","event":"changed","detail":"related DEC-068"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-060","event":"changed","detail":"related FND-047"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"FND-047","event":"changed","detail":"related DEC-060"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-055","event":"changed","detail":"related DEC-058"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-058","event":"changed","detail":"related DEC-055"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"DEC-056","event":"changed","detail":"related LES-002"}
+{"time":"2026-11-26T19:52:40+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"link","id":"LES-002","event":"changed","detail":"related DEC-056"}
+{"time":"2026-11-26T19:55:56+01:00","name":"reyna - claude fable 5.2","person":"reyna - claude fable 5.2","llm":false,"command":"hooks","id":"HOOKS","event":"changed","detail":"hooks installed; DOSSIER_AGENT set"}
