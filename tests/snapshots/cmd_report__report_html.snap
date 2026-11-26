@@ -236,12 +236,12 @@ details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
 </div>
 <div id="tree">
 <details class="ms" open>
-<summary><span class="ms-title">Lantern tool</span><span class="ms-state st-prog">in progress</span><span class="ms-count">4 of 10 done</span><span class="bar"><i style="width:40%"></i></span></summary>
+<summary><span class="ms-mark" role="img" aria-label="Milestone">M</span><span class="ms-id">T-001</span><span class="ms-title">Lantern tool</span><span class="ms-state st-prog">in progress</span><span class="ms-count">4 of 10 done</span><span class="bar"><i style="width:40%"></i></span></summary>
 <div class="ms-body">
 <p class="goal">Goal: a sky map becomes the list of lanterns for the club hall</p>
 <div class="more"><p><span class="lbl">Summary</span><br>Turns a sky map into the lanterns to hang in the club hall.</p></div>
 <details class="ms" open>
-<summary><span class="ms-title">Sky map reader</span><span class="ms-state st-prog">in progress</span><span class="ms-count">1 of 4 done</span><span class="bar"><i style="width:25%"></i></span></summary>
+<summary><span class="ms-mark" role="img" aria-label="Milestone">M</span><span class="ms-id">T-002</span><span class="ms-title">Sky map reader</span><span class="ms-state st-prog">in progress</span><span class="ms-count">1 of 4 done</span><span class="bar"><i style="width:25%"></i></span></summary>
 <div class="ms-body">
 <p class="goal">Goal: every map format the club uses can be read</p>
 <ul class="items">
@@ -257,7 +257,7 @@ details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
 </div>
 </details>
 <details class="ms" open>
-<summary><span class="ms-title">Lamp plan</span><span class="ms-state st-prog">in progress</span><span class="ms-count">0 of 3 done</span><span class="bar"><i style="width:0%"></i></span></summary>
+<summary><span class="ms-mark" role="img" aria-label="Milestone">M</span><span class="ms-id">T-011</span><span class="ms-title">Lamp plan</span><span class="ms-state st-prog">in progress</span><span class="ms-count">0 of 3 done</span><span class="bar"><i style="width:0%"></i></span></summary>
 <div class="ms-body">
 <p class="goal">Goal: each room has a plan of its lanterns</p>
 <ul class="items">
@@ -271,7 +271,7 @@ details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
 </div>
 </details>
 <details class="ms">
-<summary><span class="ms-title">Club hall</span><span class="ms-state st-done">finished 18 Nov</span><span class="ms-count">2 of 2 done</span><span class="bar"><i style="width:100%"></i></span></summary>
+<summary><span class="ms-mark" role="img" aria-label="Milestone">M</span><span class="ms-id">T-020</span><span class="ms-title">Club hall</span><span class="ms-state st-done">finished 18 Nov</span><span class="ms-count">2 of 2 done</span><span class="bar"><i style="width:100%"></i></span></summary>
 <div class="ms-body">
 <p class="goal">Goal: the hall is measured and marked before the plan is drawn</p>
 <ul class="items">
@@ -307,7 +307,7 @@ details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
 <details class="fold"><summary>Earlier work (1 finished milestone, 2 tasks) <span class="muted">— from the archive</span></summary>
 <div class="tree">
 <details class="ms">
-<summary><span class="ms-title">Lantern tool v0</span><span class="ms-state st-done">finished 2 Oct</span><span class="ms-count">1 of 1 done</span><span class="bar"><i style="width:100%"></i></span></summary>
+<summary><span class="ms-mark" role="img" aria-label="Milestone">M</span><span class="ms-id">T-040</span><span class="ms-title">Lantern tool v0</span><span class="ms-state st-done">finished 2 Oct</span><span class="ms-count">1 of 1 done</span><span class="bar"><i style="width:100%"></i></span></summary>
 <div class="ms-body">
 <p class="goal">Goal: a first plan for one room</p>
 <ul class="items">

@@ -231,7 +231,7 @@ fn all_work_is_one_tree_and_a_done_entry_stays_in_its_milestone() {
 
     // The finished milestone is closed and shows its two done tasks.
     assert!(html.contains(
-        "<details class=\"ms\">\n<summary><span class=\"ms-title\">Club hall</span><span class=\"ms-state st-done\">finished 18 Nov</span><span class=\"ms-count\">2 of 2 done</span>"
+        "<details class=\"ms\">\n<summary><span class=\"ms-mark\" role=\"img\" aria-label=\"Milestone\">M</span><span class=\"ms-id\">T-020</span><span class=\"ms-title\">Club hall</span><span class=\"ms-state st-done\">finished 18 Nov</span><span class=\"ms-count\">2 of 2 done</span>"
     ));
     let club = section_from(&html, "Club hall");
     assert!(
@@ -242,7 +242,7 @@ fn all_work_is_one_tree_and_a_done_entry_stays_in_its_milestone() {
 
     // The milestone with work in progress is open and counts its tasks below at any depth.
     assert!(html.contains(
-        "<details class=\"ms\" open>\n<summary><span class=\"ms-title\">Sky map reader</span><span class=\"ms-state st-prog\">in progress</span><span class=\"ms-count\">1 of 4 done</span>"
+        "<details class=\"ms\" open>\n<summary><span class=\"ms-mark\" role=\"img\" aria-label=\"Milestone\">M</span><span class=\"ms-id\">T-002</span><span class=\"ms-title\">Sky map reader</span><span class=\"ms-state st-prog\">in progress</span><span class=\"ms-count\">1 of 4 done</span>"
     ));
     // A cancelled task stays in its place, with its reason on the second line.
     assert!(html.contains("<li class=\"item drop\">"));

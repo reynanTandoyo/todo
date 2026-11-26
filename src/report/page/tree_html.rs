@@ -75,6 +75,7 @@ pub fn push_milestone(h: &mut String, milestone: &MilestoneView, today: NaiveDat
     let (state_class, state_text) = milestone_state(milestone.state, today);
     push_summary(
         h,
+        Some(&milestone.id),
         &milestone.title,
         state_class,
         &state_text,
@@ -124,6 +125,7 @@ fn push_other_work(h: &mut String, tasks: &[EntryView], today: NaiveDate) {
     h.push_str("<details class=\"ms\" open>\n");
     push_summary(
         h,
+        None,
         "Other work",
         "st-none",
         "not part of a milestone",
@@ -135,18 +137,28 @@ fn push_other_work(h: &mut String, tasks: &[EntryView], today: NaiveDate) {
     h.push_str("</div>\n</details>\n");
 }
 
-/// The summary row of a milestone or of *Other work*: title, state, "N of M done" and the bar.
+/// The summary row of a milestone or of *Other work*: the marker and the ID when there is one (a
+/// milestone; *Other work* has none), then title, state, "N of M done" and the bar.
 fn push_summary(
     h: &mut String,
+    id: Option<&str>,
     title: &str,
     state_class: &str,
     state_text: &str,
     done: usize,
     total: usize,
 ) {
+    h.push_str("<summary>");
+    if let Some(id) = id {
+        let _ = write!(
+            h,
+            "<span class=\"ms-mark\" role=\"img\" aria-label=\"Milestone\">M</span><span class=\"ms-id\">{}</span>",
+            escape(id),
+        );
+    }
     let _ = writeln!(
         h,
-        "<summary><span class=\"ms-title\">{}</span><span class=\"ms-state {state_class}\">{}</span><span class=\"ms-count\">{done} of {total} done</span><span class=\"bar\"><i style=\"width:{}%\"></i></span></summary>",
+        "<span class=\"ms-title\">{}</span><span class=\"ms-state {state_class}\">{}</span><span class=\"ms-count\">{done} of {total} done</span><span class=\"bar\"><i style=\"width:{}%\"></i></span></summary>",
         inline_code(title),
         escape(state_text),
         percent(done, total),
@@ -426,6 +438,15 @@ mod tests {
         let at = html.find(&needle).unwrap();
         let start = html[..at].rfind("<details").unwrap();
         let end = html[start..].find('>').unwrap() + start + 1;
+        html[start..end].to_string()
+    }
+
+    /// The `summary` row of the milestone or group titled `title`, as written.
+    fn summary_of(html: &str, title: &str) -> String {
+        let needle = format!("<span class=\"ms-title\">{title}</span>");
+        let at = html.find(&needle).unwrap();
+        let start = html[..at].rfind("<summary>").unwrap();
+        let end = html[at..].find("</summary>").unwrap() + at + "</summary>".len();
         html[start..end].to_string()
     }
 
@@ -772,5 +793,64 @@ mod tests {
         let item = item_of(&html, "T-001");
         assert!(item.contains("<span class=\"t\">Add the <code>--summary</code> option</span>"));
         assert!(item.contains("<span class=\"id\">T-001</span>"));
+    }
+
+    #[test]
+    fn a_milestone_row_holds_its_marker_and_its_id_before_its_title() {
+        let html = tree_html(&text(&[
+            "### T-001 · Develop the renderer",
+            "- status: open",
+            "- type: milestone",
+            "### T-002 · Work under it",
+            "- status: open",
+            "- milestone: T-001",
+        ]));
+        let row = summary_of(&html, "Develop the renderer");
+        assert!(
+            row.starts_with(
+                "<summary><span class=\"ms-mark\" role=\"img\" aria-label=\"Milestone\">M</span>\
+                 <span class=\"ms-id\">T-001</span><span class=\"ms-title\">Develop the renderer</span>"
+            ),
+            "{row}"
+        );
+    }
+
+    #[test]
+    fn a_nested_milestone_row_holds_its_marker_and_its_id_too() {
+        let html = tree_html(&text(&[
+            "### T-001 · Develop the renderer",
+            "- status: open",
+            "- type: milestone",
+            "### T-002 · C shader",
+            "- status: open",
+            "- type: milestone",
+            "- milestone: T-001",
+        ]));
+        let row = summary_of(&html, "C shader");
+        assert!(
+            row.starts_with(
+                "<summary><span class=\"ms-mark\" role=\"img\" aria-label=\"Milestone\">M</span>\
+                 <span class=\"ms-id\">T-002</span><span class=\"ms-title\">C shader</span>"
+            ),
+            "{row}"
+        );
+    }
+
+    #[test]
+    fn the_other_work_row_has_neither_marker_nor_id() {
+        let html = tree_html(&text(&[
+            "### T-001 · A milestone",
+            "- status: open",
+            "- type: milestone",
+            "### T-002 · A loose task",
+            "- status: open",
+        ]));
+        let row = summary_of(&html, "Other work");
+        assert!(
+            row.starts_with("<summary><span class=\"ms-title\">Other work</span>"),
+            "{row}"
+        );
+        assert!(!row.contains("ms-mark"), "{row}");
+        assert!(!row.contains("ms-id"), "{row}");
     }
 }
