@@ -33,6 +33,9 @@ pub struct PageData {
     pub as_of: String,
     /// Tasks in each state, counted over `TODO.md` (the overall line).
     pub counts: tree::Counts,
+    /// The overall counts over TODO.md and the archive together (R-REPORT-6, Include archive);
+    /// None without an archive.
+    pub counts_with_archive: Option<tree::Counts>,
     /// Needs you (R-REPORT-4), in order.
     pub needs: Vec<needs::Need>,
     /// Last 7 days (R-REPORT-5).
@@ -67,6 +70,8 @@ pub fn build(
     let tree = tree::build_tree(doc, &ctx);
     let mut planner = model::build_page(doc, archive, cfg, now, file_label);
     unlink_planner_rows(&mut planner.planning);
+    let earlier = archive.map(|archive| tree::build_earlier(archive, &ctx));
+    let counts_with_archive = earlier.as_ref().map(|e| tree.counts.plus(e.tree.counts));
     PageData {
         title: planner.title.clone(),
         description: cfg
@@ -76,9 +81,10 @@ pub fn build(
         today: now.date_naive(),
         as_of: as_of_text(now),
         counts: tree.counts,
+        counts_with_archive,
         needs: needs::build_needs(doc, &ctx),
         recent: recent::build_recent(doc, archive, &ctx),
-        earlier: archive.map(|archive| tree::build_earlier(archive, &ctx)),
+        earlier,
         ideas: planner
             .ideas
             .iter()
