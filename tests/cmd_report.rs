@@ -180,7 +180,7 @@ fn the_overall_line_with_the_archive_is_in_the_page_and_hidden() {
     assert_eq!(report(&home, &work, &[]).status.code(), Some(0));
     let html = default_html(&work);
     assert!(html.contains("<div class=\"overall\" id=\"overall-now\">"));
-    assert!(!html.contains("overall-all"));
+    assert!(!html.contains("id=\"overall-all\""));
     assert!(!html.contains("archive included"));
 }
 
@@ -417,7 +417,7 @@ fn an_archive_is_shown_under_earlier_work_and_one_without_it_is_left_out() {
     let tmp = TempDir::new().unwrap();
     let (home, work, _todo) = setup_proj(&tmp, &body);
     assert_eq!(report(&home, &work, &[]).status.code(), Some(0));
-    assert!(!default_html(&work).contains("Earlier work"));
+    assert!(!default_html(&work).contains("<summary>Earlier work"));
 }
 
 #[test]
@@ -455,9 +455,31 @@ fn the_archive_has_a_toggle_and_a_movable_tree() {
     assert_eq!(report(&home, &work, &[]).status.code(), Some(0));
     let html = default_html(&work);
     assert!(!html.contains("id=\"arch\""));
-    assert!(!html.contains("Include archive"));
+    assert!(!html.contains("Include archive</button>"));
     assert!(!html.contains("id=\"earlier\""));
-    assert!(!html.contains("arch-tree"));
+    assert!(!html.contains("id=\"arch-tree\""));
+}
+
+#[test]
+fn the_script_moves_the_archive_into_all_work() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    let html = lf(&html);
+    // The page's own script is the only script element, so the script is the text between its tags.
+    let start = html.find("<script>").unwrap() + "<script>".len();
+    let end = html.find("</script>").unwrap();
+    let script = &html[start..end];
+    for text in [
+        "todo-report-archive",
+        "arch-tree",
+        "overall-all",
+        "function setArchive",
+    ] {
+        assert!(
+            script.contains(text),
+            "{text} is missing from the script: {script}"
+        );
+    }
 }
 
 #[test]
@@ -752,7 +774,7 @@ fn an_empty_list_says_what_is_missing_in_words() {
     assert!(html.contains("Nothing changed in the last 7 days."));
     assert!(html.contains("No tasks or milestones in TODO.md yet."));
     assert!(!html.contains("Ideas ("));
-    assert!(!html.contains("Earlier work"));
+    assert!(!html.contains("<summary>Earlier work"));
     assert!(html.contains("Every task at or below the target level has its detail."));
     assert!(html.contains("Nothing given back."));
 }
