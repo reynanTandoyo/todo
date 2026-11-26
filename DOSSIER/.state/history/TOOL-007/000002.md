@@ -1,0 +1,17 @@
+<!-- dossier-format: 1 -->
+# TOOL-007 · todo.exe installed on this PC
+
+- kind: tool
+- status: draft
+- created: 2026-11-26T19:51:12+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- type: software
+- location: %LOCALAPPDATA%\Programs\todo\todo.exe
+- related: HOW-002
+- history: 2026-11-26T19:51:12+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:51:44+01:00 reyna via reyna - claude fable 5.2: changed — related HOW-002
+
+## Purpose
+
+The todo that every agent on this PC runs. After a build or a release it is replaced by copying target\release\todo.exe or the downloaded file there; todo --version shows the version and the commit.

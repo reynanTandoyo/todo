@@ -2,16 +2,19 @@
 # HOW-001 · Run the Linux checks locally in WSL before a push
 
 - kind: howto
-- status: draft
+- status: approved
 - created: 2026-11-26T19:51:12+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
 - software: WSL FedoraLinux-44
 - topic: testing
 - related: DEC-061, TOOL-002
+- approved: 2026-11-26T23:20:53+01:00 by reyna
+- valid-from: 2026-11-26T23:20:53+01:00
 - history: 2026-11-26T19:51:12+01:00 reyna via reyna - claude fable 5.2: created
 - history: 2026-11-26T19:51:43+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-061
 - history: 2026-11-26T19:51:44+01:00 reyna via reyna - claude fable 5.2: changed — related TOOL-002
+- history: 2026-11-26T23:20:53+01:00 reyna via reyna - claude fable 5.2: approved
 
 ## Purpose
 

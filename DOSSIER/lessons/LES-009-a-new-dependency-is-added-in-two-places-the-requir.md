@@ -2,7 +2,7 @@
 # LES-009 · A new dependency is added in two places: the requirements and the CI allow-list
 
 - kind: lesson
-- status: draft
+- status: approved
 - created: 2026-11-26T19:51:11+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
@@ -10,9 +10,12 @@
 - topic: release
 - code: .github/workflows
 - related: DEC-018, FND-026
+- approved: 2026-11-26T23:20:10+01:00 by reyna
+- valid-from: 2026-11-26T23:20:10+01:00
 - history: 2026-11-26T19:51:11+01:00 reyna via reyna - claude fable 5.2: created
 - history: 2026-11-26T19:51:40+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-018
 - history: 2026-11-26T19:51:44+01:00 reyna via reyna - claude fable 5.2: changed — related FND-026
+- history: 2026-11-26T23:20:10+01:00 reyna via reyna - claude fable 5.2: approved
 
 ## Statement
 

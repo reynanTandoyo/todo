@@ -2,7 +2,7 @@
 # LES-002 · Draw a mockup and have it approved before building anything people look at
 
 - kind: lesson
-- status: draft
+- status: approved
 - created: 2026-11-26T19:51:11+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
@@ -10,9 +10,12 @@
 - topic: report
 - code: src/report
 - related: DEC-055, DEC-056
+- approved: 2026-11-26T23:20:10+01:00 by reyna
+- valid-from: 2026-11-26T23:20:10+01:00
 - history: 2026-11-26T19:51:11+01:00 reyna via reyna - claude fable 5.2: created
 - history: 2026-11-26T19:51:42+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-055
 - history: 2026-11-26T19:52:40+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-056
+- history: 2026-11-26T23:20:10+01:00 reyna via reyna - claude fable 5.2: approved
 
 ## Statement
 

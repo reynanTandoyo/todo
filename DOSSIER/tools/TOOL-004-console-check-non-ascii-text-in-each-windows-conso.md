@@ -2,7 +2,7 @@
 # TOOL-004 · Console check: non-ASCII text in each Windows console
 
 - kind: tool
-- status: draft
+- status: approved
 - created: 2026-11-26T19:51:12+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
@@ -10,7 +10,10 @@
 - location: scripts/console-check.ps1
 - language: PowerShell
 - checksum: sha256:b5b53477a30fb35db4fe60c2a189609b0994587d19313364af78496083979137
+- approved: 2026-11-26T23:20:53+01:00 by reyna
+- valid-from: 2026-11-26T23:20:53+01:00
 - history: 2026-11-26T19:51:12+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T23:20:53+01:00 reyna via reyna - claude fable 5.2: approved
 
 ## Purpose
 

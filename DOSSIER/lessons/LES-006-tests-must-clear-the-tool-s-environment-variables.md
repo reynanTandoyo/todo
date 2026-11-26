@@ -2,7 +2,7 @@
 # LES-006 · Tests must clear the tool's environment variables and pin the clock
 
 - kind: lesson
-- status: draft
+- status: approved
 - created: 2026-11-26T19:51:11+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
@@ -10,9 +10,12 @@
 - topic: testing
 - code: tests/common
 - related: DEC-023, FND-027
+- approved: 2026-11-26T23:20:10+01:00 by reyna
+- valid-from: 2026-11-26T23:20:10+01:00
 - history: 2026-11-26T19:51:11+01:00 reyna via reyna - claude fable 5.2: created
 - history: 2026-11-26T19:51:43+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-023
 - history: 2026-11-26T19:51:43+01:00 reyna via reyna - claude fable 5.2: changed — related FND-027
+- history: 2026-11-26T23:20:10+01:00 reyna via reyna - claude fable 5.2: approved
 
 ## Statement
 

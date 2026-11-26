@@ -1,0 +1,25 @@
+<!-- dossier-format: 1 -->
+# LES-003 · Let a strong model write the requirements first; weak workers then build from them
+
+- kind: lesson
+- status: draft
+- created: 2026-11-26T19:51:11+01:00
+- author: reyna
+- via: reyna - claude fable 5.2
+- confidence: experience
+- topic: process
+- related: DEC-060
+- history: 2026-11-26T19:51:11+01:00 reyna via reyna - claude fable 5.2: created
+- history: 2026-11-26T19:51:43+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-060
+
+## Statement
+
+Write the requirements and the accept line of every task with a strong model before any worker starts; the tasks can then be built by weak workers. Writing the task a weak model can solve is most of the thinking.
+
+## Valid for
+
+Features that span several commands or change the file format; work that is handed to cheap workers.
+
+## Evidence
+
+Requirements tasks T-086 (v0.6, v0.7) and T-146 (v0.8) ran on Opus by exception; every other task of those releases was built by Haiku workers

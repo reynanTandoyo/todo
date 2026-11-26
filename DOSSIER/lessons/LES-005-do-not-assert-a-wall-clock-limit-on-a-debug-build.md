@@ -2,7 +2,7 @@
 # LES-005 · Do not assert a wall-clock limit on a debug build; prove the property another way
 
 - kind: lesson
-- status: draft
+- status: approved
 - created: 2026-11-26T19:51:11+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
@@ -10,8 +10,11 @@
 - topic: testing
 - code: tests
 - related: FND-029
+- approved: 2026-11-26T23:20:10+01:00 by reyna
+- valid-from: 2026-11-26T23:20:10+01:00
 - history: 2026-11-26T19:51:11+01:00 reyna via reyna - claude fable 5.2: created
 - history: 2026-11-26T19:51:43+01:00 reyna via reyna - claude fable 5.2: changed — related FND-029
+- history: 2026-11-26T23:20:10+01:00 reyna via reyna - claude fable 5.2: approved
 
 ## Statement
 

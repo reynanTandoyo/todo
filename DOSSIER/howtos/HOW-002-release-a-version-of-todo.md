@@ -2,17 +2,20 @@
 # HOW-002 · Release a version of todo
 
 - kind: howto
-- status: draft
+- status: approved
 - created: 2026-11-26T19:51:12+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
 - software: GitHub Actions
 - topic: release
 - related: DEC-062, TOOL-006, TOOL-007
+- approved: 2026-11-26T23:20:53+01:00 by reyna
+- valid-from: 2026-11-26T23:20:53+01:00
 - history: 2026-11-26T19:51:12+01:00 reyna via reyna - claude fable 5.2: created
 - history: 2026-11-26T19:51:43+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-062
 - history: 2026-11-26T19:51:44+01:00 reyna via reyna - claude fable 5.2: changed — related TOOL-006
 - history: 2026-11-26T19:51:44+01:00 reyna via reyna - claude fable 5.2: changed — related TOOL-007
+- history: 2026-11-26T23:20:53+01:00 reyna via reyna - claude fable 5.2: approved
 
 ## Purpose
 

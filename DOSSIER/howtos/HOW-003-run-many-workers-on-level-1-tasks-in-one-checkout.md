@@ -2,16 +2,20 @@
 # HOW-003 · Run many workers on level-1 tasks in one checkout
 
 - kind: howto
-- status: draft
+- status: approved
 - created: 2026-11-26T19:51:12+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
 - software: Orca orchestration
 - topic: planning
 - related: DEC-046, DEC-060
+- approved: 2026-11-26T23:20:53+01:00 by reyna
+- valid-from: 2026-11-26T23:20:53+01:00
 - history: 2026-11-26T19:51:12+01:00 reyna via reyna - claude fable 5.2: created
 - history: 2026-11-26T19:51:41+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-046
 - history: 2026-11-26T19:51:43+01:00 reyna via reyna - claude fable 5.2: changed — related DEC-060
+- history: 2026-11-26T23:20:53+01:00 reyna via reyna - claude fable 5.2: changed — section Settings
+- history: 2026-11-26T23:20:53+01:00 reyna via reyna - claude fable 5.2: approved
 
 ## Purpose
 
@@ -28,7 +32,7 @@ Has many cheap agents finish level-1 tasks of TODO.md at the same time in one ch
 
 ## Settings
 
-Workers started with Orca orchestration use the Claude CLI on Haiku with the highest effort: worker-start with --agent claude --model claude-haiku-5-5 --effort xhigh. A stronger model is used only when the owner names it for one task.
+Workers started with Orca orchestration use the Claude CLI on Haiku with the highest effort: worker-start with --agent claude --model claude-haiku-5-5 --effort xhigh. A stronger model is used only when the owner names it for one task. Every worker is started with DOSSIER_ROLE=worker in its environment: its session then starts with one line instead of the project brief, it gets only the entries for its task after todo claim, and it writes nothing to the dossier. When a worker's task is done or given back, the planner runs dossier review-task for it and records what its todo note shows.
 
 ## Traps
 
