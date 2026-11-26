@@ -716,3 +716,40 @@ fn an_empty_list_says_what_is_missing_in_words() {
     assert!(html.contains("Every task at or below the target level has its detail."));
     assert!(html.contains("Nothing given back."));
 }
+
+/// The `li.item` of the task `id` in `html`, from its opening tag to its closing `</li>`. The closing
+/// tag of an entry is followed by a newline; the notes inside it are not.
+fn item_of(html: &str, id: &str) -> String {
+    let needle = format!("<span class=\"id\">{id}</span>");
+    let at = html
+        .find(&needle)
+        .unwrap_or_else(|| panic!("no task {id:?}"));
+    let start = html[..at].rfind("<li class=\"item").unwrap();
+    let end = html[at..].find("</li>\n").unwrap() + at + "</li>\n".len();
+    html[start..end].to_string()
+}
+
+#[test]
+fn a_task_with_dependencies_shows_its_chain() {
+    let tmp = TempDir::new().unwrap();
+    let (_work, html) = fixture_report(&tmp);
+    assert!(html.contains("<details class=\"chain\"><summary>Show chain</summary>"));
+
+    // T-005 waits for T-004 (`depends: T-004` in the fixture): its details end with the chain, after
+    // the technical details and before the end of the entry, and its row says "this task".
+    let item = item_of(&html, "T-005");
+    in_order(
+        &item,
+        &[
+            "<details class=\"tech\">",
+            "<details class=\"chain\"><summary>Show chain</summary>",
+            "<span class=\"cid\">T-004</span>",
+            "<b>this task</b>",
+            "</details>\n</div></details></li>\n",
+        ],
+    );
+
+    // T-016 has no `depends` and nothing waits for it, so it has no chain.
+    let plain = item_of(&html, "T-016");
+    assert!(!plain.contains("class=\"chain\""), "{plain}");
+}
