@@ -69,10 +69,20 @@ pub fn build(
         cfg,
         now,
     };
-    let tree = tree::build_tree(doc, &ctx);
+    let mut tree = tree::build_tree(doc, &ctx);
     let mut planner = model::build_page(doc, archive, cfg, now, file_label);
     unlink_planner_rows(&mut planner.planning);
-    let earlier = archive.map(|archive| tree::build_earlier(archive, &ctx));
+    let mut earlier = archive.map(|archive| tree::build_earlier(archive, &ctx));
+    // One index for both trees, so every task's chain reads TODO.md and the archive alike.
+    let mut index = chain::ChainIndex::new(doc, archive, &ctx);
+    index.set_milestone_states(&tree);
+    if let Some(earlier) = earlier.as_mut() {
+        index.set_milestone_states(&earlier.tree);
+    }
+    chain::fill_chains(&mut tree, &index);
+    if let Some(earlier) = earlier.as_mut() {
+        chain::fill_chains(&mut earlier.tree, &index);
+    }
     let counts_with_archive = earlier.as_ref().map(|e| tree.counts.plus(e.tree.counts));
     PageData {
         title: planner.title.clone(),

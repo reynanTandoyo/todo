@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use super::entry::{Ctx, State, entry_view};
+use super::entry::{Ctx, EntryView, State, entry_view};
 use super::tree::{MilestoneState, MilestoneView, Tree};
 use crate::doc::{Document, EntryKind};
 
@@ -225,6 +225,28 @@ impl ChainIndex {
     }
 }
 
+/// Sets the chain of every task of `tree`, in its other work and below its milestones at any depth,
+/// from `index` (R-REPORT-7). Milestones have no chain.
+pub fn fill_chains(tree: &mut Tree, index: &ChainIndex) {
+    fill_in(&mut tree.other, index);
+    fill_below(&mut tree.milestones, index);
+}
+
+/// Sets the chain of the tasks of each milestone in `milestones`, and then of those below it.
+fn fill_below(milestones: &mut [MilestoneView], index: &ChainIndex) {
+    for milestone in milestones {
+        fill_in(&mut milestone.tasks, index);
+        fill_below(&mut milestone.milestones, index);
+    }
+}
+
+/// Sets the chain of each entry in `entries` from `index`.
+fn fill_in(entries: &mut [EntryView], index: &ChainIndex) {
+    for entry in entries {
+        entry.chain = index.chain_of(&entry.id);
+    }
+}
+
 /// Sets `milestone_state` on the node of each milestone in `milestones`, and then in those below it.
 fn set_states(nodes: &mut HashMap<String, Node>, milestones: &[MilestoneView]) {
     for milestone in milestones {
@@ -315,7 +337,7 @@ mod tests {
 
     use super::*;
     use crate::ops::OpsConfig;
-    use crate::report::page::tree::build_tree;
+    use crate::report::page::tree::{build_earlier, build_tree};
 
     /// The clock of every test: 21 Nov 2026, 15:00, in the +01:00 offset.
     const NOW: &str = "2026-11-21T15:00:00+01:00";
@@ -758,5 +780,83 @@ mod tests {
         let index = index_of(&["### T-001 · Light the lamp", "- status: open"], None);
         assert_eq!(index.chain_of("T-001"), None);
         assert_eq!(index.chain_of("T-999"), None);
+    }
+
+    #[test]
+    fn fill_chains_sets_the_chain_of_every_task_of_both_trees() {
+        let todo = [
+            "### T-001 · Keep the light",
+            "- status: open",
+            "- type: milestone",
+            "### T-002 · Trim the wick",
+            "- status: open",
+            "- milestone: T-001",
+            "- depends: T-003",
+            "### T-003 · Fill the oil",
+            "- status: open",
+            "### T-004 · Clean the glass",
+            "- status: open",
+            "### T-005 · Polish the lens",
+            "- status: open",
+            "- milestone: T-001",
+            "### T-006 · Inner milestone",
+            "- status: open",
+            "- type: milestone",
+            "- milestone: T-001",
+            "### T-007 · Check the lens",
+            "- status: open",
+            "- milestone: T-006",
+            "- depends: T-004",
+            "### T-008 · Sweep the floor",
+            "- status: open",
+        ];
+        let archive = [
+            "### T-020 · Older part",
+            "- status: done",
+            "### T-021 · Older task",
+            "- status: done",
+            "- depends: T-020",
+            "### T-022 · Lone archived task",
+            "- status: done",
+        ];
+        let doc = Document::parse_bytes(text(&todo).as_bytes()).unwrap();
+        let archive_doc = Document::parse_bytes(text(&archive).as_bytes()).unwrap();
+        let cfg = OpsConfig::default();
+        let ctx = Ctx {
+            doc: &doc,
+            archive: Some(&archive_doc),
+            cfg: &cfg,
+            now: now(),
+        };
+        let mut tree = build_tree(&doc, &ctx);
+        let mut earlier = build_earlier(&archive_doc, &ctx);
+        let mut index = ChainIndex::new(&doc, Some(&archive_doc), &ctx);
+        index.set_milestone_states(&tree);
+        fill_chains(&mut tree, &index);
+        fill_chains(&mut earlier.tree, &index);
+
+        // T-001 has tasks T-002 and T-005 and the milestone T-006, which holds T-007.
+        let top = &tree.milestones[0];
+        let inner = &top.milestones[0];
+        // T-002 waits for T-003: its chain shows that path before it.
+        let waits = top.tasks[0].chain.as_ref().unwrap();
+        assert_eq!(ids_of(&waits.before[0]), ["T-003"]);
+        // T-005 waits for nothing and nothing waits for it.
+        assert_eq!(top.tasks[1].chain, None);
+        // T-007 sits below the milestone T-006 and waits for T-004, so it has a chain.
+        assert!(inner.tasks[0].chain.is_some());
+        // T-003 and T-004 are waited for, so they have a chain; T-008 has none.
+        assert!(tree.other[0].chain.is_some());
+        assert!(tree.other[1].chain.is_some());
+        assert_eq!(tree.other[2].chain, None);
+
+        // The archive's tree: T-021 waits for T-020, which is waited for; T-022 has no link.
+        let archived = &earlier.tree.other;
+        assert!(archived[0].chain.is_some());
+        assert_eq!(
+            ids_of(&archived[1].chain.as_ref().unwrap().before[0]),
+            ["T-020"]
+        );
+        assert_eq!(archived[2].chain, None);
     }
 }
