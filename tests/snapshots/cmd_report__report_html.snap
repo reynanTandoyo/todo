@@ -149,8 +149,19 @@ details.fold p,details.fold ul{font-size:14px; margin:6px 0 0}
 .reason{color:var(--c-wait)}
 .hide{display:none !important}
 
-@media (max-width:560px){ .bar{display:none} .id{display:none} }
-@media print{ .controls{display:none} details.ms{break-inside:avoid} }
+.page h4{font-size:13px; margin:12px 0 4px}
+.page code{font-family:ui-monospace,Consolas,monospace; font-size:.92em; background:var(--p-mut); padding:0 3px; border-radius:3px}
+.ms-mark{display:inline-block; flex:none; min-width:1.5em; padding:0 4px; border:1.5px solid var(--p-fg); border-radius:4px; font-size:11px; font-weight:700; line-height:1.5; text-align:center}
+.ms-id{flex:none; font-size:12px; color:var(--p-mfg); font-family:ui-monospace,Consolas,monospace}
+details.chain{margin-top:6px}
+details.chain>summary{cursor:pointer; font-size:13px; color:var(--p-mfg)}
+.chain-line{margin:2px 0 6px; font-size:13px; line-height:1.6}
+.chain-line .cid{font-family:ui-monospace,Consolas,monospace; font-size:12px}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+.arch-label{margin:14px 0 8px; font-size:13px; font-weight:600; color:var(--p-mfg)}
+
+@media (max-width:560px){ .bar{display:none} .id{display:none} .ms-id{display:none} }
+@media print{ .controls{display:none} details.ms{break-inside:avoid} .sr{position:static; width:auto; height:auto; clip:auto} }
 
 /* colour-blind mode (red/green): only blue, orange, greys and a stripe pattern; one set per background */
 .page[data-cb="on"]{
