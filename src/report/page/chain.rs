@@ -6,6 +6,17 @@ use super::entry::{Ctx, State, entry_view};
 use super::tree::{MilestoneState, MilestoneView, Tree};
 use crate::doc::{Document, EntryKind};
 
+/// The most paths a group (the paths before the task, or after it) shows, one line each (R-REPORT-7).
+pub const MAX_LINES: usize = 10;
+
+/// The most steps a path shows. A longer path is cut and keeps the steps nearest the task
+/// (R-REPORT-7).
+pub const MAX_STEPS: usize = 12;
+
+/// How many paths beyond the shown lines are counted, so that a count of `MAX_COUNTED` or more
+/// means more than 100 (R-REPORT-7). The walk stops once `MAX_LINES + MAX_COUNTED` paths are found.
+pub const MAX_COUNTED: usize = 101;
+
 /// The state of one step of a chain: an entry's state in words, a milestone's state as the tree
 /// shows it, or no entry at all.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -153,6 +164,53 @@ impl ChainIndex {
         }
     }
 
+    /// The chain of the task `id` (a canonical ID): the paths through `depends` that lead to it and
+    /// the paths through `dependents` that lead away from it, each within the limits of R-REPORT-7.
+    /// `None` when `id` names no entry, or when it has no `depends` and nothing depends on it.
+    #[must_use]
+    pub fn chain_of(&self, id: &str) -> Option<Chain> {
+        let node = self.nodes.get(id)?;
+        if node.depends.is_empty() && self.neighbors(id, Direction::After).is_empty() {
+            return None;
+        }
+        let (before, before_count) = self.paths_from(id, Direction::Before);
+        let (after, after_count) = self.paths_from(id, Direction::After);
+        Some(Chain {
+            more_before: before_count.saturating_sub(before.len()),
+            before,
+            more_after: after_count.saturating_sub(after.len()),
+            after,
+        })
+    }
+
+    /// The first `MAX_LINES` paths of one direction from `id`, and how many paths there are in all.
+    fn paths_from(&self, id: &str, direction: Direction) -> (Vec<Path>, usize) {
+        let mut walk = Walk {
+            index: self,
+            task: id,
+            direction,
+            lines: Vec::new(),
+            count: 0,
+        };
+        walk.visit(id, &mut Vec::new());
+        (walk.lines, walk.count)
+    }
+
+    /// The IDs one step from `id` in `direction`: its `depends`, or the entries whose `depends` name
+    /// it. Empty for an ID that names no entry.
+    fn neighbors(&self, id: &str, direction: Direction) -> &[String] {
+        match direction {
+            Direction::Before => match self.nodes.get(id) {
+                Some(node) => node.depends.as_slice(),
+                None => &[],
+            },
+            Direction::After => match self.dependents.get(id) {
+                Some(waiting) => waiting.as_slice(),
+                None => &[],
+            },
+        }
+    }
+
     /// Adds `id` to the dependents of each ID that its node depends on, once per ID.
     fn link_dependents(&mut self, id: &str) {
         let Some(node) = self.nodes.get(id) else {
@@ -174,6 +232,80 @@ fn set_states(nodes: &mut HashMap<String, Node>, milestones: &[MilestoneView]) {
             node.milestone_state = Some(milestone.state);
         }
         set_states(nodes, &milestone.milestones);
+    }
+}
+
+/// The way a walk goes from its task: through `depends` (the paths before it) or through
+/// `dependents` (the paths after it).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Direction {
+    Before,
+    After,
+}
+
+/// One walk from a task, collecting its paths in the order the walk finds them.
+struct Walk<'a> {
+    index: &'a ChainIndex,
+    task: &'a str,
+    direction: Direction,
+    /// The first `MAX_LINES` paths found.
+    lines: Vec<Path>,
+    /// Every path found, shown or not.
+    count: usize,
+}
+
+impl Walk<'_> {
+    /// Walks on from `node`, the last ID of `path` (the task itself when `path` is empty). Each
+    /// neighbour is the next step: the task or an ID already on the path closes a loop, an ID that
+    /// names no entry ends its path, and a path that reaches `MAX_STEPS` IDs is recorded cut
+    /// instead of going deeper.
+    fn visit(&mut self, node: &str, path: &mut Vec<String>) {
+        let index = self.index;
+        let next = index.neighbors(node, self.direction);
+        if next.is_empty() {
+            if !path.is_empty() {
+                self.record(path.as_slice(), None, PathEnd::Open, false);
+            }
+            return;
+        }
+        for id in next {
+            if self.count >= MAX_LINES + MAX_COUNTED {
+                return;
+            }
+            if id.as_str() == self.task || path.contains(id) {
+                self.record(
+                    path.as_slice(),
+                    Some(id.as_str()),
+                    PathEnd::Loop(id.clone()),
+                    false,
+                );
+            } else if !index.nodes.contains_key(id) {
+                self.record(path.as_slice(), Some(id.as_str()), PathEnd::Open, false);
+            } else if path.len() + 1 == MAX_STEPS {
+                // A complete entry at the limit is a whole path; one with more beyond it is cut.
+                let cut = !index.neighbors(id, self.direction).is_empty();
+                self.record(path.as_slice(), Some(id.as_str()), PathEnd::Open, cut);
+            } else {
+                path.push(id.clone());
+                self.visit(id, path);
+                path.pop();
+            }
+        }
+    }
+
+    /// Counts the path `path` followed by `last`, and keeps it while fewer than `MAX_LINES` are
+    /// kept. A path through `depends` is read from its far end, so the start comes first.
+    fn record(&mut self, path: &[String], last: Option<&str>, end: PathEnd, cut: bool) {
+        self.count += 1;
+        if self.lines.len() >= MAX_LINES {
+            return;
+        }
+        let mut ids: Vec<&str> = path.iter().map(String::as_str).chain(last).collect();
+        if self.direction == Direction::Before {
+            ids.reverse();
+        }
+        let steps = ids.into_iter().map(|id| self.index.step(id)).collect();
+        self.lines.push(Path { steps, cut, end });
     }
 }
 
@@ -367,5 +499,264 @@ mod tests {
             index.step("T-003").state,
             StepState::Milestone(MilestoneState::Finished(Some(day(20))))
         );
+    }
+
+    /// The IDs of the steps of `path`, in the order they are read.
+    fn ids_of(path: &Path) -> Vec<&str> {
+        path.steps.iter().map(|step| step.id.as_str()).collect()
+    }
+
+    /// The lines of `count` invented tasks, T-001 first, where each task waits for the one before.
+    fn chain_lines(count: usize) -> Vec<String> {
+        let mut lines = Vec::new();
+        for n in 1..=count {
+            lines.push(format!("### T-{n:03} · Step {n}"));
+            lines.push("- status: open".to_string());
+            if n > 1 {
+                lines.push(format!("- depends: T-{:03}", n - 1));
+            }
+        }
+        lines
+    }
+
+    fn refs(lines: &[String]) -> Vec<&str> {
+        lines.iter().map(String::as_str).collect()
+    }
+
+    #[test]
+    fn a_straight_chain_gives_one_path_each_way() {
+        // A <- B <- C: B waits for A and C waits for B.
+        let index = index_of(
+            &[
+                "### T-001 · Light the lamp",
+                "- status: open",
+                "### T-002 · Trim the wick",
+                "- status: open",
+                "- depends: T-001",
+                "### T-003 · Fill the oil",
+                "- status: open",
+                "- depends: T-002",
+            ],
+            None,
+        );
+        let c = index.chain_of("T-003").unwrap();
+        assert_eq!(c.before.len(), 1);
+        assert_eq!(ids_of(&c.before[0]), ["T-001", "T-002"]);
+        assert!(!c.before[0].cut);
+        assert_eq!(c.before[0].end, PathEnd::Open);
+        assert!(c.after.is_empty());
+        assert_eq!((c.more_before, c.more_after), (0, 0));
+
+        let a = index.chain_of("T-001").unwrap();
+        assert!(a.before.is_empty());
+        assert_eq!(a.after.len(), 1);
+        assert_eq!(ids_of(&a.after[0]), ["T-002", "T-003"]);
+        assert_eq!(a.after[0].end, PathEnd::Open);
+    }
+
+    #[test]
+    fn a_branch_gives_a_path_for_each_way_back() {
+        // T-003 waits for T-001 and for T-002, which waits for T-001.
+        let index = index_of(
+            &[
+                "### T-001 · Light the lamp",
+                "- status: open",
+                "### T-002 · Trim the wick",
+                "- status: open",
+                "- depends: T-001",
+                "### T-003 · Fill the oil",
+                "- status: open",
+                "- depends: T-001, T-002",
+            ],
+            None,
+        );
+        let c = index.chain_of("T-003").unwrap();
+        assert_eq!(c.before.len(), 2);
+        assert_eq!(ids_of(&c.before[0]), ["T-001"]);
+        assert_eq!(ids_of(&c.before[1]), ["T-001", "T-002"]);
+    }
+
+    #[test]
+    fn a_step_in_the_archive_is_archived() {
+        let index = index_of(
+            &[
+                "### T-011 · Current part",
+                "- status: open",
+                "- depends: T-010",
+            ],
+            Some(&["### T-010 · Older part", "- status: done"]),
+        );
+        let c = index.chain_of("T-011").unwrap();
+        assert_eq!(c.before.len(), 1);
+        let step = &c.before[0].steps[0];
+        assert_eq!(step.id, "T-010");
+        assert_eq!(step.title, "Older part");
+        assert_eq!(step.state, StepState::Task(State::Done));
+        assert!(step.archived);
+    }
+
+    #[test]
+    fn a_milestone_in_depends_is_a_milestone_step() {
+        let lines = [
+            "### T-001 · Keep the light",
+            "- status: open",
+            "- type: milestone",
+            "### T-002 · Fill the oil",
+            "- status: claimed",
+            "- owner: keeper-1",
+            "- claimed: 2026-11-21T09:00+01:00",
+            "- milestone: T-001",
+            "### T-003 · Trim the wick",
+            "- status: open",
+            "- depends: T-001",
+        ];
+        let doc = Document::parse_bytes(text(&lines).as_bytes()).unwrap();
+        let cfg = OpsConfig::default();
+        let ctx = Ctx {
+            doc: &doc,
+            archive: None,
+            cfg: &cfg,
+            now: now(),
+        };
+        let tree = build_tree(&doc, &ctx);
+        let mut index = ChainIndex::new(&doc, None, &ctx);
+        index.set_milestone_states(&tree);
+
+        let c = index.chain_of("T-003").unwrap();
+        assert_eq!(c.before.len(), 1);
+        assert_eq!(
+            c.before[0].steps[0].state,
+            StepState::Milestone(MilestoneState::InProgress)
+        );
+    }
+
+    #[test]
+    fn an_unknown_id_is_a_not_found_step_that_ends_its_path() {
+        // T-002 waits for T-999, which names no entry; T-003 waits for T-002.
+        let index = index_of(
+            &[
+                "### T-002 · Trim the wick",
+                "- status: open",
+                "- depends: T-999",
+                "### T-003 · Fill the oil",
+                "- status: open",
+                "- depends: T-002",
+            ],
+            None,
+        );
+        let c = index.chain_of("T-003").unwrap();
+        assert_eq!(c.before.len(), 1);
+        assert_eq!(ids_of(&c.before[0]), ["T-999", "T-002"]);
+        assert_eq!(c.before[0].steps[0].state, StepState::NotFound);
+        assert_eq!(c.before[0].steps[0].title, "");
+        assert_eq!(c.before[0].end, PathEnd::Open);
+    }
+
+    #[test]
+    fn a_loop_ends_with_loop_and_names_the_id_it_comes_back_to() {
+        // T-001 waits for T-002, and T-002 waits for T-001.
+        let index = index_of(
+            &[
+                "### T-001 · Light the lamp",
+                "- status: open",
+                "- depends: T-002",
+                "### T-002 · Trim the wick",
+                "- status: open",
+                "- depends: T-001",
+            ],
+            None,
+        );
+        let c = index.chain_of("T-001").unwrap();
+        assert_eq!(c.before.len(), 1);
+        assert_eq!(ids_of(&c.before[0]), ["T-001", "T-002"]);
+        assert_eq!(c.before[0].end, PathEnd::Loop("T-001".to_string()));
+        assert_eq!(c.after.len(), 1);
+        assert_eq!(c.after[0].end, PathEnd::Loop("T-001".to_string()));
+    }
+
+    #[test]
+    fn fifteen_waiting_tasks_give_ten_lines_and_five_counted() {
+        let mut lines = vec![
+            "### T-001 · Light the lamp".to_string(),
+            "- status: open".to_string(),
+        ];
+        for n in 2..=16 {
+            lines.push(format!("### T-{n:03} · Waiting {n}"));
+            lines.push("- status: open".to_string());
+            lines.push("- depends: T-001".to_string());
+        }
+        let index = index_of(&refs(&lines), None);
+        let c = index.chain_of("T-001").unwrap();
+        assert_eq!(c.after.len(), 10);
+        assert_eq!(c.more_after, 5);
+        assert!(c.before.is_empty());
+        assert_eq!(c.more_before, 0);
+    }
+
+    #[test]
+    fn more_than_one_hundred_paths_are_counted_up_to_the_limit() {
+        let mut lines = vec![
+            "### T-001 · Light the lamp".to_string(),
+            "- status: open".to_string(),
+        ];
+        for n in 2..=130 {
+            lines.push(format!("### T-{n:03} · Waiting {n}"));
+            lines.push("- status: open".to_string());
+            lines.push("- depends: T-001".to_string());
+        }
+        let index = index_of(&refs(&lines), None);
+        let c = index.chain_of("T-001").unwrap();
+        assert_eq!(c.after.len(), MAX_LINES);
+        assert_eq!(c.more_after, MAX_COUNTED);
+    }
+
+    #[test]
+    fn a_long_chain_is_cut_to_the_twelve_steps_nearest_the_task() {
+        // T-001 <- T-002 <- ... <- T-020, so T-020 waits for a chain of 19 tasks.
+        let lines = chain_lines(20);
+        let index = index_of(&refs(&lines), None);
+
+        let before = index.chain_of("T-020").unwrap();
+        assert_eq!(before.before.len(), 1);
+        assert!(before.before[0].cut);
+        assert_eq!(before.before[0].steps.len(), MAX_STEPS);
+        assert_eq!(
+            ids_of(&before.before[0]),
+            [
+                "T-008", "T-009", "T-010", "T-011", "T-012", "T-013", "T-014", "T-015", "T-016",
+                "T-017", "T-018", "T-019"
+            ]
+        );
+
+        let after = index.chain_of("T-001").unwrap();
+        assert_eq!(after.after.len(), 1);
+        assert!(after.after[0].cut);
+        assert_eq!(
+            ids_of(&after.after[0]),
+            [
+                "T-002", "T-003", "T-004", "T-005", "T-006", "T-007", "T-008", "T-009", "T-010",
+                "T-011", "T-012", "T-013"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_complete_path_of_exactly_the_limit_is_not_cut() {
+        // Thirteen tasks in a chain: T-013 waits for twelve tasks, and T-001 waits for nothing.
+        let lines = chain_lines(13);
+        let index = index_of(&refs(&lines), None);
+        let c = index.chain_of("T-013").unwrap();
+        assert_eq!(c.before.len(), 1);
+        assert_eq!(c.before[0].steps.len(), MAX_STEPS);
+        assert!(!c.before[0].cut);
+        assert_eq!(ids_of(&c.before[0]).first(), Some(&"T-001"));
+        assert_eq!(c.before[0].end, PathEnd::Open);
+    }
+
+    #[test]
+    fn a_task_without_depends_or_dependents_has_no_chain() {
+        let index = index_of(&["### T-001 · Light the lamp", "- status: open"], None);
+        assert_eq!(index.chain_of("T-001"), None);
+        assert_eq!(index.chain_of("T-999"), None);
     }
 }
