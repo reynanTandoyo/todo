@@ -625,8 +625,8 @@ milestones that stand out from tasks.
 - note (2026-11-22, claude-main): split into T-230, T-231
 
 ### T-230 · All work holds a hidden line for a view that matches nothing
-- status: open
-- owner: —
+- status: done
+- owner: t230-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-222
 - why: the script needs a place in the page to write "Nothing still to do." and the like
@@ -641,7 +641,12 @@ milestones that stand out from tasks.
   5. Run the four checks of AGENTS.md.
 - accept: All work ends with `<p id="empty-view" class="muted" hidden></p>` after the tree; the new test passes; the snapshot is updated
 - verify: cargo test --all-features --test cmd_report
+- verified: 2026-11-26
+- commit: e04ca24
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-26, t230-haiku): forced claim (files held by T-229)
+- note (2026-11-26, t230-haiku): done — Added the hidden empty-view line after the All work tree in src/report/page/html.rs with a test and updated snapshot; full suite passes 1042 tests (1041 before plus the new one), fmt and both clippy targets clean.
 
 ### T-231 · The script writes the line for a view that matches nothing
 - status: open
@@ -697,8 +702,8 @@ milestones that stand out from tasks.
 - note (2026-11-22, claude-main): split into T-232, T-233, T-234
 
 ### T-232 · A text helper that shows text between backticks as code
-- status: open
-- owner: —
+- status: done
+- owner: t232-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-224
 - why: titles, summaries and ideas often name commands in backticks; the page needs one function that escapes text and turns those pairs into code
@@ -713,7 +718,13 @@ milestones that stand out from tasks.
   5. Run the four checks of AGENTS.md.
 - accept: src/report/page/text.rs has inline_code, which escapes text and turns each pair of backticks around non-empty text into a code element; an unpaired or empty pair stays as typed; unit tests cover each case
 - verify: cargo test --all-features --lib report::page
+- verified: 2026-11-26
+- commit: de4df6b
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-26, t232-haiku): forced claim (files held by T-235, T-239)
+- note (2026-11-26, t232-haiku): Worker t232-haiku, commit de4df6b: a reading of step 2 that the spec leaves open is used. An empty pair of backticks stays as typed and the scan goes on after it, so '`` `c`' still shows c as code; the 'write the rest as it is' wording is read as the unpaired case only. Pairs are taken from the left, as CommonMark does. The claim needed --force: src/report/page/mod.rs is also in T-239's files (both add one pub mod line; git merged them without conflict here, but a later merge may need a look). The first write of text.rs was refused by the dossier guard with entries in force (DEC-055, DEC-059, LES-002, DEC-038); none conflicts with the change, and the same write was then made. Only the Windows and Linux clippy checks and the test run were executed here; no dossier command was run, and nothing was pushed.
+- note (2026-11-26, t232-haiku): done — Added inline_code in src/report/page/text.rs, which escapes text and turns pairs of backticks around non-empty text into code; 10 new tests, 1051 tests passing in cargo test --all-features.
 
 ### T-233 · The tree shows text between backticks as code
 - status: open
@@ -792,8 +803,8 @@ milestones that stand out from tasks.
 - note (2026-11-22, claude-main): split into T-235, T-236, T-237, T-238
 
 ### T-235 · Page data counts the tasks of TODO.md and the archive together
-- status: open
-- owner: —
+- status: done
+- owner: t235-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-226
 - why: the overall line with the archive included needs counts over both files
@@ -807,7 +818,12 @@ milestones that stand out from tasks.
   4. Run the four checks of AGENTS.md.
 - accept: Counts has plus; PageData has counts_with_archive, the sum of the counts of TODO.md and the archive, None without an archive; a unit test covers plus
 - verify: cargo test --all-features --lib report::page
+- verified: 2026-11-26
+- commit: 3a66a0b
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-26, t235-haiku): forced claim (files held by T-239)
+- note (2026-11-26, t235-haiku): done — Added Counts::plus and PageData.counts_with_archive (TODO.md plus archive counts, None without an archive) with a unit test for plus; 1042 tests pass, 76 in report::page; the claim needed --force because T-239 lists the same files.
 
 ### T-236 · The page writes a second, hidden overall line with the archive included
 - status: open
@@ -938,8 +954,8 @@ milestones that stand out from tasks.
 - note (2026-11-22, claude-main): split into T-239, T-240, T-241, T-242, T-243, T-244
 
 ### T-239 · Chain data: the steps and an index of every entry
-- status: open
-- owner: —
+- status: done
+- owner: t239-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-228
 - why: the chain of each task is found through depends in both files; one index built once keeps the page fast
@@ -958,7 +974,11 @@ milestones that stand out from tasks.
   9. Run the four checks of AGENTS.md.
 - accept: src/report/page/chain.rs has StepState, Step, PathEnd, Path, Chain and ChainIndex with new, set_milestone_states and step; the index covers both files, TODO.md first; unit tests cover each point
 - verify: cargo test --all-features --lib report::page
+- verified: 2026-11-26
+- commit: 28dc0c8
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-26, t239-haiku): done — Added src/report/page/chain.rs (StepState, Step, PathEnd, Path, Chain, ChainIndex with new, set_milestone_states and step) and registered it in page/mod.rs; cargo test --all-features passes 1047 tests (6 new chain tests), fmt and clippy pass for Windows and Linux. Read as: the index is in memory per page build, which D15 allows, and holds every entry of both files; dependents list each ID once; an archived milestone shows its tree state only when the archive tree is also passed to set_milestone_states.
 
 ### T-240 · Chain data: the paths before and after a task, with their limits
 - status: open
@@ -1065,8 +1085,8 @@ milestones that stand out from tasks.
 - note (2026-11-22, claude-main): added
 
 ### T-229 · Stylesheet rules for the v1.1 page
-- status: open
-- owner: —
+- status: done
+- owner: t229-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: report
 - milestone: T-220
 - why: every v1.1 page part needs its CSS; writing it in one place first keeps the other tasks to their markup
@@ -1084,7 +1104,11 @@ milestones that stand out from tasks.
   7. Run the four checks of AGENTS.md.
 - accept: src/report/page/style.css has the rules for h4, code, .ms-mark, .ms-id, details.chain, .chain-line, .sr and .arch-label, the narrow-window rule hides .ms-id, the print rule shows .sr; the colour test and all report tests pass; the snapshot is updated
 - verify: cargo test --all-features --test cmd_report --test report_colours
+- verified: 2026-11-26
+- commit: 07ce428
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-26, t229-haiku): done — Added the v1.1 page rules to style.css (milestone marker and ID, code, h4 subheadings, chain part, archive label, screen-reader class), hid the milestone ID under 560 px, showed the screen-reader class in print and updated the report snapshot; all 1041 tests pass, and fmt and both clippy checks pass.
 
 ## Questions
 
