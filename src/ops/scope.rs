@@ -526,3 +526,141 @@ pub fn check_done_commit(
         }
     }
 }
+
+/// Checks that the commit `done --commit` names holds the task's files as they are on disk
+/// (`R-SCOPE-3`). `differences` are the files that the commit does not hold, in the folder where
+/// the `verify` command runs, relative to the folder of `TODO.md` with `/` separators. The caller
+/// leaves out `TODO.md` and the archive file, which never count. The ones inside the task's
+/// `files` are its uncommitted changes. A task without `files` is not checked. Without `force`
+/// such a file refuses `done` (`UNCOMMITTED_CHANGES`); with `force` the returned note records the
+/// files.
+pub fn check_done_committed(
+    task: &Task,
+    differences: &[String],
+    force: bool,
+    id_str: &str,
+) -> Result<Option<String>> {
+    let Some(files) = task.files.as_deref() else {
+        return Ok(None);
+    };
+    let entries = parse_files(files);
+    let kept: Vec<&str> = differences
+        .iter()
+        .map(String::as_str)
+        .filter(|path| path_in_scope(&entries, path))
+        .collect();
+    if kept.is_empty() {
+        return Ok(None);
+    }
+    let list = kept.join(", ");
+    if force {
+        return Ok(Some(format!(
+            "forced done with uncommitted changes: {list}"
+        )));
+    }
+    Err(TodoError::new(
+        ErrorCode::UncommittedChanges,
+        format!(
+            "{id_str} has changes in its files that the commit does not hold: {list}; commit them and run done again with --commit HEAD, or pass --force to finish it anyway"
+        ),
+    )
+    .with_task(id_str)
+    .with_detail("files_uncommitted", json!(kept)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An invented document with one task; `files` is its `files` value, or no `files` line.
+    fn document(files: Option<&str>) -> Document {
+        let files_line = files
+            .map(|value| format!("- files: {value}\n"))
+            .unwrap_or_default();
+        let text = format!(
+            "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
+### T-001 · Title\n\
+- status: open\n\
+- priority: P1 · difficulty: 2\n\
+{files_line}"
+        );
+        Document::parse_bytes_with_config(text.as_bytes(), crate::doc::IdConfig::default()).unwrap()
+    }
+
+    fn differences(paths: &[&str]) -> Vec<String> {
+        paths.iter().map(|path| (*path).to_string()).collect()
+    }
+
+    #[test]
+    fn a_difference_inside_files_refuses_done_and_names_only_that_file() {
+        let doc = document(Some("src/"));
+        let err = check_done_committed(
+            &doc.tasks[0],
+            &differences(&["src/a.rs", "other.txt"]),
+            false,
+            "T-001",
+        )
+        .unwrap_err();
+        assert_eq!(err.code, ErrorCode::UncommittedChanges);
+        assert!(err.message.contains("src/a.rs"), "{}", err.message);
+        assert!(!err.message.contains("other.txt"), "{}", err.message);
+        assert_eq!(
+            err.details.extra.get("files_uncommitted"),
+            Some(&json!(["src/a.rs"]))
+        );
+    }
+
+    #[test]
+    fn force_finishes_done_and_the_note_names_the_file() {
+        let doc = document(Some("src/"));
+        let note = check_done_committed(
+            &doc.tasks[0],
+            &differences(&["src/a.rs", "other.txt"]),
+            true,
+            "T-001",
+        )
+        .unwrap();
+        assert_eq!(
+            note.as_deref(),
+            Some("forced done with uncommitted changes: src/a.rs")
+        );
+    }
+
+    #[test]
+    fn a_task_without_files_is_not_checked() {
+        let doc = document(None);
+        let result =
+            check_done_committed(&doc.tasks[0], &differences(&["src/a.rs"]), false, "T-001");
+        assert_eq!(result.unwrap(), None);
+    }
+
+    #[test]
+    fn no_differences_pass() {
+        let doc = document(Some("src/"));
+        let result = check_done_committed(&doc.tasks[0], &[], false, "T-001");
+        assert_eq!(result.unwrap(), None);
+    }
+
+    #[test]
+    fn differences_outside_files_pass() {
+        let doc = document(Some("src/"));
+        let result =
+            check_done_committed(&doc.tasks[0], &differences(&["other.txt"]), false, "T-001");
+        assert_eq!(result.unwrap(), None);
+    }
+
+    #[test]
+    fn a_pattern_covers_its_folder_only() {
+        let doc = document(Some("src/*.rs"));
+        let refused =
+            check_done_committed(&doc.tasks[0], &differences(&["src/a.rs"]), false, "T-001");
+        assert_eq!(refused.unwrap_err().code, ErrorCode::UncommittedChanges);
+        let passed = check_done_committed(
+            &doc.tasks[0],
+            &differences(&["src/sub/a.rs"]),
+            false,
+            "T-001",
+        );
+        assert_eq!(passed.unwrap(), None);
+    }
+}
