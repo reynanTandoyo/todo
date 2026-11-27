@@ -132,6 +132,61 @@ pub fn changed_files(dir: Option<&Path>, commit: &str) -> Result<Vec<String>> {
         .collect())
 }
 
+/// The files inside the folder `dir` that are not as `commit` holds them (R-SCOPE-3): the files that
+/// differ between the commit and the folder, and the new files that git does not ignore. The paths
+/// are relative to `dir`, with `/` separators, as [`changed_files`] gives them. Files named in
+/// `always_allowed` (such as `TODO.md`) are left out; the rest are sorted, without duplicates. A
+/// `commit` that starts with `-` is refused as an unknown commit; one that git cannot compare with
+/// the folder is refused with `BAD_VALUE`.
+pub fn worktree_differences(
+    dir: &Path,
+    commit: &str,
+    always_allowed: &[&str],
+) -> Result<Vec<String>> {
+    if commit.starts_with('-') {
+        return Err(TodoError::new(
+            ErrorCode::BadValue,
+            format!("unknown git commit '{commit}'"),
+        ));
+    }
+    let uncomparable = || {
+        TodoError::new(
+            ErrorCode::BadValue,
+            format!("could not compare the folder with git commit '{commit}'"),
+        )
+    };
+    let changed = git_stdout(
+        Some(dir),
+        &[
+            "diff",
+            "--name-only",
+            "--no-renames",
+            "-z",
+            "--relative",
+            commit,
+            "--",
+        ],
+    )
+    .ok_or_else(uncomparable)?;
+    let new = git_stdout(
+        Some(dir),
+        &["ls-files", "--others", "--exclude-standard", "-z"],
+    )
+    .ok_or_else(uncomparable)?;
+    let mut paths: Vec<String> = Vec::new();
+    for output in [&changed, &new] {
+        for path in String::from_utf8_lossy(output).split('\0') {
+            if path.is_empty() || always_allowed.iter().any(|name| same_path(path, name)) {
+                continue;
+            }
+            paths.push(path.to_string());
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    Ok(paths)
+}
+
 /// Resolves and verifies a commit given to `done` or to an `apply` operation (R-WRITE-4, NFR-5), with
 /// `git rev-parse --short` in `dir`: `HEAD` and names become the short hash of their commit, a hash
 /// is kept as given, and a commit git does not know is refused. Without git on `PATH` the trimmed
