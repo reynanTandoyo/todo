@@ -12,9 +12,9 @@ use crate::cli::{
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, verify_folder};
-use crate::ops::commit_files::{resolve_commit, scope_of_commit};
+use crate::ops::commit_files::{resolve_commit, scope_of_commit, worktree_differences};
 use crate::ops::identity::done_by;
-use crate::ops::scope::{CommitScope, check_done_commit};
+use crate::ops::scope::{CommitScope, check_done_commit, check_done_committed};
 use crate::ops::verify::{self, CheckOutcome};
 use crate::ops::{
     DoneCheck, OpsConfig, StatusCommand, TaskOp, VerifyWhen, file_label, parse_doc_for_write,
@@ -28,7 +28,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "done",
     summary: "Mark a task done",
     kind: CommandKind::Write,
-    details: "Marks the task `done`, sets the calling agent as `owner`, removes `claimed`, and appends a `done` note. If the task has a `verify` command, todo runs it first, outside the write lock, in the folder of TODO.md (in a linked worktree, the matching folder of that worktree); a pass also writes `verified: <date>`, and a failure refuses with `VERIFY_FAILED` (exit 1), leaves the task claimed and adds the note `verify failed — <last line>`; after `verify_attempts` failures the task is given back as `stuck`. With `verify_when = \"wave\"` the command runs later, with `todo verify --wave`. `--no-verify` skips the command and needs `--force`. When the task has `files` and git is available, the files that a `--commit` changed must lie inside them (`TODO.md` and the archive file always may), or `done` is refused with `OUT_OF_SCOPE` before any command runs; `--force` finishes it and records the files in a note. A task at or below the target level (`target_difficulty`, the lowest level by default) with `files` needs `--commit` while git is available. If `--commit` is given, `HEAD` is resolved via `git rev-parse` before the write lock is taken and unknown commits are refused when `git` is available. When git can tell who did the work, records it as `by` (the author of `--commit`, otherwise the configured `user.name`, in both cases after `.mailmap`; never an email address); without git or a name, `by` is left out. Prints the task's `accept` line as a reminder.",
+    details: "Marks the task `done`, sets the calling agent as `owner`, removes `claimed`, and appends a `done` note. If the task has a `verify` command, todo runs it first, outside the write lock, in the folder of TODO.md (in a linked worktree, the matching folder of that worktree); a pass also writes `verified: <date>`, and a failure refuses with `VERIFY_FAILED` (exit 1), leaves the task claimed and adds the note `verify failed — <last line>`; after `verify_attempts` failures the task is given back as `stuck`. With `verify_when = \"wave\"` the command runs later, with `todo verify --wave`. `--no-verify` skips the command and needs `--force`. When the task has `files` and git is available, the files that a `--commit` changed must lie inside them (`TODO.md` and the archive file always may), or `done` is refused with `OUT_OF_SCOPE` before any command runs; `--force` finishes it and records the files in a note. The task's files must also be in the commit as they are on disk: a changed or new file inside them that the commit does not hold refuses `done` with `UNCOMMITTED_CHANGES`, before the command runs and again after it passed; `--force` finishes it and records the files in a note. A task at or below the target level (`target_difficulty`, the lowest level by default) with `files` needs `--commit` while git is available. If `--commit` is given, `HEAD` is resolved via `git rev-parse` before the write lock is taken and unknown commits are refused when `git` is available. When git can tell who did the work, records it as `by` (the author of `--commit`, otherwise the configured `user.name`, in both cases after `.mailmap`; never an email address); without git or a name, `by` is left out. Prints the task's `accept` line as a reminder.",
     examples: &[
         "todo done T-012 --agent agent-1",
         "todo done T-012 --agent agent-1 --note \"all checks pass\" --commit HEAD",
@@ -95,15 +95,31 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
     );
     // Which files the commit changed (R-SCOPE-2), also asked of git before the lock.
     let scope = scope_of_commit(&found.path, &cfg.archive_file, resolved_commit.as_deref())?;
+    // The files the commit does not hold (R-SCOPE-3), also asked of git before the lock.
+    let before = uncommitted_files(&found, &cfg, &scope, resolved_commit.as_deref())?;
 
     // The check runs outside the lock (R-LOCK-4); its result is written by the change below.
     let command: String;
-    let (check, state) = match plan_check(ctx, &found, &cfg, &args.task, args.no_verify, &scope)? {
-        PlannedCheck::Recorded(check, state) => (check, state),
+    let (check, state, uncommitted) = match plan_check(
+        ctx,
+        &found,
+        &cfg,
+        &args.task,
+        args.no_verify,
+        &scope,
+        &before,
+    )? {
+        PlannedCheck::Recorded(check, state) => (check, state, before),
         PlannedCheck::Run { id, command: text } => {
             command = text;
             run_check_before_done(ctx, out, &found, &cfg, &args.task, &id, &command)?;
-            (DoneCheck::Passed { command: &command }, CheckState::Passed)
+            // The command may have changed files, so git is asked once more (R-SCOPE-3).
+            let after = uncommitted_files(&found, &cfg, &scope, resolved_commit.as_deref())?;
+            (
+                DoneCheck::Passed { command: &command },
+                CheckState::Passed,
+                after,
+            )
         }
     };
 
@@ -112,12 +128,41 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         commit: resolved_commit.as_deref(),
         by: by.as_deref(),
         scope: &scope,
-        uncommitted: &[],
+        uncommitted: &uncommitted,
         check,
     };
     let res = edit_one_task(ctx, out, META.name, &args.task, &op, &cfg, Some(found))?;
     report_task_ready_checked(out, META.name, &res, true, Some(state));
     Ok(())
+}
+
+/// The files of the task's folder that the commit `commit` does not hold (R-SCOPE-3), asked of git
+/// in the folder where the `verify` command runs. Without git, or without a commit, there is nothing
+/// to ask, and the list is empty. `TODO.md` and the archive file never count.
+fn uncommitted_files(
+    found: &FoundTodo,
+    cfg: &OpsConfig,
+    scope: &CommitScope,
+    commit: Option<&str>,
+) -> Result<Vec<String>> {
+    if matches!(scope, CommitScope::NoGit) {
+        return Ok(Vec::new());
+    }
+    let Some(commit) = commit else {
+        return Ok(Vec::new());
+    };
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let folder = verify_folder(found, &cwd);
+    let todo_name = found
+        .path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    worktree_differences(
+        &folder,
+        commit,
+        &[todo_name.as_str(), cfg.archive_file.as_str()],
+    )
 }
 
 /// Decides, from a read of `TODO.md` that takes no lock, what `done` does about the task's check.
@@ -131,6 +176,7 @@ fn plan_check(
     task_input: &str,
     no_verify: bool,
     scope: &CommitScope,
+    uncommitted: &[String],
 ) -> Result<PlannedCheck> {
     let bytes = read_file_with_snapshot(&found.path)?.bytes;
     let label = file_label(&found.path);
@@ -147,6 +193,9 @@ fn plan_check(
     // R-SCOPE-2 before any command: a commit outside the task's files, or a missing commit, is
     // refused here. The change checks it again under the lock.
     check_done_commit(task, cfg, scope, ctx.force, &id)?;
+    // R-SCOPE-3 before any command: the commit must hold the task's files as they are on disk. The
+    // change checks the same list again under the lock.
+    check_done_committed(task, uncommitted, ctx.force, &id)?;
 
     let Some(verify_line) = task.verify.as_deref() else {
         return Ok(PlannedCheck::Recorded(
