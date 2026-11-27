@@ -1245,8 +1245,8 @@ whether agents follow the rules and whether the guards are tested.
 - note (2026-11-27, claude-main): added
 
 ### T-250 · List the files a folder holds differently from a commit
-- status: open
-- owner: —
+- status: done
+- owner: t250-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: scope
 - milestone: T-248
 - why: done must know whether the commit holds the task's files as they are on disk; git can say which files differ
@@ -1264,12 +1264,16 @@ whether agents follow the rules and whether the guards are tested.
   8. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: worktree_differences returns the changed, deleted and new unignored files of a folder compared with a commit, relative to that folder, sorted, each once, without the always-allowed names; tests/ops_commit_files.rs covers the nine cases
 - verify: cargo test --all-features --test ops_commit_files
+- verified: 2026-11-27
+- commit: 35adee1
 - reqs: R-SCOPE-3, NFR-5
+- by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
+- note (2026-11-27, t250-haiku): done — worktree_differences in src/ops/commit_files.rs lists the files in a folder that differ from a commit or are new and not ignored, leaving out TODO.md; 11 tests in tests/ops_commit_files.rs cover it.
 
 ### T-251 · Error code UNCOMMITTED_CHANGES
-- status: open
-- owner: —
+- status: done
+- owner: t251-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: scope
 - milestone: T-248
 - why: an agent must tell this refusal from a commit outside the files, because the fix is different: commit the files and run done again
@@ -1286,8 +1290,12 @@ whether agents follow the rules and whether the guards are tested.
   7. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: ErrorCode::UncommittedChanges exists with the string UNCOMMITTED_CHANGES and exit code 1, todo schema lists it, the table in docs/json.md has its row, and the unit tests of src/error.rs, tests/docs_exit_codes.rs and tests/cmd_schema.rs pass
 - verify: cargo test --all-features --lib --test docs_exit_codes --test cmd_schema
+- verified: 2026-11-27
+- commit: ca32ae4
 - reqs: R-SCOPE-3, R-OUT-3
+- by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
+- note (2026-11-27, t251-haiku): done — Added the error code UNCOMMITTED_CHANGES (exit 1, a refusal by a rule) with its meaning, its row in docs/json.md and a test entry; done does not yet raise it.
 
 ### T-252 · Rule: a task's files must be in the commit as they are on disk
 - status: open
@@ -1336,8 +1344,8 @@ whether agents follow the rules and whether the guards are tested.
 - note (2026-11-27, claude-main): added
 
 ### T-254 · done says what happened to the task's check
-- status: open
-- owner: —
+- status: done
+- owner: t254-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: verify
 - milestone: T-248
 - why: in wave mode, with verify off or with --no-verify, done prints done ok and nothing says that no check has passed
@@ -1356,8 +1364,12 @@ whether agents follow the rules and whether the guards are tested.
   9. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: done prints one line about the check after done ok for a task with a verify command and carries the state as check in its JSON (passed, waiting, off, skipped, none), drop is unchanged, and tests/cmd_done_check.rs covers the five cases in text and JSON
 - verify: cargo test --all-features --test cmd_done_check --test cmd_done --test cmd_milestone
+- verified: 2026-11-27
+- commit: 731e2a7
 - reqs: R-VERIFY-3
+- by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
+- note (2026-11-27, t254-haiku): done — done prints one line about the task's check after the done line (passed, not run yet in wave mode, off, skipped, or none), and --json carries the same state as check
 
 ### T-255 · done refuses a commit that does not hold the task's files as they are on disk
 - status: open
@@ -1431,8 +1443,8 @@ whether agents follow the rules and whether the guards are tested.
 - note (2026-11-27, claude-main): added
 
 ### T-258 · verify --wave --json says which failed checks timed out
-- status: open
-- owner: —
+- status: done
+- owner: t258-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: verify
 - milestone: T-248
 - why: the error of one check carries timed_out, the wave result does not, so a stopped check looks like a failed one
@@ -1447,8 +1459,15 @@ whether agents follow the rules and whether the guards are tested.
   5. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: each object of failed in verify --wave --json carries timed_out: false for a check that failed and true for one that was stopped after verify_timeout_seconds; the two wave tests assert it
 - verify: cargo test --all-features --test cmd_verify wave
+- attempts: 2
+- verified: 2026-11-27
+- commit: 7e812ae
 - reqs: R-VERIFY-3
+- by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
+- note (2026-11-27, t258-haiku): verify failed — Access is denied. (os error 5)
+- note (2026-11-27, t258-haiku): verify failed — Access is denied. (os error 5)
+- note (2026-11-27, t258-haiku): done — verify --wave --json now carries timed_out on each failed check, so a stopped check is told apart from one that failed.
 
 ### T-259 · Document the commit check and the check state: json.md, README, CHANGELOG
 - status: open
@@ -1475,8 +1494,8 @@ whether agents follow the rules and whether the guards are tested.
 - note (2026-11-27, claude-main): added
 
 ### T-260 · Rules trial: a script that sets up a tempting task and grades what the agent did
-- status: open
-- owner: —
+- status: done
+- owner: t260-haiku
 - priority: P2 · difficulty: 1 · type: test · area: testing
 - milestone: T-248
 - why: ASM-005 assumes that agents follow the rules text; nothing measures it, and the worker rules are only ten lines long
@@ -1496,8 +1515,12 @@ whether agents follow the rules and whether the guards are tested.
   10. Run the verify command: the self-test must print `self-test: ok`.
 - accept: scripts/rules-trial.ps1 sets up the trial project, grades the four rules from todo's history, the bare repository, git's log and status, and the task's state, and its self-test passes for a worker that keeps the rules and catches each of the four broken rules; docs/rules-trial.md gives the procedure
 - verify: & ./scripts/rules-trial.ps1 -SelfTest; exit $LASTEXITCODE
+- verified: 2026-11-27
+- commit: 03fb94c
 - reqs: TEST-10, R-AGENT-1
+- by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
+- note (2026-11-27, t260-haiku): done — Added scripts/rules-trial.ps1 (-Setup, -Grade, -SelfTest) and docs/rules-trial.md: the self-test sets up five invented projects, plays a worker in each and checks that the four rules tell them apart.
 
 ### T-261 · Run the rules trial once with a weak worker and record the result
 - status: open
