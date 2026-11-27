@@ -112,6 +112,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         commit: resolved_commit.as_deref(),
         by: by.as_deref(),
         scope: &scope,
+        uncommitted: &[],
         check,
     };
     let res = edit_one_task(ctx, out, META.name, &args.task, &op, &cfg, Some(found))?;

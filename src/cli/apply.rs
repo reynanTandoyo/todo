@@ -806,6 +806,7 @@ fn apply_task_op(
                 commit: done_commit,
                 by: done_by,
                 scope: done_scope,
+                uncommitted: &[],
                 check: passed.map_or(DoneCheck::NotChecked, |command| DoneCheck::Passed {
                     command,
                 }),

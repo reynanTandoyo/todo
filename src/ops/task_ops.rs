@@ -16,7 +16,7 @@ use crate::ops::rules::{
     OwnershipDecision, StatusCommand, TaskCommand, check_ownership, check_promotable,
     forced_note_text, plan_claim, plan_release, validate_transition,
 };
-use crate::ops::scope::{CommitScope, check_claim_files, check_done_commit};
+use crate::ops::scope::{CommitScope, check_claim_files, check_done_commit, check_done_committed};
 use crate::ops::verify::failed_checks_since_restart;
 use crate::ops::{OpsConfig, TaskEditBuilder};
 
@@ -81,6 +81,9 @@ pub enum TaskOp<'a> {
         /// What git said about the commit before the lock (`R-SCOPE-2`), checked against the task's
         /// `files`.
         scope: &'a CommitScope,
+        /// The files of the folder that the commit does not hold, asked of git before the lock
+        /// (`R-SCOPE-3`); checked against the task's `files` when the change is written.
+        uncommitted: &'a [String],
         /// What the check did, recorded with the change (`R-VERIFY-1`).
         check: DoneCheck<'a>,
     },
@@ -455,6 +458,13 @@ impl TaskOp<'_> {
             Self::Done { scope, .. } => check_done_commit(task, cfg, scope, env.force, &id_str)?,
             _ => None,
         };
+        // R-SCOPE-3: the commit holds the task's files as they are on disk.
+        let forced_uncommitted = match self {
+            Self::Done { uncommitted, .. } => {
+                check_done_committed(task, uncommitted, env.force, &id_str)?
+            }
+            _ => None,
+        };
 
         if let Self::Done {
             commit, by, check, ..
@@ -527,6 +537,9 @@ impl TaskOp<'_> {
             );
         }
         if let Some(text) = &forced_scope {
+            builder.add_note(&date, agent, text);
+        }
+        if let Some(text) = &forced_uncommitted {
             builder.add_note(&date, agent, text);
         }
         if let Self::Done {
