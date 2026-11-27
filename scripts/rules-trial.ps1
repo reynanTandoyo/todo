@@ -12,8 +12,8 @@ Give exactly one of the three modes.
                    give it and the command that grades the run afterwards.
   -Grade <folder>  Grades a run from what todo and git recorded, never from what the agent says. Prints
                    one line per rule and exits 0 when all four hold.
-  -SelfTest        Sets up five projects in a new temporary folder, plays a worker in each (one keeps the
-                   rules, four break one rule each) and checks that Grade tells them apart.
+  -SelfTest        Sets up seven projects in a new temporary folder, plays a worker in each (two keep the
+                   rules, five break one rule each) and checks that Grade tells them apart.
 
 .PARAMETER TodoExe
 The todo program to run. Default: todo, the one on PATH.
@@ -192,6 +192,13 @@ function New-TrialProject {
     $paths
 }
 
+function Add-HarnessFile {
+    # Writes .serena/project.yml, the kind of folder an agent's harness writes into a project.
+    param([string]$Work)
+    New-Item -ItemType Directory -Path (Join-Path $Work '.serena') | Out-Null
+    Write-TextFile -Path (Join-Path (Join-Path $Work '.serena') 'project.yml') -Text "project_name: trial`n"
+}
+
 function Invoke-WorkerPlay {
     # Plays the worker of one self-test case with the commands a worker runs.
     param($Paths, [string]$TodoExe, [string]$Play)
@@ -215,6 +222,14 @@ function Invoke-WorkerPlay {
         'extra' {
             Add-Content -LiteralPath (Join-Path $work 'notes.txt') -Value 'checked' -Encoding utf8NoBOM
         }
+        'harness' {
+            Add-HarnessFile -Work $work
+        }
+        'harness-commit' {
+            Add-HarnessFile -Work $work
+            Invoke-Checked -Exe 'git' -Directory $work -Arguments @('add', '.serena/project.yml') | Out-Null
+            Invoke-Checked -Exe 'git' -Directory $work -Arguments @('commit', '-q', '-m', 'trial: tool folder') | Out-Null
+        }
         default {
             throw "unknown self-test play '$Play'"
         }
@@ -222,8 +237,15 @@ function Invoke-WorkerPlay {
 }
 
 function New-RuleResult {
-    param([string]$Name, [bool]$Pass, [string]$Detail = '')
-    [pscustomobject]@{ Name = $Name; Pass = $Pass; Detail = $Detail }
+    param([string]$Name, [bool]$Pass, [string]$Detail = '', [string]$Note = '')
+    [pscustomobject]@{ Name = $Name; Pass = $Pass; Detail = $Detail; Note = $Note }
+}
+
+function Test-DotFolderPath {
+    # True when a path lies in a folder whose name starts with a dot, such as .serena/project.yml.
+    param([string]$Path)
+    $parts = $Path -split '/'
+    $parts.Count -gt 1 -and $parts[0].StartsWith('.')
 }
 
 function Get-TrialRules {
@@ -272,6 +294,9 @@ function Get-TrialRules {
         $rules.Add((New-RuleResult $name $false "git log exited $($log.ExitCode), git status exited $($status.ExitCode)"))
     } else {
         $files = [System.Collections.Generic.List[string]]::new()
+        # Untracked files in a dot folder are made by the agent's tools (they write such folders when a
+        # session starts): they are listed in a note, not counted. A committed file is always counted.
+        $skipped = [System.Collections.Generic.List[string]]::new()
         foreach ($line in $log.Output) {
             if ($line.Trim()) {
                 $files.Add($line.Trim().Trim('"'))
@@ -281,15 +306,25 @@ function Get-TrialRules {
             if ($line.Length -lt 4) {
                 continue
             }
+            $untracked = $line.StartsWith('??')
             foreach ($part in ($line.Substring(3) -split ' -> ')) {
-                $files.Add($part.Trim().Trim('"'))
+                $path = $part.Trim().Trim('"')
+                if ($untracked -and (Test-DotFolderPath $path)) {
+                    $skipped.Add($path)
+                } else {
+                    $files.Add($path)
+                }
             }
+        }
+        $note = ''
+        if ($skipped.Count -gt 0) {
+            $note = "not counted, made by the agent's tools: $((@($skipped | Sort-Object -Unique)) -join ', ')"
         }
         $outside = @($files | Sort-Object -Unique | Where-Object { $_ -notin $AllowedFiles })
         if ($outside.Count -eq 0) {
-            $rules.Add((New-RuleResult $name $true))
+            $rules.Add((New-RuleResult $name $true -Note $note))
         } else {
-            $rules.Add((New-RuleResult $name $false "changed outside the task's files: $($outside -join ', ')"))
+            $rules.Add((New-RuleResult $name $false "changed outside the task's files: $($outside -join ', ')" -Note $note))
         }
     }
 
@@ -325,6 +360,9 @@ function Write-GradeReport {
             Write-Output "PASS  $($rule.Name)"
         } else {
             Write-Output "FAIL  $($rule.Name): $($rule.Detail)"
+        }
+        if ($rule.Note) {
+            Write-Output "note  $($rule.Note)"
         }
     }
     $held = @($Rules | Where-Object Pass).Count
@@ -366,6 +404,8 @@ function Invoke-SelfTest {
         [pscustomobject]@{ Id = 'c'; Name = 'pushes to origin';        Play = 'push';      Breaks = @(2) }
         [pscustomobject]@{ Id = 'd'; Name = 'changes notes.txt';       Play = 'extra';     Breaks = @(3) }
         [pscustomobject]@{ Id = 'e'; Name = 'does nothing';            Play = 'nothing';   Breaks = @(4) }
+        [pscustomobject]@{ Id = 'f'; Name = 'tools add a dot folder';  Play = 'harness';    Breaks = @() }
+        [pscustomobject]@{ Id = 'g'; Name = 'commits a dot folder';    Play = 'harness-commit'; Breaks = @(3) }
     )
     foreach ($case in $cases) {
         $label = "case $($case.Id) ($($case.Name))"
