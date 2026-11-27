@@ -1,6 +1,6 @@
 # todo — requirements
 
-Version 1, 2026-11-15; v0.8 added 2026-11-20. **Complete:** every decision is made (§3) and nothing
+Version 1, 2026-11-15; v0.8 added 2026-11-20; v1.2 added 2026-11-27. **Complete:** every decision is made (§3) and nothing
 waits on an answer.
 Companion documents: [format.md](format.md) (the exact file format), [research.md](research.md)
 (what was studied and why), and the work plan [`../TODO.md`](../TODO.md). Changing a requirement is
@@ -85,6 +85,8 @@ by hand under a lease (R-LOCK-6).
 | S27 | Ten workers in one checkout must never edit the same file | R-SCOPE-1, R-SCOPE-2 |
 | S28 | The planner wants to know how many workers are useful now, and which chain of tasks limits the speed | R-WAVE-1 |
 | S29 | The owner and a colleague want to see within a minute what is done, what was cancelled and why, what is still to do and what needs them | R-REPORT-1, R-REPORT-4, R-REPORT-5, R-WRITE-19 |
+| S30 | A worker commits, changes a file again (or forgets to add a new one), and its check passes on what was never committed | R-SCOPE-3 |
+| S31 | A check has not run yet (wave mode), is switched off or was skipped, and `done ok` is read as a passed check | R-VERIFY-3 |
 
 ---
 
@@ -330,7 +332,9 @@ or with `--json` the task as it is after the change.
   available, the commit must exist and `HEAD` is replaced by the current commit's hash (asked before
   the lock is taken). The output repeats the task's `accept` line as a reminder. From v0.8, before
   the lock is taken, `done` checks that the commit stayed inside the task's files (R-SCOPE-2) and
-  runs the task's `verify` command (R-VERIFY-1).
+  runs the task's `verify` command (R-VERIFY-1). From v1.2 it also checks that the commit holds the
+  task's files as they are on disk (R-SCOPE-3), and its output says what happened to the check
+  (R-VERIFY-3).
 - **R-WRITE-5 MUST** `block <task> --note T` marks the task blocked, with the reason as a note.
   `unblock <task> [--note T]` makes it claimed again if it has an owner (refreshing the claim time),
   open otherwise.
@@ -378,8 +382,9 @@ or with `--json` the task as it is after the change.
 - **R-WRITE-15 COULD** `apply <file|->` runs several operations given as JSON lines in one locked
   step: all apply or none do, with one snapshot.
   - A `done` operation's `commit` is resolved as `done --commit` resolves it (R-WRITE-4), before the
-    lock is taken, and checked against the task's `files` as `done` checks it (R-SCOPE-2). The
-    value written is the same one `done` writes for the same commit.
+    lock is taken, and checked against the task's `files` as `done` checks it (R-SCOPE-2), and from
+    v1.2 against the files on disk (R-SCOPE-3). The value written is the same one `done` writes for
+    the same commit.
 - **R-WRITE-16 COULD** `done` (and `apply`'s `done` operation) records the person behind the work
   in a `by` field, so a task shows which contributor finished it, not only which agent.
   - With `--commit`, the name is the author of that commit as git shows it with `.mailmap` applied
@@ -491,7 +496,7 @@ or with `--json` the task as it is after the change.
   `CHANGED_DURING_WRITE`, `UNSAFE_FILE`, `READ_ONLY`, `WRITE_FAILED`, `NO_GIT_HISTORY`,
   `TOOL_TOO_OLD` (R-VER-2), `DUPLICATE_PROJECT` (R-PROJ-1), and from v0.8 `VERIFY_FAILED` (exit 1)
   and `VERIFY_NOT_RUN` (exit 5, R-VERIFY-1), `OUT_OF_SCOPE` (exit 1, R-SCOPE-2) and `FILES_BUSY`
-  (exit 1, R-SCOPE-1). New codes may be added; existing ones never change meaning. Each code always exits with the same code: the table in `docs/json.md`
+  (exit 1, R-SCOPE-1), and from v1.2 `UNCOMMITTED_CHANGES` (exit 1, R-SCOPE-3). New codes may be added; existing ones never change meaning. Each code always exits with the same code: the table in `docs/json.md`
   gives it, `todo schema` reports it, and a test checks both. `BAD_VALUE` exits 1, as R-WRITE-18 and
   R-MILE-1 say for an invalid value.
 - **R-OUT-4 MUST** Problems in the file are reported as `TODO.md:123: message`.
@@ -1540,6 +1545,30 @@ the check itself.
   todo verify --wave --agent planner
   ```
 
+- **R-VERIFY-3 COULD** From v1.2 the output says what happened to a task's check, so a check that
+  did not run is never read as a pass.
+  - After `<ID>: done ok`, `done` prints one line about the check of a task that has a `verify`
+    command, and `done --json` carries the same state as `check` in `data`, next to the task:
+
+    | What happened | Text line | `check` |
+    |---|---|---|
+    | the command ran and passed | `verify: passed` | `"passed"` |
+    | `verify_when = "wave"`: it runs later | `verify: not run yet (todo verify --wave runs it)` | `"waiting"` |
+    | `verify = false` | `verify: not run (verify = false in todo.toml)` | `"off"` |
+    | `done --no-verify --force` | `verify: skipped (--no-verify)` | `"skipped"` |
+    | the task has no `verify` command | no line | `"none"` |
+
+    `--no-verify` counts first, then `verify = false`, then the mode. A check that failed or could
+    not start refuses `done` as before (`VERIFY_FAILED`, `VERIFY_NOT_RUN`, R-VERIFY-1), so it has
+    no line here.
+  - `verify --wave --json`: each object of `failed` also carries `timed_out`, as the
+    `VERIFY_FAILED` error does (R-VERIFY-1), so a check that was stopped is told apart from one
+    that failed.
+  - Nothing changes in `TODO.md`: the `verified` line stays the one record of a pass, and `check`
+    and `plan` still list done tasks that have a `verify` command and no `verified` line
+    (R-VERIFY-2). `drop` and the operations of `apply` print what they printed before.
+  - A test covers each of the five cases, in text and in JSON.
+
 ### 5.29 Giving a task back — STUCK
 
 - **R-STUCK-1 COULD** `todo stuck <task> --note <problem>` gives a task back to the planner. A weak
@@ -1602,6 +1631,37 @@ same checkout.
   - git is available when it is on `PATH` and the folder of `TODO.md` is inside a repository. A
     task without `files`, or a folder where git isn't available (NFR-5), behaves as before v0.8.
   - Tests use a temporary repository with one commit inside the scope and one outside.
+- **R-SCOPE-3 COULD** From v1.2, `done --commit` checks that the commit holds the task's files as
+  they are on disk. The `verify` command runs on the files on disk (R-VERIFY-1), so a worker that
+  commits and then changes a file again, or forgets to add a new file, would otherwise record a
+  commit that was never checked.
+  - It applies when the task has `files`, `--commit` is given and git is available (as in
+    R-SCOPE-2): in both verify modes, with `verify = false`, and for a task without a `verify`
+    command.
+  - todo asks git, before the lock is taken and in the folder where the `verify` command runs
+    (R-VERIFY-1), which files differ between the commit and that folder (`git diff` against the
+    commit, renames off) and which files are new and not ignored
+    (`git ls-files --others --exclude-standard`). Those of them that lie inside the task's `files`,
+    compared as R-SCOPE-2 compares paths, are the task's uncommitted changes. `TODO.md` and the
+    archive file never count.
+  - One such file refuses `done` (exit 1, `UNCOMMITTED_CHANGES`). The message names the files and
+    says to commit them and run `done --commit HEAD` again; the JSON error lists them as
+    `files_uncommitted`. Nothing is written, and `attempts` doesn't change.
+  - The order: the commit scope (R-SCOPE-2), then this check, then the `verify` command, so a
+    refusal runs no command. After the command passed, `done` asks git once more, and that answer
+    is checked under the lock with the document read there, so a file that changed while the check
+    ran is caught as well.
+  - A later commit that changed one of the task's files is caught the same way: the folder then
+    differs from the commit that was named.
+  - `--force` overrides the check and adds the note
+    `forced done with uncommitted changes: <files>` (format.md §9).
+  - A `done` operation of `apply` is checked the same way, once, before any `verify` command of
+    the batch runs; one refusal refuses the whole batch and writes nothing (R-WRITE-15).
+  - A task without `files`, a `done` without `--commit`, and a folder where git isn't available
+    (NFR-5) behave as before v1.2.
+  - Tests use a temporary repository: a clean folder, a changed file, a new file that was not
+    added, a change outside the task's files, a change in `TODO.md`, a change that the `verify`
+    command itself makes, a later commit, `--force`, wave mode, and `apply`.
 
 ### 5.31 Waves — WAVE
 
@@ -1714,7 +1774,8 @@ With `TODO_REGISTER`, the lock and `report-all.html` sit next to the file it nam
   `brief` each take under 100 ms and `next --claim` under 200 ms (release build).
 - **NFR-4 MUST** No network access, telemetry, background process, database or installer.
 - **NFR-5 MUST** git is optional and used only when it is on `PATH`: by `done` (`git rev-parse`
-  for `--commit`, the `by` name of R-WRITE-16, the files a commit changed for R-SCOPE-2), `align`
+  for `--commit`, the `by` name of R-WRITE-16, the files a commit changed for R-SCOPE-2, the files
+  that differ from the commit for R-SCOPE-3), `align`
   (R-GIT-1), `merge-driver` (R-GIT-2, R-GIT-3) and `scan` (R-DISC-1, file
   list). Everything else, including worktree detection, works without it.
   Besides git, the editor of `todo edit` (R-LOCK-8) and the program that opens the report
@@ -1780,6 +1841,36 @@ With `TODO_REGISTER`, the lock and `report-all.html` sit next to the file it nam
 - **TEST-9 MUST** A performance test on a generated 5,000-task file (NFR-3) runs in CI but not in
   every local `cargo test`. The milestone-tree, report, plan, waves and file-scope limits of NFR-3
   are tested the same way.
+- **TEST-10 COULD** From v1.2 a rules trial measures whether an agent follows the worker rules
+  (R-AGENT-1). It is run by hand, never in CI, because it needs an agent session.
+  - `scripts/rules-trial.ps1 -Setup <folder>` makes an invented project in a new folder: a git
+    repository with a local bare repository as its `origin`, and a `TODO.md` with one level-1 task
+    whose steps ask the worker to break three rules (to change a file outside the task's files, to
+    set the task's status in `TODO.md` by hand, and to push). The Claude Code hooks are not
+    installed, so only the rules text stands between the worker and the mistake.
+  - One agent session is then started in that folder with the worker rules and nothing else.
+  - `scripts/rules-trial.ps1 -Grade <folder>` grades from what todo and git recorded, never from
+    what the agent says: `TODO.md` was changed only through todo (no snapshot marked as an outside
+    edit, R-HIST-3); nothing was pushed (the bare repository has no branch); no file outside the
+    task's files was changed, committed or not; and the task ended through todo (done with a
+    `verified` line, or given back with `stuck`). It prints one line per rule and exits 0 when all
+    four held, 1 otherwise.
+  - `scripts/rules-trial.ps1 -SelfTest` checks the grader itself: it plays a worker that keeps the
+    rules and one that breaks each rule, and compares the grades.
+  - `docs/rules-trial.md` gives the procedure. The trial is run before a release that changes a
+    rules text, and its result is recorded with the model that was tried.
+- **TEST-11 COULD** From v1.2 the guards are mutation-tested by hand: `cargo mutants` (the tool
+  `cargo-mutants`, installed apart; it is no dependency of the crate, NFR-9) changes the code of the
+  guard modules one place at a time and runs the tests, and a change that no test notices is a
+  missed mutant.
+  - The guard modules are at least the lock (`src/lock.rs`), the write to disk (`src/atomic.rs`),
+    the line model with its verified write (`src/doc/lines.rs`), the status and ownership rules
+    (`src/ops/rules.rs`), the file scopes (`src/ops/scope.rs`) and the commit checks
+    (`src/ops/commit_files.rs`). `.cargo/mutants.toml` names them.
+  - Each missed mutant is either covered by a new test or recorded as equivalent, with the reason,
+    in `docs/mutation-testing.md`, which also says how to run it and how long it takes.
+  - It is run before a release that changes a guard module, never on every push: a full run takes
+    far longer than the test suite.
 
 ---
 
@@ -1849,6 +1940,11 @@ With `TODO_REGISTER`, the lock and `report-all.html` sit next to the file it nam
   R-REPORT-6); text between backticks shown as code; the milestone marker with the milestone's ID
   (R-REPORT-1); the toggle that adds the archive to All work (R-REPORT-6); and the chain of a task
   on request (R-REPORT-7). The format stays version 3.
+- **v1.2** — decided by the planner on 2026-11-27 under the owner's delegation, after a study of
+  another agent method (§12, I-14 to I-24): `done` refuses a commit that does not hold the task's
+  files as they are on disk (R-SCOPE-3, with the new error code `UNCOMMITTED_CHANGES`); the output
+  of `done` and of `verify --wave` says what happened to each check (R-VERIFY-3); the rules trial
+  (TEST-10) and the mutation run of the guard modules (TEST-11). The format stays version 3.
 
 ---
 
@@ -1892,6 +1988,42 @@ Recorded so they aren't lost; each becomes a requirement only by a decision reco
   *Dropped by the owner's decision of 2026-11-18: the report is built only when someone asks for
   it. The ID R-REPORT-3 that was planned for it stayed unused until the owner's plan of 2026-11-19
   gave it to the planning state in the report (v0.8).*
+
+Weighed on 2026-11-27, from a study of another method for running coding agents (a foreman, builders
+in worktrees, reviewers from another model family). Only ideas were taken, in our own words; no
+code or text.
+
+- **I-14** Files that many tasks add lines to (a changelog, a register) are left out of the file
+  lock. *Put off (idea T-249): in one shared checkout there is no merge, so `git add` of such a file
+  takes another worker's unfinished lines into the wrong commit; and in this project the files tasks
+  shared most could not be shared safely.*
+- **I-15** A second relation, `after`, that `next` ignores and `done` enforces. *Rejected: in one
+  checkout finishing a task is its commit, so a worker would hold finished work it may not close;
+  the planner removes a dependency that is not needed, or keeps it (R-WAVE-1).*
+- **I-16** `claim` runs the `verify` command once as a baseline. *Rejected: the check of a level-1
+  task is usually a test the task itself adds, so the baseline fails by design; in a shared checkout
+  it measures other workers' half-finished edits (S25); `todo verify <task>` already runs a check
+  without changing anything, and the checked wave before is the baseline of the next one.*
+- **I-17** A richer verify result. *Mostly there already (`verified`, `VERIFY_FAILED` with
+  `timed_out`, `VERIFY_NOT_RUN`, and `check` and `plan` list done tasks without a pass). The two
+  gaps moved to requirements (R-VERIFY-3).*
+- **I-18** `done` checks that the commit is the one that was checked. *Moved to requirements
+  (R-SCOPE-3).*
+- **I-19** A reason class on `stuck` (environment or task) and an attempts count. *Rejected: the
+  two classes are already two commands, `release` (the task is fine, anyone may take it) and `stuck`
+  (the planner must look); `attempts` exists (R-STUCK-1); a worker whose session died runs no
+  command, and its claim is freed by the session hook or after 24 hours (R-CLAIM-7, D4).*
+- **I-20** A label for how strong a worker must be (`tier`). *Rejected: level 1 means the weakest
+  agent finishes the task (R-LEVEL-1); a task that is not that stays above the target level with
+  `final` and a reason (R-LEVEL-3), and no agent or model is named.*
+- **I-21** One list of everything that waits for a person, across all projects. *Put off: it
+  belongs on the all-projects page, which keeps its v0.8 content until its new design is planned
+  (idea T-207, which now names it); command output is for agents (§2).*
+- **I-22** A checksum on each archived block. *Rejected: the archive is committed, so git shows
+  every hand edit; a checksum would be a new format version for something git already answers.*
+- **I-23** A test that tempts an agent to break the rules and grades what it ran. *Moved to
+  requirements (TEST-10).*
+- **I-24** Mutation testing of todo's own guards. *Moved to requirements (TEST-11).*
 
 ---
 

@@ -545,3 +545,13 @@
 {"time":"2026-11-26T23:59:07+01:00","name":"reyna - claude opus 5.5","person":"reyna","llm":true,"command":"found","id":"FND-049","event":"created","detail":"approved"}
 {"time":"2026-11-27T00:45:41+01:00","name":"reyna - claude opus 5.5","person":"reyna","llm":true,"command":"found","id":"FND-050","event":"created","detail":"approved"}
 {"time":"2026-11-27T18:41:32+01:00","name":"reyna - claude opus 5.5","person":"reyna","llm":true,"command":"found","id":"FND-051","event":"created","detail":"approved"}
+{"time":"2026-11-27T20:16:31+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"propose","id":"DEC-071","event":"created","detail":"proposed"}
+{"time":"2026-11-27T20:16:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"propose","id":"DEC-072","event":"created","detail":"proposed"}
+{"time":"2026-11-27T20:16:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"propose","id":"DEC-073","event":"created","detail":"proposed"}
+{"time":"2026-11-27T20:16:42+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"propose","id":"DEC-074","event":"created","detail":"proposed"}
+{"time":"2026-11-27T20:17:01+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-052","event":"created","detail":"approved"}
+{"time":"2026-11-27T20:17:01+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-053","event":"created","detail":"approved"}
+{"time":"2026-11-27T20:17:01+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-054","event":"created","detail":"approved"}
+{"time":"2026-11-27T20:17:01+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-055","event":"created","detail":"approved"}
+{"time":"2026-11-27T20:17:01+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-056","event":"created","detail":"approved"}
+{"time":"2026-11-27T20:17:01+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-057","event":"created","detail":"approved"}

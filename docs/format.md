@@ -262,6 +262,7 @@ Notes the tool writes itself:
 | `verify --wave`, on a task whose command failed | `stuck — verify failed after done: <last line of the output>` |
 | `done --no-verify --force` | `forced done without verify` |
 | `done --force` with a commit outside the task's files | `forced done outside files: <files>` |
+| `done --force` while the task's files hold changes the commit does not hold (from todo 1.2) | `forced done with uncommitted changes: <files>` |
 | `claim --force` of a task whose files another agent holds | `forced claim (files held by <ID>)` |
 | `split`, on the task that became a milestone | `split into <ID>, <ID>, …` |
 
@@ -413,7 +414,7 @@ version label.
 |---|---|---|
 | 1 | todo 0.1 to 0.5 | the format line is optional |
 | 2 | todo 0.6 and 0.7 | the format line is required; the tool line (§4); the kinds `milestone` and `idea` (§16); the fields `difficulty`, `milestone`, `about`, `goal` and `why` (§8) |
-| 3 | todo 0.8 and later (todo 1.0 adds the field `summary`, §8, without a new version: an older todo keeps it as an unknown field) | the levels `1` to `5` as the default `difficulties`; the fields `steps` (a numbered list on indented lines), `read`, `verify`, `final`, `attempts` and `verified` (§8); `files` as the list of paths and patterns a task may change (§19); the notes of `stuck`, `split` and the verify command (§9) |
+| 3 | todo 0.8 and later (todo 1.0 adds the field `summary`, §8, without a new version: an older todo keeps it as an unknown field; todo 1.2 adds one note text of `done --force`, §9, and notes are free text to every version) | the levels `1` to `5` as the default `difficulties`; the fields `steps` (a numbered list on indented lines), `read`, `verify`, `final`, `attempts` and `verified` (§8); `files` as the list of paths and patterns a task may change (§19); the notes of `stuck`, `split` and the verify command (§9) |
 
 A tool migrates a file in an older format on its first write, and with `todo migrate`, one version
 at a time, under the lock and in one write after a snapshot. Each step changes whole lines only.
