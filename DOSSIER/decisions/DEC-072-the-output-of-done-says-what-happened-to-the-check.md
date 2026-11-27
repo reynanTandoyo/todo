@@ -2,15 +2,18 @@
 # DEC-072 · The output of done says what happened to the check
 
 - kind: decision
-- status: proposed
+- status: approved
 - created: 2026-11-27T20:16:42+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
 - task: T-248
 - tags: done,verify,json,output
 - topic: verify,cli
+- approved: 2026-11-27T20:24:04+01:00 by reyna
+- valid-from: 2026-11-27T20:24:04+01:00
 - history: 2026-11-27T20:16:42+01:00 reyna via reyna - claude fable 5.2: created
 - history: 2026-11-27T20:16:42+01:00 reyna via reyna - claude fable 5.2: proposed
+- history: 2026-11-27T20:24:04+01:00 reyna via reyna - claude fable 5.2: accepted
 
 ## Decision
 

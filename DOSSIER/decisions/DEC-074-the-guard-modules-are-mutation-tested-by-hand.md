@@ -2,15 +2,18 @@
 # DEC-074 · The guard modules are mutation-tested by hand
 
 - kind: decision
-- status: proposed
+- status: approved
 - created: 2026-11-27T20:16:42+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
 - task: T-248
 - tags: mutation,guards,tests,cargo-mutants
 - topic: testing
+- approved: 2026-11-27T20:24:04+01:00 by reyna
+- valid-from: 2026-11-27T20:24:04+01:00
 - history: 2026-11-27T20:16:42+01:00 reyna via reyna - claude fable 5.2: created
 - history: 2026-11-27T20:16:42+01:00 reyna via reyna - claude fable 5.2: proposed
+- history: 2026-11-27T20:24:04+01:00 reyna via reyna - claude fable 5.2: accepted
 
 ## Decision
 

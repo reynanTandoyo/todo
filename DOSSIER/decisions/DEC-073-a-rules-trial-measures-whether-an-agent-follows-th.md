@@ -2,15 +2,18 @@
 # DEC-073 · A rules trial measures whether an agent follows the worker rules
 
 - kind: decision
-- status: proposed
+- status: approved
 - created: 2026-11-27T20:16:42+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
 - task: T-248
 - tags: rules,worker,trial,script
 - topic: testing,agents
+- approved: 2026-11-27T20:24:04+01:00 by reyna
+- valid-from: 2026-11-27T20:24:04+01:00
 - history: 2026-11-27T20:16:42+01:00 reyna via reyna - claude fable 5.2: created
 - history: 2026-11-27T20:16:42+01:00 reyna via reyna - claude fable 5.2: proposed
+- history: 2026-11-27T20:24:04+01:00 reyna via reyna - claude fable 5.2: accepted
 
 ## Decision
 

@@ -2,15 +2,18 @@
 # DEC-071 · done refuses a commit that does not hold the task's files as they are on disk
 
 - kind: decision
-- status: proposed
+- status: approved
 - created: 2026-11-27T20:16:31+01:00
 - author: reyna
 - via: reyna - claude fable 5.2
 - task: T-248
 - tags: done,commit,scope,verify
 - topic: verify,git
+- approved: 2026-11-27T20:24:02+01:00 by reyna
+- valid-from: 2026-11-27T20:24:02+01:00
 - history: 2026-11-27T20:16:31+01:00 reyna via reyna - claude fable 5.2: created
 - history: 2026-11-27T20:16:31+01:00 reyna via reyna - claude fable 5.2: proposed
+- history: 2026-11-27T20:24:02+01:00 reyna via reyna - claude fable 5.2: accepted
 
 ## Decision
 
