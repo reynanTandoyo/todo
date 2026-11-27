@@ -1278,15 +1278,23 @@ fn apply_done_runs_no_check_in_wave_mode_and_none_with_verify_false() {
 // The processes a check starts are stopped with it (T-172)
 // ---------------------------------------------------------------------------------------------
 
-/// A check that starts a child process, which writes `hb.txt` every tenth of a second, and then
-/// waits `wait_seconds` in the shell itself. The child is a process of the check, not of the shell.
+/// A check that starts a child process, which writes a line to `hb.txt` about every second (Windows)
+/// or tenth of a second (elsewhere), waits until the child has written (at most 60 seconds), and
+/// then waits `wait_seconds` in the shell itself. The child is a process of the check, not of the
+/// shell.
+///
+/// On Windows the child is `cmd.exe`, which starts in milliseconds, where a new PowerShell can take
+/// over ten seconds on a busy PC. The shell waits for the first line, so the check never ends
+/// before its child has written anything (T-219).
 fn heartbeat_check(wait_seconds: u32) -> String {
     if cfg!(windows) {
         format!(
-            r#"Start-Process -NoNewWindow -FilePath powershell.exe -ArgumentList '-NoProfile -Command "while ($true) {{ Add-Content -Path hb.txt -Value beat; Start-Sleep -Milliseconds 100 }}"'; Start-Sleep -Seconds {wait_seconds}"#
+            r#"Start-Process -NoNewWindow -FilePath cmd.exe -ArgumentList '/d /c "for /l %i in (0,0,1) do (echo beat>>hb.txt & ping -n 2 127.0.0.1 >nul)"'; $n = 0; while (-not (Test-Path hb.txt) -and $n -lt 600) {{ Start-Sleep -Milliseconds 100; $n++ }}; Start-Sleep -Seconds {wait_seconds}"#
         )
     } else {
-        format!("(while true; do echo beat >> hb.txt; sleep 0.1; done) & sleep {wait_seconds}")
+        format!(
+            "(while true; do echo beat >> hb.txt; sleep 0.1; done) & n=0; while [ ! -s hb.txt ] && [ $n -lt 600 ]; do sleep 0.1; n=$((n+1)); done; sleep {wait_seconds}"
+        )
     }
 }
 
@@ -1302,7 +1310,9 @@ fn a_timeout_stops_the_child_processes_of_the_check_and_not_only_the_shell() {
     let tmp = TempDir::new().unwrap();
     let body = claimed_with_verify(&heartbeat_check(30));
     let (home, work, _todo_file) = setup_proj(&tmp, &body);
-    write_toml(&work, "verify_timeout_seconds = 5\n");
+    // The timeout leaves the child time to start on a busy PC; the check itself waits 30 seconds
+    // after the child's first line, so it still ends by the timeout.
+    write_toml(&work, "verify_timeout_seconds = 10\n");
 
     let out = todo(
         &home,
@@ -1330,7 +1340,7 @@ fn a_timeout_stops_the_child_processes_of_the_check_and_not_only_the_shell() {
 #[test]
 fn a_check_that_ends_normally_leaves_no_child_process_running() {
     let tmp = TempDir::new().unwrap();
-    let body = claimed_with_verify(&heartbeat_check(2));
+    let body = claimed_with_verify(&heartbeat_check(1));
     let (home, work, _todo_file) = setup_proj(&tmp, &body);
 
     let out = todo(&home, &work, &["verify", "T-001", "--agent", "planner"]);
