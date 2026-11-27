@@ -590,13 +590,15 @@ Small fixes the owner found on this project's own page, the archive shown in the
 milestones that stand out from tasks.
 
 ### T-220 · The status page, polished
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · type: milestone
 - goal: The page reads clearly on a finished project too: no blank views, one heading style, milestones that stand out, and the archive shown in the same tree on request
 - why: the owner looked at this project's own page after the 1.0.0 release (2026-11-22) and found these points
 - summary: Small improvements to the status page that the owner found on this project's own page after the 1.0 release.
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
+- note (2026-11-27, claude-main): done — v1.1: empty-view line, planner subheadings, backticks as code, milestone marker, Include archive and Show chain; released as 1.1.0
 
 ### T-221 · Requirements for the v1.1 page changes
 - status: done
@@ -942,8 +944,8 @@ milestones that stand out from tasks.
 - note (2026-11-27, t238-haiku): Assumed: when the archive leaves All work its entries lose the view filter's hide, so Earlier work shows them all as before the button; milestones the filter opened stay open. Not run in a real browser: the behaviour was checked with jsdom on the snapshot page only.
 
 ### T-227 · Release 1.1.0
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · type: milestone · area: release
 - milestone: T-220
 - goal: Version 1.1.0 is released with the polished page
@@ -951,8 +953,10 @@ milestones that stand out from tasks.
 - summary: Version 1.1.0 is released with the polished page.
 - depends: T-222, T-223, T-224, T-225, T-226, T-228
 - accept: README and todo help report describe the archive toggle and the milestone marker; CHANGELOG.md has the 1.1.0 entry; Cargo.toml is 1.1.0; all checks pass on Windows and Linux; the owner has looked at this project's page
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
 - note (2026-11-22, claude-main): split into T-245, T-246
+- note (2026-11-27, claude-main): done — 1.1.0 released
 
 ### T-245 · Help text and README describe the v1.1 page
 - status: done
@@ -978,22 +982,28 @@ milestones that stand out from tasks.
 - note (2026-11-27, t245-haiku): done — Help text (report META details) and README HTML report section now describe the milestone marker, Include archive, Show chain and the empty-view line; fmt, clippy (Windows and Linux) and cargo test pass: 1096 tests passed, 0 failed, 5 ignored.
 
 ### T-246 · Version 1.1.0 and changelog
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · difficulty: 2 · type: docs · area: release
 - milestone: T-227
 - why: the owner gets the polished page through a release
 - summary: Version 1.1.0 is released with the polished page.
 - final: The release is done by the planner: version, changelog, checks on both systems and the owner's look before tagging.
 - depends: T-245
-- files: Cargo.toml, CHANGELOG.md, docs/json.md
+- files: Cargo.toml, Cargo.lock, CHANGELOG.md, docs/json.md, tests/snapshots/cli_basic__cli_overview_json.snap
 - read: docs/requirements.md
 - steps:
   1. The planner does this task: version 1.1.0 in Cargo.toml, Cargo.lock and the examples of docs/json.md, the changelog entry, the overview snapshot, all checks on Windows and Linux, and the owner's look at this project's page before tagging.
 - accept: Cargo.toml is 1.1.0; CHANGELOG.md has the 1.1.0 entry; all checks pass on Windows and Linux; the owner has looked at this project's page
 - verify: cargo test --all-features
+- attempts: 1
+- verified: 2026-11-27
+- commit: 4dd76fc
+- by: Reynan Henry Tandoyo
 - note (2026-11-22, claude-main): added
 - note (2026-11-27, session-end): released — session f7957659-295e-4e1b-b8f8-96b2d860c5e5 ended
+- note (2026-11-27, claude-main): verify failed — error: test failed, to rerun pass `--test cmd_verify`
+- note (2026-11-27, claude-main): done — 1.1.0 in Cargo.toml, Cargo.lock and docs/json.md, changelog entry; Windows 1096 and Linux 1093 tests pass; the owner approved the release on 2026-11-27
 
 ### T-228 · Show chain: each task can show the chain of tasks it waits for and that wait for it
 - status: done
@@ -1263,3 +1273,4 @@ milestones that stand out from tasks.
 - note (2026-11-21, claude-main): added
 - note (2026-11-22, claude-main): Also seen in CI on main 2026-11-21 (run 44908893803, windows-latest): cmd_verify a_check_that_ends_normally_leaves_no_child_process_running failed at tests/cmd_verify.rs:1341; the same commit passed on dev. Both flakes are process timing in cmd_verify on Windows.
 - note (2026-11-27, claude-main): 2026-11-26: t233 worker saw two more cmd_verify timing failures in full runs under parallel load; both passed on rerun
+- note (2026-11-27, claude-main): 2026-11-27: a_timeout_stops_the_child_processes_of_the_check_and_not_only_the_shell and a_check_that_ends_normally_leaves_no_child_process_running failed once right after a full rebuild (the heartbeat child wrote nothing in time: slow PowerShell start under load); 3 reruns of cmd_verify passed 35 of 35
