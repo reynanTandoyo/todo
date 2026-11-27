@@ -54,6 +54,7 @@ struct FailedJson<'a> {
     task: &'a str,
     exit_code: Option<i32>,
     last_line: &'a str,
+    timed_out: bool,
     log: String,
 }
 
@@ -187,6 +188,7 @@ fn check_wave(ctx: &Context, out: &mut Output, found: &FoundTodo, cfg: &OpsConfi
                     task: id,
                     exit_code: failure.exit_code,
                     last_line: &failure.last_line,
+                    timed_out: failure.timed_out,
                     log: failure.log.display().to_string(),
                 })
                 .collect(),

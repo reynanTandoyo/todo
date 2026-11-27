@@ -899,6 +899,7 @@ fn wave_json_lists_passed_failed_and_given_back() {
     assert_eq!(json["data"]["failed"][0]["task"], "T-002");
     assert_eq!(json["data"]["failed"][0]["last_line"], "two failed");
     assert_eq!(json["data"]["failed"][0]["exit_code"], 1);
+    assert_eq!(json["data"]["failed"][0]["timed_out"], false);
     assert_eq!(json["data"]["given_back"], serde_json::json!(["T-002"]));
 }
 
@@ -1093,6 +1094,7 @@ fn wave_check_that_outlives_the_timeout_is_given_back_with_the_timeout_as_its_pr
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr_text(&out));
     let json = parse_json(&out.stdout);
     assert_eq!(json["data"]["failed"][0]["task"], "T-001", "{json}");
+    assert_eq!(json["data"]["failed"][0]["timed_out"], true, "{json}");
     assert_eq!(
         json["data"]["given_back"],
         serde_json::json!(["T-001"]),
