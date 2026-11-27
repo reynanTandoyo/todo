@@ -126,6 +126,8 @@ pub enum ErrorCode {
     FilesBusy,
     /// The commit given to `done` changed files outside the task's files, so `done` is refused (R-SCOPE-2).
     OutOfScope,
+    /// The task's files hold changes that the commit given to `done` does not hold, so `done` is refused (R-SCOPE-3).
+    UncommittedChanges,
     /// A task's `verify` command ran and failed, or timed out (R-VERIFY-1, R-VERIFY-2).
     VerifyFailed,
     /// A `verify` command could not run: no shell could be started, or `verify = false` (R-VERIFY-1).
@@ -161,6 +163,7 @@ impl ErrorCode {
             Self::DuplicateProject => "DUPLICATE_PROJECT",
             Self::FilesBusy => "FILES_BUSY",
             Self::OutOfScope => "OUT_OF_SCOPE",
+            Self::UncommittedChanges => "UNCOMMITTED_CHANGES",
             Self::VerifyFailed => "VERIFY_FAILED",
             Self::VerifyNotRun => "VERIFY_NOT_RUN",
         }
@@ -193,6 +196,7 @@ impl ErrorCode {
         Self::DuplicateProject,
         Self::FilesBusy,
         Self::OutOfScope,
+        Self::UncommittedChanges,
         Self::VerifyFailed,
         Self::VerifyNotRun,
     ];
@@ -241,6 +245,9 @@ impl ErrorCode {
             Self::OutOfScope => {
                 "The commit changed files outside the task's files. Finish with --force to record them in a note."
             }
+            Self::UncommittedChanges => {
+                "The task's files hold changes that the commit does not hold. Commit them and run done again with --commit HEAD, or finish with --force to record them in a note."
+            }
             Self::VerifyFailed => {
                 "A task's verify command failed or timed out, so the task was not marked done (or was not verified)."
             }
@@ -267,7 +274,8 @@ impl ErrorCode {
             | Self::BadValue
             | Self::DuplicateProject
             | Self::FilesBusy
-            | Self::OutOfScope => ExitCode::Refused,
+            | Self::OutOfScope
+            | Self::UncommittedChanges => ExitCode::Refused,
             Self::Busy | Self::LeaseHeld | Self::ChangedDuringWrite => ExitCode::Busy,
             Self::VerifyFailed => ExitCode::Refused,
             Self::NoGitHistory | Self::VerifyNotRun => ExitCode::CheckError,
@@ -452,6 +460,11 @@ mod tests {
             (ErrorCode::ReadOnly, "READ_ONLY", ExitCode::FileError),
             (ErrorCode::WriteFailed, "WRITE_FAILED", ExitCode::FileError),
             (ErrorCode::OutOfScope, "OUT_OF_SCOPE", ExitCode::Refused),
+            (
+                ErrorCode::UncommittedChanges,
+                "UNCOMMITTED_CHANGES",
+                ExitCode::Refused,
+            ),
             (ErrorCode::VerifyFailed, "VERIFY_FAILED", ExitCode::Refused),
             (
                 ErrorCode::VerifyNotRun,

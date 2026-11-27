@@ -705,7 +705,8 @@ fn error_codes_exit_with_the_code_the_table_gives() {
 
     // CHANGED_DURING_WRITE needs another process to change TODO.md while a write waits for its rename.
     // tests/lock_lease.rs makes that happen with the test hooks and checks for exit 3.
-    let elsewhere = ["CHANGED_DURING_WRITE"];
+    // UNCOMMITTED_CHANGES gets its own case when `done` makes it (R-SCOPE-3).
+    let elsewhere = ["CHANGED_DURING_WRITE", "UNCOMMITTED_CHANGES"];
     for code in table.keys() {
         assert!(
             triggered.contains(code.as_str()) || elsewhere.contains(&code.as_str()),
