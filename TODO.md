@@ -1266,11 +1266,23 @@ milestones that stand out from tasks.
 - about: T-195
 - note (2026-11-21, claude-main): added
 
-### T-219 · Flaky test: cmd_verify a_check_that_outlives_verify_timeout_seconds_counts_as_failed hung once under full-suite load on Windows (seen by t218-haiku 2026-11-21) and left todo.exe and pwsh running; passed alone and on rerun
-- status: open
-- owner: —
-- type: idea
+### T-219 · The cmd_verify heartbeat tests do not depend on how fast PowerShell starts
+- status: done
+- owner: claude-main
+- priority: P2
+- difficulty: 1
+- type: bug
+- area: testing
+- why: the heartbeat tests failed now and then on Windows when the PC was busy: the child PowerShell started later than the fixed waits allowed
+- summary: Two tests of verify no longer fail by chance when the computer is busy.
+- files: tests/cmd_verify.rs
+- accept: the heartbeat check waits until its child has written before its own wait; the timeout test gives the child time to start; cmd_verify passes, also under load
+- verify: cargo test --all-features --test cmd_verify
+- verified: 2026-11-27
+- commit: cecc965
+- by: Reynan Henry Tandoyo
 - note (2026-11-21, claude-main): added
 - note (2026-11-22, claude-main): Also seen in CI on main 2026-11-21 (run 44908893803, windows-latest): cmd_verify a_check_that_ends_normally_leaves_no_child_process_running failed at tests/cmd_verify.rs:1341; the same commit passed on dev. Both flakes are process timing in cmd_verify on Windows.
 - note (2026-11-27, claude-main): 2026-11-26: t233 worker saw two more cmd_verify timing failures in full runs under parallel load; both passed on rerun
 - note (2026-11-27, claude-main): 2026-11-27: a_timeout_stops_the_child_processes_of_the_check_and_not_only_the_shell and a_check_that_ends_normally_leaves_no_child_process_running failed once right after a full rebuild (the heartbeat child wrote nothing in time: slow PowerShell start under load); 3 reruns of cmd_verify passed 35 of 35
+- note (2026-11-27, claude-main): done — heartbeat check waits for its child's first line; the Windows child is cmd.exe; the timeout test allows 10 s; under heavy load 16 of 16 runs pass (before 9 of 16 failed); Windows 1096 and Linux 1093 tests pass. The single hang of 2026-11-21 was not reproduced
