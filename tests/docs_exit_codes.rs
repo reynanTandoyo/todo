@@ -90,6 +90,9 @@ enum Setup {
     /// The folder is a git repository whose last commit changed a file outside the files of the task
     /// (`OUT_OF_SCOPE`).
     CommitOutsideFiles,
+    /// The folder is a git repository whose commit holds `src/a.rs`, and `src/a.rs` was changed again
+    /// afterwards (`UNCOMMITTED_CHANGES`).
+    UncommittedChange,
 }
 
 /// A command that makes one error. `before` lists commands that must succeed first.
@@ -558,6 +561,14 @@ const ERROR_CASES: &[ErrorCase] = &[
         before: &[],
         args: &["--agent", "alice", "done", "T-001", "--commit", "HEAD"],
     },
+    ErrorCase {
+        code: "UNCOMMITTED_CHANGES",
+        todo: Some(SCOPE_BODY),
+        config: None,
+        setup: Setup::UncommittedChange,
+        before: &[],
+        args: &["--agent", "alice", "done", "T-001", "--commit", "HEAD"],
+    },
 ];
 
 /// `todo --json --file <todo>` plus `args`, run in `work`, with the register at `register`.
@@ -588,39 +599,53 @@ fn hold_write_lock(work: &Path) -> File {
     file
 }
 
+/// Runs `git args` in `work` with a fixed author and no global config, and fails the test when git fails.
+fn run_git(work: &Path, args: &[&str]) {
+    let out = git_command()
+        .current_dir(work)
+        .env("GIT_CONFIG_GLOBAL", work.join("no-such-gitconfig"))
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .args([
+            "-c",
+            "user.name=Test User",
+            "-c",
+            "user.email=test@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+        ])
+        .args(args)
+        .output()
+        .expect("run git");
+    assert!(
+        out.status.success(),
+        "git {args:?} failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+/// Makes `work` a git repository whose only commit, `T-001: start`, holds TODO.md and `src/a.rs`.
+fn start_repo(work: &Path) {
+    fs::create_dir_all(work.join("src")).expect("create src");
+    fs::write(work.join("src/a.rs"), "pub fn a() {}\n").expect("write src/a.rs");
+    run_git(work, &["init", "-q"]);
+    run_git(work, &["add", "--", "TODO.md", "src/a.rs"]);
+    run_git(work, &["commit", "-q", "-m", "T-001: start"]);
+}
+
 /// Makes `work` a git repository whose first commit holds TODO.md and `src/a.rs`, and whose second
 /// commit changes `other.txt`, which lies outside the files of T-001 (`src/`).
 fn commit_outside_files(work: &Path) {
-    let git = |args: &[&str]| {
-        let out = git_command()
-            .current_dir(work)
-            .env("GIT_CONFIG_GLOBAL", work.join("no-such-gitconfig"))
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .args([
-                "-c",
-                "user.name=Test User",
-                "-c",
-                "user.email=test@example.invalid",
-                "-c",
-                "commit.gpgsign=false",
-            ])
-            .args(args)
-            .output()
-            .expect("run git");
-        assert!(
-            out.status.success(),
-            "git {args:?} failed: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-    };
-    fs::create_dir_all(work.join("src")).expect("create src");
-    fs::write(work.join("src/a.rs"), "pub fn a() {}\n").expect("write src/a.rs");
-    git(&["init", "-q"]);
-    git(&["add", "--", "TODO.md", "src/a.rs"]);
-    git(&["commit", "-q", "-m", "T-001: start"]);
+    start_repo(work);
     fs::write(work.join("other.txt"), "outside the task\n").expect("write other.txt");
-    git(&["add", "--", "other.txt"]);
-    git(&["commit", "-q", "-m", "T-001: outside"]);
+    run_git(work, &["add", "--", "other.txt"]);
+    run_git(work, &["commit", "-q", "-m", "T-001: outside"]);
+}
+
+/// Makes `work` a git repository whose commit holds `src/a.rs`, then changes `src/a.rs` without a
+/// commit, so the files of T-001 are not as they are on disk.
+fn uncommitted_change(work: &Path) {
+    start_repo(work);
+    fs::write(work.join("src/a.rs"), "pub fn a() { /* changed */ }\n").expect("write src/a.rs");
 }
 
 fn set_read_only(path: &Path, read_only: bool) {
@@ -665,6 +690,9 @@ fn error_codes_exit_with_the_code_the_table_gives() {
         if case.setup == Setup::CommitOutsideFiles {
             commit_outside_files(&work);
         }
+        if case.setup == Setup::UncommittedChange {
+            uncommitted_change(&work);
+        }
         for step in case.before {
             let out = case_command(&todo, &work, &register, step)
                 .output()
@@ -705,8 +733,7 @@ fn error_codes_exit_with_the_code_the_table_gives() {
 
     // CHANGED_DURING_WRITE needs another process to change TODO.md while a write waits for its rename.
     // tests/lock_lease.rs makes that happen with the test hooks and checks for exit 3.
-    // UNCOMMITTED_CHANGES gets its own case when `done` makes it (R-SCOPE-3).
-    let elsewhere = ["CHANGED_DURING_WRITE", "UNCOMMITTED_CHANGES"];
+    let elsewhere = ["CHANGED_DURING_WRITE"];
     for code in table.keys() {
         assert!(
             triggered.contains(code.as_str()) || elsewhere.contains(&code.as_str()),
