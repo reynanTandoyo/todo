@@ -663,9 +663,13 @@ fn apply_keeps_a_full_hash_and_resolves_names_as_done_does() {
     repo_with_first_commit(&p);
     write(&p.work, "src/b.rs", "pub fn b() {}\n");
     commit(&p.work, &["src/b.rs"], "T-001: work");
-    let before = fs::read(&p.todo).expect("read TODO.md");
     let full = git(&p.work, &["rev-parse", "HEAD"]);
-    let parent_short = git(&p.work, &["rev-parse", "--short", "HEAD~1"]);
+    let work_short = git(&p.work, &["rev-parse", "--short", "HEAD"]);
+    // A commit outside the task's files comes after the work, so HEAD~1 is the work commit, which
+    // holds src/b.rs (R-SCOPE-3).
+    write(&p.work, "notes.txt", "outside the task\n");
+    commit(&p.work, &["notes.txt"], "T-002: notes");
+    let before = fs::read(&p.todo).expect("read TODO.md");
 
     // A full hash is kept as it was given, as `done` keeps it.
     let out = apply(&p, &[done_op(Some(&full)).as_str()], &[]);
@@ -679,7 +683,7 @@ fn apply_keeps_a_full_hash_and_resolves_names_as_done_does() {
         format!("- commit: {full}")
     );
 
-    // A name such as HEAD~1 is resolved to the short hash of its commit.
+    // A name such as HEAD~1 is resolved to the short hash of its commit, the work commit here.
     fs::write(&p.todo, &before).expect("restore TODO.md");
     let out = apply(&p, &[done_op(Some("HEAD~1")).as_str()], &[]);
     assert!(
@@ -689,7 +693,7 @@ fn apply_keeps_a_full_hash_and_resolves_names_as_done_does() {
     );
     assert_eq!(
         commit_line(&read_text(&p.todo)),
-        format!("- commit: {parent_short}")
+        format!("- commit: {work_short}")
     );
 }
 

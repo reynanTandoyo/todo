@@ -25,7 +25,7 @@ use crate::ops::{
     highest_task_number, milestone, parse_doc_for_write, read_optional_archive,
     resolve_task_in_doc, steps_from_text,
 };
-use crate::ops::commit_files::{resolve_commit, scope_of_commit};
+use crate::ops::commit_files::{resolve_commit, scope_of_commit, worktree_differences};
 use crate::ops::identity::done_by;
 use crate::ops::migrate::PendingMigration;
 use crate::ops::scope::CommitScope;
@@ -260,6 +260,31 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
             _ => Ok(CommitScope::NoGit),
         })
         .collect::<Result<_>>()?;
+    // Which files of the task's folder differ from the commit of each `done` operation (R-SCOPE-3),
+    // asked of git before the lock, in the folder where the `verify` command runs, as `done` asks it.
+    // A `done` without a commit, or without git, has none to compare with.
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let check_folder = verify_folder(&found, &cwd);
+    let todo_name = found
+        .path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let done_uncommitted: Vec<Vec<String>> = ops
+        .iter()
+        .zip(&done_commits)
+        .zip(&done_scopes)
+        .map(|((op, commit), scope)| match (op, commit) {
+            (ApplyOp::Done { .. }, Some(commit)) if !matches!(scope, CommitScope::NoGit) => {
+                worktree_differences(
+                    &check_folder,
+                    commit,
+                    &[todo_name.as_str(), cfg.archive_file.as_str()],
+                )
+            }
+            _ => Ok(Vec::new()),
+        })
+        .collect::<Result<_>>()?;
 
     // The `verify` commands of the `done` operations run before the lock is taken, as `done` runs
     // them (T-173, R-LOCK-4). Nothing runs when the verify commands are off or wait for the wave.
@@ -272,6 +297,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         done_bys: &done_bys,
         done_commits: &done_commits,
         done_scopes: &done_scopes,
+        done_uncommitted: &done_uncommitted,
         now: current_time(),
     };
     let required = cfg.verify_enabled && cfg.verify_when == VerifyWhen::Done;
@@ -496,6 +522,7 @@ fn apply_one_op(
     done_commit: Option<&str>,
     done_by: Option<&str>,
     done_scope: &CommitScope,
+    done_uncommitted: &[String],
     now: chrono::DateTime<chrono::FixedOffset>,
     highest_id: &mut u64,
     refs: &mut BTreeMap<String, String>,
@@ -733,6 +760,7 @@ fn apply_one_op(
                 done_commit,
                 done_by,
                 done_scope,
+                done_uncommitted,
                 passed,
             )
         }
@@ -788,6 +816,7 @@ fn apply_task_op(
     done_commit: Option<&str>,
     done_by: Option<&str>,
     done_scope: &CommitScope,
+    done_uncommitted: &[String],
     passed: Option<&str>,
 ) -> Result<(&'static str, String, Vec<LineEdit>, TaskChangeIntent)> {
     let mut dep_owned = String::new();
@@ -806,7 +835,7 @@ fn apply_task_op(
                 commit: done_commit,
                 by: done_by,
                 scope: done_scope,
-                uncommitted: &[],
+                uncommitted: done_uncommitted,
                 check: passed.map_or(DoneCheck::NotChecked, |command| DoneCheck::Passed {
                     command,
                 }),
@@ -953,6 +982,9 @@ struct BatchEnv<'a> {
     done_commits: &'a [Option<String>],
     /// What git says about the commit of each `done` operation (`R-SCOPE-2`).
     done_scopes: &'a [CommitScope],
+    /// The files of the task's folder that differ from the commit of each `done` operation, which
+    /// the commit does not hold (`R-SCOPE-3`); empty for other operations.
+    done_uncommitted: &'a [Vec<String>],
     now: chrono::DateTime<chrono::FixedOffset>,
 }
 
@@ -1006,6 +1038,7 @@ fn run_batch(
             env.done_commits[idx].as_deref(),
             env.done_bys[idx].as_deref(),
             &env.done_scopes[idx],
+            &env.done_uncommitted[idx],
             env.now,
             &mut highest_id,
             &mut refs,
