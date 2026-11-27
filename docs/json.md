@@ -906,11 +906,40 @@ An entry written by a write that migrated the file (R-MIG-1) also has `"migrated
 ### `todo done --json` and `todo drop --json` (`newly_ready`, `R-DEP-4`)
 
 A `done` can be refused: `OUT_OF_SCOPE` (exit 1), before anything is written, when `--commit` changed files outside
-the task's `files` (the error names them), and `VERIFY_FAILED` (exit 1) when the `verify` command failed or timed out;
+the task's `files` (the error names them); `UNCOMMITTED_CHANGES` (exit 1), before any command runs and again after the
+command passed, when a file inside the task's `files` differs from the commit or is new (the error lists them as
+`files_uncommitted`); and `VERIFY_FAILED` (exit 1) when the `verify` command failed or timed out;
 that failed check adds the note `verify failed — <last line>` and leaves the task claimed, and after
 `verify_attempts` failures the task is given back as stuck. Also
 `VERIFY_NOT_RUN` (exit 5) when no shell could start the command; `todo verify` also refuses with it while
 `verify = false`. Each is in the error table below. A `done` with a passing `verify` writes `verified`.
+
+From todo 1.2 the `data` of `done --json` also carries `check`, what happened to the task's `verify` command.
+The text output says the same in one line after `<ID>: done ok`:
+
+| `check` | What happened | Text line |
+|---|---|---|
+| `"passed"` | the command ran and passed | `verify: passed` |
+| `"waiting"` | `verify_when = "wave"`: `todo verify --wave` runs it later | `verify: not run yet (todo verify --wave runs it)` |
+| `"off"` | `verify = false` in `todo.toml`: nothing runs | `verify: not run (verify = false in todo.toml)` |
+| `"skipped"` | `done --no-verify --force`: the check was skipped | `verify: skipped (--no-verify)` |
+| `"none"` | the task has no `verify` command | no line |
+
+`drop` has no `check`. A `done` whose check passed looks like this; the example leaves out the rest of the
+`TaskJson` keys:
+
+```json
+{
+  "schema": "todo.done.v1",
+  "ok": true,
+  "data": {
+    "id": "T-012",
+    "status": "done",
+    "check": "passed"
+  },
+  "warnings": []
+}
+```
 
 When finishing or dropping a task makes other tasks ready, their summaries appear in `"newly_ready"`:
 
@@ -937,9 +966,11 @@ A passing `verify <task>` prints `data` with `task`, `passed: true` and `log` (t
 reaches the JSON; it is in the log file.
 
 `verify --wave` prints `data` with `checked` (the number of done tasks that were checked), `passed`
-(the IDs that passed), `failed` (one object per failed task: `task`, `exit_code`, `last_line` and
+(the IDs that passed), `failed` (one object per failed task: `task`, `exit_code`, `last_line`, `timed_out` and
 `log`) and `given_back` (the IDs given back as `stuck`). It is `ok: true` with exit 1 when anything
-failed, as `align` is.
+failed, as `align` is. `timed_out` is `true` when the check was stopped after `verify_timeout_seconds`, and
+`false` when the command exited with a failing code (R-VERIFY-3), so a stopped check is told apart from one
+that failed.
 
 ```json
 {
@@ -949,7 +980,7 @@ failed, as `align` is.
     "checked": 2,
     "passed": ["T-001"],
     "failed": [
-      { "task": "T-002", "exit_code": 1, "last_line": "2 tests failed", "log": "…/verify/T-002.log" }
+      { "task": "T-002", "exit_code": 1, "last_line": "2 tests failed", "timed_out": false, "log": "…/verify/T-002.log" }
     ],
     "given_back": ["T-002"]
   },

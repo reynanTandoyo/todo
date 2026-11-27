@@ -506,7 +506,10 @@ overlap never run at the same time:
 - `todo waves` puts overlapping tasks of one wave in one lane, so they run one after another, and shows
   how many workers can work at once and the longest chain of tasks;
 - `done --commit` checks that the commit changed only the task's files and refuses a commit that changed
-  others with `OUT_OF_SCOPE`, so one worker's edit does not break another worker's task unnoticed.
+  others with `OUT_OF_SCOPE`, so one worker's edit does not break another worker's task unnoticed;
+- `done --commit` also checks that the commit holds the task's files as they are on disk, and refuses with
+  `UNCOMMITTED_CHANGES` when one of them was changed or added after the commit, so the recorded commit is the one
+  that was checked.
 
 ### What `verify` is trusted to do
 
@@ -515,7 +518,9 @@ the write lock. todo trusts only its exit code: `0` passes, and anything else fa
 `verify_timeout_seconds` the command and every process it started are stopped, and the check fails.
 `done` runs the command before it marks the task done; a failure refuses it with `VERIFY_FAILED` and the
 task stays claimed, and after `verify_attempts` failures the task is given back as stuck. With
-`verify_when = "wave"`, `todo verify --wave` runs the checks of a finished wave instead.
+`verify_when = "wave"`, `todo verify --wave` runs the checks of a finished wave instead. After `done ok`,
+`done` prints what happened to the check (`verify: passed`, not run yet in wave mode, not run with
+`verify = false`, or skipped), and `done --json` carries it as `check`.
 
 The command is written in `TODO.md`, and it runs with the permissions of the agent that finishes the
 task: review a `verify` line the way you review code. todo does not sandbox it, and a pass proves only

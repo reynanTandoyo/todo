@@ -4,6 +4,21 @@ All notable changes to `todo` are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `done` says what happened to the task's check (`R-VERIFY-3`): after `done ok` a line reads
+  `verify: passed`, not run yet in wave mode, not run with `verify = false`, or skipped, and
+  `done --json` carries the same state as `check`. `verify --wave --json` carries `timed_out` for each
+  failed check, so a stopped check is told apart from one that failed (T-254, T-258).
+- The error code `UNCOMMITTED_CHANGES` (exit 1, `R-SCOPE-3`): `done --commit` names the files inside the
+  task's `files` that the commit does not hold; the JSON error lists them as `files_uncommitted` (T-251).
+
+### Changed
+
+- `done --commit` and the `done` operations of `apply` refuse a commit that does not hold the task's files
+  as they are on disk (`R-SCOPE-3`): a `done` that was accepted with changed or new files inside the task's
+  `files` is now refused until they are committed, or needs `--force` (T-252, T-253, T-255, T-256).
+
 ## [1.1.0] - 2026-11-27
 
 The status page, polished: what the owner found on this project's own page after the 1.0.0
