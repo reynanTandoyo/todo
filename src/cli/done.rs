@@ -7,7 +7,8 @@ use clap::Args as ClapArgs;
 
 use crate::atomic::read_file_with_snapshot;
 use crate::cli::{
-    CommandKind, CommandMeta, Context, edit_one_task, report_task_with_ready, resolve_opt_text_arg,
+    CheckState, CommandKind, CommandMeta, Context, edit_one_task, report_task_ready_checked,
+    resolve_opt_text_arg,
 };
 use crate::error::{ErrorCode, Result, TodoError};
 use crate::find::{FoundTodo, verify_folder};
@@ -58,8 +59,9 @@ pub struct Args {
 
 /// What `done` does about the task's check, decided from the file before the lock is taken.
 enum PlannedCheck {
-    /// Nothing runs; the done change records this check (`NotChecked` or `Skipped`).
-    Recorded(DoneCheck<'static>),
+    /// Nothing runs; the done change records this check (`NotChecked` or `Skipped`), and the
+    /// output says what happened to it (R-VERIFY-3).
+    Recorded(DoneCheck<'static>, CheckState),
     /// The command `command` of the task `id` runs first.
     Run { id: String, command: String },
 }
@@ -96,12 +98,12 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
 
     // The check runs outside the lock (R-LOCK-4); its result is written by the change below.
     let command: String;
-    let check = match plan_check(ctx, &found, &cfg, &args.task, args.no_verify, &scope)? {
-        PlannedCheck::Recorded(check) => check,
+    let (check, state) = match plan_check(ctx, &found, &cfg, &args.task, args.no_verify, &scope)? {
+        PlannedCheck::Recorded(check, state) => (check, state),
         PlannedCheck::Run { id, command: text } => {
             command = text;
             run_check_before_done(ctx, out, &found, &cfg, &args.task, &id, &command)?;
-            DoneCheck::Passed { command: &command }
+            (DoneCheck::Passed { command: &command }, CheckState::Passed)
         }
     };
 
@@ -113,7 +115,7 @@ pub fn run(args: Args, ctx: &Context, out: &mut Output) -> Result<()> {
         check,
     };
     let res = edit_one_task(ctx, out, META.name, &args.task, &op, &cfg, Some(found))?;
-    report_task_with_ready(out, META.name, &res, true);
+    report_task_ready_checked(out, META.name, &res, true, Some(state));
     Ok(())
 }
 
@@ -134,19 +136,40 @@ fn plan_check(
     let doc = parse_doc_for_write(&bytes, &label, cfg)?;
     let task = resolve_task_in_doc(&doc, task_input)?;
     let id = cfg.id_config.format_id(task.id);
-    validate_transition(task, StatusCommand::Done, ctx.require_agent()?, ctx.force, &id)?;
+    validate_transition(
+        task,
+        StatusCommand::Done,
+        ctx.require_agent()?,
+        ctx.force,
+        &id,
+    )?;
     // R-SCOPE-2 before any command: a commit outside the task's files, or a missing commit, is
     // refused here. The change checks it again under the lock.
     check_done_commit(task, cfg, scope, ctx.force, &id)?;
 
     let Some(verify_line) = task.verify.as_deref() else {
-        return Ok(PlannedCheck::Recorded(DoneCheck::NotChecked));
+        return Ok(PlannedCheck::Recorded(
+            DoneCheck::NotChecked,
+            CheckState::NoCommand,
+        ));
     };
     if no_verify {
-        return Ok(PlannedCheck::Recorded(DoneCheck::Skipped));
+        return Ok(PlannedCheck::Recorded(
+            DoneCheck::Skipped,
+            CheckState::Skipped,
+        ));
     }
-    if !cfg.verify_enabled || cfg.verify_when == VerifyWhen::Wave {
-        return Ok(PlannedCheck::Recorded(DoneCheck::NotChecked));
+    if !cfg.verify_enabled {
+        return Ok(PlannedCheck::Recorded(
+            DoneCheck::NotChecked,
+            CheckState::Off,
+        ));
+    }
+    if cfg.verify_when == VerifyWhen::Wave {
+        return Ok(PlannedCheck::Recorded(
+            DoneCheck::NotChecked,
+            CheckState::Waiting,
+        ));
     }
     Ok(PlannedCheck::Run {
         id,
@@ -178,7 +201,15 @@ fn run_check_before_done(
                 command,
                 last_line: &failure.last_line,
             };
-            let res = edit_one_task(ctx, out, META.name, task_input, &op, cfg, Some(found.clone()))?;
+            let res = edit_one_task(
+                ctx,
+                out,
+                META.name,
+                task_input,
+                &op,
+                cfg,
+                Some(found.clone()),
+            )?;
             if !out.is_json() {
                 for line in &failure.tail {
                     out.info(line);

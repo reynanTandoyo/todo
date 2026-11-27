@@ -451,10 +451,53 @@ pub(crate) fn report_task_ok(out: &mut Output, name: &str, res: &WriteTaskResult
     }
 }
 
+/// What happened to a task's check when `done` finished the task (R-VERIFY-3), so that a check that
+/// did not run is never read as a pass. [`CheckState::word`] is the value of `check` in JSON;
+/// [`CheckState::line`] is the text line written after `<ID>: <name> ok`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CheckState {
+    /// The command ran and passed.
+    Passed,
+    /// `verify_when = "wave"`: the command runs later, with `todo verify --wave`.
+    Waiting,
+    /// `verify = false` in `todo.toml`: nothing runs and nothing is recorded.
+    Off,
+    /// `done --no-verify --force`: the check was skipped.
+    Skipped,
+    /// The task has no `verify` command, so there is no check to report.
+    NoCommand,
+}
+
+impl CheckState {
+    /// The value of `check` in the JSON output of `done` (R-VERIFY-3).
+    pub(crate) const fn word(self) -> &'static str {
+        match self {
+            Self::Passed => "passed",
+            Self::Waiting => "waiting",
+            Self::Off => "off",
+            Self::Skipped => "skipped",
+            Self::NoCommand => "none",
+        }
+    }
+
+    /// The text line written after `<ID>: <name> ok` (R-VERIFY-3); `None` when there is no check.
+    pub(crate) const fn line(self) -> Option<&'static str> {
+        match self {
+            Self::Passed => Some("verify: passed"),
+            Self::Waiting => Some("verify: not run yet (todo verify --wave runs it)"),
+            Self::Off => Some("verify: not run (verify = false in todo.toml)"),
+            Self::Skipped => Some("verify: skipped (--no-verify)"),
+            Self::NoCommand => None,
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct TaskReadyJson<'a> {
     #[serde(flatten)]
     task: &'a TaskJson,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    check: Option<&'static str>,
     #[serde(skip_serializing_if = "<[NewlyReadyTask]>::is_empty")]
     newly_ready: &'a [NewlyReadyTask],
     #[serde(skip_serializing_if = "<[ReadyToClose]>::is_empty")]
@@ -489,9 +532,23 @@ pub(crate) fn report_task_with_ready(
     res: &WriteTaskResult<()>,
     show_accept: bool,
 ) {
+    report_task_ready_checked(out, name, res, show_accept, None);
+}
+
+/// [`report_task_with_ready`] for `done`, which also says what happened to the task's check
+/// (R-VERIFY-3): the text output has the check's line right after `<ID>: <name> ok`, and the JSON
+/// has `check` next to the task. With `check` of `None` the output is the same as without it.
+pub(crate) fn report_task_ready_checked(
+    out: &mut Output,
+    name: &str,
+    res: &WriteTaskResult<()>,
+    show_accept: bool,
+    check: Option<CheckState>,
+) {
     if out.is_json() {
         let json = TaskReadyJson {
             task: &res.task,
+            check: check.map(CheckState::word),
             newly_ready: &res.newly_ready,
             ready_to_close: &res.ready_to_close,
         };
@@ -499,6 +556,9 @@ pub(crate) fn report_task_with_ready(
         return;
     }
     out.write_line(&format!("{}: {name} ok", res.task_id));
+    if let Some(line) = check.and_then(CheckState::line) {
+        out.write_line(line);
+    }
     if show_accept && let Some(ref accept) = res.task.accept {
         out.write_line(&format!("accept: {accept}"));
     }
