@@ -978,10 +978,8 @@ milestones that stand out from tasks.
 - note (2026-11-27, t245-haiku): done — Help text (report META details) and README HTML report section now describe the milestone marker, Include archive, Show chain and the empty-view line; fmt, clippy (Windows and Linux) and cargo test pass: 1096 tests passed, 0 failed, 5 ignored.
 
 ### T-246 · Version 1.1.0 and changelog
-- status: claimed
-- owner: claude-main
-- claimed: 2026-11-27T00:50+01:00
-- session: f7957659-295e-4e1b-b8f8-96b2d860c5e5
+- status: open
+- owner: —
 - priority: P2 · difficulty: 2 · type: docs · area: release
 - milestone: T-227
 - why: the owner gets the polished page through a release
@@ -995,6 +993,7 @@ milestones that stand out from tasks.
 - accept: Cargo.toml is 1.1.0; CHANGELOG.md has the 1.1.0 entry; all checks pass on Windows and Linux; the owner has looked at this project's page
 - verify: cargo test --all-features
 - note (2026-11-22, claude-main): added
+- note (2026-11-27, session-end): released — session f7957659-295e-4e1b-b8f8-96b2d860c5e5 ended
 
 ### T-228 · Show chain: each task can show the chain of tasks it waits for and that wait for it
 - status: done
