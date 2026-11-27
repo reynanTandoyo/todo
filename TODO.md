@@ -1,5 +1,5 @@
 <!-- todo-format: 3 -->
-<!-- todo-tool: 1.0.0 -->
+<!-- todo-tool: 1.1.0 -->
 # todo — task list
 
 The work plan for building `todo`. What each task must achieve is in
