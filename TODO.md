@@ -1298,8 +1298,8 @@ whether agents follow the rules and whether the guards are tested.
 - note (2026-11-27, t251-haiku): done — Added the error code UNCOMMITTED_CHANGES (exit 1, a refusal by a rule) with its meaning, its row in docs/json.md and a test entry; done does not yet raise it.
 
 ### T-252 · Rule: a task's files must be in the commit as they are on disk
-- status: open
-- owner: —
+- status: done
+- owner: t252-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: scope
 - milestone: T-248
 - why: the rule lives in one place, so that done and apply cannot disagree about it
@@ -1318,12 +1318,16 @@ whether agents follow the rules and whether the guards are tested.
   8. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: check_done_committed refuses with UNCOMMITTED_CHANGES when a file inside the task's files is among the differences, names only those files, returns the forced note with force, and returns None for a task without files or without such a file; six unit tests cover it
 - verify: cargo test --all-features --lib ops::scope
+- verified: 2026-11-27
+- commit: 7df3d35
 - reqs: R-SCOPE-3
+- by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
+- note (2026-11-27, t252-haiku): done — Added check_done_committed, which refuses a done when a file inside the task's files differs from the commit it names (--force records the files), with six tests; done does not call it yet.
 
 ### T-253 · The done operation carries the uncommitted files and checks them under the lock
-- status: open
-- owner: —
+- status: done
+- owner: t253-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: scope
 - milestone: T-248
 - why: the check is repeated with the document read under the lock, and the forced note is written by the done change itself
@@ -1340,8 +1344,12 @@ whether agents follow the rules and whether the guards are tested.
   6. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: TaskOp::Done has the field uncommitted, build_edits refuses a done whose list holds a file inside the task's files and adds the forced note with force, done and apply pass an empty list, and every existing test of done and apply passes unchanged
 - verify: cargo test --all-features --test cmd_done_scope --test cmd_done --test cmd_apply
+- verified: 2026-11-27
+- commit: eb7446d
 - reqs: R-SCOPE-3
+- by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
+- note (2026-11-27, t253-haiku): done — done now takes the list of uncommitted files of the task's folder and refuses a commit that does not hold them (R-SCOPE-3), with --force noting them; the list is empty until the next task fills it.
 
 ### T-254 · done says what happened to the task's check
 - status: done
@@ -1372,8 +1380,8 @@ whether agents follow the rules and whether the guards are tested.
 - note (2026-11-27, t254-haiku): done — done prints one line about the task's check after the done line (passed, not run yet in wave mode, off, skipped, or none), and --json carries the same state as check
 
 ### T-255 · done refuses a commit that does not hold the task's files as they are on disk
-- status: open
-- owner: —
+- status: done
+- owner: t255-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: scope
 - milestone: T-248
 - why: a worker that commits and then changes a file again gets a passing check on work that is not in the recorded commit, which is a false done
@@ -1394,18 +1402,22 @@ whether agents follow the rules and whether the guards are tested.
   10. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: done --commit on a task with files is refused with UNCOMMITTED_CHANGES while a file inside them differs from the commit or is new, before the verify command runs and again after it passed; --force finishes with the note; TODO.md, files outside the task, tasks without files and done without --commit behave as before; tests/cmd_done_committed.rs covers the twelve cases
 - verify: cargo test --all-features --test cmd_done_committed --test cmd_done_scope --test cmd_done --test cmd_done_check
+- verified: 2026-11-27
+- commit: 85ca36c
 - reqs: R-SCOPE-3, R-WRITE-4
+- by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
+- note (2026-11-27, t255-haiku): done — done now refuses --commit while a changed or new file inside the task's files is not in the commit, before the verify command runs and again after it passed; --force finishes the task and notes the files
 
 ### T-256 · apply checks its done operations for uncommitted changes
-- status: open
-- owner: —
+- status: done
+- owner: t256-haiku
 - priority: P2 · difficulty: 1 · type: feature · area: scope
 - milestone: T-248
 - why: apply must refuse what done refuses, or a batch becomes the way around the check
 - summary: Batches that finish tasks get the same check for uncommitted work, and one failure stops the whole batch.
 - depends: T-250, T-253
-- files: src/cli/apply.rs, tests/cmd_apply_committed.rs
+- files: src/cli/apply.rs, tests/cmd_apply_committed.rs, tests/cmd_done_scope.rs
 - read: docs/requirements.md, src/ops/commit_files.rs, tests/cmd_done_scope.rs
 - steps:
   1. Read the `apply` line of R-SCOPE-3 in docs/requirements.md. In src/cli/apply.rs read how `done_scopes` is computed in `run`, stored in `BatchEnv`, and passed through `run_batch` and `apply_one_op` to `apply_task_op`.
@@ -1414,11 +1426,19 @@ whether agents follow the rules and whether the guards are tested.
   4. Give `apply_one_op` and `apply_task_op` a new parameter `done_uncommitted: &[String]` directly after `done_scope`. `run_batch` passes `&env.done_uncommitted[idx]`, `apply_one_op` passes it on, and `apply_task_op` uses it as `uncommitted` in `TaskOp::Done`, in place of `&[]`.
   5. Create tests/cmd_apply_committed.rs with a module comment that names R-SCOPE-3 and `mod common;`. Copy from tests/cmd_done_scope.rs the helpers `git`, `write`, `commit`, `Proj`, `two_tasks_body`, `two_tasks`, `done_op`, `apply`, `marker_check` and `verify_body`. A project is `two_tasks(Some("src/"))` with a first commit of TODO.md and `src/a.rs`.
   6. Tests: (1) `src/a.rs` changed after the commit: `apply` of `done_op(Some("HEAD"))` exits 1 with `UNCOMMITTED_CHANGES` and TODO.md is byte-identical; (2) the same batch with a second operation `{"op":"note","task":"T-002","text":"x"}` writes nothing either; (3) a clean folder: the batch applies and T-001 is done; (4) `--force` with a changed `src/a.rs`: the batch applies and T-001 has the note `forced done with uncommitted changes: src/a.rs`; (5) with a `verify_body("src/", &marker_check())` project and a changed `src/a.rs`, the batch is refused and `ran.txt` does not exist.
-  7. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
+  7. In tests/cmd_done_scope.rs change only the test `apply_keeps_a_full_hash_and_resolves_names_as_done_does`: its second half names `HEAD~1`, a commit that does not hold `src/b.rs`, which R-SCOPE-3 now rightly refuses. Keep what the test proves (a full hash is kept, a name is resolved to the short hash). After the commit `T-001: work`, read `full` (`rev-parse HEAD`) and `work_short` (`rev-parse --short HEAD`), then make a third commit that changes only a file outside the task's files (`notes.txt`, message `T-002: notes`), and read `before` after it. The first apply names `full` and expects `- commit: {full}`; the second names `HEAD~1`, which is now the work commit, and expects `- commit: {work_short}`. Change no other test in that file.
+  8. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: a done operation of apply whose task's files hold uncommitted changes refuses the whole batch with UNCOMMITTED_CHANGES before any verify command runs and writes nothing; --force applies it with the note; tests/cmd_apply_committed.rs covers the five cases
 - verify: cargo test --all-features --test cmd_apply_committed --test cmd_done_scope --test cmd_apply
+- attempts: 1
+- verified: 2026-11-27
+- commit: 61f862d
 - reqs: R-SCOPE-3, R-WRITE-15
+- by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
+- note (2026-11-27, t256-haiku): stuck — apply now refuses a done whose commit lacks the task's changed files (R-SCOPE-3), so the verify line fails: the test apply_keeps_a_full_hash_and_resolves_names_as_done_does in tests/cmd_done_scope.rs (line 682-693) applies done with commit HEAD~1, which now gets UNCOMMITTED_CHANGES for src/b.rs (reproduced with the built todo.exe). That test is outside this task's files, so a decision is needed on it; the finished change is left uncommitted in src/cli/apply.rs and tests/cmd_apply_committed.rs. The 5 new tests, cmd_apply and clippy pass; cmd_done_scope passes 27 of 28.
+- note (2026-11-27, claude-main): unblocked — planner: the plan missed one existing test. apply_keeps_a_full_hash_and_resolves_names_as_done_does in tests/cmd_done_scope.rs names HEAD~1 after a later commit changed a file inside the task's files, which R-SCOPE-3 rightly refuses; the test is about how a commit name is written, so it gets a third commit outside the files. That file is added to this task's files and the change is a new step
+- note (2026-11-27, t256-haiku): done — apply's done operations now refuse a commit that does not hold the task's files as they are on disk (R-SCOPE-3), and the apply test that named HEAD~1 first adds a commit outside the task's files.
 
 ### T-257 · The exit-code test makes UNCOMMITTED_CHANGES
 - status: open
