@@ -344,6 +344,53 @@ fn claim_with_force_takes_the_files_and_records_the_override() {
 }
 
 #[test]
+fn forced_takeover_of_a_live_claim_still_notes_the_files_others_hold() {
+    let tmp = TempDir::new().unwrap();
+    let claimed = fresh_claim();
+    let (home, work, todo_file) = setup_proj(
+        &tmp,
+        &body(&[
+            block(
+                1,
+                "Shader",
+                "claimed",
+                "alice",
+                "P1",
+                Some(&claimed),
+                Some("src/a.rs"),
+            ),
+            block(
+                2,
+                "Shader part two",
+                "claimed",
+                "bob",
+                "P1",
+                Some(&claimed),
+                Some("src/a.rs"),
+            ),
+        ]),
+    );
+
+    // alice's claim of T-001 is fresh, so carol may take it only with --force. The files are held
+    // by bob's T-002, so the takeover still records that override in T-001.
+    let out = run(
+        &home,
+        &work,
+        &["claim", "T-001", "--agent", "carol", "--force"],
+    );
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let text = fs::read_to_string(&todo_file).unwrap();
+    assert!(
+        text.contains("forced claim (files held by T-002)"),
+        "the override note is missing:\n{text}"
+    );
+    let doc = Document::parse_bytes(text.as_bytes()).unwrap();
+    let t1 = doc.tasks.iter().find(|t| t.title == "Shader").unwrap();
+    assert_eq!(t1.status, Status::Claimed);
+    assert_eq!(t1.owner.as_deref(), Some("carol"));
+}
+
+#[test]
 fn a_task_without_files_is_claimed_while_others_hold_files() {
     let tmp = TempDir::new().unwrap();
     let (home, work, _todo) = setup_proj(

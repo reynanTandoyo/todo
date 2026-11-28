@@ -191,7 +191,9 @@ fn verification_catches_deliberately_wrong_edits_and_writes_nothing() {
 #[test]
 fn replaced_lines_keep_their_own_endings() {
     // Lines 1 and 2 (`b` with LF, `c` with CRLF) are replaced by two lines: each keeps its ending.
-    let orig = b"a\r\nb\nc\r\nd\n";
+    // Line 0 has LF, so lines 0 and 2 differ: taking the ending from line 0 instead of line 2
+    // would then change the result.
+    let orig = b"a\nb\nc\r\nd\n";
     let doc = LineDoc::from_bytes(orig).expect("decode");
     let applied = doc
         .apply_and_verify_bytes(&[LineEdit::replace_range(
@@ -200,7 +202,20 @@ fn replaced_lines_keep_their_own_endings() {
         )])
         .expect("apply");
     assert!(applied.changed);
-    assert_eq!(applied.bytes, b"a\r\nB\nC\r\nd\n");
+    assert_eq!(applied.bytes, b"a\nB\nC\r\nd\n");
+
+    // Lines 2 and 3 (`c` with CRLF, `d` with LF) are replaced by `C` and `D`. Line 1 has CRLF, so
+    // lines 1 and 3 differ: `D` must take the LF of line 3, not the CRLF of line 1.
+    let orig = b"a\nb\r\nc\r\nd\ne\n";
+    let doc = LineDoc::from_bytes(orig).expect("decode");
+    let applied = doc
+        .apply_and_verify_bytes(&[LineEdit::replace_range(
+            2..4,
+            vec!["C".to_string(), "D".to_string()],
+        )])
+        .expect("apply");
+    assert!(applied.changed);
+    assert_eq!(applied.bytes, b"a\nb\r\nC\r\nD\ne\n");
 }
 
 #[test]
@@ -241,6 +256,30 @@ fn invalid_utf8_reports_the_line_and_byte_of_the_bad_byte() {
     let err = LineDoc::from_bytes(b"a\xFF\nb\n").expect_err("must reject invalid UTF-8");
     assert_eq!(err.line, 1);
     assert_eq!(err.byte_offset, 1);
+}
+
+#[test]
+fn verified_write_reports_the_line_and_byte_of_invalid_utf8() {
+    // The verified write reads the bytes with its own scan, not with LineDoc::from_bytes. Line 3 is
+    // `c` followed by 0xFF, so the bad byte is the second byte of line 3 (offset 5).
+    let bytes = b"a\nb\nc\xFF\n";
+    match verify_byte_edits(bytes, bytes, &[]) {
+        Err(EditError::InvalidUtf8(err)) => {
+            assert_eq!(err.line, 3);
+            assert_eq!(err.byte_offset, 5);
+        }
+        other => panic!("expected InvalidUtf8 for line 3, got {other:?}"),
+    }
+
+    // Bad byte as the first byte of line 1: line 1, offset 0.
+    let bytes = b"\xFFa\nb\nc\n";
+    match verify_byte_edits(bytes, bytes, &[]) {
+        Err(EditError::InvalidUtf8(err)) => {
+            assert_eq!(err.line, 1);
+            assert_eq!(err.byte_offset, 0);
+        }
+        other => panic!("expected InvalidUtf8 for line 1, got {other:?}"),
+    }
 }
 
 #[test]
