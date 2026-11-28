@@ -222,10 +222,7 @@ pub fn resolve_commit(raw: &str, dir: Option<&Path>) -> Result<String> {
     };
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.to_ascii_lowercase().contains("not a git repository")
-            && !trimmed.eq_ignore_ascii_case("HEAD")
-        {
+        if !in_git_repository(dir) && !trimmed.eq_ignore_ascii_case("HEAD") {
             return Ok(trimmed.to_string());
         }
         return Err(TodoError::new(

@@ -530,6 +530,19 @@ fn head_is_refused_in_a_folder_outside_any_repository_and_todo_md_is_left_alone(
     assert_eq!(fs::read(&p.todo).expect("read TODO.md"), before);
 }
 
+#[test]
+fn an_unknown_commit_inside_a_repository_is_refused_and_todo_md_is_left_alone() {
+    // Inside a repository git knows every commit, so a name it does not know is an unknown commit.
+    let p = project("3", None);
+    repo_with_first_commit(&p);
+    let before = fs::read(&p.todo).expect("read TODO.md");
+
+    let out = done(&p, &["--commit", "deadbeef12"]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(parse_json(&out.stdout)["error"]["code"], "BAD_VALUE");
+    assert_eq!(fs::read(&p.todo).expect("read TODO.md"), before);
+}
+
 // The `done` operations of `todo apply` get the same check, for the whole batch (T-174).
 
 /// A TODO.md with T-001, which names `files` when given, and T-002, which names none.
