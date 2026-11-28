@@ -567,3 +567,5 @@
 {"time":"2026-11-28T06:13:03+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"found","id":"FND-063","event":"created","detail":"approved"}
 {"time":"2026-11-28T06:13:24+01:00","name":"reyna - claude fable 5.2","person":"reyna","llm":true,"command":"digest","id":"DIG-001","event":"created","detail":"draft"}
 {"time":"2026-11-28T08:18:56+01:00","name":"reyna - claude opus 5.5","person":"reyna","llm":true,"command":"confirm","id":"ASM-005","event":"confirmed","detail":"reyna, 2026-11-28: confirmed for Claude Haiku 5.5 at the highest effort, from the first rules trial (FND-059): the worker kept all four rules and refused the three tempting steps by name"}
+{"time":"2026-11-28T08:44:29+01:00","name":"reyna - claude opus 5.5","person":"reyna","llm":true,"command":"set","id":"DIG-001","event":"changed","detail":"section Summary"}
+{"time":"2026-11-28T08:44:29+01:00","name":"reyna - claude opus 5.5","person":"reyna","llm":true,"command":"approve","id":"DIG-001","event":"approved","detail":""}
