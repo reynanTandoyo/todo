@@ -1236,13 +1236,15 @@ what its check ran on, the output says what happened to the check, and two proce
 whether agents follow the rules and whether the guards are tested.
 
 ### T-248 · A done that holds what was checked, and guards that are tested
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · type: milestone
 - goal: done --commit refuses a commit that does not hold the task's files as they are on disk, the output of done and of verify --wave says what happened to each check, and the project has a rules trial and a mutation run of its guard modules, each with a first result on record
 - why: a study of another agent method on 2026-11-27 showed two places where a done can still be false, and two of todo's own assumptions that nothing measures
 - summary: Closes two gaps where a task could be marked finished without proof, and adds two checks of our own safety: whether agents follow the rules, and whether the tests would notice a broken guard.
+- by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
+- note (2026-11-28, claude-main): done — done --commit and apply refuse a commit that does not hold the task's files as they are on disk, done says what happened to the check, the rules trial exists and a Haiku worker kept all rules in its first run, and the guard modules were mutation-tested: the tests now notice about 90% of the changes
 
 ### T-250 · List the files a folder holds differently from a commit
 - status: done
@@ -1815,14 +1817,14 @@ whether agents follow the rules and whether the guards are tested.
 - note (2026-11-28, t270-haiku): done — Six tests in tests/atomic_io.rs: a TODO.md removed while the write waits gives exit 3 with no temporary file (through the test-hook command), the temporary file is made next to TODO.md while the rename waits, and the check before the rename waits for, or gives up on, a file held with no sharing (Windows); a TODO.md removed before the write gives NO_FILE and no temporary file.
 
 ### T-271 · Run the second mutation pass again and see the 51 gaps caught
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · difficulty: 3 · type: test · area: testing
 - milestone: T-248
 - why: a new test only closes a gap when the mutant it was written for now fails; that is proved by running the mutants again, not by the test passing
 - summary: Runs the mutation test once more after the new tests are in, and updates the numbers.
 - final: it judges which mutants are still real gaps, and it must run when no worker is editing
-- depends: T-264, T-265, T-266, T-267, T-268, T-269, T-270, T-272, T-273
+- depends: T-264, T-265, T-266, T-267, T-268, T-269, T-270, T-272, T-273, T-275
 - files: docs/mutation-testing.md, .cargo/mutants.toml
 - read: docs/requirements.md
 - steps:
@@ -1831,8 +1833,12 @@ whether agents follow the rules and whether the guards are tested.
   3. Compare missed.txt with the 51 mutants that the tables of docs/mutation-testing.md give to T-264 to T-270. For each one still missed: read the test that should catch it, and either add a task that says what the test must also assert, or move the mutant to the table of mutants that are no gap, with the reason.
   4. Update docs/mutation-testing.md: a second section with the date, the commit, the numbers of this run and what changed. Commit it with this task's ID, record the run with dossier found, and finish with todo done and a note that gives the numbers in one sentence.
 - accept: the mutation test has been run again after T-264 to T-270; docs/mutation-testing.md gives the numbers of that run; every mutant of the 51 is caught, or has a new task, or is recorded as no gap with its reason
+- commit: 936a19d
 - reqs: TEST-11
+- by: Reynan Henry Tandoyo
 - note (2026-11-28, claude-main): added
+- note (2026-11-28, claude-main): First re-run against the guard tests (2026-11-28): 34 of the 51 gaps are now caught. Of the 17 still missed, 12 turn out to be no gap (reasons go into docs/mutation-testing.md) and 5 need sharper tests, which is T-275; this task goes on after T-275.
+- note (2026-11-28, claude-main): done — After the new tests, 39 of the 51 gaps are caught and the other 12 turned out to be harmless; the tests now notice about 90% of the changes to the guard modules, up from 80%, and every change still unnoticed has its reason on record
 
 ### T-272 · The verified write refuses a correct result when an empty insert comes before an append at the end of a file without a final newline
 - status: done
@@ -1888,6 +1894,55 @@ whether agents follow the rules and whether the guards are tested.
 - by: Reynan Henry Tandoyo
 - note (2026-11-28, claude-main): added
 - note (2026-11-28, t273-haiku): done — done --commit no longer reads git's English error text to tell a folder outside a repository; it asks whether the folder is inside one, and a test pins an unknown commit inside a repository.
+
+### T-275 · Tests: three checks that the mutation re-run showed are still too weak
+- status: done
+- owner: t275-haiku
+- priority: P2 · difficulty: 1 · type: test · area: testing
+- milestone: T-248
+- why: after T-264 to T-270 the mutation re-run still passed with five changes in place: the fixture of one new test cannot tell the two line endings apart, the line number of invalid UTF-8 is tested on another code path than the one that was changed, and a forced takeover of a claim loses its note about the files
+- summary: Sharpens three of the new tests so that they really fail when the code they guard is broken.
+- files: tests/doc_lines.rs, tests/cmd_scope.rs
+- read: docs/requirements.md, docs/mutation-testing.md, src/doc/lines.rs, src/ops/scope.rs
+- steps:
+  1. Read in src/doc/lines.rs `LineDoc::apply_edits` (the branch for an edit that replaces lines by the same number of lines), `scan_line_slices`, `verify_byte_edits` and how a `Utf8DecodeError` becomes an `EditError`; in src/ops/scope.rs `check_claim_files`. Every fixture is invented.
+  2. tests/doc_lines.rs, the test from T-266 that replaces two lines and expects each to keep its own ending: its bytes `a
+  3. b
+  4. c
+  5. d
+  6. ` give line 0 and line 2 the same ending, so taking the ending from the wrong line gives the same result. Change the fixture to `a
+  7. b
+  8. c
+  9. d
+  10. ` and replace the lines 1 and 2 (`LineEdit::replace_range(1..3, ...)`) by `B` and `C`: the result must be `a
+  11. B
+  12. C
+  13. d
+  14. `. Add a second case that replaces the lines 2 and 3 of `a
+  15. b
+  16. c
+  17. d
+  18. e
+  19. ` by `C` and `D`: the result must be `a
+  20. b
+  21. C
+  22. D
+  23. e
+  24. `.
+  25. tests/doc_lines.rs, a new test for the line of invalid UTF-8 on the path of the verified write: call `verify_byte_edits(orig, edited, &[])` where `orig` is two valid lines followed by a third line whose second byte is `0xFF`, and `edited` is the same bytes. It must fail, and the error must carry line 3 and the exact byte offset; read the `EditError` variant that holds a `Utf8DecodeError` and assert its `line` and `byte_offset`. A second case with the bad byte as the first byte of line 1 gives line 1 and offset 0.
+  26. tests/cmd_scope.rs, a new test: T-001 is claimed by alice with a fresh claim and names `src/a.rs`; T-002 is claimed by bob with a fresh claim and names `src/a.rs` (write both as claimed in the fixture). `todo claim T-001 --agent carol --force` succeeds, and T-001 then has the note `forced claim (files held by T-002)`: taking over another agent's live claim is still checked against the files that others hold.
+  27. Change no file under src. When a test shows that the program does not do what R-EDIT-1, R-IO-4 or R-SCOPE-1 says, give the task back with todo stuck and say what you saw.
+  28. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
+- accept: tests/doc_lines.rs tells the endings of replaced lines apart with fixtures in which the neighbouring lines differ, and asserts the line and byte of invalid UTF-8 through verify_byte_edits; tests/cmd_scope.rs has a test in which a forced takeover of a live claim records the files held by another task; all pass
+- verify: cargo test --all-features --test doc_lines --test cmd_scope
+- attempts: 1
+- verified: 2026-11-28
+- commit: 9b92fe8
+- reqs: R-EDIT-1, R-IO-4, R-SCOPE-1, TEST-11
+- by: Reynan Henry Tandoyo
+- note (2026-11-28, claude-main): added
+- note (2026-11-28, t275-haiku): verify failed — error: test failed, to rerun pass `--test cmd_scope`
+- note (2026-11-28, t275-haiku): done — Three tests now catch the surviving mutants: a replaced line keeps its own ending (the fixture gives line 0 and line 2 different endings, plus a second case), invalid UTF-8 is reported with its line and byte through the verified write, and a forced takeover of another agent's live claim still notes the files others hold.
 
 ## Questions
 
