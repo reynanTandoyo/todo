@@ -6,7 +6,7 @@ use std::path::Path;
 
 use tempfile::TempDir;
 
-use common::git;
+use common::{git, parse_json, run_todo, setup_proj, stderr_text};
 use todo::atomic::read_file_with_snapshot;
 use todo::find::{ExplicitSource, FindOptions, find_todo};
 use todo::state::{IdsState, LastWrite, Lease, LockHolder, StateDir};
@@ -178,4 +178,29 @@ fn state_json_files_round_trip_atomically() {
         .filter(|e| e.file_name().to_string_lossy().ends_with(".tmp"))
         .count();
     assert_eq!(tmp_count, 0);
+}
+
+#[test]
+fn status_reports_the_write_lock_free_when_the_state_folder_has_no_lock_file() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _todo_file) = setup_proj(
+        &tmp,
+        "<!-- TEST FIXTURE: invented data, not a real task list -->\n# Status without lock file\n",
+    );
+    // The state folder exists, but no command has locked yet, so it holds no write.lock.
+    let state_dir = work.join(".todo");
+    std::fs::create_dir_all(&state_dir).unwrap();
+    let lock_file = state_dir.join("write.lock");
+    assert!(!lock_file.exists());
+
+    let out = run_todo(&home, &work, &["--json", "status"], &[]).unwrap();
+    assert!(out.status.success(), "status failed: {}", stderr_text(&out));
+    let parsed = parse_json(&out.stdout);
+    assert_eq!(parsed["schema"], "todo.status.v1");
+    assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["data"]["write_lock"]["held"], false);
+    assert!(parsed["data"]["lease"].is_null());
+
+    // Status reads the lock without taking it, so it creates no write.lock (R-LOCK-5).
+    assert!(!lock_file.exists(), "status created write.lock");
 }

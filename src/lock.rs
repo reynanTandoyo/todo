@@ -822,3 +822,38 @@ fn is_write_lock_held(state: &StateDir) -> io::Result<bool> {
         Err(TryLockError::Error(e)) => Err(e),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use super::{RETRY_MAX_MS, RETRY_MIN_MS, random_retry_delay};
+
+    #[test]
+    fn retry_delay_stays_between_40_and_160_ms_and_varies() {
+        let mut seen = BTreeSet::new();
+        for _ in 0..2000 {
+            let ms = u64::try_from(random_retry_delay().as_millis()).unwrap();
+            assert!(
+                (RETRY_MIN_MS..=RETRY_MAX_MS).contains(&ms),
+                "retry delay {ms} ms is outside {RETRY_MIN_MS} to {RETRY_MAX_MS} ms"
+            );
+            seen.insert(ms);
+        }
+        let smallest = *seen.first().unwrap();
+        let largest = *seen.last().unwrap();
+        assert!(
+            smallest < 60,
+            "smallest retry delay in 2000 draws is {smallest} ms, expected below 60 ms"
+        );
+        assert!(
+            largest > 140,
+            "largest retry delay in 2000 draws is {largest} ms, expected above 140 ms"
+        );
+        assert!(
+            seen.len() >= 20,
+            "only {} different retry delays in 2000 draws, expected at least 20",
+            seen.len()
+        );
+    }
+}
