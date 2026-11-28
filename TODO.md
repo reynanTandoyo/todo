@@ -1574,15 +1574,15 @@ whether agents follow the rules and whether the guards are tested.
 - note (2026-11-27, claude-main): done — A Haiku worker kept all four rules in the first trial and refused the three tempting steps by name; the grade showed 3 of 4 only because the grader counted two files the agent's own tools had made, which T-263 fixes (FND-059)
 
 ### T-262 · Mutation run of the guard modules, with every missed mutant covered or explained
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · difficulty: 3 · type: test · area: testing
 - milestone: T-248
 - why: todo's promise is safety; a guard that can be broken without a test going red is not protected against the next change
 - summary: Breaks the safety checks on purpose, one place at a time, to see whether the tests notice; every gap found becomes a test or a recorded reason.
 - final: telling a real test gap from an equivalent mutant needs an understanding of the guard code, and each real gap becomes a new task, which is the planner's work
 - depends: T-255, T-256
-- files: .cargo/mutants.toml, docs/mutation-testing.md, .gitignore
+- files: .cargo/mutants.toml, .cargo/mutants-full.toml, docs/mutation-testing.md, .gitignore
 - read: docs/requirements.md
 - steps:
   1. Read TEST-11 in docs/requirements.md. Install the tool apart from the crate: `cargo install cargo-mutants --locked`. It must not appear in Cargo.toml (NFR-9); CI checks the direct dependencies.
@@ -1592,9 +1592,12 @@ whether agents follow the rules and whether the guards are tested.
   5. Write docs/mutation-testing.md: what the run is for, how to install and run it in PowerShell, the modules and why these, how long the run took and on which machine, the numbers of the first run (mutants, caught, missed, unviable, timed out), and a table of the mutants recorded as equivalent with the reason for each.
   6. Commit .cargo/mutants.toml, docs/mutation-testing.md and a changed .gitignore as one commit that starts with this task's ID. Record the first run with `dossier found`. Finish with `todo done` and a note that gives the numbers in one sentence.
 - accept: cargo mutants has run over the guard modules named in .cargo/mutants.toml; docs/mutation-testing.md says how to run it and gives the numbers of the first run; every missed mutant is either a task under this milestone or recorded there as equivalent with its reason
+- commit: 2cda9a4
 - reqs: TEST-11, NFR-9
+- by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
 - note (2026-11-27, claude-main): Runs after T-255 and T-256 so that the new commit checks are mutation-tested too, and at a time when no worker is editing: cargo mutants copies the tree as it is.
+- note (2026-11-28, claude-main): done — The first mutation run changed 532 places in the six guard modules: the tests noticed 80% of the changes that compile; 51 unnoticed ones are real test gaps and became seven test tasks, and 38 are recorded as harmless with their reasons
 
 ### T-263 · Rules trial grader: files that the agent's own tools create do not count as a broken rule
 - status: done
@@ -1620,6 +1623,180 @@ whether agents follow the rules and whether the guards are tested.
 - by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
 - note (2026-11-27, t263-haiku): done — The rules trial grader no longer counts untracked files in dot folders (such as .serena/) against rule 3: it lists them in a note line instead, and the self-test has two new cases for this.
+
+### T-264 · Tests: another agent's todo lock during a live lease, the longest lease, and unlock after expiry
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: test · area: testing
+- milestone: T-248
+- why: the mutation run changed these five places in src/lock.rs and no test failed; one of them lets a second agent take over a live lease
+- summary: Adds the missing tests for the hand-edit lease: a second agent cannot take a live lease, waits for it, and an expired lease counts as ended.
+- files: tests/lock_lease.rs
+- read: docs/requirements.md, docs/mutation-testing.md, src/lock.rs
+- steps:
+  1. Read R-LOCK-6 in docs/requirements.md, `acquire_lease` and `release_lease_inner` in src/lock.rs, and in tests/lock_lease.rs the test `lease_blocks_other_agents_allows_holder_and_expires` with the helpers and the test hooks it uses (`TODO_TEST_LOCK_WAIT_MS`, `TODO_TEST_LEASE_SECONDS`).
+  2. Add a test: alice runs `todo lock`; bob runs `todo lock` with a wait of 200 ms (`TODO_TEST_LOCK_WAIT_MS`). Bob's command exits 3 with the error code `LEASE_HELD`, and `todo status --json` still names alice as the holder of the lease.
+  3. Add a test: alice runs `todo lock` twice. The second one succeeds (the holder may take its own lease again).
+  4. Add a test: alice takes a lease that lasts 1 second (`TODO_TEST_LEASE_SECONDS=1`); bob runs `todo lock` with a wait of 5000 ms. Bob's command succeeds, takes longer than 500 ms, and the lease is then bob's.
+  5. Add a test: with `lease_max_minutes = 5` in todo.toml, `todo lock --minutes 5` succeeds and `todo lock --minutes 6` is refused with exit 1 and `BAD_VALUE`.
+  6. Add a test: alice takes a lease that lasts 1 second; after 1.5 seconds bob runs `todo unlock` without `--force`. It exits 0 (an expired lease counts as ended), and `todo status --json` shows no live lease.
+  7. Change no file under src unless this task lists it, and never change code to make a test pass: when a test shows that the program does not do what the requirement says, give the task back with todo stuck and say what you saw.
+  8. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
+- accept: tests/lock_lease.rs has five new tests that pass: a second agent's lock during a live lease is refused with LEASE_HELD and leaves the lease alone, the holder's own second lock succeeds, a second agent's lock waits and succeeds once the lease has expired, the longest allowed lease is accepted and one minute more is refused, and unlock of an expired lease by another agent succeeds
+- verify: cargo test --all-features --test lock_lease
+- reqs: R-LOCK-6, TEST-11
+- note (2026-11-28, claude-main): added
+
+### T-265 · Tests: the retry delay stays between 40 and 160 ms, and todo status works without a lock file
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: test · area: testing
+- milestone: T-248
+- why: the mutation run changed nine places in src/lock.rs and no test failed: the delay between two tries of the lock could become 0 or grow without limit, and status could fail when the state folder has no lock file yet
+- summary: Adds a test for the pause between two tries of the lock and one for the status command in a project where nothing has taken the lock yet.
+- files: src/lock.rs, tests/lock_state.rs
+- read: docs/requirements.md, docs/mutation-testing.md, tests/lock_lease.rs
+- steps:
+  1. Read R-LOCK-3 in docs/requirements.md (a command tries again every 40 to 160 ms at random), and in src/lock.rs `random_retry_delay`, `RETRY_MIN_MS`, `RETRY_MAX_MS` and `is_write_lock_held`.
+  2. At the end of src/lock.rs add `#[cfg(test)] mod tests` (the file has none). Add one unit test: call `random_retry_delay()` 2000 times; every value is at least `RETRY_MIN_MS` and at most `RETRY_MAX_MS` milliseconds; the smallest value seen is below 60 ms and the largest above 140 ms; and at least 20 different values were seen. Change nothing else in src/lock.rs.
+  3. In tests/lock_state.rs add a test, outside git: a temporary folder with an invented `TODO.md` (first line `<!-- TEST FIXTURE: invented data, not a real task list -->`) and an empty folder `.todo` next to it, created by the test, so the state folder exists and holds no `write.lock`. `todo status --json` exits 0 and reports that the write lock is not held. Read tests/lock_lease.rs `status_works_before_any_state_exists_without_creating_dot_todo` for how status is run and read.
+  4. If `todo status` fails in that test, do not change src/lock.rs: give the task back with todo stuck and the output.
+  5. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
+- accept: src/lock.rs has a unit test that holds random_retry_delay inside 40 to 160 ms and sees it vary, and tests/lock_state.rs has a test in which todo status succeeds while the state folder exists without a lock file; both pass
+- verify: cargo test --all-features --lib --test lock_state
+- reqs: R-LOCK-3, R-LOCK-6, TEST-11
+- note (2026-11-28, claude-main): added
+
+### T-266 · Tests: replaced lines keep their line endings, invalid UTF-8 names its line, and the verified write guards the last line
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: test · area: testing
+- milestone: T-248
+- why: the mutation run changed twelve places in src/doc/lines.rs and no test failed, among them the part of the verified write (R-EDIT-7) that protects the last line when lines are added to a file without a final newline
+- summary: Adds the missing tests for the byte-exact line model: line endings of replaced lines, the line number of invalid text, and the check that an append at the end of the file changes nothing else.
+- files: tests/doc_lines.rs
+- read: docs/requirements.md, docs/format.md, docs/mutation-testing.md, src/doc/lines.rs
+- steps:
+  1. Read R-EDIT-1, R-EDIT-4 and R-EDIT-7 in docs/requirements.md and section 2 of docs/format.md. In src/doc/lines.rs read `LineDoc::apply_edits`, `LineDoc::from_bytes`, `verify_byte_edits` and `verify_unchanged_gap`. In tests/doc_lines.rs read the existing tests, to use the same imports and style. Every text in the new tests is invented.
+  2. Test 1 (each replaced line keeps its own ending): the bytes `a\r\nb\nc\r\nd\n`; replace the lines 1 and 2 (`b`, `c`) by two new lines with `LineEdit::replace_range(1..3, ...)`; the result is `a\r\nB\nC\r\nd\n`.
+  3. Test 2 (another number of lines): the bytes `a\r\nb\r\nc` (CRLF, no ending on the last line); replace the last line by two lines `X`, `Y`: the result is `a\r\nb\r\nX\r\nY`, so the first new line gets the file's usual ending and the last keeps none. A second case: replace the middle line `b` by `P`, `Q`, `R` in `a\nb\r\nc\n`: the result is `a\nP\nQ\nR\r\nc\n` (the last new line gets the ending of the replaced line, the others the usual one).
+  4. Test 3 (the line of invalid UTF-8): bytes with two valid lines and the byte `0xFF` as the second byte of line 3; `LineDoc::from_bytes` fails with `line == 3` and the exact `byte_offset`. A second case with the bad byte on line 1 gives `line == 1`.
+  5. Test 4 (the verified write at the end of a file without a final newline), with `verify_byte_edits(orig, edited, &[edit])` where `orig` is `a\nb` and the edit is `LineEdit::insert(2, vec!["c".to_string()])`: (a) `edited = a\nb\nc` passes; (b) `edited = a\nB\nc` (the text of the old last line changed) is refused; (c) `edited = a\nb\r\nc` (the old last line got an ending that is not the file's usual one) is refused; (d) `edited = A\nb\nc` (an earlier line changed) is refused.
+  6. Test 5 (two edits at the end): with `orig = a\nb` and the two edits `LineEdit::insert(2, vec![])` and `LineEdit::insert(2, vec!["c".to_string()])`, apply them with `LineDoc::apply_edits` if it accepts them, and check that the result verifies with `verify_byte_edits`; if `apply_edits` refuses two edits at one place, assert that refusal instead and say so in a comment.
+  7. Change no file under src unless this task lists it, and never change code to make a test pass: when a test shows that the program does not do what the requirement says, give the task back with todo stuck and say what you saw.
+  8. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
+- accept: tests/doc_lines.rs has new tests that pass: replaced lines keep their own endings for the same and for another number of lines, invalid UTF-8 reports its line and byte, and verify_byte_edits accepts a correct append at the end of a file without a final newline and refuses a changed last line, a wrong ending on it and a changed earlier line
+- verify: cargo test --all-features --test doc_lines
+- reqs: R-EDIT-1, R-EDIT-4, R-EDIT-7, R-IO-4, TEST-11
+- note (2026-11-28, claude-main): added
+
+### T-267 · Tests: done --commit from a subfolder, and --commit outside a repository
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: test · area: testing
+- milestone: T-248
+- why: the mutation run changed three places in src/ops/commit_files.rs and no test failed: git could be asked in the wrong folder, and the rule for a folder without a repository could be turned around
+- summary: Adds the missing tests for finishing a task from a subfolder of the project and for naming a commit in a folder that is no git repository.
+- files: tests/cmd_done_scope.rs
+- read: docs/requirements.md, docs/mutation-testing.md, src/ops/commit_files.rs
+- steps:
+  1. Read R-SCOPE-2 and R-WRITE-4 in docs/requirements.md, `scope_of_commit` and `resolve_commit` in src/ops/commit_files.rs, and the helpers at the top of tests/cmd_done_scope.rs.
+  2. Add a test: `project("1", Some("src/"))` with `repo_with_first_commit`; write and commit `src/b.rs` and `other.txt` in one commit; run `todo --json done T-001 --agent alice --commit HEAD` with the folder `src` of the project as the working folder (use `run_todo` with `&p.work.join("src")`). It exits 1 with `OUT_OF_SCOPE`, and `error.files_outside` is `["other.txt"]`: the path is given from the folder of TODO.md, not from the subfolder.
+  3. Add a test: the same project, a commit that changes only `src/b.rs`, and `done --commit HEAD` run from the folder `src`: it succeeds.
+  4. Add a test, in a project folder that is no git repository (`project("3", None)`, no `git init`): `done --commit cafebabe` succeeds and TODO.md holds `- commit: cafebabe`.
+  5. Add a test, in a project folder that is no git repository: `done --commit HEAD` exits 1 with `BAD_VALUE`, and TODO.md is byte-identical. The temporary folder must not lie inside a git repository; `tempfile::TempDir` under the system's temporary folder is fine.
+  6. Change no file under src unless this task lists it, and never change code to make a test pass: when a test shows that the program does not do what the requirement says, give the task back with todo stuck and say what you saw.
+  7. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
+- accept: tests/cmd_done_scope.rs has four new tests that pass: done --commit from a subfolder refuses a commit outside the files with the path given from the folder of TODO.md and accepts one inside them, and outside a repository a hash is kept as given while HEAD is refused with BAD_VALUE
+- verify: cargo test --all-features --test cmd_done_scope
+- reqs: R-SCOPE-2, R-WRITE-4, NFR-5, TEST-11
+- note (2026-11-28, claude-main): added
+
+### T-268 · Tests: a blocked task can be dropped, and ALREADY_CLAIMED gives the claim's age
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: test · area: testing
+- milestone: T-248
+- why: the mutation run changed three places in src/ops/rules.rs and no test failed: the row blocked to dropped of the status table could be removed, and the age in the refusal could be wrong
+- summary: Adds the missing tests for cancelling a waiting task and for the age shown when someone else already has a task.
+- files: tests/cmd_block_drop.rs, tests/cmd_claim_release.rs
+- read: docs/requirements.md, docs/mutation-testing.md, src/ops/rules.rs
+- steps:
+  1. Read the table of R-WRITE-9 and R-CLAIM-2 in docs/requirements.md, and `validate_transition` and `already_claimed_error` in src/ops/rules.rs. Read the existing tests in both test files for their helpers; every fixture is invented.
+  2. In tests/cmd_block_drop.rs add a test: a task with `status: blocked` and no owner; `todo drop T-001 --agent alice --note "not needed"` exits 0, and the task has `- status: dropped` and the note `dropped — not needed`.
+  3. In tests/cmd_claim_release.rs add a test with a fixed clock (`TODO_TEST_NOW=2026-11-15T14:30:00+01:00`): T-001 is claimed by alice with `claimed: 2026-11-15T11:10+01:00`, so the claim is 3 hours and 20 minutes old. `todo --json claim T-001 --agent bob` exits 1 with `ALREADY_CLAIMED`; read `already_claimed_error` for how the age is written, and assert that the message holds exactly that age text for 3 hours and 20 minutes.
+  4. Add a second case to that test with `claimed: 2026-11-15T14:05+01:00` (25 minutes old) and assert its age text as well.
+  5. Change no file under src unless this task lists it, and never change code to make a test pass: when a test shows that the program does not do what the requirement says, give the task back with todo stuck and say what you saw.
+  6. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
+- accept: tests/cmd_block_drop.rs has a test in which a blocked task is dropped, and tests/cmd_claim_release.rs has a test that asserts the age text of the ALREADY_CLAIMED refusal for a claim of 3 hours 20 minutes and one of 25 minutes; both pass
+- verify: cargo test --all-features --test cmd_block_drop --test cmd_claim_release
+- reqs: R-WRITE-9, R-CLAIM-2, TEST-11
+- note (2026-11-28, claude-main): added
+
+### T-269 · Tests: when a blocked task holds its files, the FILES_BUSY message, and refreshing one's own claim
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: test · area: testing
+- milestone: T-248
+- why: the mutation run changed nine places in src/ops/scope.rs and no test failed: a blocked task could hold its files for ever or without an owner, and the refusal could name the holder wrongly
+- summary: Adds the missing tests for the file lock of a waiting task and for the message that says who holds the files.
+- files: tests/cmd_scope.rs
+- read: docs/requirements.md, docs/mutation-testing.md, src/ops/scope.rs
+- steps:
+  1. Read R-SCOPE-1 in docs/requirements.md, and `holds_files`, `claim_within_ttl`, `holder_text` and `check_claim_files` in src/ops/scope.rs. In tests/cmd_scope.rs read the helpers `fresh_claim`, `block`, `body` and `run`, and the tests `a_stale_claim_holds_no_files` and `a_blocked_task_with_a_fresh_claim_holds_its_files`.
+  2. Add a test: T-001 is blocked, owned by alice, with a `claimed` time more than 24 hours before the test clock, and names `src/a.rs`; T-002 is open and names `src/a.rs`. `todo claim T-002 --agent bob` succeeds: a blocked task with a stale claim holds nothing.
+  3. Add a test: T-001 is blocked with no owner (and no `claimed` line) and names `src/a.rs`; bob's claim of T-002 with the same file succeeds.
+  4. Add a test: T-001 is blocked, owned by alice, with a fresh claim; bob's `todo --json claim T-002` exits 1 with `FILES_BUSY`, and the message contains `T-001 (blocked, owned by alice)`.
+  5. Add a test: T-001 is claimed by alice with a fresh claim; bob's `todo --json claim T-002` exits 1 with `FILES_BUSY`, and the message contains `T-001 (claimed by alice)`.
+  6. Add a test: alice holds T-001 (fresh claim, `src/a.rs`); bob claims T-002 (`src/a.rs`) with `--force`; then alice runs `todo claim T-001 --agent alice` again. It succeeds (refreshing one's own live claim takes no new files), and the task has no new `forced claim` note.
+  7. Change no file under src unless this task lists it, and never change code to make a test pass: when a test shows that the program does not do what the requirement says, give the task back with todo stuck and say what you saw.
+  8. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
+- accept: tests/cmd_scope.rs has five new tests that pass: a blocked task with a stale claim and one without an owner hold no files, the FILES_BUSY message names a blocked holder as blocked, owned by its owner and a claimed one as claimed by its owner, and the owner can refresh its claim while another agent holds overlapping files by force
+- verify: cargo test --all-features --test cmd_scope
+- reqs: R-SCOPE-1, R-CLAIM-2, TEST-11
+- note (2026-11-28, claude-main): added
+
+### T-270 · Tests: the temporary file is made next to TODO.md, and the check before the rename when TODO.md is gone or held
+- status: open
+- owner: —
+- priority: P2 · difficulty: 1 · type: test · area: testing
+- milestone: T-248
+- why: the mutation run changed ten places in src/atomic.rs and no test failed: the temporary file could be made in the working folder instead of the folder of TODO.md, and the read that checks TODO.md just before the rename has no test for a file that is gone or held by another program
+- summary: Adds the missing tests for the safe replacement of the file: where the temporary copy is made, and what happens when the file disappears or is held by another program at the last moment.
+- files: tests/atomic_io.rs
+- read: docs/requirements.md, docs/mutation-testing.md, src/atomic.rs
+- steps:
+  1. Read R-IO-1, R-IO-2 and R-IO-3 in docs/requirements.md, and `atomic_replace`, `verify_unchanged`, `read_snapshot_for_verify` and `create_temp_file_for` in src/atomic.rs. In tests/atomic_io.rs read `windows_sharing_violation_retries_and_succeeds_once_released` and `count_tmp_files`; the new tests use the same calls (`read_file_with_snapshot`, `atomic_replace`). Every fixture is invented.
+  2. Add a test for every platform: write the file, take its snapshot with `read_file_with_snapshot`, delete the file, then call `atomic_replace`. It fails with `ErrorCode::ChangedDuringWrite`, the file does not exist afterwards, and no `.tmp` file is left in the folder.
+  3. Add a Windows-only test (`#[cfg(windows)]`): open the file with `share_mode(0)` (no other program may read it) and release it from a thread after 250 ms; `atomic_replace` succeeds, the file holds the new bytes, and no `.tmp` file is left. This is the read that checks the file before the rename.
+  4. Add a Windows-only test: hold the file with `share_mode(0)` for the whole call; `atomic_replace` fails with `ErrorCode::WriteFailed` after at least 1.5 seconds, the file still holds the old bytes once it is released, and no `.tmp` file is left.
+  5. Add a Windows-only test for the place of the temporary file: the target is in a temporary folder that is not the working folder of the test; hold the target with `share_mode(1)` (the rename must wait) and release it after 600 ms; while `atomic_replace` runs in the main thread, a second thread looks at 300 ms and counts the `.tmp` files in the target's folder with `count_tmp_files`: it finds exactly one. After the call none is left.
+  6. Change no file under src unless this task lists it, and never change code to make a test pass: when a test shows that the program does not do what the requirement says, give the task back with todo stuck and say what you saw.
+  7. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
+- accept: tests/atomic_io.rs has new tests that pass: a target that was deleted before the rename is reported as CHANGED_DURING_WRITE with no temporary file left, and on Windows a target that another program holds without sharing is waited for and written, a target held for good fails with WRITE_FAILED after the retry time, and the temporary file is found in the folder of the target while the rename waits
+- verify: cargo test --all-features --test atomic_io
+- reqs: R-IO-1, R-IO-2, R-IO-3, TEST-7, TEST-11
+- note (2026-11-28, claude-main): added
+
+### T-271 · Run the second mutation pass again and see the 51 gaps caught
+- status: open
+- owner: —
+- priority: P2 · difficulty: 3 · type: test · area: testing
+- milestone: T-248
+- why: a new test only closes a gap when the mutant it was written for now fails; that is proved by running the mutants again, not by the test passing
+- summary: Runs the mutation test once more after the new tests are in, and updates the numbers.
+- final: it judges which mutants are still real gaps, and it must run when no worker is editing
+- depends: T-264, T-265, T-266, T-267, T-268, T-269, T-270
+- files: docs/mutation-testing.md, .cargo/mutants.toml
+- read: docs/requirements.md
+- steps:
+  1. Wait until T-264 to T-270 are done and no worker is editing. Add every test program that a new test lives in to the list in .cargo/mutants.toml if it is not there yet (tests/atomic_io.rs, doc_lines, lock_lease, lock_state, cmd_done_scope, cmd_block_drop, cmd_claim_release and cmd_scope are).
+  2. Run the mutation test as docs/mutation-testing.md says: the first pass, then the second pass with --iterate.
+  3. Compare missed.txt with the 51 mutants that the tables of docs/mutation-testing.md give to T-264 to T-270. For each one still missed: read the test that should catch it, and either add a task that says what the test must also assert, or move the mutant to the table of mutants that are no gap, with the reason.
+  4. Update docs/mutation-testing.md: a second section with the date, the commit, the numbers of this run and what changed. Commit it with this task's ID, record the run with dossier found, and finish with todo done and a note that gives the numbers in one sentence.
+- accept: the mutation test has been run again after T-264 to T-270; docs/mutation-testing.md gives the numbers of that run; every mutant of the 51 is caught, or has a new task, or is recorded as no gap with its reason
+- reqs: TEST-11
+- note (2026-11-28, claude-main): added
 
 ## Questions
 
