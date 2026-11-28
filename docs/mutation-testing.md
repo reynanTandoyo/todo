@@ -109,7 +109,9 @@ of these.
 
 ### The 89 missed mutants
 
-51 are real gaps. Each belongs to one of seven tasks under the milestone T-248:
+51 were judged as real gaps and given to seven tasks under the milestone T-248. (The re-run below
+showed that 12 of them are no gap after all; the counts in this table are those of the first
+judgment.)
 
 | Task | What the missing tests check | Mutants |
 |---|---|---|
@@ -121,7 +123,9 @@ of these.
 | T-269 | A blocked task holds its files only with an owner and a fresh claim; the `FILES_BUSY` message names the holder; refreshing one's own claim is not checked against others | 9 in `src/ops/scope.rs` |
 | T-270 | The temporary file is made in the folder of `TODO.md`; a `TODO.md` that disappears or is held by another program while the write checks it | 10 in `src/atomic.rs` |
 
-38 are recorded as no gap:
+38 were recorded as no gap in the first run. The table below is the list as it stands after the
+re-run: 4 of the 38 are caught now and are gone from it, and the 12 found to be no gap in the
+re-run are added, which makes the 46 mutants that are still missed today:
 
 | Where | Change | Mutants | Why it is no gap |
 |---|---|---|---|
@@ -131,21 +135,58 @@ of these.
 | `src/atomic.rs` `create_temp_file_for` (292) | the guard always `true` | 1 | an empty parent folder joined with the file name is the same file as `.` joined with it |
 | `src/atomic.rs` `create_temp_file_for` (317) | the retry when the temporary name exists | 7 | needs two 64-bit random names to collide; cannot be made to happen from outside |
 | `src/atomic.rs` `TempFileGuard::disarm` (348) | does nothing | 1 | the guard then tries to delete a temporary file that the rename has already moved; nothing happens |
-| `src/atomic.rs` `random_u64` (380) | returns 0 or 1 | 2 | temporary names still differ by process ID, and a name that exists is retried |
 | `src/atomic.rs` `maybe_run_before_rename_hook` (399) | `>` to `>=` | 1 | test hook only; a pause of 0 ms is no pause |
+| `src/atomic.rs` `verify_unchanged` (185) | `<` to `<=` on the deadline | 1 | differs only at the exact instant of the deadline |
+| `src/atomic.rs` `is_sharing_violation` (266) | always `true` | 1 | every error of the read before the rename is then retried for 2 seconds before the same failure is reported; only slower |
+| `src/lock.rs` `random_retry_delay` (522) | `+ 1` to `- 1` or `* 1` in the span | 2 | the delay stays between 40 and 160 ms; only the one or two largest values are no longer drawn |
+| `src/lock.rs` `is_write_lock_held` (813) | the guard for a lock file that does not exist | 3 | the one caller turns every error into "not held", which is also the answer for a missing file |
 | `src/lock.rs` `is_lease_live` (80) | `<` to `<=` | 1 | differs only at the exact instant the lease expires |
 | `src/lock.rs` waiting loops (202, 325, 632) | the pause between tries is skipped | 3 | the command then tries again without pausing; the result is the same, only the processor is busier |
 | `src/lock.rs` `read_existing` (466), `put_back_archive` (478, 479) | error paths of putting the archive back | 3 | they run only when replacing `TODO.md` fails after the archive was written and the archive was changed or removed in between; the tests that make the replace fail catch the other 12 mutants of this code. Open: a test would need a way to make that second failure happen |
-| `src/lock.rs` `lease_duration` (658) | the test hook's `secs > 0` | 3 | test hook only |
+| `src/lock.rs` `lease_duration` (658) | `>` to `>=` in the test hook | 1 | test hook only; a lease of 0 seconds is not used by any test |
 | `src/doc/lines.rs` `LineEnding::as_str` (36) | returns another text | 2 | no write uses it; the bytes come from `as_bytes` |
 | `src/doc/lines.rs` `Display for EditError` (110) | prints nothing | 1 | message text only; the commands report the error with its code |
 | `src/doc/lines.rs` `LineDoc::to_bytes` (277, 280) | the size reserved for the output | 2 | a capacity hint; the bytes written are the same |
-| `src/doc/lines.rs` `verify_unchanged_gap` (656) | `>` to `>=` | 1 | an empty gap has already returned before this line |
+| `src/doc/lines.rs` `verify_unchanged_gap` (656, now 664) | `>` to `>=` | 1 | an empty gap has already returned before this line |
+| `src/doc/lines.rs` `verify_expected_byte_changes` (592, now 600) | which change at the end of the file gets the allowance for the last line | 4 | they alter the answer only for a second change at the end of the file, and the gap before that change is always empty, so the allowance is never used |
 | `src/ops/rules.rs` `TaskCommand::as_str` (71) | returns another text | 2 | message text only |
 | `src/ops/rules.rs` `bad_transition_error` (130) | `&&` to `\|\|` | 1 | chooses between two wordings of the same refusal |
 | `src/ops/rules.rs` `validate_transition` (237) | the arm for `claim` on a claimed task is removed | 1 | `claim` never reaches this function; `plan_claim` decides it |
+| `src/ops/scope.rs` `claim_within_ttl` (353) | `/` to `%` | 1 | in the fallback for a `claim_ttl_hours` too large for a 64-bit number, which no settings file can hold in practice |
 | `src/ops/scope.rs` `wildcard_matches` (312, 314) | `+ 1` to `* 1` when a `*` takes one more character | 2 | the match then steps back to the `*` and comes to the same answer in more steps |
 | `src/ops/commit_files.rs` `resolve_commit` (213) | every failure to start git counts as git missing | 1 | differs only when git exists and cannot be started |
+
+## The re-run after the new tests (2026-11-28)
+
+Commit `9b92fe8`: the tests of T-264 to T-270 and T-275, and two small fixes in guard modules that
+the work on those tests brought up (T-272 in `src/doc/lines.rs`, T-273 in
+`src/ops/commit_files.rs`). The changed code has 535 mutants. Only the mutants that were missed or
+timed out before, and those whose place in the file had moved, were run again (`--iterate`): three
+passes against the guard tests and one against the whole suite, about 2.5 hours together.
+
+| Result | Mutants |
+|---|---|
+| Caught, or unviable (78 in the first run) | 484 |
+| Timeout | 5 |
+| Missed | 46 |
+| **All** | **535** |
+
+Of the mutants that compile, the tests now notice about 90% (80% in the first run).
+
+What happened to the 51 mutants that were judged as real gaps:
+
+- **39 are caught now**: 34 by the tests of T-264 to T-270, and 5 more after T-275 sharpened three
+  tests (a fixture whose two line endings were the same, the line number of invalid UTF-8 tested on
+  another path than the changed one, and a forced takeover of a claim).
+- **12 are no gap.** A second look at the code showed that the change cannot matter; they are in
+  the table above with their reasons.
+
+4 mutants that the first run recorded as no gap are caught as well, by tests written for something
+else (the two in `random_u64` and two of the three in `lease_duration`).
+
+Writing the tests found one fault in a guard: the verified write refused a correct result when an
+edit that changes nothing came before an append at the end of a file without a final newline
+(fixed by T-272). All 46 mutants that are still missed are in the table above.
 
 ## Equivalent mutants recorded later
 
