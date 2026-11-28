@@ -269,6 +269,47 @@ fn verified_write_guards_the_last_line_when_lines_are_added_after_it() {
     assert!(matches!(err, EditError::VerificationFailed { .. }));
 }
 
+#[test]
+fn empty_insert_before_an_append_at_unterminated_eof_verifies() {
+    // The original ends without a final newline. An empty insert at the end comes before an
+    // insert of `c` at the same place: the intended result must verify in either order.
+    let orig = b"a\nb";
+    let doc = LineDoc::from_bytes(orig).expect("decode");
+
+    let edits = [
+        LineEdit::insert(2, vec![]),
+        LineEdit::insert(2, vec!["c".to_string()]),
+    ];
+    let applied = doc.apply_edits(&edits).expect("apply");
+    assert_eq!(applied.bytes, b"a\nb\nc");
+    verify_byte_edits(orig, &applied.bytes, &edits).expect("empty insert first verifies");
+
+    let edits = [
+        LineEdit::insert(2, vec!["c".to_string()]),
+        LineEdit::insert(2, vec![]),
+    ];
+    let applied = doc.apply_edits(&edits).expect("apply");
+    assert_eq!(applied.bytes, b"a\nb\nc");
+    verify_byte_edits(orig, &applied.bytes, &edits).expect("empty insert last verifies");
+}
+
+#[test]
+fn empty_insert_before_an_append_still_refuses_a_changed_or_mis_ended_last_line() {
+    let orig = b"a\nb";
+    let edits = [
+        LineEdit::insert(2, vec![]),
+        LineEdit::insert(2, vec!["c".to_string()]),
+    ];
+
+    // The text of the old last line changed.
+    let err = verify_byte_edits(orig, b"a\nB\nc", &edits).expect_err("changed last line");
+    assert!(matches!(err, EditError::VerificationFailed { .. }));
+
+    // The old last line got a CRLF, which is not the file's usual ending.
+    let err = verify_byte_edits(orig, b"a\nb\r\nc", &edits).expect_err("CRLF on old last line");
+    assert!(matches!(err, EditError::VerificationFailed { .. }));
+}
+
 fn arb_line_text() -> impl Strategy<Value = String> {
     prop::string::string_regex("[A-Za-z0-9 _.:·—日本語-]{0,30}").expect("valid regex")
 }

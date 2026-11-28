@@ -576,6 +576,14 @@ pub fn verify_expected_byte_changes(
 
     let default_ending = default_ending_from_slices(&orig_slices);
 
+    // A change that removes and adds nothing changes no bytes, so it is left out here. Kept in the
+    // loop, it would split the gap before an append at the end of the file and deny that append
+    // its allowance for the last line gaining an ending.
+    let sorted: Vec<&ExpectedByteChange> = sorted
+        .into_iter()
+        .filter(|change| !(change.orig_range.is_empty() && change.new_lines.is_empty()))
+        .collect();
+
     let mut orig_cursor = 0usize;
     let mut edited_cursor = 0usize;
 
