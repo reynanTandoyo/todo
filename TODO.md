@@ -1625,8 +1625,8 @@ whether agents follow the rules and whether the guards are tested.
 - note (2026-11-27, t263-haiku): done — The rules trial grader no longer counts untracked files in dot folders (such as .serena/) against rule 3: it lists them in a note line instead, and the self-test has two new cases for this.
 
 ### T-264 · Tests: another agent's todo lock during a live lease, the longest lease, and unlock after expiry
-- status: open
-- owner: —
+- status: done
+- owner: t264-haiku
 - priority: P2 · difficulty: 1 · type: test · area: testing
 - milestone: T-248
 - why: the mutation run changed these five places in src/lock.rs and no test failed; one of them lets a second agent take over a live lease
@@ -1644,12 +1644,18 @@ whether agents follow the rules and whether the guards are tested.
   8. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: tests/lock_lease.rs has five new tests that pass: a second agent's lock during a live lease is refused with LEASE_HELD and leaves the lease alone, the holder's own second lock succeeds, a second agent's lock waits and succeeds once the lease has expired, the longest allowed lease is accepted and one minute more is refused, and unlock of an expired lease by another agent succeeds
 - verify: cargo test --all-features --test lock_lease
+- attempts: 1
+- verified: 2026-11-28
+- commit: a70eaad
 - reqs: R-LOCK-6, TEST-11
+- by: Reynan Henry Tandoyo
 - note (2026-11-28, claude-main): added
+- note (2026-11-28, t264-haiku): verify failed — error: test failed, to rerun pass `--test lock_lease`
+- note (2026-11-28, t264-haiku): done — Added five tests in tests/lock_lease.rs: another agent's lock is refused while a lease is live, the holder may take its lease again, a takeover waits for the lease to run out, lease_max_minutes from todo.toml limits the lease, and unlock after expiry ends the lease without --force; each of four mutants of src/lock.rs they target now fails a test.
 
 ### T-265 · Tests: the retry delay stays between 40 and 160 ms, and todo status works without a lock file
-- status: open
-- owner: —
+- status: done
+- owner: t265-haiku
 - priority: P2 · difficulty: 1 · type: test · area: testing
 - milestone: T-248
 - why: the mutation run changed nine places in src/lock.rs and no test failed: the delay between two tries of the lock could become 0 or grow without limit, and status could fail when the state folder has no lock file yet
@@ -1664,12 +1670,16 @@ whether agents follow the rules and whether the guards are tested.
   5. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: src/lock.rs has a unit test that holds random_retry_delay inside 40 to 160 ms and sees it vary, and tests/lock_state.rs has a test in which todo status succeeds while the state folder exists without a lock file; both pass
 - verify: cargo test --all-features --lib --test lock_state
+- verified: 2026-11-28
+- commit: 102387b
 - reqs: R-LOCK-3, R-LOCK-6, TEST-11
+- by: Reynan Henry Tandoyo
 - note (2026-11-28, claude-main): added
+- note (2026-11-28, t265-haiku): done — Added a unit test that the retry delay stays between 40 and 160 ms and varies, and a test that todo status reports the lock free, creates no write.lock, and works when the state folder exists without one.
 
 ### T-266 · Tests: replaced lines keep their line endings, invalid UTF-8 names its line, and the verified write guards the last line
-- status: open
-- owner: —
+- status: done
+- owner: t266-haiku
 - priority: P2 · difficulty: 1 · type: test · area: testing
 - milestone: T-248
 - why: the mutation run changed twelve places in src/doc/lines.rs and no test failed, among them the part of the verified write (R-EDIT-7) that protects the last line when lines are added to a file without a final newline
@@ -1682,17 +1692,23 @@ whether agents follow the rules and whether the guards are tested.
   3. Test 2 (another number of lines): the bytes `a\r\nb\r\nc` (CRLF, no ending on the last line); replace the last line by two lines `X`, `Y`: the result is `a\r\nb\r\nX\r\nY`, so the first new line gets the file's usual ending and the last keeps none. A second case: replace the middle line `b` by `P`, `Q`, `R` in `a\nb\r\nc\n`: the result is `a\nP\nQ\nR\r\nc\n` (the last new line gets the ending of the replaced line, the others the usual one).
   4. Test 3 (the line of invalid UTF-8): bytes with two valid lines and the byte `0xFF` as the second byte of line 3; `LineDoc::from_bytes` fails with `line == 3` and the exact `byte_offset`. A second case with the bad byte on line 1 gives `line == 1`.
   5. Test 4 (the verified write at the end of a file without a final newline), with `verify_byte_edits(orig, edited, &[edit])` where `orig` is `a\nb` and the edit is `LineEdit::insert(2, vec!["c".to_string()])`: (a) `edited = a\nb\nc` passes; (b) `edited = a\nB\nc` (the text of the old last line changed) is refused; (c) `edited = a\nb\r\nc` (the old last line got an ending that is not the file's usual one) is refused; (d) `edited = A\nb\nc` (an earlier line changed) is refused.
-  6. Test 5 (two edits at the end): with `orig = a\nb` and the two edits `LineEdit::insert(2, vec![])` and `LineEdit::insert(2, vec!["c".to_string()])`, apply them with `LineDoc::apply_edits` if it accepts them, and check that the result verifies with `verify_byte_edits`; if `apply_edits` refuses two edits at one place, assert that refusal instead and say so in a comment.
-  7. Change no file under src unless this task lists it, and never change code to make a test pass: when a test shows that the program does not do what the requirement says, give the task back with todo stuck and say what you saw.
-  8. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
+  6. Change no file under src unless this task lists it, and never change code to make a test pass: when a test shows that the program does not do what the requirement says, give the task back with todo stuck and say what you saw.
+  7. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: tests/doc_lines.rs has new tests that pass: replaced lines keep their own endings for the same and for another number of lines, invalid UTF-8 reports its line and byte, and verify_byte_edits accepts a correct append at the end of a file without a final newline and refuses a changed last line, a wrong ending on it and a changed earlier line
 - verify: cargo test --all-features --test doc_lines
+- attempts: 1
+- verified: 2026-11-28
+- commit: d5ab44c
 - reqs: R-EDIT-1, R-EDIT-4, R-EDIT-7, R-IO-4, TEST-11
+- by: Reynan Henry Tandoyo
 - note (2026-11-28, claude-main): added
+- note (2026-11-28, t266-haiku): stuck — Program does not match R-EDIT-7 for two edits at the end of a file without a final newline: on a\nb, apply_edits(insert(2, []), insert(2, [c])) correctly gives a\nb\nc (format 2), but verify_byte_edits refuses it with VerificationFailed 'untouched line 2 changed bytes'. The same two edits in reverse order verify OK, so the verifier only accepts the ending gained by the unterminated last line when the first non-empty append at end of file comes first (src/doc/lines.rs verify_expected_byte_changes: appends_after_unterminated_eof is set per change, and the gap before an empty end-of-file insert is checked without that allowance). The other four new tests pass (replaced lines keep their endings, added lines after an unterminated CRLF file, invalid UTF-8 line and offset, verified write guarding the last line). Nothing committed; tests/doc_lines.rs is back to HEAD; the candidate with the failing test is C:\Users\reyna\AppData\Local\Temp\claude\3ef412990566a24d\e0916571-2c00-4c2e-a344-bd5be0213c4c\scratchpad\doc_lines_t266_candidate.rs
+- note (2026-11-28, claude-main): unblocked — planner: the fifth test found a real fault in the check of R-EDIT-7 (a correct result is refused when an empty insert comes before an append at the end of a file without a final newline). The fault and its test are now T-272; this task keeps its four other tests
+- note (2026-11-28, t266-haiku): done — Added four tests to tests/doc_lines.rs: replaced lines keep their own endings, added lines after an unterminated CRLF file, invalid UTF-8 reports its line and byte, and the verified write guards the last line when lines are added after it.
 
 ### T-267 · Tests: done --commit from a subfolder, and --commit outside a repository
-- status: open
-- owner: —
+- status: done
+- owner: t267-haiku
 - priority: P2 · difficulty: 1 · type: test · area: testing
 - milestone: T-248
 - why: the mutation run changed three places in src/ops/commit_files.rs and no test failed: git could be asked in the wrong folder, and the rule for a folder without a repository could be turned around
@@ -1709,12 +1725,16 @@ whether agents follow the rules and whether the guards are tested.
   7. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: tests/cmd_done_scope.rs has four new tests that pass: done --commit from a subfolder refuses a commit outside the files with the path given from the folder of TODO.md and accepts one inside them, and outside a repository a hash is kept as given while HEAD is refused with BAD_VALUE
 - verify: cargo test --all-features --test cmd_done_scope
+- verified: 2026-11-28
+- commit: a9d88f1
 - reqs: R-SCOPE-2, R-WRITE-4, NFR-5, TEST-11
+- by: Reynan Henry Tandoyo
 - note (2026-11-28, claude-main): added
+- note (2026-11-28, t267-haiku): done — Four tests added to tests/cmd_done_scope.rs: done --commit from a subfolder names the files from the folder of TODO.md, and outside any repository a commit name is kept while HEAD is refused; the mutation run's three missed guard mutants are now caught, with no change to the program.
 
 ### T-268 · Tests: a blocked task can be dropped, and ALREADY_CLAIMED gives the claim's age
-- status: open
-- owner: —
+- status: done
+- owner: t268-haiku
 - priority: P2 · difficulty: 1 · type: test · area: testing
 - milestone: T-248
 - why: the mutation run changed three places in src/ops/rules.rs and no test failed: the row blocked to dropped of the status table could be removed, and the age in the refusal could be wrong
@@ -1730,12 +1750,18 @@ whether agents follow the rules and whether the guards are tested.
   6. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: tests/cmd_block_drop.rs has a test in which a blocked task is dropped, and tests/cmd_claim_release.rs has a test that asserts the age text of the ALREADY_CLAIMED refusal for a claim of 3 hours 20 minutes and one of 25 minutes; both pass
 - verify: cargo test --all-features --test cmd_block_drop --test cmd_claim_release
+- attempts: 1
+- verified: 2026-11-28
+- commit: c8b310b6a4daa1921650e205d86c1509d49030a4
 - reqs: R-WRITE-9, R-CLAIM-2, TEST-11
+- by: Reynan Henry Tandoyo
 - note (2026-11-28, claude-main): added
+- note (2026-11-28, t268-haiku): verify failed — error: test failed, to rerun pass `--test cmd_claim_release`
+- note (2026-11-28, t268-haiku): done — Added two tests: a blocked task with no owner can be dropped with its note, and the ALREADY_CLAIMED refusal states the claim's age (3h 20m and 25 minutes old); both fail when the mutants from the mutation run are applied.
 
 ### T-269 · Tests: when a blocked task holds its files, the FILES_BUSY message, and refreshing one's own claim
-- status: open
-- owner: —
+- status: done
+- owner: t269-haiku
 - priority: P2 · difficulty: 1 · type: test · area: testing
 - milestone: T-248
 - why: the mutation run changed nine places in src/ops/scope.rs and no test failed: a blocked task could hold its files for ever or without an owner, and the refusal could name the holder wrongly
@@ -1751,14 +1777,20 @@ whether agents follow the rules and whether the guards are tested.
   6. Add a test: alice holds T-001 (fresh claim, `src/a.rs`); bob claims T-002 (`src/a.rs`) with `--force`; then alice runs `todo claim T-001 --agent alice` again. It succeeds (refreshing one's own live claim takes no new files), and the task has no new `forced claim` note.
   7. Change no file under src unless this task lists it, and never change code to make a test pass: when a test shows that the program does not do what the requirement says, give the task back with todo stuck and say what you saw.
   8. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
-- accept: tests/cmd_scope.rs has five new tests that pass: a blocked task with a stale claim and one without an owner hold no files, the FILES_BUSY message names a blocked holder as blocked, owned by its owner and a claimed one as claimed by its owner, and the owner can refresh its claim while another agent holds overlapping files by force
+- accept: tests/cmd_scope.rs has six new tests that pass: a blocked task with a stale claim and one without an owner hold no files, the FILES_BUSY message names a blocked holder as blocked, owned by its owner and a claimed one as claimed by its owner, and the owner can refresh its claim while another agent holds overlapping files by force
 - verify: cargo test --all-features --test cmd_scope
+- attempts: 1
+- verified: 2026-11-28
+- commit: 25075179d86236e933b32ace23f8851b125cb4d2
 - reqs: R-SCOPE-1, R-CLAIM-2, TEST-11
+- by: Reynan Henry Tandoyo
 - note (2026-11-28, claude-main): added
+- note (2026-11-28, t269-haiku): verify failed — error: test failed, to rerun pass `--test cmd_scope`
+- note (2026-11-28, t269-haiku): done — Six tests now cover a blocked task holding its files only while its claim is fresh and it has an owner, the FILES_BUSY message naming a blocked or claimed holder with its owner, and refreshing one's own live claim taking no new files; each of four hand-made mutants of the guard fails its own test.
 
 ### T-270 · Tests: the temporary file is made next to TODO.md, and the check before the rename when TODO.md is gone or held
-- status: open
-- owner: —
+- status: done
+- owner: t270-haiku
 - priority: P2 · difficulty: 1 · type: test · area: testing
 - milestone: T-248
 - why: the mutation run changed ten places in src/atomic.rs and no test failed: the temporary file could be made in the working folder instead of the folder of TODO.md, and the read that checks TODO.md just before the rename has no test for a file that is gone or held by another program
@@ -1775,8 +1807,12 @@ whether agents follow the rules and whether the guards are tested.
   7. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
 - accept: tests/atomic_io.rs has new tests that pass: a target that was deleted before the rename is reported as CHANGED_DURING_WRITE with no temporary file left, and on Windows a target that another program holds without sharing is waited for and written, a target held for good fails with WRITE_FAILED after the retry time, and the temporary file is found in the folder of the target while the rename waits
 - verify: cargo test --all-features --test atomic_io
+- verified: 2026-11-28
+- commit: b0d0133
 - reqs: R-IO-1, R-IO-2, R-IO-3, TEST-7, TEST-11
+- by: Reynan Henry Tandoyo
 - note (2026-11-28, claude-main): added
+- note (2026-11-28, t270-haiku): done — Six tests in tests/atomic_io.rs: a TODO.md removed while the write waits gives exit 3 with no temporary file (through the test-hook command), the temporary file is made next to TODO.md while the rename waits, and the check before the rename waits for, or gives up on, a file held with no sharing (Windows); a TODO.md removed before the write gives NO_FILE and no temporary file.
 
 ### T-271 · Run the second mutation pass again and see the 51 gaps caught
 - status: open
@@ -1786,7 +1822,7 @@ whether agents follow the rules and whether the guards are tested.
 - why: a new test only closes a gap when the mutant it was written for now fails; that is proved by running the mutants again, not by the test passing
 - summary: Runs the mutation test once more after the new tests are in, and updates the numbers.
 - final: it judges which mutants are still real gaps, and it must run when no worker is editing
-- depends: T-264, T-265, T-266, T-267, T-268, T-269, T-270
+- depends: T-264, T-265, T-266, T-267, T-268, T-269, T-270, T-272, T-273
 - files: docs/mutation-testing.md, .cargo/mutants.toml
 - read: docs/requirements.md
 - steps:
@@ -1797,6 +1833,61 @@ whether agents follow the rules and whether the guards are tested.
 - accept: the mutation test has been run again after T-264 to T-270; docs/mutation-testing.md gives the numbers of that run; every mutant of the 51 is caught, or has a new task, or is recorded as no gap with its reason
 - reqs: TEST-11
 - note (2026-11-28, claude-main): added
+
+### T-272 · The verified write refuses a correct result when an empty insert comes before an append at the end of a file without a final newline
+- status: done
+- owner: t272-haiku
+- priority: P2 · difficulty: 1 · type: bug · area: format
+- milestone: T-248
+- why: found by the worker of T-266: the check of R-EDIT-7 gives the last line's missing ending only to the first change that adds lines at the end, so an edit that changes nothing, placed before it, makes a correct write fail; no command is known to build such a pair today, but the check must not refuse a correct result
+- summary: Fixes a case where the safety check before a write would wrongly refuse a correct change at the end of a file that has no final newline.
+- depends: T-266
+- files: src/doc/lines.rs, tests/doc_lines.rs
+- read: docs/requirements.md, docs/format.md, docs/mutation-testing.md
+- steps:
+  1. Read R-EDIT-4 and R-EDIT-7 in docs/requirements.md and section 2 of docs/format.md. In src/doc/lines.rs read `verify_expected_byte_changes` and `verify_unchanged_gap`.
+  2. First add the failing test to tests/doc_lines.rs: with `orig = a
+  3. b` (no ending on the last line), apply the two edits `LineEdit::insert(2, vec![])` and `LineEdit::insert(2, vec!["c".to_string()])` with `LineDoc::apply_edits`; the result is `a
+  4. b
+  5. c`; `verify_byte_edits(orig, result, &edits)` must return Ok. Run it and see it fail with `untouched line 2 changed bytes`. Add the same with the two edits in the other order, which passes already.
+  6. The cause: in the loop over `sorted`, `appends_after_unterminated_eof` is true only for a change that adds lines, so the gap before the empty insert is checked without the allowance for the last line gaining its ending. Fix it in `verify_expected_byte_changes` by leaving out, before the loop, every change that changes nothing (an empty `orig_range` and no `new_lines`); the line counts above the loop do not change, because such a change removes and adds nothing. Change nothing else in the function.
+  7. Add two tests that the check is as strict as before: with the same two edits, `edited = a
+  8. B
+  9. c` (the old last line's text changed) is refused, and `edited = a
+  10. b
+  11. c` (an ending that is not the file's usual one) is refused.
+  12. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, the verify command, and then the whole suite once: cargo test --all-features.
+- accept: verify_byte_edits accepts the correct result of an empty insert followed by an append at the end of a file without a final newline, in both orders, and still refuses a changed last line and a wrong ending on it; the whole test suite passes
+- verify: cargo test --all-features --test doc_lines --test doc_fixtures --test doc_parser --lib
+- verified: 2026-11-28
+- commit: 26186ac
+- reqs: R-EDIT-7, R-EDIT-4, TEST-11
+- by: Reynan Henry Tandoyo
+- note (2026-11-28, claude-main): added
+- note (2026-11-28, t272-haiku): done — The verified write no longer refuses a correct result when an empty insert comes before an append at the end of a file without a final newline: a change that adds and removes nothing is left out of the check, and tests cover both orders and the refusals that must stay.
+
+### T-273 · done --commit outside a repository must not depend on git's English message
+- status: done
+- owner: t273-haiku
+- priority: P3 · difficulty: 1 · type: bug · area: git
+- milestone: T-248
+- why: found by the worker of T-267: resolve_commit decides that a folder is no repository by looking for the English words 'not a git repository' in git's error text; a git that prints its messages in another language would make done --commit <hash> fail outside a repository
+- summary: Finishing a task with a commit name in a folder that is no git repository no longer depends on the language git prints its messages in.
+- files: src/ops/commit_files.rs, tests/cmd_done_scope.rs
+- read: docs/requirements.md
+- steps:
+  1. Read R-WRITE-4 and NFR-5 in docs/requirements.md, and `resolve_commit` and `in_git_repository` in src/ops/commit_files.rs.
+  2. In `resolve_commit`, in the branch for a git command that did not succeed, replace the test of git's error text (`stderr ... contains("not a git repository")`) by `!in_git_repository(dir)`. The rule stays the same: outside a repository a value other than `HEAD` is kept as given, and `HEAD` is refused with `BAD_VALUE` and the message `unknown git commit 'HEAD'`; inside a repository an unknown commit is refused. Remove the `stderr` variable if nothing else uses it. Change nothing else in the function.
+  3. In tests/cmd_done_scope.rs the tests added by T-267 already cover a folder that is no repository (a hash is kept, HEAD is refused). Add one more: in a repository (`repo_with_first_commit`), `done --commit deadbeef12` on `project("3", None)` exits 1 with `BAD_VALUE`, and TODO.md is byte-identical.
+  4. Run cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, and the verify command.
+- accept: resolve_commit no longer reads git's error text: it asks in_git_repository; outside a repository a hash is kept and HEAD is refused, inside a repository an unknown commit is refused, and the tests of tests/cmd_done_scope.rs, cmd_done and cmd_apply pass
+- verify: cargo test --all-features --test cmd_done_scope --test cmd_done --test cmd_apply --test cmd_done_committed
+- verified: 2026-11-28
+- commit: 4893d10
+- reqs: R-WRITE-4, NFR-5
+- by: Reynan Henry Tandoyo
+- note (2026-11-28, claude-main): added
+- note (2026-11-28, t273-haiku): done — done --commit no longer reads git's English error text to tell a folder outside a repository; it asks whether the folder is inside one, and a test pins an unknown commit inside a repository.
 
 ## Questions
 
@@ -1863,3 +1954,9 @@ whether agents follow the rules and whether the guards are tested.
 - type: idea
 - note (2026-11-27, claude-main): added
 - note (2026-11-27, claude-main): Put off on 2026-11-27, not rejected. In this project's 233 entries no task ever listed CHANGELOG.md (the planner writes it once per release), and the files tasks did share most (a snapshot file, a test file, a module file) cannot be shared safely. In one shared checkout there is no merge: git add of a shared file takes another worker's uncommitted lines into the wrong commit, and they stay there when that worker's task is given back. Worth promoting when a project shows tasks that queue up only behind an append-only file; then waves must show the shared files, and done must allow them like TODO.md.
+
+### T-274 · Worker rules and the work order: finish with the hash of the commit the worker made, not with --commit HEAD, because in a shared checkout HEAD may already be another worker's commit
+- status: open
+- owner: —
+- type: idea
+- note (2026-11-28, claude-main): added
