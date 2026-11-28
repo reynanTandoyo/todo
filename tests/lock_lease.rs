@@ -10,7 +10,7 @@ use tempfile::TempDir;
 
 #[cfg(feature = "test-hooks")]
 use common::read_text;
-use common::{git, parse_json, setup_proj, stderr_text, stdout_text};
+use common::{git, parse_json, setup_proj, stderr_text, stdout_text, write_toml};
 
 const LEASE_BODY: &str = "<!-- TEST FIXTURE: invented data, not a real task list -->
 # Lease tests
@@ -418,4 +418,219 @@ fn linked_worktree_status_works_with_git_removed_from_path() {
         std::fs::canonicalize(reported).unwrap(),
         std::fs::canonicalize(&main_todo).unwrap()
     );
+}
+
+#[cfg(feature = "test-hooks")]
+#[test]
+fn live_lease_refuses_another_agent_and_keeps_its_holder() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _todo_file) = setup_proj(&tmp, LEASE_BODY);
+    let t0 = "2026-11-15T14:00:00+01:00";
+
+    let lock_out = common::run_todo(
+        &home,
+        &work,
+        &["--json", "lock", "--agent", "alice"],
+        &[("TODO_TEST_NOW", t0)],
+    )
+    .unwrap();
+    assert!(lock_out.status.success());
+
+    // Bob waits 200 ms for the live lease, then exits 3 with LEASE_HELD naming alice.
+    let bob_out = common::run_todo(
+        &home,
+        &work,
+        &["--json", "lock", "--agent", "bob"],
+        &[("TODO_TEST_NOW", t0), ("TODO_TEST_LOCK_WAIT_MS", "200")],
+    )
+    .unwrap();
+    assert_eq!(bob_out.status.code(), Some(3));
+    let bob_json: serde_json::Value = parse_json(&bob_out.stdout);
+    assert_eq!(bob_json["error"]["code"], "LEASE_HELD");
+    assert_eq!(bob_json["error"]["owner"], "alice");
+
+    // The lease is still alice's.
+    let status_out = common::run_todo(
+        &home,
+        &work,
+        &["--json", "status"],
+        &[("TODO_TEST_NOW", t0)],
+    )
+    .unwrap();
+    assert!(status_out.status.success());
+    let status_json: serde_json::Value = parse_json(&status_out.stdout);
+    assert_eq!(status_json["data"]["lease"]["agent"], "alice");
+}
+
+#[cfg(feature = "test-hooks")]
+#[test]
+fn holder_may_take_its_own_lease_again() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _todo_file) = setup_proj(&tmp, LEASE_BODY);
+    let t0 = "2026-11-15T14:00:00+01:00";
+    let t1 = "2026-11-15T14:03:00+01:00";
+
+    let first = common::run_todo(
+        &home,
+        &work,
+        &["--json", "lock", "--agent", "alice"],
+        &[("TODO_TEST_NOW", t0)],
+    )
+    .unwrap();
+    assert!(first.status.success());
+
+    // Alice locks again three minutes into her first lease: it succeeds and starts a new 10-minute
+    // lease.
+    let second = common::run_todo(
+        &home,
+        &work,
+        &["--json", "lock", "--agent", "alice"],
+        &[("TODO_TEST_NOW", t1)],
+    )
+    .unwrap();
+    assert!(
+        second.status.success(),
+        "second lock failed: {}",
+        stderr_text(&second)
+    );
+    let second_json: serde_json::Value = parse_json(&second.stdout);
+    assert_eq!(second_json["data"]["agent"], "alice");
+
+    let status_out = common::run_todo(
+        &home,
+        &work,
+        &["--json", "status"],
+        &[("TODO_TEST_NOW", t1)],
+    )
+    .unwrap();
+    let status_json: serde_json::Value = parse_json(&status_out.stdout);
+    assert_eq!(status_json["data"]["lease"]["agent"], "alice");
+    assert_eq!(status_json["data"]["lease"]["remaining_seconds"], 600);
+}
+
+#[cfg(feature = "test-hooks")]
+#[test]
+fn another_agent_takes_a_lease_only_after_it_runs_out() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _todo_file) = setup_proj(&tmp, LEASE_BODY);
+
+    // Alice's lease lasts one second on the real clock (no TODO_TEST_NOW).
+    let alice_out = common::run_todo(
+        &home,
+        &work,
+        &["--json", "lock", "--agent", "alice"],
+        &[("TODO_TEST_LEASE_SECONDS", "1")],
+    )
+    .unwrap();
+    assert!(alice_out.status.success());
+    let alice_json: serde_json::Value = parse_json(&alice_out.stdout);
+    let alice_expires = alice_json["data"]["expires_at"].as_str().unwrap();
+
+    // Bob waits up to 5 s; he gets the lease once alice's has run out.
+    let bob_out = common::run_todo(
+        &home,
+        &work,
+        &["--json", "lock", "--agent", "bob"],
+        &[("TODO_TEST_LOCK_WAIT_MS", "5000")],
+    )
+    .unwrap();
+    assert!(
+        bob_out.status.success(),
+        "bob's lock failed: {}",
+        stderr_text(&bob_out)
+    );
+    // Bob's lease starts no earlier than alice's expiry: he waited for it and did not take it over.
+    // This is compared on the clock, not against a time limit, so a slow machine cannot fail it.
+    let bob_json: serde_json::Value = parse_json(&bob_out.stdout);
+    let bob_text = bob_json["data"]["started_at"].as_str().unwrap();
+    let bob_started = chrono::DateTime::parse_from_rfc3339(bob_text).unwrap();
+    let alice_expiry = chrono::DateTime::parse_from_rfc3339(alice_expires).unwrap();
+    assert!(
+        bob_started >= alice_expiry,
+        "bob's lease started at {bob_started}, before alice's ended at {alice_expiry}"
+    );
+
+    let status_out = common::run_todo(&home, &work, &["--json", "status"], &[]).unwrap();
+    let status_json: serde_json::Value = parse_json(&status_out.stdout);
+    assert_eq!(status_json["data"]["lease"]["agent"], "bob");
+}
+
+#[test]
+fn lease_max_minutes_from_todo_toml_limits_the_lease() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _todo_file) = setup_proj(&tmp, LEASE_BODY);
+    // The default lease_minutes (10) may not exceed this maximum, so both are set to 5.
+    write_toml(&work, "lease_minutes = 5\nlease_max_minutes = 5\n");
+
+    let at_max = common::run_todo(
+        &home,
+        &work,
+        &["--json", "lock", "--agent", "alice", "--minutes", "5"],
+        &[],
+    )
+    .unwrap();
+    assert!(
+        at_max.status.success(),
+        "lock at the maximum failed: {}",
+        stderr_text(&at_max)
+    );
+    let at_max_json: serde_json::Value = parse_json(&at_max.stdout);
+    assert_eq!(at_max_json["data"]["minutes"], 5);
+
+    let over = common::run_todo(
+        &home,
+        &work,
+        &["--json", "lock", "--agent", "alice", "--minutes", "6"],
+        &[],
+    )
+    .unwrap();
+    assert_eq!(over.status.code(), Some(1));
+    let over_json: serde_json::Value = parse_json(&over.stdout);
+    assert_eq!(over_json["error"]["code"], "BAD_VALUE");
+}
+
+#[cfg(feature = "test-hooks")]
+#[test]
+fn unlock_after_expiry_counts_the_lease_as_ended() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _todo_file) = setup_proj(&tmp, LEASE_BODY);
+    let t0 = "2026-11-15T14:00:00+01:00";
+
+    // Alice's lease lasts one second.
+    let lock_out = common::run_todo(
+        &home,
+        &work,
+        &["--json", "lock", "--agent", "alice"],
+        &[("TODO_TEST_NOW", t0), ("TODO_TEST_LEASE_SECONDS", "1")],
+    )
+    .unwrap();
+    assert!(lock_out.status.success());
+
+    // One and a half seconds later the lease has run out: bob's unlock succeeds without --force
+    // and ends no one else's lease.
+    let later = "2026-11-15T14:00:01.500+01:00";
+    let unlock_out = common::run_todo(
+        &home,
+        &work,
+        &["--json", "unlock", "--agent", "bob"],
+        &[("TODO_TEST_NOW", later)],
+    )
+    .unwrap();
+    assert!(
+        unlock_out.status.success(),
+        "unlock failed: {}",
+        stderr_text(&unlock_out)
+    );
+    let unlock_json: serde_json::Value = parse_json(&unlock_out.stdout);
+    assert_eq!(unlock_json["data"]["forced"], false);
+
+    let status_out = common::run_todo(
+        &home,
+        &work,
+        &["--json", "status"],
+        &[("TODO_TEST_NOW", later)],
+    )
+    .unwrap();
+    let status_json: serde_json::Value = parse_json(&status_out.stdout);
+    assert!(status_json["data"]["lease"].is_null());
 }
