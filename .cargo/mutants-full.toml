@@ -1,0 +1,12 @@
+# The second pass of the mutation test (docs/mutation-testing.md, TEST-11): the same guard modules
+# as .cargo/mutants.toml, tested with the whole suite. Used with --config and --iterate, for the
+# mutants that the first pass missed.
+examine_globs = [
+    "src/lock.rs",
+    "src/atomic.rs",
+    "src/doc/lines.rs",
+    "src/ops/rules.rs",
+    "src/ops/scope.rs",
+    "src/ops/commit_files.rs",
+]
+all_features = true

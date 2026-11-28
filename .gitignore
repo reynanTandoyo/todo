@@ -3,3 +3,5 @@
 *.snap.new
 .claude/*.bak
 .claude/worktrees/
+# Output of cargo mutants when it is run without -o (docs/mutation-testing.md)
+/mutants.out*/

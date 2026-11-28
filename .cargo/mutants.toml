@@ -1,0 +1,32 @@
+# Mutation testing of the guard modules (docs/requirements.md TEST-11, docs/mutation-testing.md).
+# Run by hand with `cargo mutants`; cargo-mutants is installed apart and is no dependency (NFR-9).
+
+# Only the guard modules are examined.
+examine_globs = [
+    "src/lock.rs",
+    "src/atomic.rs",
+    "src/doc/lines.rs",
+    "src/ops/rules.rs",
+    "src/ops/scope.rs",
+    "src/ops/commit_files.rs",
+]
+
+# The tests run with every feature, as the checks of AGENTS.md run them (the test hooks included).
+all_features = true
+
+# The tests that exercise the guards. Linking all 108 test programs for each of several hundred
+# mutants takes most of a day; these take a fraction of it. A mutant that these tests miss is run
+# again with the whole suite before it counts as missed (docs/mutation-testing.md).
+additional_cargo_test_args = [
+    "--lib",
+    "--test", "lock_lease", "--test", "lock_state", "--test", "lock_write",
+    "--test", "atomic_io", "--test", "outside_edit",
+    "--test", "doc_lines", "--test", "doc_fixtures", "--test", "doc_parser", "--test", "doc_steps",
+    "--test", "ops_rules", "--test", "ops_scope", "--test", "ops_commit_files",
+    "--test", "cmd_scope", "--test", "cmd_done_scope", "--test", "cmd_done_committed",
+    "--test", "cmd_apply_committed", "--test", "cmd_claim_release", "--test", "cmd_done",
+    "--test", "cmd_block_drop", "--test", "cmd_reopen_move", "--test", "cmd_set", "--test", "cmd_note",
+    "--test", "cmd_add", "--test", "cmd_stuck", "--test", "cmd_waves", "--test", "cmd_next",
+    "--test", "cmd_detail_rule", "--test", "cmd_check", "--test", "cmd_history_diff_restore",
+    "--test", "cmd_session", "--test", "cmd_release_bulk", "--test", "cmd_milestone",
+]
