@@ -336,3 +336,53 @@ fn twenty_parallel_claims_of_one_task_have_exactly_one_winner() {
     assert_eq!(t1.status, Status::Claimed);
     assert_eq!(t1.owner.as_deref(), Some(winners[0].as_str()));
 }
+
+#[cfg(feature = "test-hooks")]
+#[test]
+fn already_claimed_refusal_gives_the_claims_age() {
+    let tmp = TempDir::new().unwrap();
+    let initial = "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
+## Now\n\n\
+### T-001 · Claimed three hours ago\n\
+- status: claimed\n\
+- owner: alice\n\
+- claimed: 2026-11-15T11:10+01:00\n\
+\n\
+### T-002 · Claimed 25 minutes ago\n\
+- status: claimed\n\
+- owner: alice\n\
+- claimed: 2026-11-15T14:05+01:00\n";
+    let (home, work, todo_file) = setup_proj(&tmp, initial);
+    // Both claims are well inside claim_ttl_hours (24), so neither is stale and bob is refused.
+    let now = "2026-11-15T14:30:00+01:00";
+
+    // 14:30 minus 11:10 is 3 hours 20 minutes: the refusal says "(3h 20m old)".
+    let old = common::run_todo(
+        &home,
+        &work,
+        &["--json", "claim", "T-001", "--agent", "bob"],
+        &[("TODO_TEST_NOW", now)],
+    )
+    .unwrap();
+    assert_eq!(old.status.code(), Some(1));
+    let j_old: serde_json::Value = parse_json(&old.stdout);
+    assert_eq!(j_old["error"]["code"], "ALREADY_CLAIMED");
+    let msg_old = j_old["error"]["message"].as_str().unwrap();
+    assert!(msg_old.contains("(3h 20m old)"), "message: {msg_old}");
+    assert_eq!(read_text(&todo_file), initial);
+
+    // 14:30 minus 14:05 is 25 minutes: the refusal says "(0h 25m old)".
+    let recent = common::run_todo(
+        &home,
+        &work,
+        &["--json", "claim", "T-002", "--agent", "bob"],
+        &[("TODO_TEST_NOW", now)],
+    )
+    .unwrap();
+    assert_eq!(recent.status.code(), Some(1));
+    let j_recent: serde_json::Value = parse_json(&recent.stdout);
+    assert_eq!(j_recent["error"]["code"], "ALREADY_CLAIMED");
+    let msg_recent = j_recent["error"]["message"].as_str().unwrap();
+    assert!(msg_recent.contains("(0h 25m old)"), "message: {msg_recent}");
+    assert_eq!(read_text(&todo_file), initial);
+}

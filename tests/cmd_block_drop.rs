@@ -255,3 +255,40 @@ fn drop_lists_tasks_that_became_ready() {
         "{stdout}"
     );
 }
+
+#[cfg(feature = "test-hooks")]
+#[test]
+fn drop_takes_a_blocked_task_without_owner() {
+    let tmp = TempDir::new().unwrap();
+    let initial = "<!-- TEST FIXTURE: invented data, not a real task list -->\n\
+## Now\n\n\
+### T-001 · Blocked task\n\
+- status: blocked\n\
+- owner: —\n";
+    let (home, work, todo_file) = setup_proj(&tmp, initial);
+
+    // R-WRITE-9: blocked -> dropped is allowed for any agent when the task has no owner.
+    let res = common::run_todo(
+        &home,
+        &work,
+        &["drop", "T-001", "--agent", "alice", "--note", "not needed"],
+        &[("TODO_TEST_NOW", "2026-11-15T12:00:00+01:00")],
+    )
+    .unwrap();
+    assert!(
+        res.status.success(),
+        "stderr: {}",
+        common::stderr_text(&res)
+    );
+    let after = read_text(&todo_file);
+    assert!(
+        after.contains(
+            "### T-001 · Blocked task\n\
+- status: dropped\n\
+- owner: —\n\
+- note (2026-11-15, alice): dropped \u{2014} not needed\n"
+        ),
+        "{after}"
+    );
+    assert!(!after.contains("- status: blocked"), "{after}");
+}
