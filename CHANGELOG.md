@@ -4,6 +4,12 @@ All notable changes to `todo` are documented in this file.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-28
+
+A done that holds what was checked. `done --commit` now proves that the recorded commit is the one
+its check ran on, the output says what happened to the check, and the guards are mutation-tested.
+The file format stays version 3.
+
 ### Added
 
 - `done` says what happened to the task's check (`R-VERIFY-3`): after `done ok` a line reads
@@ -18,6 +24,24 @@ All notable changes to `todo` are documented in this file.
 - `done --commit` and the `done` operations of `apply` refuse a commit that does not hold the task's files
   as they are on disk (`R-SCOPE-3`): a `done` that was accepted with changed or new files inside the task's
   `files` is now refused until they are committed, or needs `--force` (T-252, T-253, T-255, T-256).
+
+### Fixed
+
+- The verified write no longer refuses a correct change when an edit that changes nothing comes
+  before an append at the end of a file without a final newline (`R-EDIT-7`, T-272).
+- `done --commit` outside a git repository no longer depends on the language of git's messages
+  (T-273).
+
+### For contributors
+
+- A rules trial (`TEST-10`): `scripts/rules-trial.ps1` sets up a project whose task tempts an agent to
+  break the worker rules and grades what it did from todo's history and git; `docs/rules-trial.md`
+  (T-260, T-261, T-263).
+- Mutation testing of the guard modules (`TEST-11`) with `cargo-mutants`, installed apart:
+  `.cargo/mutants.toml`, `docs/mutation-testing.md`. The tests now notice about 90% of the changes
+  to the guards, up from 80%, through new tests for the lease, the retry delay, the line model, the
+  commit checks, the status rules, the file scopes and the write to disk (T-262, T-264 to T-271,
+  T-275).
 
 ## [1.1.0] - 2026-11-27
 
