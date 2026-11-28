@@ -1,5 +1,5 @@
 <!-- todo-format: 3 -->
-<!-- todo-tool: 1.1.0 -->
+<!-- todo-tool: 1.2.0 -->
 # todo — task list
 
 The work plan for building `todo`. What each task must achieve is in
@@ -1236,15 +1236,17 @@ what its check ran on, the output says what happened to the check, and two proce
 whether agents follow the rules and whether the guards are tested.
 
 ### T-248 · A done that holds what was checked, and guards that are tested
-- status: open
-- owner: —
+- status: done
+- owner: claude-main
 - priority: P2 · type: milestone
 - goal: done --commit refuses a commit that does not hold the task's files as they are on disk, the output of done and of verify --wave says what happened to each check, and the project has a rules trial and a mutation run of its guard modules, each with a first result on record
 - why: a study of another agent method on 2026-11-27 showed two places where a done can still be false, and two of todo's own assumptions that nothing measures
 - summary: Closes two gaps where a task could be marked finished without proof, and adds two checks of our own safety: whether agents follow the rules, and whether the tests would notice a broken guard.
+- by: Reynan Henry Tandoyo
 - note (2026-11-27, claude-main): added
 - note (2026-11-28, claude-main): done — done --commit and apply refuse a commit that does not hold the task's files as they are on disk, done says what happened to the check, the rules trial exists and a Haiku worker kept all rules in its first run, and the guard modules were mutation-tested: the tests now notice about 90% of the changes
 - note (2026-11-28, claude-main): reopened — the owner asked for the 1.2.0 release on 2026-11-28; the release task belongs to this milestone
+- note (2026-11-28, claude-main): done — done --commit and apply refuse a commit that does not hold the task's files as they are on disk, done says what happened to the check, the rules trial exists and a Haiku worker kept all rules in its first run, the guard modules were mutation-tested to about 90%, and 1.2.0 is released
 
 ### T-250 · List the files a folder holds differently from a commit
 - status: done
@@ -1945,17 +1947,18 @@ whether agents follow the rules and whether the guards are tested.
 - note (2026-11-28, t275-haiku): done — Three tests now catch the surviving mutants: a replaced line keeps its own ending (the fixture gives line 0 and line 2 different endings, plus a second case), invalid UTF-8 is reported with its line and byte through the verified write, and a forced takeover of another agent's live claim still notes the files others hold.
 
 ### T-276 · Release 1.2.0
-- status: claimed
+- status: done
 - owner: claude-main
-- claimed: 2026-11-28T08:19+01:00
-- session: d1669a10-9983-46f7-8f59-c8c8337c9b80
 - priority: P2 · difficulty: 2 · type: chore · area: release
 - milestone: T-248
 - why: the owner asked on 2026-11-28 to push to main and release the latest version
 - summary: Version 1.2.0 is released with the commit check, the check line, the rules trial and the tested guards.
 - final: a release needs the owner's push and a judgement on CI; it is the planner's own work
 - accept: Cargo.toml is 1.2.0; CHANGELOG.md has the 1.2.0 entry; all checks pass on Windows and in WSL Fedora; CI on main is green; the tag v1.2.0 has published todo.exe and todo-linux-x86_64 with their checksums; todo 1.2.0 is installed and todo check is clean
+- commit: 7df113b
+- by: Reynan Henry Tandoyo
 - note (2026-11-28, claude-main): added
+- note (2026-11-28, claude-main): done — 1.2.0 is released: CI on main was green, the tag v1.2.0 published todo.exe and the Linux program with checksums, and todo 1.2.0 is installed on this PC
 
 ## Questions
 
