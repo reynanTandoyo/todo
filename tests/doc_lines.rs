@@ -188,6 +188,87 @@ fn verification_catches_deliberately_wrong_edits_and_writes_nothing() {
     assert_eq!(fs::read(&file_path).expect("read back"), orig);
 }
 
+#[test]
+fn replaced_lines_keep_their_own_endings() {
+    // Lines 1 and 2 (`b` with LF, `c` with CRLF) are replaced by two lines: each keeps its ending.
+    let orig = b"a\r\nb\nc\r\nd\n";
+    let doc = LineDoc::from_bytes(orig).expect("decode");
+    let applied = doc
+        .apply_and_verify_bytes(&[LineEdit::replace_range(
+            1..3,
+            vec!["B".to_string(), "C".to_string()],
+        )])
+        .expect("apply");
+    assert!(applied.changed);
+    assert_eq!(applied.bytes, b"a\r\nB\nC\r\nd\n");
+}
+
+#[test]
+fn added_lines_use_the_usual_ending_and_the_new_last_line_keeps_none() {
+    // CRLF file without a final newline: the last line is replaced by two lines.
+    // The first new line gets the file's usual ending, the last one keeps none.
+    let orig = b"a\r\nb\r\nc";
+    let doc = LineDoc::from_bytes(orig).expect("decode");
+    let applied = doc
+        .apply_and_verify_bytes(&[LineEdit::replace_range(
+            2..3,
+            vec!["X".to_string(), "Y".to_string()],
+        )])
+        .expect("apply");
+    assert_eq!(applied.bytes, b"a\r\nb\r\nX\r\nY");
+
+    // LF file: the middle line (CRLF) is replaced by three lines. The first two new lines get
+    // the usual ending (LF), the last one takes the ending of the line it replaces (CRLF).
+    let orig = b"a\nb\r\nc\n";
+    let doc = LineDoc::from_bytes(orig).expect("decode");
+    let applied = doc
+        .apply_and_verify_bytes(&[LineEdit::replace_range(
+            1..2,
+            vec!["P".to_string(), "Q".to_string(), "R".to_string()],
+        )])
+        .expect("apply");
+    assert_eq!(applied.bytes, b"a\nP\nQ\nR\r\nc\n");
+}
+
+#[test]
+fn invalid_utf8_reports_the_line_and_byte_of_the_bad_byte() {
+    // Line 3 is `c` followed by 0xFF, so the bad byte is the second byte of line 3 (offset 5).
+    let err = LineDoc::from_bytes(b"a\nb\nc\xFF\n").expect_err("must reject invalid UTF-8");
+    assert_eq!(err.line, 3);
+    assert_eq!(err.byte_offset, 5);
+
+    // Bad byte on the first line: line 1, offset 1.
+    let err = LineDoc::from_bytes(b"a\xFF\nb\n").expect_err("must reject invalid UTF-8");
+    assert_eq!(err.line, 1);
+    assert_eq!(err.byte_offset, 1);
+}
+
+#[test]
+fn verified_write_guards_the_last_line_when_lines_are_added_after_it() {
+    // The original ends without a final newline; one line is added after `b`.
+    let orig = b"a\nb";
+    let edits = [LineEdit::insert(2, vec!["c".to_string()])];
+
+    let doc = LineDoc::from_bytes(orig).expect("decode");
+    let applied = doc.apply_and_verify_bytes(&edits).expect("apply");
+    assert_eq!(applied.bytes, b"a\nb\nc");
+
+    // (a) The intended result passes.
+    verify_byte_edits(orig, b"a\nb\nc", &edits).expect("intended result verifies");
+
+    // (b) The text of the old last line changed.
+    let err = verify_byte_edits(orig, b"a\nB\nc", &edits).expect_err("changed last line");
+    assert!(matches!(err, EditError::VerificationFailed { .. }));
+
+    // (c) The old last line got a CRLF, which is not the file's usual ending.
+    let err = verify_byte_edits(orig, b"a\nb\r\nc", &edits).expect_err("CRLF on old last line");
+    assert!(matches!(err, EditError::VerificationFailed { .. }));
+
+    // (d) An earlier line changed.
+    let err = verify_byte_edits(orig, b"A\nb\nc", &edits).expect_err("changed earlier line");
+    assert!(matches!(err, EditError::VerificationFailed { .. }));
+}
+
 fn arb_line_text() -> impl Strategy<Value = String> {
     prop::string::string_regex("[A-Za-z0-9 _.:·—日本語-]{0,30}").expect("valid regex")
 }
