@@ -361,6 +361,213 @@ fn a_task_without_files_is_claimed_while_others_hold_files() {
 }
 
 #[test]
+fn a_blocked_task_with_a_stale_claim_holds_no_files() {
+    let tmp = TempDir::new().unwrap();
+    // alice's claim is 25 hours old, past the 24 hours of claim_ttl_hours, so it is stale and the
+    // blocked task holds nothing (R-CLAIM-4).
+    let stale = (Local::now() - chrono::Duration::hours(25))
+        .format("%Y-%m-%dT%H:%M%:z")
+        .to_string();
+    let (home, work, todo_file) = setup_proj(
+        &tmp,
+        &body(&[
+            block(
+                1,
+                "Blocked shader",
+                "blocked",
+                "alice",
+                "P1",
+                Some(&stale),
+                Some("src/a.rs"),
+            ),
+            block(2, "Shader", "open", "—", "P0", None, Some("src/a.rs")),
+        ]),
+    );
+
+    let out = run(&home, &work, &["--agent", "bob", "claim", "T-002"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+    let doc = Document::parse_bytes(&fs::read(&todo_file).unwrap()).unwrap();
+    let t2 = doc.tasks.iter().find(|t| t.title == "Shader").unwrap();
+    assert_eq!(t2.status, Status::Claimed);
+    assert_eq!(t2.owner.as_deref(), Some("bob"));
+}
+
+#[test]
+fn a_blocked_task_without_an_owner_holds_no_files() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, _todo) = setup_proj(
+        &tmp,
+        &body(&[
+            block(
+                1,
+                "Blocked shader",
+                "blocked",
+                "—",
+                "P1",
+                None,
+                Some("src/a.rs"),
+            ),
+            block(2, "Shader", "open", "—", "P0", None, Some("src/a.rs")),
+        ]),
+    );
+
+    let out = run(&home, &work, &["--agent", "bob", "claim", "T-002"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+}
+
+#[test]
+fn a_blocked_task_without_an_owner_holds_no_files_even_with_a_fresh_claim_time() {
+    let tmp = TempDir::new().unwrap();
+    let claimed = fresh_claim();
+    // The claim time is fresh, so only the missing owner keeps the task from holding its files.
+    let (home, work, _todo) = setup_proj(
+        &tmp,
+        &body(&[
+            block(
+                1,
+                "Blocked shader",
+                "blocked",
+                "—",
+                "P1",
+                Some(&claimed),
+                Some("src/a.rs"),
+            ),
+            block(2, "Shader", "open", "—", "P0", None, Some("src/a.rs")),
+        ]),
+    );
+
+    let out = run(&home, &work, &["--agent", "bob", "claim", "T-002"]);
+    assert!(out.status.success(), "stderr: {}", stderr_text(&out));
+}
+
+#[test]
+fn files_busy_names_a_blocked_holder_with_its_owner() {
+    let tmp = TempDir::new().unwrap();
+    let claimed = fresh_claim();
+    let (home, work, todo_file) = setup_proj(
+        &tmp,
+        &body(&[
+            block(
+                1,
+                "Blocked shader",
+                "blocked",
+                "alice",
+                "P1",
+                Some(&claimed),
+                Some("src/a.rs"),
+            ),
+            block(2, "Shader", "open", "—", "P0", None, Some("src/a.rs")),
+        ]),
+    );
+    let before = fs::read(&todo_file).unwrap();
+
+    let out = run(
+        &home,
+        &work,
+        &["--json", "--agent", "bob", "claim", "T-002"],
+    );
+    assert_eq!(out.status.code(), Some(1), "stdout: {}", stdout_text(&out));
+    let json = parse_json(&out.stdout);
+    assert_eq!(json["error"]["code"], "FILES_BUSY", "{json}");
+    assert_eq!(json["error"]["files_busy"][0], "T-001");
+    let message = json["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("T-001 (blocked, owned by alice)"),
+        "{message}"
+    );
+    // A refusal writes nothing.
+    assert_eq!(fs::read(&todo_file).unwrap(), before);
+}
+
+#[test]
+fn files_busy_names_a_claimed_holder_with_its_owner() {
+    let tmp = TempDir::new().unwrap();
+    let claimed = fresh_claim();
+    let (home, work, todo_file) = setup_proj(
+        &tmp,
+        &body(&[
+            block(
+                1,
+                "Shader",
+                "claimed",
+                "alice",
+                "P1",
+                Some(&claimed),
+                Some("src/a.rs"),
+            ),
+            block(
+                2,
+                "Shader part two",
+                "open",
+                "—",
+                "P0",
+                None,
+                Some("src/a.rs"),
+            ),
+        ]),
+    );
+    let before = fs::read(&todo_file).unwrap();
+
+    let out = run(
+        &home,
+        &work,
+        &["--json", "--agent", "bob", "claim", "T-002"],
+    );
+    assert_eq!(out.status.code(), Some(1), "stdout: {}", stdout_text(&out));
+    let json = parse_json(&out.stdout);
+    assert_eq!(json["error"]["code"], "FILES_BUSY", "{json}");
+    assert_eq!(json["error"]["files_busy"][0], "T-001");
+    let message = json["error"]["message"].as_str().unwrap();
+    assert!(message.contains("T-001 (claimed by alice)"), "{message}");
+    assert_eq!(fs::read(&todo_file).unwrap(), before);
+}
+
+#[test]
+fn refreshing_an_own_live_claim_takes_no_new_files_after_another_forced_them() {
+    let tmp = TempDir::new().unwrap();
+    let (home, work, todo_file) = setup_proj(
+        &tmp,
+        &body(&[
+            block(1, "Shader", "open", "—", "P1", None, Some("src/a.rs")),
+            block(
+                2,
+                "Shader part two",
+                "open",
+                "—",
+                "P1",
+                None,
+                Some("src/a.rs"),
+            ),
+        ]),
+    );
+    let first = run(&home, &work, &["--agent", "alice", "claim", "T-001"]);
+    assert!(first.status.success(), "stderr: {}", stderr_text(&first));
+    let forced = run(
+        &home,
+        &work,
+        &["claim", "T-002", "--agent", "bob", "--force"],
+    );
+    assert!(forced.status.success(), "stderr: {}", stderr_text(&forced));
+    let before = fs::read_to_string(&todo_file).unwrap();
+    assert_eq!(before.matches("forced claim").count(), 1, "{before}");
+
+    // bob's forced claim of T-002 now holds src/a.rs as well. alice refreshes her own live claim on
+    // T-001, which takes no new files, so it is not refused and adds no note.
+    let refresh = run(&home, &work, &["--agent", "alice", "claim", "T-001"]);
+    assert!(
+        refresh.status.success(),
+        "stderr: {}",
+        stderr_text(&refresh)
+    );
+    let after = fs::read_to_string(&todo_file).unwrap();
+    assert_eq!(after.matches("forced claim").count(), 1, "{after}");
+    let doc = Document::parse_bytes(after.as_bytes()).unwrap();
+    let t1 = doc.tasks.iter().find(|t| t.title == "Shader").unwrap();
+    assert_eq!(t1.status, Status::Claimed);
+    assert_eq!(t1.owner.as_deref(), Some("alice"));
+}
+
+#[test]
 fn show_json_lists_the_other_claims_that_hold_the_files() {
     let tmp = TempDir::new().unwrap();
     let claimed = fresh_claim();
