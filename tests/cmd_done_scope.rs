@@ -3,7 +3,7 @@
 //! outside them refuses `done` (`OUT_OF_SCOPE`) unless `--force`, which notes the files; a task at the
 //! lowest level that names files needs its commit while git is there (`MISSING_FIELD`). `apply`
 //! refuses its whole batch in the same cases. Every fixture is invented and written into a temporary
-//! folder with its own git repository.
+//! folder: with its own git repository, or, for a folder outside any repository, with none.
 
 mod common;
 
@@ -104,11 +104,16 @@ fn repo_with_first_commit(p: &Proj) {
     commit(&p.work, &["TODO.md", "src/a.rs"], "T-001: start");
 }
 
-/// `todo --json done T-001 --agent alice` plus `extra`, run in the project folder.
-fn done(p: &Proj, extra: &[&str]) -> Output {
+/// `todo --json done T-001 --agent alice` plus `extra`, run in `dir`, a folder of the project.
+fn done_in(p: &Proj, dir: &Path, extra: &[&str]) -> Output {
     let mut args = vec!["--json", "done", "T-001", "--agent", "alice"];
     args.extend_from_slice(extra);
-    run_todo(&p.home, &p.work, &args, &[("TODO_TEST_NOW", NOW)]).expect("run todo")
+    run_todo(&p.home, dir, &args, &[("TODO_TEST_NOW", NOW)]).expect("run todo")
+}
+
+/// `todo --json done T-001 --agent alice` plus `extra`, run in the project folder.
+fn done(p: &Proj, extra: &[&str]) -> Output {
+    done_in(p, &p.work, extra)
 }
 
 #[test]
@@ -458,6 +463,71 @@ fn a_commit_inside_the_folder_of_todo_md_passes_inside_a_larger_repository() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+#[test]
+fn from_a_subfolder_the_files_are_named_from_the_folder_of_todo_md() {
+    let p = project("1", Some("src/"));
+    repo_with_first_commit(&p);
+    write(&p.work, "src/b.rs", "pub fn b() {}\n");
+    write(&p.work, "other.txt", "outside the task\n");
+    commit(&p.work, &["src/b.rs", "other.txt"], "T-001: work");
+    let before = fs::read(&p.todo).expect("read TODO.md");
+
+    // Run in the subfolder `src`: git is asked there, but the paths name the files from the folder
+    // of TODO.md, so `other.txt` is named as it is written and not as `../other.txt`.
+    let out = done_in(&p, &p.work.join("src"), &["--commit", "HEAD"]);
+    assert_eq!(out.status.code(), Some(1));
+    let json = parse_json(&out.stdout);
+    assert_eq!(json["error"]["code"], "OUT_OF_SCOPE", "{json}");
+    assert_eq!(
+        json["error"]["files_outside"],
+        json!(["other.txt"]),
+        "{json}"
+    );
+    assert_eq!(fs::read(&p.todo).expect("read TODO.md"), before);
+}
+
+#[test]
+fn from_a_subfolder_a_commit_inside_the_files_finishes_the_task() {
+    let p = project("1", Some("src/"));
+    repo_with_first_commit(&p);
+    write(&p.work, "src/b.rs", "pub fn b() {}\n");
+    commit(&p.work, &["src/b.rs"], "T-001: work");
+
+    let out = done_in(&p, &p.work.join("src"), &["--commit", "HEAD"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(read_text(&p.todo).contains("- status: done\n"));
+}
+
+#[test]
+fn a_commit_name_is_kept_as_given_in_a_folder_outside_any_repository() {
+    // No `git init`: the temporary folder lies outside every repository, so git cannot check the name.
+    let p = project("3", None);
+
+    let out = done(&p, &["--commit", "cafebabe"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(read_text(&p.todo).contains("- commit: cafebabe\n"));
+}
+
+#[test]
+fn head_is_refused_in_a_folder_outside_any_repository_and_todo_md_is_left_alone() {
+    // HEAD names a commit only inside a repository, so without one it is an unknown commit.
+    let p = project("3", None);
+    let before = fs::read(&p.todo).expect("read TODO.md");
+
+    let out = done(&p, &["--commit", "HEAD"]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(parse_json(&out.stdout)["error"]["code"], "BAD_VALUE");
+    assert_eq!(fs::read(&p.todo).expect("read TODO.md"), before);
 }
 
 // The `done` operations of `todo apply` get the same check, for the whole batch (T-174).
